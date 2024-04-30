@@ -87,23 +87,6 @@ package:
     - '!./**'
   individually: true
 
-# functions:
-#   hello:
-#     handler: bin/hello
-#     events:
-#       - httpApi:
-#           path: /hello
-#           method: get
-#     patterns:
-#       - '.bin/hello'
-#   world:
-#     handler: bin/world
-#     events:
-#       - httpApi:
-#           path: /world
-#           method: get
-#     patterns:
-#       - '.bin/world'
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
 #    Check the event documentation for details
