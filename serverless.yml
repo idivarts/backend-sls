@@ -10,8 +10,10 @@
 #    docs.serverless.com
 #
 # Happy Coding!
-org: trendshub
-app: th-backend
+
+# Removing organization and app for direct aws connection
+# org: trendshub
+# app: th-backend
 
 service: th-backend
 # app and org for use with dashboard.serverless.com
