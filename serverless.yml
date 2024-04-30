@@ -52,24 +52,55 @@ provider:
 #  environment:
 #    variable1: value1
 
-package:
-  patterns:
-    - '!./**'
-    - ./bin/**
+plugins:
+  - serverless-go-plugin
+
+custom:
+  go:
+    baseDir: . # folder where go.mod file lives, if set `handler` property should be set relatively to that folder
+    binDir: .bin # target folder for binary files
+    cgo: 0 # CGO_ENABLED flag
+    cmd: GOARCH=arm64 GOOS=linux go build -tags lambda.norpc # compile command
+    monorepo: false # if enabled, builds function every directory (useful for monorepo where go.mod is managed by each function
+    supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level) 
+    buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
 
 functions:
   hello:
-    handler: bin/hello/bootstrap
+    handler: hello/main.go
     events:
       - httpApi:
           path: /hello
           method: get
   world:
-    handler: bin/world/bootstrap
+    handler: world/main.go
     events:
       - httpApi:
           path: /world
           method: get
+
+package:
+  patterns:
+    - '!./**'
+  individually: true
+
+# functions:
+#   hello:
+#     handler: bin/hello
+#     events:
+#       - httpApi:
+#           path: /hello
+#           method: get
+#     patterns:
+#       - '.bin/hello'
+#   world:
+#     handler: bin/world
+#     events:
+#       - httpApi:
+#           path: /world
+#           method: get
+#     patterns:
+#       - '.bin/world'
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
 #    Check the event documentation for details

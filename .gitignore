@@ -555,3 +555,8 @@ node_modules/wrap-ansi-cjs/node_modules/strip-ansi/index.js
 node_modules/wrap-ansi-cjs/node_modules/strip-ansi/license
 node_modules/wrap-ansi-cjs/node_modules/strip-ansi/package.json
 node_modules/wrap-ansi-cjs/node_modules/strip-ansi/readme.md
+.bin/.DS_Store
+.bin/hello
+.bin/hello.zip
+.bin/world
+.bin/world.zip
