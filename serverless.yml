@@ -70,13 +70,13 @@ custom:
 
 functions:
   hello:
-    handler: hello/main.go
+    handler: functions/hello/main.go
     events:
       - httpApi:
           path: /hello
           method: get
   world:
-    handler: world/main.go
+    handler: functions/world/main.go
     events:
       - httpApi:
           path: /world
