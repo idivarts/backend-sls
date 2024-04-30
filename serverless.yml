@@ -24,6 +24,7 @@ frameworkVersion: '3'
 
 provider:
   name: aws
+  architecture: arm64
   runtime: provided.al2
 
 # you can overwrite defaults here
