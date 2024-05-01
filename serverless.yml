@@ -76,9 +76,7 @@ functions:
   message_wh:
     handler: functions/message_webhook/main.go
     events:
-      - httpApi:
-          path: /instagram/webhook
-          method: post
+      - httpApi: POST /instagram/webhook
   scrape_brands:
     handler: functions/scrape_brands/main.go
     events:
