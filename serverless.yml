@@ -81,7 +81,26 @@ functions:
       - httpApi:
           path: /world
           method: get
-
+  automated_sm:
+    handler: functions/automated_sm/main.go
+    events:
+      - schedule: rate(4 hours) 
+  message_wh:
+    handler: functions/message_webhook/main.go
+    events:
+      - httpApi:
+          path: /instagram/webhook
+          method: post
+  scrape_brands:
+    handler: functions/scrape_brands/main.go
+    events:
+      - httpApi: GET /scrape/brands
+      - httpApi: POST /scrape/brands
+  scrape_influencers:
+    handler: functions/scrape_influencers/main.go
+    events:
+      - httpApi: GET /scrape/influencers
+      - httpApi: POST /scrape/influencers
 package:
   patterns:
     - '!./**'
