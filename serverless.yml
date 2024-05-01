@@ -69,18 +69,6 @@ custom:
     buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
 
 functions:
-  hello:
-    handler: functions/hello/main.go
-    events:
-      - httpApi:
-          path: /hello
-          method: get
-  world:
-    handler: functions/world/main.go
-    events:
-      - httpApi:
-          path: /world
-          method: get
   automated_sm:
     handler: functions/automated_sm/main.go
     events:
