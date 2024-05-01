@@ -76,17 +76,17 @@ functions:
   message_wh:
     handler: functions/message_webhook/main.go
     events:
-      - httpApi: POST /instagram/webhook
+      - http: POST /instagram/webhook
   scrape_brands:
     handler: functions/scrape_brands/main.go
     events:
-      - httpApi: GET /scrape/brands
-      - httpApi: POST /scrape/brands
+      - http: GET /scrape/brands
+      - http: POST /scrape/brands
   scrape_influencers:
     handler: functions/scrape_influencers/main.go
     events:
-      - httpApi: GET /scrape/influencers
-      - httpApi: POST /scrape/influencers
+      - http: GET /scrape/influencers
+      - http: POST /scrape/influencers
 package:
   patterns:
     - '!./**'

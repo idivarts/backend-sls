@@ -6,12 +6,12 @@ import (
 )
 
 func main() {
-	apihandler.GinEngine.POST("/", func(ctx *gin.Context) {
+	apihandler.GinEngine.POST("/scrape/influencers", func(ctx *gin.Context) {
 		ctx.JSON(200, gin.H{
 			"message": "Success",
 		})
 	})
-	apihandler.GinEngine.GET("/", func(ctx *gin.Context) {
+	apihandler.GinEngine.GET("/scrape/influencers", func(ctx *gin.Context) {
 		ctx.JSON(200, gin.H{
 			"message": "Success",
 		})

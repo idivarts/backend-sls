@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	apihandler.GinEngine.POST("/", func(ctx *gin.Context) {
+	apihandler.GinEngine.POST("/instagram/webhook", func(ctx *gin.Context) {
 		ctx.JSON(200, gin.H{
 			"message": "Success",
 		})
