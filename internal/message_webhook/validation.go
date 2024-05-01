@@ -19,12 +19,13 @@ func Validation(c *gin.Context) {
 		return
 	}
 
+	// request.Mode != "subscribe" ||
 	// Validate the request fields as needed
-	if request.Mode != "subscribe" || request.VerifyToken != "mytoken" {
+	if request.VerifyToken != "mytoken" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request parameters"})
 		return
 	}
 
 	// Handle valid request
-	c.JSON(http.StatusOK, gin.H{"challenge": request.Challenge})
+	c.String(http.StatusOK, "%s", request.Challenge)
 }
