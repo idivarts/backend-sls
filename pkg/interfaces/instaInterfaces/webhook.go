@@ -113,7 +113,7 @@ type Read struct {
 	Mid string `json:"mid"` // ID of the message that was read
 }
 
-func (message *InstagramMessage) calcualateMessageType() {
+func (message *InstagramMessage) CalcualateMessageType() {
 
 	for i := 0; i < len(message.Entry); i++ {
 		for j := 0; j < len(message.Entry[i].Messaging); j++ {
@@ -146,6 +146,6 @@ func NewWebHook(jsonString string) (*InstagramMessage, error) {
 		fmt.Println("Error:", err)
 		return nil, err
 	}
-	fbMessage.calcualateMessageType()
+	fbMessage.CalcualateMessageType()
 	return &fbMessage, nil
 }
