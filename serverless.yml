@@ -91,7 +91,7 @@ functions:
       SEND_MESSAGE_QUEUE_ARN:
         Fn::GetAtt:
           - SendMessageQueue
-          - Arn
+          - QueueName
 
   message_sqs:
     handler: functions/message_sqs/main.go
