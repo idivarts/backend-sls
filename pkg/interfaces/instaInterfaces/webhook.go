@@ -118,7 +118,7 @@ func (message *InstagramMessage) CalcualateMessageType() {
 	for i := 0; i < len(message.Entry); i++ {
 		for j := 0; j < len(message.Entry[i].Messaging); j++ {
 			// Unmarshal the JSON into a Messaging struct
-			msg := message.Entry[i].Messaging[j]
+			msg := &message.Entry[i].Messaging[j]
 
 			// Check which optional field is populated
 			switch {

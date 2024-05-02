@@ -1,6 +1,7 @@
 package messagewebhook
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -23,7 +24,12 @@ func Receive(c *gin.Context) {
 	// openai.SendMessage(message.Entry[0].Messaging[0].Sender.ID, message.Entry[0].Messaging[0].Message.Text)
 
 	log.Printf("Received Message of Type %s", message.Entry[0].Messaging[0].Type)
-	log.Println("Complete Message", message)
+	log.Println("Complete Message", message, message.Entry[0].Messaging[0].Message.Text)
+
+	data, err := json.Marshal(&message)
+	if err == nil {
+		log.Println("Complete Message After Marshall", string(data))
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Instagram webhook received successfully",
