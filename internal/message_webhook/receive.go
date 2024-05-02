@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
-	"github.com/TrendsHub/th-backend/pkg/openai"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,7 +20,7 @@ func Receive(c *gin.Context) {
 	// Handle the Instagram message as needed
 	// You can access message fields like message.Sender.ID, message.Message.Text, etc.
 
-	openai.SendMessage(message.Entry[0].Messaging[0].Sender.ID, message.Entry[0].Messaging[0].Message.Text)
+	// openai.SendMessage(message.Entry[0].Messaging[0].Sender.ID, message.Entry[0].Messaging[0].Message.Text)
 
 	log.Printf("Received Message of Type %s", message.Entry[0].Messaging[0].Type)
 	log.Println("Complete Message", message)
