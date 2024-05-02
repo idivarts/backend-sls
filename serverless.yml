@@ -57,6 +57,7 @@ provider:
 
 plugins:
   - serverless-go-plugin
+  # - serverless-lift
 
 custom:
   go:
@@ -68,26 +69,42 @@ custom:
     supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level) 
     buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
 
+# This is for serverless lift
+# constructs:
+#   my-queue:
+#     type: queue
+#     worker:
+#       handler: handler.compute
+
 functions:
-  automated_sm:
-    handler: functions/automated_sm/main.go
-    events:
-      - schedule: rate(4 hours) 
+  # automated_sm:
+  #   handler: functions/automated_sm/main.go
+  #   events:
+  #     - schedule: rate(4 hours) 
   message_wh:
     handler: functions/message_webhook/main.go
     events:
       - http: GET /instagram/webhook
       - http: POST /instagram/webhook
-  scrape_brands:
-    handler: functions/scrape_brands/main.go
+  message_sqs:
+    handler: functions/message_sqs/main.go
     events:
-      - http: GET /scrape/brands
-      - http: POST /scrape/brands
-  scrape_influencers:
-    handler: functions/scrape_influencers/main.go
-    events:
-      - http: GET /scrape/influencers
-      - http: POST /scrape/influencers
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - SendMessage
+              - Arn
+
+  # scrape_brands:
+  #   handler: functions/scrape_brands/main.go
+  #   events:
+  #     - http: GET /scrape/brands
+  #     - http: POST /scrape/brands
+  # scrape_influencers:
+  #   handler: functions/scrape_influencers/main.go
+  #   events:
+  #     - http: GET /scrape/influencers
+  #     - http: POST /scrape/influencers
 package:
   patterns:
     - '!./**'
@@ -145,3 +162,14 @@ package:
 #     NewOutput:
 #       Description: "Description for the output"
 #       Value: "Some output value"
+
+resources:
+  Resources:
+    SendMessage:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SendMessage
+        # DelaySeconds: 0 # Optional: Set delay in seconds
+        # MaximumMessageSize: 1024 # Optional: Set maximum message size
+        # VisibilityTimeout: 30 # Optional: Set visibility timeout in seconds
+        # MessageRetentionPeriod: 604800 # Optional: Set message retention period in seconds
