@@ -28,6 +28,13 @@ provider:
   name: aws
   architecture: arm64
   runtime: provided.al2
+  iam:
+    role:
+      statements:
+        - Effect: "Allow"
+          Action:
+            - "sqs:sendmessage"
+          Resource: { "Fn::GetAtt" : ["SendMessageQueue","Arn"]  }
 
 # you can overwrite defaults here
 #  stage: dev
