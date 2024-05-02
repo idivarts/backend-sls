@@ -86,13 +86,20 @@ functions:
     events:
       - http: GET /instagram/webhook
       - http: POST /instagram/webhook
+      - http: GET /test/sqs
+    environment:
+      SEND_MESSAGE_QUEUE_ARN:
+        Fn::GetAtt:
+          - SendMessageQueue
+          - Arn
+
   message_sqs:
     handler: functions/message_sqs/main.go
     events:
       - sqs:
           arn:
             Fn::GetAtt:
-              - SendMessage
+              - SendMessageQueue
               - Arn
 
   # scrape_brands:
@@ -165,10 +172,10 @@ package:
 
 resources:
   Resources:
-    SendMessage:
+    SendMessageQueue:
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: SendMessage
+        QueueName: SendMessageQueue
         # DelaySeconds: 0 # Optional: Set delay in seconds
         # MaximumMessageSize: 1024 # Optional: Set maximum message size
         # VisibilityTimeout: 30 # Optional: Set visibility timeout in seconds
