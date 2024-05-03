@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-const messageInfoFields = "id,created_time,from,to,message"
+const messageInfoFields = "id,created_time,from,to,message,attachment"
 
 type Participants struct {
 	Data []struct {

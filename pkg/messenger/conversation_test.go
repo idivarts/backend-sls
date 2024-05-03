@@ -19,11 +19,19 @@ func TestGetAll(t *testing.T) {
 	// }
 	// t.Log("Print Data", string(str))
 	if len(data.Data) > 0 {
-		conversationID = data.Data[0].ID
-		getMessages(t)
+		// conversationID = data.Data[0].ID
+		// getMessages(t)
+		// fmt.Println("Sending Message to", data.Data[0].Participants.Data[0].ID, data.Data[0].Participants.Data[0].Username)
+		messageParticipant(messenger.GetRecepientIDFromParticipants(data.Data[0].Participants), t)
 	}
 }
-
+func messageParticipant(igSid string, t *testing.T) {
+	err := messenger.SendTextMessage(igSid, "Hello Everyone! Final test is here")
+	if err != nil {
+		t.Log(err)
+		t.Fail()
+	}
+}
 func getMessages(t *testing.T) {
 	messages, err := messenger.GetConversationMessages(conversationID)
 	if err != nil {
