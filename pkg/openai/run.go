@@ -2,6 +2,7 @@ package openai
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -19,12 +20,20 @@ func StartRun(threadID string, assistantID AssistantID) error {
 	}
 
 	// Make the API request
-	_, err := client.R().
+	resp, err := client.R().
 		SetHeader("Authorization", "Bearer "+apiKey).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("OpenAI-Beta", "assistants=v2").
 		SetBody(requestBody).
 		Post(apiURL)
+	if err != nil {
+		return err
+	}
+	data, err := io.ReadAll(resp.RawBody())
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
 
 	return err
 }

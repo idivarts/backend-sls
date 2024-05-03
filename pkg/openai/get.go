@@ -1,12 +1,41 @@
 package openai
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/go-resty/resty/v2"
 )
 
-func GetMessages(threadID string) error {
+type Message struct {
+	ID          string `json:"id"`
+	Object      string `json:"object"`
+	CreatedAt   int64  `json:"created_at"`
+	AssistantID string `json:"assistant_id,omitempty"`
+	ThreadID    string `json:"thread_id"`
+	RunID       string `json:"run_id,omitempty"`
+	Role        string `json:"role"`
+	Content     []struct {
+		Type string `json:"type"`
+		Text struct {
+			Value       string   `json:"value"`
+			Annotations []string `json:"annotations"`
+		} `json:"text"`
+	} `json:"content"`
+	Attachments []interface{} `json:"attachments"`
+	Metadata    struct{}      `json:"metadata"`
+}
+
+type ListData struct {
+	Object  string    `json:"object"`
+	Data    []Message `json:"data"`
+	FirstID string    `json:"first_id"`
+	LastID  string    `json:"last_id"`
+	HasMore bool      `json:"has_more"`
+}
+
+func GetMessages(threadID string) (*ListData, error) {
 	// Set up the REST client
 	client := resty.New()
 
@@ -14,11 +43,24 @@ func GetMessages(threadID string) error {
 	apiURL := fmt.Sprintf("%s/threads/%s/messages", baseURL, threadID)
 
 	// Make the API request
-	_, err := client.R().
+	resp, err := client.R().
 		SetHeader("Authorization", "Bearer "+apiKey).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("OpenAI-Beta", "assistants=v2").
 		Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
 
-	return err
+	d, err := io.ReadAll(resp.RawResponse.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	data := ListData{}
+	err = json.Unmarshal(d, &data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
 }
