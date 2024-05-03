@@ -10,7 +10,7 @@ import (
 )
 
 func Receive(c *gin.Context) {
-	var message instainterfaces.InstagramMessage
+	var message instainterfaces.IMessageWebhook
 	if err := c.ShouldBindJSON(&message); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		log.Println(err.Error())

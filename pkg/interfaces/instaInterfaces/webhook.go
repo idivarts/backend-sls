@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-type InstagramMessage struct {
+type IMessageWebhook struct {
 	Object string  `json:"object"`
 	Entry  []Entry `json:"entry"`
 }
@@ -132,8 +132,8 @@ func CalcualateMessageType(msg *Messaging) MessageType {
 	return ""
 }
 
-func NewWebHook(jsonString string) (*InstagramMessage, error) {
-	var fbMessage InstagramMessage
+func NewWebHook(jsonString string) (*IMessageWebhook, error) {
+	var fbMessage IMessageWebhook
 	err := json.Unmarshal([]byte(jsonString), &fbMessage)
 	if err != nil {
 		fmt.Println("Error:", err)
