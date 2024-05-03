@@ -113,30 +113,23 @@ type Read struct {
 	Mid string `json:"mid"` // ID of the message that was read
 }
 
-func (message *InstagramMessage) CalcualateMessageType() {
-
-	for i := 0; i < len(message.Entry); i++ {
-		for j := 0; j < len(message.Entry[i].Messaging); j++ {
-			// Unmarshal the JSON into a Messaging struct
-			msg := &message.Entry[i].Messaging[j]
-
-			// Check which optional field is populated
-			switch {
-			case msg.Message != nil:
-				msg.Type = MessageTypeMessage
-			case msg.Reaction != nil:
-				msg.Type = MessageTypeReaction
-			case msg.Postback != nil:
-				msg.Type = MessageTypePostback
-			case msg.Referral != nil:
-				msg.Type = MessageTypeReferral
-			case msg.Read != nil:
-				msg.Type = MessageTypeRead
-			default:
-				// None of the optional fields are populated
-			}
-		}
+func CalcualateMessageType(msg *Messaging) MessageType {
+	// Check which optional field is populated
+	switch {
+	case msg.Message != nil:
+		return MessageTypeMessage
+	case msg.Reaction != nil:
+		return MessageTypeReaction
+	case msg.Postback != nil:
+		return MessageTypePostback
+	case msg.Referral != nil:
+		return MessageTypeReferral
+	case msg.Read != nil:
+		return MessageTypeRead
+	default:
+		// None of the optional fields are populated
 	}
+	return ""
 }
 
 func NewWebHook(jsonString string) (*InstagramMessage, error) {
@@ -146,6 +139,6 @@ func NewWebHook(jsonString string) (*InstagramMessage, error) {
 		fmt.Println("Error:", err)
 		return nil, err
 	}
-	fbMessage.CalcualateMessageType()
+	// fbMessage.CalcualateMessageType()
 	return &fbMessage, nil
 }

@@ -16,14 +16,13 @@ func Receive(c *gin.Context) {
 		log.Println(err.Error())
 		return
 	}
-	message.CalcualateMessageType()
 
 	// Handle the Instagram message as needed
 	// You can access message fields like message.Sender.ID, message.Message.Text, etc.
 
 	// openai.SendMessage(message.Entry[0].Messaging[0].Sender.ID, message.Entry[0].Messaging[0].Message.Text)
 
-	log.Printf("Received Message of Type %s", message.Entry[0].Messaging[0].Type)
+	log.Printf("Received Message of Type %s", instainterfaces.CalcualateMessageType(&message.Entry[0].Messaging[0]))
 	log.Println("Complete Message", message, message.Entry[0].Messaging[0].Message.Text)
 
 	data, err := json.Marshal(&message)
