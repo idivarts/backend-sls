@@ -28,6 +28,12 @@ provider:
   name: aws
   architecture: arm64
   runtime: provided.al2
+  environment:
+    SEND_MESSAGE_QUEUE_ARN:
+      Fn::GetAtt:
+        - SendMessageQueue
+        - QueueName
+    OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
   iam:
     role:
       statements:
@@ -106,12 +112,6 @@ functions:
       - http: GET /instagram/webhook
       - http: POST /instagram/webhook
       - http: GET /test/sqs
-    environment:
-      SEND_MESSAGE_QUEUE_ARN:
-        Fn::GetAtt:
-          - SendMessageQueue
-          - QueueName
-      OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
 
   message_sqs:
     handler: functions/message_sqs/main.go
@@ -121,8 +121,6 @@ functions:
             Fn::GetAtt:
               - SendMessageQueue
               - Arn
-    environment:
-      OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
 
   # scrape_brands:
   #   handler: functions/scrape_brands/main.go
