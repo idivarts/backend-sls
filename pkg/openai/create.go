@@ -3,7 +3,6 @@ package openai
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -33,13 +32,13 @@ func CreateThread() (*Thread, error) {
 		return nil, err
 	}
 
-	d, err := io.ReadAll(resp.RawResponse.Body)
-	if err != nil {
-		return nil, err
-	}
+	// d, err := io.ReadAll(resp.RawBody())
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	data := Thread{}
-	err = json.Unmarshal(d, &data)
+	err = json.Unmarshal(resp.Body(), &data)
 	if err != nil {
 		return nil, err
 	}

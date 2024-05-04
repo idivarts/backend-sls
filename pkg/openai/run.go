@@ -2,7 +2,6 @@ package openai
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -29,11 +28,11 @@ func StartRun(threadID string, assistantID AssistantID) error {
 	if err != nil {
 		return err
 	}
-	data, err := io.ReadAll(resp.RawBody())
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(data))
+	// data, err := io.ReadAll(resp.RawBody())
+	// if err != nil {
+	// 	return err
+	// }
+	fmt.Println(string(resp.Body()))
 
 	return err
 }

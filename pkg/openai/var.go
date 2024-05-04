@@ -10,7 +10,7 @@ const (
 )
 
 var (
-	apiKey = "your_openai_api_key_here"
+	apiKey = "sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH"
 )
 
 type AssistantID string
@@ -27,7 +27,7 @@ func init() {
 		log.Println("Environment variable is not set")
 	} else {
 		log.Println("Environment variable value:", envValue)
+		apiKey = envValue
 	}
 
-	apiKey = envValue
 }
