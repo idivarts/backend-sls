@@ -1,6 +1,7 @@
 package mwh_handler
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 
@@ -12,9 +13,10 @@ import (
 )
 
 type IGMessagehandler struct {
-	ConversationID string
-	IGSID          string
-	Message        *instainterfaces.Message
+	ConversationID   string
+	IGSID            string
+	Message          *instainterfaces.Message
+	conversationData *models.Conversation
 }
 
 func (msg IGMessagehandler) HandleMessage() error {
@@ -23,23 +25,22 @@ func (msg IGMessagehandler) HandleMessage() error {
 	}
 
 	log.Println("Getting the conversation from dynamoDB")
-	var data *models.Conversation
-	err := data.Get(msg.IGSID)
+	err := msg.conversationData.Get(msg.IGSID)
 	if err != nil {
 		// return err
 		// This is where I would need to create a new instance
-		data, err = msg.createMessageThread()
+		msg.conversationData, err = msg.createMessageThread()
 		if err != nil {
 			return err
 		}
 		// return nil
 	}
-	err = msg.handleMessageThreadOperation(data.ThreadID)
+	err = msg.handleMessageThreadOperation()
 	return err
 }
-func (msg IGMessagehandler) handleMessageThreadOperation(threadId string) error {
+func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	log.Println("Handling Message Send Logic")
-	err := openai.SendMessage(threadId, msg.Message.Text, false)
+	err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, false)
 	if err != nil {
 		return err
 	}
@@ -48,7 +49,11 @@ func (msg IGMessagehandler) handleMessageThreadOperation(threadId string) error 
 	log.Println("Timing the Duration for the next message")
 	sendTimeDuration := 10
 
-	err = sqshandler.SendToMessageQueue(threadId, int64(sendTimeDuration))
+	jData, err := json.Marshal(msg.conversationData)
+	if err != nil {
+		return err
+	}
+	err = sqshandler.SendToMessageQueue(string(jData), int64(sendTimeDuration))
 	if err != nil {
 		return err
 	}
