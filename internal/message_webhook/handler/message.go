@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math/rand"
 
 	"github.com/TrendsHub/th-backend/internal/models"
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
@@ -47,7 +48,9 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 
 	// TODO Write code to time the send of message
 	log.Println("Timing the Duration for the next message")
-	sendTimeDuration := 10
+
+	// Generate a random integer between 0 and 10
+	sendTimeDuration := rand.Intn(11) // Generates a random integer in [0, 11)
 
 	jData, err := json.Marshal(msg.conversationData)
 	if err != nil {
