@@ -35,6 +35,18 @@ provider:
           Action:
             - "sqs:sendmessage"
           Resource: { "Fn::GetAtt" : ["SendMessageQueue","Arn"]  }
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            Fn::GetAtt:
+              - conversationTable
+              - Arn
 
 # you can overwrite defaults here
 #  stage: dev
@@ -190,3 +202,17 @@ resources:
         # MaximumMessageSize: 1024 # Optional: Set maximum message size
         # VisibilityTimeout: 30 # Optional: Set visibility timeout in seconds
         # MessageRetentionPeriod: 604800 # Optional: Set message retention period in seconds
+    conversationTable:
+      Type: AWS::DynamoDB::Table
+      Properties: 
+        TableName: conversationTable
+        AttributeDefinitions: 
+          - AttributeName: igsid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: igsid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    
