@@ -34,7 +34,7 @@ func (c *Conversation) Get(igsid string) error {
 	result, err := dynamodbhandler.Client.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
 		Key: map[string]*dynamodb.AttributeValue{
-			"ID": {
+			"igsid": {
 				S: aws.String(igsid),
 			},
 		},
