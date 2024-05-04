@@ -26,6 +26,7 @@ func (msg IGMessagehandler) HandleMessage() error {
 	}
 
 	log.Println("Getting the conversation from dynamoDB")
+	msg.conversationData = &models.Conversation{}
 	err := msg.conversationData.Get(msg.IGSID)
 	if err != nil {
 		// return err
