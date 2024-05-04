@@ -6,16 +6,20 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-func SendMessage(threadID string, message string) error {
+func SendMessage(threadID string, message string, isAssistant bool) error {
 	// Set up the REST client
 	client := resty.New()
 
 	// Set the API endpoint
 	apiURL := fmt.Sprintf("%s/threads/%s/messages", baseURL, threadID)
 
+	role := "user"
+	if isAssistant {
+		role = "assistant"
+	}
 	// Create the request body
 	requestBody := map[string]interface{}{
-		"role":    "user",
+		"role":    role,
 		"content": message,
 	}
 

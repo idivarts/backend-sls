@@ -15,8 +15,8 @@ func TestXxx(t *testing.T) {
 		return
 	}
 
-	openai.SendMessage(thread.ID, "Hello Rahul")
-	openai.SendMessage(thread.ID, "This is Arjun")
+	openai.SendMessage(thread.ID, "Hello Rahul", false)
+	openai.SendMessage(thread.ID, "This is Arjun", false)
 
 	openai.StartRun(thread.ID, openai.ArjunAssistant)
 	time.Sleep(5 * time.Second)
