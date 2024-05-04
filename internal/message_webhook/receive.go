@@ -32,8 +32,13 @@ func Receive(c *gin.Context) {
 	}
 
 	for i := 0; i < len(message.Entry); i++ {
+		pageId := message.Entry[i].ID
 		for j := 0; j < len(message.Entry[i].Messaging); j++ {
 			entry := &message.Entry[i].Messaging[j]
+			if pageId == entry.Sender.ID {
+				continue
+			}
+
 			mType := instainterfaces.CalcualateMessageType(entry)
 			if mType == instainterfaces.MessageTypeMessage {
 				err = mwh_handler.IGMessagehandler{
