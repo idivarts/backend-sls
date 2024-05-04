@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	mwh_handler "github.com/TrendsHub/th-backend/internal/message_webhook/handler"
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
 	"github.com/gin-gonic/gin"
 )
@@ -30,6 +31,22 @@ func Receive(c *gin.Context) {
 		log.Println("Complete Message After Marshall", string(data))
 	}
 
+	for i := 0; i < len(message.Entry); i++ {
+		for j := 0; j < len(message.Entry[i].Messaging); j++ {
+			entry := &message.Entry[i].Messaging[j]
+			mType := instainterfaces.CalcualateMessageType(entry)
+			if mType == instainterfaces.MessageTypeMessage {
+				err = mwh_handler.IGMessagehandler{
+					IGSID:   entry.Sender.ID,
+					Message: entry.Message,
+					// ConversationID: ,
+				}.HandleMessage()
+				if err != nil {
+					log.Println(err.Error())
+				}
+			}
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Instagram webhook received successfully",
 		"instagram": message,

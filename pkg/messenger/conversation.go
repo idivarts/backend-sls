@@ -20,30 +20,36 @@ type ConversationMessagesData struct {
 	} `json:"messages"`
 }
 
-func GetConversationsByUserId(userID string) error {
+func GetConversationsByUserId(userID string) (*ConversationData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s/conversations?platform=%s&fields=name,id,participants&user_id=%s&access_token=%s", baseURL, apiVersion, pageID, platform, userID, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s/conversations?platform=%s&fields=name,id,messages{%s}&user_id=%s&access_token=%s", baseURL, apiVersion, pageID, platform, messageInfoFields, userID, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
-	body, err := ioutil.ReadAll(resp.Body)
+	// Print the response body
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Print the response body
-	fmt.Println(string(body))
+	// fmt.Println(string(body))
+	data := ConversationData{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		fmt.Print(err.Error())
+		return nil, err
+	}
 
-	return nil
+	return &data, nil
 }
 
 func GetConversationMessages(conversationID string) (*ConversationMessagesData, error) {

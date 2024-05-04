@@ -30,12 +30,12 @@ func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
 	return res, err
 }
 
-func (c *Conversation) Get() error {
+func (c *Conversation) Get(igsid string) error {
 	result, err := dynamodbhandler.Client.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
 		Key: map[string]*dynamodb.AttributeValue{
 			"ID": {
-				S: aws.String("1"), // Assuming "1" is the ID of the item you want to retrieve
+				S: aws.String(igsid),
 			},
 		},
 	})
@@ -44,8 +44,7 @@ func (c *Conversation) Get() error {
 		return err
 	}
 
-	item := Conversation{}
-	err = dynamodbattribute.UnmarshalMap(result.Item, &item)
+	err = dynamodbattribute.UnmarshalMap(result.Item, c)
 	if err != nil {
 		fmt.Println("Error unmarshalling item:", err)
 		return err
