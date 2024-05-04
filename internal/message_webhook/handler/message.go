@@ -42,7 +42,7 @@ func (msg IGMessagehandler) HandleMessage() error {
 	return err
 }
 func (msg IGMessagehandler) handleMessageThreadOperation() error {
-	log.Println("Handling Message Send Logic")
+	log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
 	err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, false)
 	if err != nil {
 		return err
