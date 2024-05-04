@@ -51,15 +51,15 @@ type Recipient struct {
 }
 
 type Message struct {
-	Mid           string       `json:"mid"`            // ID of the message sent to your business
-	Text          string       `json:"text"`           // Included when a customer sends a message containing text
-	IsDeleted     bool         `json:"is_deleted"`     // Included when a customer deletes a message
-	IsEcho        bool         `json:"is_echo"`        // Included when your business sends a message to the customer
-	IsUnsupported bool         `json:"is_unsupported"` // Included when a customer sends a message with unsupported media
-	QuickReply    QuickReply   `json:"quick_reply"`
-	Attachments   []Attachment `json:"attachments"`
-	Referral      Referral     `json:"referral"`
-	ReplyTo       ReplyTo      `json:"reply_to"`
+	Mid           string        `json:"mid"`            // ID of the message sent to your business
+	Text          string        `json:"text"`           // Included when a customer sends a message containing text
+	IsDeleted     bool          `json:"is_deleted"`     // Included when a customer deletes a message
+	IsEcho        bool          `json:"is_echo"`        // Included when your business sends a message to the customer
+	IsUnsupported bool          `json:"is_unsupported"` // Included when a customer sends a message with unsupported media
+	QuickReply    *QuickReply   `json:"quick_reply,omitempty"`
+	Attachments   *[]Attachment `json:"attachments,omitempty"`
+	Referral      *Referral     `json:"referral,omitempty"`
+	ReplyTo       *ReplyTo      `json:"reply_to,omitempty"`
 }
 
 type QuickReply struct {
@@ -67,7 +67,7 @@ type QuickReply struct {
 }
 
 type Attachment struct {
-	Type    string `json:"type"` // Can be audio, file, image (image or sticker), share, story_mention, or video
+	Type    string `json:"type"` // Can be template, audio, file, image (image or sticker), share, story_mention, or video or reel
 	Payload struct {
 		URL string `json:"url"`
 	} `json:"payload"`
@@ -99,7 +99,7 @@ type ReplyTo struct {
 type Reaction struct {
 	Mid      string `json:"mid"`                // ID of the message sent to your business
 	Action   string `json:"action"`             // "react" or "unreact"
-	Reaction string `json:"reaction,omitempty"` // optional, to unreact if there is no reaction field
+	Reaction string `json:"reaction,omitempty"` // optional, to unreact if there is no reaction field | "smile|angry|sad|wow|love|like|dislike|other"
 	Emoji    string `json:"emoji,omitempty"`    // optional, to unreact if there is no emoji field
 }
 
