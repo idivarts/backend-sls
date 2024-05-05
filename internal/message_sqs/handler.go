@@ -41,6 +41,12 @@ func sendMessage(message string) error {
 	if err != nil {
 		return err
 	}
+	go waitAndSend(conv)
+
+	return nil
+}
+func waitAndSend(conv *models.Conversation) error {
+	log.Println("Waiting 5 second before sending message")
 	time.Sleep(5 * time.Second)
 
 	log.Println("Getting messaged from thread", conv.ThreadID)
@@ -54,5 +60,4 @@ func sendMessage(message string) error {
 	log.Println("Sending Message", conv.IGSID, aMsg.Value, msgs.Data[0].ID)
 	messenger.SendTextMessage(conv.IGSID, aMsg.Value)
 
-	return nil
 }
