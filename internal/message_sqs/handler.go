@@ -8,6 +8,7 @@ import (
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
+	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
@@ -40,6 +41,18 @@ func sendMessage(message string) error {
 		return WaitAndSend(conv)
 		// return nil
 	}
+
+	cData := &models.Conversation{}
+	err = cData.Get(conv.IGSID)
+	if err != nil {
+		return err
+	}
+
+	if cData.LastMID != conv.MID {
+		log.Println("This message is old.. Waiting for new message", cData.LastMID, conv.MID)
+		return nil
+	}
+
 	log.Println("Starting Run")
 	err = openai.StartRun(conv.ThreadID, openai.ArjunAssistant)
 	if err != nil {
