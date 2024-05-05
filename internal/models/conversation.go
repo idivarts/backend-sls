@@ -58,10 +58,10 @@ func (c *Conversation) UpdateLastMID(mid string) (*dynamodb.UpdateItemOutput, er
 	// Specify the update expression and expression attribute values
 	updateExpression := "SET #lastMid = :lastMid"
 	expressionAttributeNames := map[string]*string{
-		"#name": aws.String("lastMid"),
+		"#lastMid": aws.String("lastMid"),
 	}
 	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
-		":name": {S: aws.String(c.LastMID)},
+		":lastMid": {S: aws.String(c.LastMID)},
 	}
 
 	// Construct the update input
