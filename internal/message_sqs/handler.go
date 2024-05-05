@@ -54,7 +54,7 @@ func sendMessage(message string) error {
 	}
 
 	log.Println("Starting Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant)
+	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, "")
 	if err != nil {
 		return err
 	}

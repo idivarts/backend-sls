@@ -40,7 +40,7 @@ type IRunObject struct {
 	ToolChoice        string      `json:"tool_choice"`
 }
 
-func StartRun(threadID string, assistantID AssistantID) (*IRunObject, error) {
+func StartRun(threadID string, assistantID AssistantID, additionalInstructions string) (*IRunObject, error) {
 	// Set up the REST client
 	client := resty.New()
 
@@ -50,6 +50,10 @@ func StartRun(threadID string, assistantID AssistantID) (*IRunObject, error) {
 	// Create the request body
 	requestBody := map[string]interface{}{
 		"assistant_id": assistantID,
+	}
+	// additional_instructions
+	if additionalInstructions != "" {
+		requestBody["additional_instructions"] = additionalInstructions
 	}
 
 	// Make the API request
