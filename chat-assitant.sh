@@ -44,7 +44,7 @@ OPENAI_API_KEY=sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
 #     "assistant_id": "asst_3rJKwjfT1VeXRh6KHLg4hQoM"
 #   }'
 
-# curl https://api.openai.com/v1/threads/thread_Dq5w7QFOluBlPtFsaEQgSlaX/messages?limit=2 \
+# curl https://api.openai.com/v1/threads/thread_Dq5w7QFOluBlPtFsaEQgSlaX/messages?run_id=run_V4NUQKfnHzvja5u9n89pgoNy\&limit=10 \
 #   -H "Content-Type: application/json" \
 #   -H "Authorization: Bearer $OPENAI_API_KEY" \
 #   -H "OpenAI-Beta: assistants=v2"
