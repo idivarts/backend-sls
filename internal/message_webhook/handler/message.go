@@ -29,10 +29,10 @@ func (msg IGMessagehandler) HandleMessage() error {
 	log.Println("Getting the conversation from dynamoDB")
 	msg.conversationData = &models.Conversation{}
 	err := msg.conversationData.Get(msg.IGSID)
-	if err != nil {
+	if err != nil || msg.conversationData.IGSID == "" {
 		// return err
 		// This is where I would need to create a new instance
-		log.Println("Error Finding IGSID", err.Error())
+		log.Println("Error Finding IGSID")
 		msg.conversationData, err = msg.createMessageThread()
 		if err != nil {
 			return err

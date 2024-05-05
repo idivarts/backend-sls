@@ -44,7 +44,7 @@ func sendMessage(message string) error {
 
 	cData := &models.Conversation{}
 	err = cData.Get(conv.IGSID)
-	if err != nil {
+	if err != nil || cData.IGSID == "" {
 		return err
 	}
 
