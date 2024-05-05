@@ -5,4 +5,5 @@ type ConversationEvent struct {
 	IGSID    string `json:"igsid"`
 	ThreadID string `json:"threadId"`
 	MID      string `json:"mid"`
+	RunID    string `json:"runID"`
 }
