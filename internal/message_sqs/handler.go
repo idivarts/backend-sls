@@ -6,11 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
-	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
+	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
 	"github.com/aws/aws-lambda-go/events"
 )
 
@@ -25,8 +24,14 @@ func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 	return nil
 }
 
+type ConversationEvent struct {
+	Action   string `json:"action"`
+	IGSID    string `json:"igsid"`
+	ThreadID string `json:"threadId"`
+}
+
 func sendMessage(message string) error {
-	conv := &models.Conversation{}
+	conv := &ConversationEvent{}
 	err := json.Unmarshal([]byte(message), conv)
 	if err != nil {
 		return err
@@ -36,19 +41,28 @@ func sendMessage(message string) error {
 		return errors.New("Malformed Input")
 	}
 
+	if conv.Action == "sendMessage" {
+		WaitAndSend(conv)
+		return nil
+	}
 	log.Println("Starting Run")
 	err = openai.StartRun(conv.ThreadID, openai.ArjunAssistant)
 	if err != nil {
 		return err
 	}
-	go waitAndSend(conv)
+	// go waitAndSend(conv)
+	log.Println("Waiting 5 second before sending message")
+	conv.Action = "sendMessage"
+	b, err := json.Marshal(&conv)
+	if err != nil {
+		return err
+	}
+	log.Println("Sending wait message", string(b))
+	sqshandler.SendToMessageQueue(string(b), 5)
 
 	return nil
 }
-func waitAndSend(conv *models.Conversation) error {
-	log.Println("Waiting 5 second before sending message")
-	time.Sleep(5 * time.Second)
-
+func WaitAndSend(conv *ConversationEvent) error {
 	log.Println("Getting messaged from thread", conv.ThreadID)
 	msgs, err := openai.GetMessages(conv.ThreadID)
 	if err != nil {
