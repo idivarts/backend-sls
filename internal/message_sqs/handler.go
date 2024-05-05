@@ -73,7 +73,7 @@ func sendMessage(message string) error {
 }
 func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 	log.Println("Getting messaged from thread", conv.ThreadID)
-	msgs, err := openai.GetMessages(conv.ThreadID, 5)
+	msgs, err := openai.GetMessages(conv.ThreadID, 1, conv.RunID)
 	if err != nil {
 		return err
 	}

@@ -21,7 +21,7 @@ func TestXxx(t *testing.T) {
 	openai.StartRun(thread.ID, openai.ArjunAssistant)
 	time.Sleep(5 * time.Second)
 
-	msgs, err := openai.GetMessages(thread.ID, 2)
+	msgs, err := openai.GetMessages(thread.ID, 2, "")
 	if err != nil {
 		t.Log(err)
 		t.Fail()
