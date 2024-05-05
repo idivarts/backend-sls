@@ -72,12 +72,23 @@ func sendMessage(message string) error {
 }
 func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 	log.Println("Getting messaged from thread", conv.ThreadID)
-	msgs, err := openai.GetMessages(conv.ThreadID)
+	msgs, err := openai.GetMessages(conv.ThreadID, 1)
 	if err != nil {
 		return err
 	}
 	log.Println("Message received", len(msgs.Data[0].Content), msgs.Data[0].Content[0].Text.Value)
 	aMsg := msgs.Data[0].Content[0].Text
+
+	if msgs.Data[0].Role == "user" {
+		log.Println("Message not found - Waiting 1 second")
+		b, err := json.Marshal(conv)
+		if err != nil {
+			return err
+		}
+		log.Println("Sending wait message", string(b))
+		sqshandler.SendToMessageQueue(string(b), 1)
+		return nil
+	}
 
 	log.Println("Sending Message", conv.IGSID, aMsg.Value, msgs.Data[0].ID)
 	messenger.SendTextMessage(conv.IGSID, aMsg.Value)

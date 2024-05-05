@@ -34,12 +34,12 @@ type ListData struct {
 	HasMore bool      `json:"has_more"`
 }
 
-func GetMessages(threadID string) (*ListData, error) {
+func GetMessages(threadID string, limit int) (*ListData, error) {
 	// Set up the REST client
 	client := resty.New()
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/threads/%s/messages", baseURL, threadID)
+	apiURL := fmt.Sprintf("%s/threads/%s/messages?limit=%d", baseURL, threadID, limit)
 
 	// Make the API request
 	resp, err := client.R().
