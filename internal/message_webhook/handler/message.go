@@ -49,7 +49,10 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		return err
 	}
 
-	msg.conversationData.UpdateLastMID(msg.Message.Mid)
+	_, err = msg.conversationData.UpdateLastMID(msg.Message.Mid)
+	if err != nil {
+		return err
+	}
 
 	// TODO Write code to time the send of message
 	log.Println("Timing the Duration for the next message")
@@ -94,6 +97,7 @@ func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) 
 		return nil, errors.New("Cant find any conversation with this userid")
 	}
 
+	lastMid := ""
 	conv := convIds.Data[0]
 	for i := len(conv.Messages.Data) - 1; i >= 1; i-- {
 		entry := &conv.Messages.Data[i]
@@ -102,12 +106,14 @@ func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) 
 		if err != nil {
 			return nil, err
 		}
+		lastMid = msg.Message.Mid
 	}
 
 	log.Println("Inserting the Conversation Model", msg.IGSID, threadId)
 	data := &models.Conversation{
 		IGSID:    msg.IGSID,
 		ThreadID: threadId,
+		LastMID:  lastMid,
 	}
 	_, err = (data).Insert()
 	if err != nil {

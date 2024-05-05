@@ -56,7 +56,7 @@ func (c *Conversation) Get(igsid string) error {
 func (c *Conversation) UpdateLastMID(mid string) (*dynamodb.UpdateItemOutput, error) {
 	c.LastMID = mid
 	// Specify the update expression and expression attribute values
-	updateExpression := "SET #lastMid = :lastMid, #quantity = :quantity"
+	updateExpression := "SET #lastMid = :lastMid"
 	expressionAttributeNames := map[string]*string{
 		"#name": aws.String("lastMid"),
 	}
