@@ -42,8 +42,8 @@ func sendMessage(message string) error {
 	}
 
 	if conv.Action == "sendMessage" {
-		WaitAndSend(conv)
-		return nil
+		return WaitAndSend(conv)
+		// return nil
 	}
 	log.Println("Starting Run")
 	err = openai.StartRun(conv.ThreadID, openai.ArjunAssistant)
