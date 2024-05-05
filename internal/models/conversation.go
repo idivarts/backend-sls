@@ -16,6 +16,7 @@ const (
 type Conversation struct {
 	IGSID    string `json:"igsid" dynamodbav:"igsid"`
 	ThreadID string `json:"threadId" dynamodbav:"threadId"`
+	LastMID  string `json:"lastMid" dynamodbav:"lastMid"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
@@ -50,4 +51,38 @@ func (c *Conversation) Get(igsid string) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Conversation) UpdateLastMID(mid string) (*dynamodb.UpdateItemOutput, error) {
+	c.LastMID = mid
+	// Specify the update expression and expression attribute values
+	updateExpression := "SET #lastMid = :lastMid, #quantity = :quantity"
+	expressionAttributeNames := map[string]*string{
+		"#name": aws.String("lastMid"),
+	}
+	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
+		":name": {S: aws.String(c.LastMID)},
+	}
+
+	// Construct the update input
+	input := &dynamodb.UpdateItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]*dynamodb.AttributeValue{
+			"igsid": {
+				S: aws.String(c.IGSID),
+			},
+		}, // Use the marshalled item as the key
+		UpdateExpression:          aws.String(updateExpression),
+		ExpressionAttributeNames:  expressionAttributeNames,
+		ExpressionAttributeValues: expressionAttributeValues,
+		ReturnValues:              aws.String("UPDATED_NEW"), // Specify the attributes to return after the update
+	}
+
+	// Perform the update operation
+	result, err := dynamodbhandler.Client.UpdateItem(input)
+	if err != nil {
+		fmt.Println("Error updating item:", err)
+		return nil, err
+	}
+	return result, nil
 }

@@ -49,6 +49,8 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		return err
 	}
 
+	msg.conversationData.UpdateLastMID(msg.Message.Mid)
+
 	// TODO Write code to time the send of message
 	log.Println("Timing the Duration for the next message")
 
@@ -58,6 +60,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	event := sqsevents.ConversationEvent{
 		IGSID:    msg.conversationData.IGSID,
 		ThreadID: msg.conversationData.ThreadID,
+		MID:      msg.conversationData.LastMID,
 		Action:   "run",
 	}
 	jData, err := json.Marshal(event)
