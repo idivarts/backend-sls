@@ -19,7 +19,7 @@ func StartRun(threadID string, assistantID AssistantID) error {
 	}
 
 	// Make the API request
-	resp, err := client.R().
+	_, err := client.R().
 		SetHeader("Authorization", "Bearer "+apiKey).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("OpenAI-Beta", "assistants=v2").
@@ -32,7 +32,7 @@ func StartRun(threadID string, assistantID AssistantID) error {
 	// if err != nil {
 	// 	return err
 	// }
-	fmt.Println(string(resp.Body()))
+	// fmt.Println(string(resp.Body()))
 
 	return err
 }

@@ -44,7 +44,7 @@ func (msg IGMessagehandler) HandleMessage() error {
 }
 func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
-	err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, false)
+	_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, false)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) 
 	for i := len(conv.Messages.Data) - 1; i >= 1; i-- {
 		entry := &conv.Messages.Data[i]
 		log.Println("Sending Message", threadId, entry.Message, msg.IGSID != entry.From.ID)
-		err = openai.SendMessage(threadId, entry.Message, msg.IGSID != entry.From.ID)
+		_, err = openai.SendMessage(threadId, entry.Message, msg.IGSID != entry.From.ID)
 		if err != nil {
 			return nil, err
 		}
