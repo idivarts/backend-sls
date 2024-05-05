@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 
+	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
@@ -54,7 +55,12 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	// Generate a random integer between 0 and 10
 	sendTimeDuration := rand.Intn(11) // Generates a random integer in [0, 11)
 
-	jData, err := json.Marshal(msg.conversationData)
+	event := sqsevents.ConversationEvent{
+		IGSID:    msg.conversationData.IGSID,
+		ThreadID: msg.conversationData.ThreadID,
+		Action:   "run",
+	}
+	jData, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}

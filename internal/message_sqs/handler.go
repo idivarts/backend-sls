@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 
+	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
@@ -24,14 +25,8 @@ func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 	return nil
 }
 
-type ConversationEvent struct {
-	Action   string `json:"action"`
-	IGSID    string `json:"igsid"`
-	ThreadID string `json:"threadId"`
-}
-
 func sendMessage(message string) error {
-	conv := &ConversationEvent{}
+	conv := &sqsevents.ConversationEvent{}
 	err := json.Unmarshal([]byte(message), conv)
 	if err != nil {
 		return err
@@ -62,7 +57,7 @@ func sendMessage(message string) error {
 
 	return nil
 }
-func WaitAndSend(conv *ConversationEvent) error {
+func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 	log.Println("Getting messaged from thread", conv.ThreadID)
 	msgs, err := openai.GetMessages(conv.ThreadID)
 	if err != nil {
