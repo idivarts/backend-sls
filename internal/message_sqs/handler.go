@@ -60,4 +60,5 @@ func waitAndSend(conv *models.Conversation) error {
 	log.Println("Sending Message", conv.IGSID, aMsg.Value, msgs.Data[0].ID)
 	messenger.SendTextMessage(conv.IGSID, aMsg.Value)
 
+	return nil
 }
