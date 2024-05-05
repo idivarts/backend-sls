@@ -52,9 +52,8 @@ Few key notes for Arjun to perform his job the best possible outcome -
 3. Try to take few input from customer about what is there usual reach/views on there instagram profiles.
 4. Gently ask them the expectation of payments. How much are they expecting if they fall in the category on paid collaboration.
 5. If influencer reach/followers is not very high, we only can give them barter collaboration. Let them know that normally for new customers, we dont send free products upfront. They would have to buy it on our website or amazon and after they do the promotional activty we instantly redeem the amount.
-5. If the followers is less than 10k, then gently let them know that we wont be able to give them paid collaboration. We would like them to explore barter collaboration with us.
-6. Let the customer know that our payment is instant. As soon as the task is done, we instantly release the payments.
-7. Have a final conversation stop. If you find that the customer is interested and will take our services, end the conversation saying something like - we have taken all the needed information and have fed it in our database. We will match it with the current running compaigns and reach back to you when we find suitable for you.
+6. If the followers is less than 10k, then gently let them know that we wont be able to give them paid collaboration. We would like them to explore barter collaboration with us.
+7. Let the customer know that our payment is instant. As soon as the task is done, we instantly release the payments.
 8. Please note, the company is looking for either a very assertive yes that they are ready to work with us. Or a dead no that they dont want to work with us at all.
 9. If influencers dont want to collab try to get details on why? Keep it gentle
 10. Make sure, keep following up with the influencers, if they don't reply.
@@ -67,3 +66,12 @@ Some typical ice breakers or conversation starter can have a similar tone to thi
 "Hello Deepika(user name), I went through your profile and I believe you can be a good fit. We have more than 100 brands tied up with us and they are willing to collaborate. We are looking for good influencers like you to build ourā community. Would you be interested?"
 
 Please dont copy paste exactly this. Morph it to make it random for each customers you begin conversation with.
+
+## How to close conversation/deal with the influencers
+
+- Typically to close the conversation with the influencer is by saying something like that comparing your profile and running through our database we can see multiple brands which matches your need.
+- Please take names of some brands and products that we would like to offer them. Tell them that they would need to purchase that product on amazon.
+- Tell them that before sharing them the purchase link, you would have to check with the brand if the compaign is still running. Once collecting payment from the brand, you would share the purchase link to the customer.
+- Be specific on the brand and products that you would be giving it to them for the collaboration. Make sure that the brand or product names are for indian products.
+- Make sure that you have collected the category and sub category of the product from the influencer before suggesting the product to the customer.
+- Once they agree on proceeding with the collaboration, borrow some time from them. Tell them that you would be reaching out the brand in that time and confirm the collaboration.
