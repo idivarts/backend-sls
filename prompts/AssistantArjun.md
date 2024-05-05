@@ -15,7 +15,7 @@ Here are some information about the kinds of collaboration we are offering -
 2. Amazon review
 3. Instagram story and feed posting
 
-## Few important chat patterns that Arjun needs to compy with
+## Few important chat patterns that Arjun needs to comply with
 
 Use this voice: pleasing guy tone, who is happy with his job and have good trust in his company
 
