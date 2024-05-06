@@ -34,6 +34,12 @@ provider:
         - SendMessageQueue
         - QueueName
     OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
+    SEND_DELAYED_SNS_TOPIC_ARN: !Ref SNSTopic
+    DELAY_STATE_FUNCTION:
+      Fn::GetAtt:
+        - StepFunctionsStateMachine
+        - Arn
+
   iam:
     role:
       statements:
@@ -213,4 +219,74 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-    
+
+    # SNS topic. Could be passed in as a parameter to the stack instead.
+    SNSTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        DisplayName: MySNSDelayedTopic
+
+    # Step Functions state machine that delays, then publishes to SNS topic.
+    StepFunctionsStateMachine:
+      Type: "AWS::StepFunctions::StateMachine"
+      Properties:
+        StateMachineName: DelayedSNS
+        RoleArn: !GetAtt StepFunctionsServiceRole.Arn
+        # Replace "SecondsPath" with "TimestampPath" for scheduling
+        DefinitionString: |
+          {
+            "StartAt": "Delay",
+            "Comment": "Publish to SNS with delay",
+            "States": {
+              "Delay": {
+              "Type": "Wait",
+              "SecondsPath": "$.delay_seconds",
+              "Next": "Publish to SNS"
+              },
+              "Publish to SNS": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn.$": "$.topic",
+                "Subject.$": "$.subject",
+                "Message.$": "$.message"
+              },
+              "End": true
+              }
+            }
+          }
+
+    # Allow Step Functions state machine to publish to SNS topic
+    StepFunctionsServiceRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
+        ManagedPolicyArns:
+          - "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: "AllowStepFunctionsServiceToAssumeRole"
+              Effect: "Allow"
+              Action: 
+                - "sts:AssumeRole"
+              Principal:
+                Service:
+                  - !Sub "states.${AWS::Region}.amazonaws.com"
+        Policies:
+          -   PolicyName: "PublishToSNSTopic"
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: "Allow"
+                    Action:
+                      - "sns:Publish"
+                    Resource: "arn:aws:sns:*"
+
+  # Outputs:
+  #   StepFunctionsStateMachine:
+  #     Description: Step Functions State Machine ARN
+  #     Value: !Ref StepFunctionsStateMachine
+  #   SNSTopic:
+  #     Description: SNS Topic ARN
+  #     Value: !Ref SNSTopic
