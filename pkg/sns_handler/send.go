@@ -35,7 +35,7 @@ type SFNMessage struct {
 func Send(message string, delayInSeconds int64) error {
 
 	// Specify the ARN of your Step Functions state machine
-	topicARN := os.Getenv("SEND_DELAYED_SNS_TOPIC_ARN")
+	topicARN := os.Getenv("SEND_MESSAGE_QUEUE_ARN")
 
 	// Specify input data for the state machine (if needed)
 	inputObj := SFNMessage{

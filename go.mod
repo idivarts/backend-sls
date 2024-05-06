@@ -5,7 +5,6 @@ go 1.22.2
 require github.com/aws/aws-lambda-go v1.47.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.26.1 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect

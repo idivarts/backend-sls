@@ -34,7 +34,10 @@ provider:
         - SendMessageQueue
         - QueueName
     OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
-    SEND_DELAYED_SNS_TOPIC_ARN: !Ref SNSTopic
+    SEND_DELAYED_SNS_TOPIC_ARN:
+      Fn::GetAtt:
+        - SendMessageQueue
+        - Arn
     DELAY_STATE_FUNCTION:
       Fn::GetAtt:
         - StepFunctionsStateMachine
@@ -43,6 +46,10 @@ provider:
   iam:
     role:
       statements:
+        - Effect: "Allow"
+          Action:
+            - "states:StartExecution"
+          Resource: { "Fn::GetAtt" : ["StepFunctionsStateMachine","Arn"]  }
         - Effect: "Allow"
           Action:
             - "sqs:sendmessage"
@@ -128,10 +135,12 @@ functions:
               - SendMessageQueue
               - Arn
 
-  message_sns:
-    handler: functions/message_sns/main.go
-    events:
-      - sns: SNSTopic
+  # message_sns:
+  #   handler: functions/message_sns/main.go
+  #   events:
+  #     - sns:
+  #         arn: !Ref SuperTopic
+  #         topicName: SNSTopic
       
   # scrape_brands:
   #   handler: functions/scrape_brands/main.go
@@ -226,10 +235,10 @@ resources:
           WriteCapacityUnits: 1
 
     # SNS topic. Could be passed in as a parameter to the stack instead.
-    SNSTopic:
-      Type: AWS::SNS::Topic
-      Properties:
-        DisplayName: MySNSDelayedTopic
+    # SNSTopic:
+    #   Type: AWS::SNS::Topic
+    #   Properties:
+    #     TopicName: SNSTopic
 
     # Step Functions state machine that delays, then publishes to SNS topic.
     StepFunctionsStateMachine:
@@ -244,18 +253,19 @@ resources:
             "Comment": "Publish to SNS with delay",
             "States": {
               "Delay": {
-              "Type": "Wait",
-              "SecondsPath": "$.delay_seconds",
-              "Next": "Publish to SNS"
+                "Type": "Wait",
+                "SecondsPath": "$.delay_seconds",
+                "Next": "Send message to SQS"
               },
-              "Publish to SNS": {
-              "Type": "Task",
-              "Resource": "arn:aws:states:::sns:publish",
-              "Parameters": {
-                "TopicArn.$": "$.topic",
-                "Subject.$": "$.subject",
-                "Message.$": "$.message"
-              },
+              "Send message to SQS":{  
+                "Type":"Task",
+                "Resource":"arn:aws:states:::sqs:sendMessage",
+                "Parameters":{  
+                    "QueueUrl.$":"$.topic",
+                    "MessageBody":"$.message"
+                },
+                "End":true
+              }
               "End": true
               }
             }
@@ -285,8 +295,8 @@ resources:
                 Statement:
                   - Effect: "Allow"
                     Action:
-                      - "sns:Publish"
-                    Resource: "arn:aws:sns:*"
+                      - "sqs:sendmessage"
+                    Resource: "arn:aws:sqs:*"
 
   # Outputs:
   #   StepFunctionsStateMachine:
