@@ -2,7 +2,9 @@ package openai
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -44,6 +46,7 @@ func GetMessages(threadID string, limit int, runId string) (*ListData, error) {
 	if runId != "" {
 		apiURL = fmt.Sprintf("%s/threads/%s/messages?run_id=%s", baseURL, threadID, runId)
 	}
+
 	// Make the API request
 	resp, err := client.R().
 		SetHeader("Authorization", "Bearer "+apiKey).
@@ -51,18 +54,19 @@ func GetMessages(threadID string, limit int, runId string) (*ListData, error) {
 		SetHeader("OpenAI-Beta", "assistants=v2").
 		Get(apiURL)
 	if err != nil {
-		return nil, err
+		return nil, err // Return the error if request fails
 	}
 
-	// d, err := io.ReadAll(resp.RawBody())
-	// if err != nil {
-	// 	return nil, err
-	// }
+	// Check for non-200 status code
+	if resp.StatusCode() != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status())
+	}
 
 	data := ListData{}
-	err = json.Unmarshal(resp.Body(), &data)
-	if err != nil {
-		return nil, err
+	// Unmarshal the response body
+	if err := json.Unmarshal(resp.Body(), &data); err != nil {
+		return nil, err // Return any JSON unmarshal errors
 	}
+
 	return &data, nil
 }

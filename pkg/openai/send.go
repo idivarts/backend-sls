@@ -2,7 +2,9 @@ package openai
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -51,18 +53,18 @@ func SendMessage(threadID string, message string, isAssistant bool) (*ISendMessa
 		SetBody(requestBody).
 		Post(apiURL)
 	if err != nil {
-		return nil, err
+		return nil, err // Return the error if request fails
 	}
-	// data, err := io.ReadAll(resp.RawBody())
-	// if err != nil {
-	// 	return err
-	// }
 
-	// fmt.Println(string(resp.Body()))
+	// Check for non-200 status code
+	if resp.StatusCode() != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status())
+	}
+
 	data := &ISendMessage{}
-	err = json.Unmarshal(resp.Body(), data)
-	if err != nil {
-		return nil, err
+	// Unmarshal the response body
+	if err := json.Unmarshal(resp.Body(), data); err != nil {
+		return nil, err // Return any JSON unmarshal errors
 	}
 
 	return data, nil
