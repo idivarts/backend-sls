@@ -1,4 +1,4 @@
-package snshandler
+package delayedsqs
 
 import (
 	"context"
@@ -29,7 +29,6 @@ type SFNMessage struct {
 	TopicARN     string `json:"topic"`
 	DelaySeconds int64  `json:"delay_seconds"`
 	Message      string `json:"message"`
-	Subject      string `json:"subject"`
 }
 
 func Send(message string, delayInSeconds int64) error {
@@ -42,7 +41,6 @@ func Send(message string, delayInSeconds int64) error {
 		TopicARN:     topicARN,
 		DelaySeconds: delayInSeconds,
 		Message:      message,
-		Subject:      "Test Subject",
 	}
 	input, err := json.Marshal(&inputObj)
 	if err != nil {

@@ -104,7 +104,7 @@ resources:
     StepFunctionsStateMachine:
       Type: "AWS::StepFunctions::StateMachine"
       Properties:
-        StateMachineName: DelayedSNS
+        StateMachineName: DelayedSQS
         RoleArn: !GetAtt StepFunctionsServiceRole.Arn
         # Replace "SecondsPath" with "TimestampPath" for scheduling
         DefinitionString: |

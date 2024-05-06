@@ -8,10 +8,10 @@ import (
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
 	timehandler "github.com/TrendsHub/th-backend/internal/time_handler"
+	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
-	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
 )
 
 type IGMessagehandler struct {
@@ -73,7 +73,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	if err != nil {
 		return err
 	}
-	err = sqshandler.SendToMessageQueue(string(jData), int64(*sendTimeDuration))
+	err = delayedsqs.Send(string(jData), int64(*sendTimeDuration))
 	if err != nil {
 		return err
 	}
