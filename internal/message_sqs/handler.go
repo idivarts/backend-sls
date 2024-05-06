@@ -9,9 +9,9 @@ import (
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
+	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
-	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
 	"github.com/aws/aws-lambda-go/events"
 )
 
@@ -76,7 +76,7 @@ func sendMessage(message string) error {
 		return err
 	}
 	log.Println("Sending wait message", string(b))
-	sqshandler.SendToMessageQueue(string(b), 5)
+	delayedsqs.Send(string(b), 5)
 
 	return nil
 }
@@ -104,7 +104,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		return err
 	}
 	log.Println("Sending wait message", string(b))
-	sqshandler.SendToMessageQueue(string(b), 1)
+	delayedsqs.Send(string(b), 1)
 	return nil
 
 }
