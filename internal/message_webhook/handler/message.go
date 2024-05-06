@@ -78,7 +78,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		return err
 	}
 
-	log.Println("Message sent to the queue after", sendTimeDuration)
+	log.Println("Message sent to the queue after", *sendTimeDuration)
 
 	return nil
 }
