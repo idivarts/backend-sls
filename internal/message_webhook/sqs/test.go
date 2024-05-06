@@ -3,7 +3,7 @@ package sqsapp
 import (
 	"net/http"
 
-	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
+	snshandler "github.com/TrendsHub/th-backend/pkg/sns_handler"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,7 +19,7 @@ func SendTestSQSMessage(c *gin.Context) {
 		return
 	}
 
-	sqshandler.SendToMessageQueue(testMesage.Message, testMesage.Delay)
+	snshandler.Send(testMesage.Message, testMesage.Delay)
 	c.JSON(http.StatusOK, gin.H{
 		"message": testMesage,
 	})
