@@ -1,6 +1,7 @@
 package timehandler
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/TrendsHub/th-backend/internal/models"
@@ -26,14 +27,16 @@ func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
 	}
 
 	calcTime := int(difference)
-	if calcTime > 30*60 {
-		calcTime = rand.Intn(30*60) + (15 * 60)
-	} else if calcTime > 10*60 {
+	// if calcTime > 30*60 {
+	// 	calcTime = rand.Intn(30*60) + (15 * 60)
+	// } else
+	if calcTime > 10*60 {
 		calcTime = rand.Intn(10*60) + (5 * 60)
 	} else {
 		calcTime = rand.Intn(60) + (45)
 	}
 	// calcTime = rand.Intn(calcTime)
+	calcTime = int(math.Min(900, float64(calcTime)))
 
 	return &calcTime, nil
 }
