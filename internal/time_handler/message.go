@@ -9,13 +9,13 @@ import (
 
 func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
 
-	msgs, err := openai.GetMessages(conv.ThreadID, 10, "")
+	msgs, err := openai.GetMessages(conv.ThreadID, 5, "")
 	if err != nil {
 		return nil, err
 	}
 
 	lastUserMessageTime := int64(0)
-	difference := int64(10)
+	difference := int64(60)
 	for _, v := range msgs.Data {
 		if v.Role == "user" {
 			lastUserMessageTime = v.CreatedAt
