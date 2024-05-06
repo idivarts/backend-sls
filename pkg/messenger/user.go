@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 )
 
 type UserProfile struct {
@@ -14,6 +15,28 @@ type UserProfile struct {
 	FollowerCount        int    `json:"follower_count"`
 	IsUserFollowBusiness bool   `json:"is_user_follow_business"`
 	IsBusinessFollowUser bool   `json:"is_business_follow_user"`
+}
+
+func (user UserProfile) GenerateUserDescription() string {
+	description := "Here are the details abot the user(ignore if anythig is blank) -\n"
+	description += "Name: " + user.Name + "\n"
+	description += "Username: " + user.Username + "\n"
+	description += "Profile Picture: " + user.ProfilePic + "\n"
+	description += "Follower Count: " + strconv.Itoa(user.FollowerCount) + "\n"
+
+	if user.IsUserFollowBusiness {
+		description += "User follows the trendshub page.\n"
+	} else {
+		description += "User does not follow the trendshub page.\n"
+	}
+
+	if user.IsBusinessFollowUser {
+		description += "TrendsHub follows the user.\n"
+	} else {
+		description += "TrendsHub follows the user.\n"
+	}
+
+	return description
 }
 
 func GetUser(igsid string) (*UserProfile, error) {
