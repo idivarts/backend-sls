@@ -53,8 +53,16 @@ func sendMessage(message string) error {
 		return nil
 	}
 
+	additionalInstruction := ""
+	if !cData.IsProfileFetched {
+		uProfile, err := messenger.GetUser(cData.IGSID)
+		if err != nil {
+			return err
+		}
+		additionalInstruction = uProfile.GenerateUserDescription()
+	}
 	log.Println("Starting Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, "")
+	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, additionalInstruction)
 	if err != nil {
 		return err
 	}

@@ -14,9 +14,10 @@ const (
 )
 
 type Conversation struct {
-	IGSID    string `json:"igsid" dynamodbav:"igsid"`
-	ThreadID string `json:"threadId" dynamodbav:"threadId"`
-	LastMID  string `json:"lastMid" dynamodbav:"lastMid"`
+	IGSID            string `json:"igsid" dynamodbav:"igsid"`
+	ThreadID         string `json:"threadId" dynamodbav:"threadId"`
+	LastMID          string `json:"lastMid" dynamodbav:"lastMid"`
+	IsProfileFetched bool   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
