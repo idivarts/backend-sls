@@ -128,6 +128,11 @@ functions:
               - SendMessageQueue
               - Arn
 
+  message_sns:
+    handler: functions/message_sns/main.go
+    events:
+      - sns: SNSTopic
+      
   # scrape_brands:
   #   handler: functions/scrape_brands/main.go
   #   events:
