@@ -18,10 +18,10 @@ type UserProfile struct {
 }
 
 func (user UserProfile) GenerateUserDescription() string {
-	description := "Here are the details abot the user(ignore if anythig is blank) -\n"
+	description := "Here are the details about the user(ignore if anything is blank) -\n"
 	description += "Name: " + user.Name + "\n"
 	description += "Username: " + user.Username + "\n"
-	description += "Profile Picture: " + user.ProfilePic + "\n"
+	// description += "Profile Picture: " + user.ProfilePic + "\n"
 	description += "Follower Count: " + strconv.Itoa(user.FollowerCount) + "\n"
 
 	if user.IsUserFollowBusiness {
