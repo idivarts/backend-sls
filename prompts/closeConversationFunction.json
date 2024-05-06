@@ -1,0 +1,26 @@
+{
+    "name": "can_conversation_end",
+    "description": "This function determines if all the data has been collected from the influencer or not. If few data is missing, then function will return the list of data yet to be collected. If all data is successfully collected, then function will return empty array. Empty array signifies that the chat assistant can end the conversation with the user.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "enagement": {
+          "type": "string",
+          "description": "The total engagement of user on there instagram account. Eg. 1000 engagement in past 2 weeks"
+        },
+        "views": {
+          "type": "string",
+          "description": "Total views on there instagram account. Eg. 1M views in past 30 days"
+        },
+        "video_category": {
+            "type": "string",
+            "description": "This defines the type of video the content creator normally make. This can contain multiple video categories too. Eg. Comedy video or Informational Video or Video on Political agenda"
+        },
+        "brand_category": {
+            "type": "string",
+            "description": "This defines what kind of brand does user wants to collaborate with. This can contain multiple brand categories. Eg. Fashion brand or shoe brand or electronics brands"
+        }
+      },
+      "required": []
+    }
+  }
