@@ -87,3 +87,37 @@ func (c *Conversation) UpdateLastMID(mid string) (*dynamodb.UpdateItemOutput, er
 	}
 	return result, nil
 }
+
+func (c *Conversation) UpdateProfileFetched() (*dynamodb.UpdateItemOutput, error) {
+	c.IsProfileFetched = true
+	// Specify the update expression and expression attribute values
+	updateExpression := "SET #isProfileFetched = :isProfileFetched"
+	expressionAttributeNames := map[string]*string{
+		"#isProfileFetched": aws.String("isProfileFetched"),
+	}
+	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
+		":isProfileFetched": {BOOL: &c.IsProfileFetched},
+	}
+
+	// Construct the update input
+	input := &dynamodb.UpdateItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]*dynamodb.AttributeValue{
+			"igsid": {
+				S: aws.String(c.IGSID),
+			},
+		}, // Use the marshalled item as the key
+		UpdateExpression:          aws.String(updateExpression),
+		ExpressionAttributeNames:  expressionAttributeNames,
+		ExpressionAttributeValues: expressionAttributeValues,
+		ReturnValues:              aws.String("UPDATED_NEW"), // Specify the attributes to return after the update
+	}
+
+	// Perform the update operation
+	result, err := dynamodbhandler.Client.UpdateItem(input)
+	if err != nil {
+		fmt.Println("Error updating item:", err)
+		return nil, err
+	}
+	return result, nil
+}

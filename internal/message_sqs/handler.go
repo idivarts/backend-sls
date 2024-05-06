@@ -60,6 +60,7 @@ func sendMessage(message string) error {
 			return err
 		}
 		additionalInstruction = uProfile.GenerateUserDescription()
+		cData.UpdateProfileFetched()
 	}
 	log.Println("Starting Run")
 	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, additionalInstruction)
