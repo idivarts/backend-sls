@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"math/rand"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
+	timehandler "github.com/TrendsHub/th-backend/internal/time_handler"
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
@@ -58,7 +58,10 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	log.Println("Timing the Duration for the next message")
 
 	// Generate a random integer between 0 and 10
-	sendTimeDuration := rand.Intn(11) // Generates a random integer in [0, 11)
+	sendTimeDuration, err := timehandler.CalculateMessageDelay(msg.conversationData) // Generates a random integer in [0, 11)
+	if err != nil {
+		return err
+	}
 
 	event := sqsevents.ConversationEvent{
 		IGSID:    msg.conversationData.IGSID,
@@ -70,7 +73,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	if err != nil {
 		return err
 	}
-	err = sqshandler.SendToMessageQueue(string(jData), int64(sendTimeDuration))
+	err = sqshandler.SendToMessageQueue(string(jData), int64(*sendTimeDuration))
 	if err != nil {
 		return err
 	}
