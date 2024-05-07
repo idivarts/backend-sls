@@ -1,9 +1,9 @@
 package sqsevents
 
 type ConversationEvent struct {
-	Action   string `json:"action"`
-	IGSID    string `json:"igsid"`
-	ThreadID string `json:"threadId"`
-	MID      string `json:"mid"`
-	RunID    string `json:"runID"`
+	Action   SQSEvents `json:"action"`
+	IGSID    string    `json:"igsid"`
+	ThreadID string    `json:"threadId"`
+	MID      string    `json:"mid"`
+	RunID    string    `json:"runID"`
 }

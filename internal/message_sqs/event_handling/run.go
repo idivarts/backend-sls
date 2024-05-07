@@ -39,7 +39,7 @@ func RunOpenAI(conv *sqsevents.ConversationEvent) error {
 	}
 	// go waitAndSend(conv)
 	log.Println("Waiting 5 second before sending message")
-	conv.Action = "sendMessage"
+	conv.Action = sqsevents.SEND_MESSAGE
 	conv.RunID = rObj.ID
 	b, err := json.Marshal(&conv)
 	if err != nil {

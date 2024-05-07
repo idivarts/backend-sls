@@ -34,7 +34,7 @@ func sendMessage(message string) error {
 		return errors.New("Malformed Input")
 	}
 
-	if conv.Action == "sendMessage" {
+	if conv.Action == sqsevents.SEND_MESSAGE {
 		return eventhandling.WaitAndSend(conv)
 		// return nil
 	} else {

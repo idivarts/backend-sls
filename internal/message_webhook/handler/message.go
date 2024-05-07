@@ -67,7 +67,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		IGSID:    msg.conversationData.IGSID,
 		ThreadID: msg.conversationData.ThreadID,
 		MID:      msg.conversationData.LastMID,
-		Action:   "run",
+		Action:   sqsevents.RUN_OPENAI,
 	}
 	jData, err := json.Marshal(event)
 	if err != nil {
