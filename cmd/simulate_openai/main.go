@@ -45,9 +45,9 @@ func main() {
 				log.Printf("Error %s", err.Error())
 				return
 			}
-			if run.Status == "completed" {
+			if run.Status == openai.COMPLETED_STATUS {
 				break
-			} else if run.Status == "requires_action" {
+			} else if run.Status == openai.REQUIRES_ACTION_STATUS {
 				log.Println("Requires Action", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].ID, "\n", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name, run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Arguments)
 				if run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name == "can_conversation_end" {
 					cce := &openaifc.CanConversationEnd{}

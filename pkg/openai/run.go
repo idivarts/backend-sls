@@ -31,6 +31,14 @@ type TruncationStrategy struct {
 	Type         string      `json:"type"`          // "type": "auto"
 	LastMessages interface{} `json:"last_messages"` // "last_messages": null
 }
+type IRunStatus string
+
+const (
+	REQUIRES_ACTION_STATUS IRunStatus = "requires_action"
+	PENDING_STATUS         IRunStatus = "pending"
+	COMPLETED_STATUS       IRunStatus = "completed"
+	EXPIRED_STATUS         IRunStatus = "expired"
+)
 
 type IRunObject struct {
 	ID                  string             `json:"id" validate:"required"` // "id": "run_Hn1azQLK1W6qyzBUrum26sMe"
@@ -38,7 +46,7 @@ type IRunObject struct {
 	CreatedAt           int64              `json:"created_at"`             // "created_at": 1715098953
 	AssistantID         string             `json:"assistant_id"`           // "assistant_id": "asst_3rJKwjfT1VeXRh6KHLg4hQoM"
 	ThreadID            string             `json:"thread_id"`              // "thread_id": "thread_QTEJomy76q5ykzhfRSxB8pIu"
-	Status              string             `json:"status"`                 // "status": "requires_action | pending | completed | expired"
+	Status              IRunStatus         `json:"status"`                 // "status": "requires_action | pending | completed | expired"
 	StartedAt           int64              `json:"started_at"`             // "started_at": 1715098954
 	ExpiresAt           int64              `json:"expires_at"`             // "expires_at": 1715099553
 	CancelledAt         interface{}        `json:"cancelled_at"`           // "cancelled_at": null
