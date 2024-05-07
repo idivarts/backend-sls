@@ -49,6 +49,11 @@ OPENAI_API_KEY=sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
 #   -H "Authorization: Bearer $OPENAI_API_KEY" \
 #   -H "OpenAI-Beta: assistants=v2"
 
+curl https://api.openai.com/v1/threads/thread_QTEJomy76q5ykzhfRSxB8pIu/runs/run_Hn1azQLK1W6qyzBUrum26sMe \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "OpenAI-Beta: assistants=v2"
+
 # curl https://api.openai.com/v1/threads/thread_cCdE9fA8UwPbN2sbLm4Q5otJ/messages \
 #   -H "Content-Type: application/json" \
 #   -H "Authorization: Bearer $OPENAI_API_KEY" \
