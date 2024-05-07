@@ -63,7 +63,7 @@ func sendMessage(message string) error {
 		cData.UpdateProfileFetched()
 	}
 	log.Println("Starting Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, additionalInstruction)
+	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, additionalInstruction, "")
 	if err != nil {
 		return err
 	}

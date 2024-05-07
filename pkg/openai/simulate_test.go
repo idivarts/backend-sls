@@ -18,7 +18,7 @@ func TestXxx(t *testing.T) {
 	openai.SendMessage(thread.ID, "Hello Rahul", false)
 	openai.SendMessage(thread.ID, "This is Arjun", false)
 
-	openai.StartRun(thread.ID, openai.ArjunAssistant, "")
+	openai.StartRun(thread.ID, openai.ArjunAssistant, "", "")
 	time.Sleep(5 * time.Second)
 
 	msgs, err := openai.GetMessages(thread.ID, 2, "")

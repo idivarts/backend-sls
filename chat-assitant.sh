@@ -49,10 +49,27 @@ OPENAI_API_KEY=sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
 #   -H "Authorization: Bearer $OPENAI_API_KEY" \
 #   -H "OpenAI-Beta: assistants=v2"
 
-curl https://api.openai.com/v1/threads/thread_QTEJomy76q5ykzhfRSxB8pIu/runs/run_Hn1azQLK1W6qyzBUrum26sMe \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $OPENAI_API_KEY" \
-  -H "OpenAI-Beta: assistants=v2"
+# curl https://api.openai.com/v1/threads/thread_QTEJomy76q5ykzhfRSxB8pIu/runs/run_Hn1azQLK1W6qyzBUrum26sMe \
+#   -H "Content-Type: application/json" \
+#   -H "Authorization: Bearer $OPENAI_API_KEY" \
+#   -H "OpenAI-Beta: assistants=v2"
+
+# curl https://api.openai.com/v1/threads/thread_QTEJomy76q5ykzhfRSxB8pIu/runs/run_Hn1azQLK1W6qyzBUrum26sMe/submit_tool_outputs \
+#   -H "Content-Type: application/json" \
+#   -H "Authorization: Bearer $OPENAI_API_KEY" \
+#   -H "OpenAI-Beta: assistants=v2"
+#   -d '{
+#         "threadId":"thread_E1RcUUWr3XL7PA9gHVDnylm9"
+#         "runId":"run_G5qh5MAf25Ff3H6aLSSuLJU5"
+#         "functionResponses":{
+#             "tool_outputs":[
+#                 {
+#                     "tool_call_id":"call_yebrHV8GPS75dfVPVhZYhRI4"
+#                     "output":"["engagement", "views", "video_category", "brand_category"]"
+#                 }
+#             ]
+#         }
+#     }'
 
 # curl https://api.openai.com/v1/threads/thread_cCdE9fA8UwPbN2sbLm4Q5otJ/messages \
 #   -H "Content-Type: application/json" \

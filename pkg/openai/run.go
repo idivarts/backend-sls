@@ -38,7 +38,7 @@ type IRunObject struct {
 	CreatedAt           int64              `json:"created_at"`             // "created_at": 1715098953
 	AssistantID         string             `json:"assistant_id"`           // "assistant_id": "asst_3rJKwjfT1VeXRh6KHLg4hQoM"
 	ThreadID            string             `json:"thread_id"`              // "thread_id": "thread_QTEJomy76q5ykzhfRSxB8pIu"
-	Status              string             `json:"status"`                 // "status": "requires_action | pending | completed"
+	Status              string             `json:"status"`                 // "status": "requires_action | pending | completed | expired"
 	StartedAt           int64              `json:"started_at"`             // "started_at": 1715098954
 	ExpiresAt           int64              `json:"expires_at"`             // "expires_at": 1715099553
 	CancelledAt         interface{}        `json:"cancelled_at"`           // "cancelled_at": null
@@ -62,7 +62,7 @@ type IRunObject struct {
 	ToolChoice          string             `json:"tool_choice"`            // "tool_choice": "auto"
 }
 
-func StartRun(threadID string, assistantID AssistantID, additionalInstructions string) (*IRunObject, error) {
+func StartRun(threadID string, assistantID AssistantID, additionalInstructions string, requireFunction string) (*IRunObject, error) {
 	// Set up the REST client
 	client := resty.New()
 
@@ -77,6 +77,16 @@ func StartRun(threadID string, assistantID AssistantID, additionalInstructions s
 	// additional_instructions
 	if additionalInstructions != "" {
 		requestBody["additional_instructions"] = additionalInstructions
+	}
+
+	// require a function execution?
+	if requireFunction != "" {
+		requestBody["tool_choice"] = map[string]interface{}{
+			"type": "function",
+			"function": map[string]string{
+				"name": requireFunction,
+			},
+		}
 	}
 
 	// Make the API request
