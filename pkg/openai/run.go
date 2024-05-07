@@ -114,7 +114,7 @@ func StartRun(threadID string, assistantID AssistantID, additionalInstructions s
 	return data, nil
 }
 
-func GetRunStatus(threadID string, runId AssistantID) (*IRunObject, error) {
+func GetRunStatus(threadID string, runId string) (*IRunObject, error) {
 	// Set up the REST client
 	client := resty.New()
 

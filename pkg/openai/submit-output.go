@@ -4,15 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/go-resty/resty/v2"
 )
 
 type ISubmitRequest struct {
-	ThreadId          string            `json:"threadId"`
-	RunId             string            `json:"runId"`
-	FunctionResponses _FunctionResponse `json:"functionResponses"`
+	// ThreadId          string            `json:"threadId"`
+	// RunId             string            `json:"runId"`
+	ToolOutputs []ToolOutput `json:"tool_outputs"`
+	// FunctionResponses _FunctionResponse `json:"functionResponses,omitempty"`
 }
 
 type _FunctionResponse struct {
@@ -32,19 +34,26 @@ func SubmitToolOutput(threadID string, runId string, toolOutputs []ToolOutput) (
 	apiURL := fmt.Sprintf("%s/threads/%s/runs/%s/submit_tool_outputs", baseURL, threadID, runId)
 
 	requestBody := ISubmitRequest{
-		ThreadId: threadID,
-		RunId:    runId,
-		FunctionResponses: _FunctionResponse{
-			ToolOutputs: toolOutputs,
-		},
+		// ThreadId:    threadID,
+		// RunId:       runId,
+		ToolOutputs: toolOutputs,
+		// FunctionResponses: _FunctionResponse{
+		// 	ToolOutputs: toolOutputs,
+		// },
 	}
+
+	body, err := json.Marshal(&requestBody)
+	if err != nil {
+		return nil, err
+	}
+	log.Println("Request Body", apiURL, string(body))
 
 	// Make the API request
 	resp, err := client.R().
 		SetHeader("Authorization", "Bearer "+apiKey).
 		SetHeader("Content-Type", "application/json").
 		SetHeader("OpenAI-Beta", "assistants=v2").
-		SetBody(requestBody).
+		SetBody(string(body)).
 		Post(apiURL)
 	if err != nil {
 		return nil, err // Return the error if request fails
@@ -52,7 +61,7 @@ func SubmitToolOutput(threadID string, runId string, toolOutputs []ToolOutput) (
 
 	// Check for non-200 status code
 	if resp.StatusCode() != http.StatusOK {
-		return nil, errors.New("Error: Unexpected status code - " + resp.Status())
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status() + "  -  " + string(resp.Body()))
 	}
 
 	data := &IRunObject{}

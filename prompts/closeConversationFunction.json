@@ -4,7 +4,7 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "enagement": {
+        "engagement": {
           "type": "string",
           "description": "The total engagement of user on there instagram account. Eg. 1000 engagement in past 2 weeks"
         },
