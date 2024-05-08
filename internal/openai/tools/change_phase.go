@@ -84,7 +84,7 @@ func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall
 		if cData.Information.Engagement == "" || cData.Information.Views == "" || cData.Information.BrandCategory == "" || cData.Information.VideoCategory == "" {
 			oData.MissedPhases = append(oData.MissedPhases, 2)
 		}
-		if cData.Information.InterestedInService == nil {
+		if cData.Information.InterestedInApp == nil {
 			oData.MissedPhases = append(oData.MissedPhases, 3)
 		}
 		if cData.Information.CollaborationProduct == "" || cData.Information.CollaborationBrand == "" {

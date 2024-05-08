@@ -31,8 +31,13 @@ func (input ChangePhase) FindEmptyFields() ([]string, error) {
 	val := reflect.ValueOf(input)
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
-		if field.Kind() == reflect.String && field.String() == "" {
-			emptyFields = append(emptyFields, val.Type().Field(i).Tag.Get("json"))
+		jsonTag := val.Type().Field(i).Tag.Get("json")
+		if field.Kind() == reflect.String {
+			if field.String() == "" {
+				emptyFields = append(emptyFields, jsonTag)
+			}
+		} else if field.Kind() == reflect.Ptr && field.IsNil() {
+			emptyFields = append(emptyFields, jsonTag)
 		}
 	}
 	// b, err := json.Marshal(emptyFields)
