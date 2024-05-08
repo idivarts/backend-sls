@@ -1,6 +1,6 @@
 {
     "name": "change_phase",
-    "description": "This function is called in every run operation. The purpose of this function is to send and process any collected information from the chat. This function returns an array of string. That string array identifies that what all information is yet to be collected from the user before they can end the conversation",
+    "description": "This function is called in every run operation. The purpose of this function is to send and process any collected information from the chat. This function returns two variables missed_information and missed_phases.\n1. missed_information is an array of string that identifies what all information is yet to be collected from the user before they can end the conversation. The assistant need to make sure that it collects all the information in this.\n2. missed_phases is an array of integer identifying is the chat had to skip any phases of conversation. The assistant need to make sure that they cover all the phase mentioned in this return",
     "parameters": {
       "type": "object",
       "properties": {
