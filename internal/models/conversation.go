@@ -5,6 +5,7 @@ import (
 
 	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
 	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
+	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -15,13 +16,14 @@ const (
 )
 
 type Conversation struct {
-	IGSID            string               `json:"igsid" dynamodbav:"igsid"`
-	ThreadID         string               `json:"threadId" dynamodbav:"threadId"`
-	LastMID          string               `json:"lastMid" dynamodbav:"lastMid"`
-	IsProfileFetched bool                 `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
-	Phases           []int                `json:"phases" dynamodbav:"phases"`
-	CurrentPhase     int                  `json:"currentPhase" dynamodbav:"currentPhase"`
-	Information      openaifc.ChangePhase `json:"information" dynamodbav:"currentPhase"`
+	IGSID            string                 `json:"igsid" dynamodbav:"igsid"`
+	ThreadID         string                 `json:"threadId" dynamodbav:"threadId"`
+	LastMID          string                 `json:"lastMid" dynamodbav:"lastMid"`
+	IsProfileFetched bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
+	UserProfile      *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
+	Phases           []int                  `json:"phases" dynamodbav:"phases"`
+	CurrentPhase     int                    `json:"currentPhase" dynamodbav:"currentPhase"`
+	Information      openaifc.ChangePhase   `json:"information" dynamodbav:"currentPhase"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {

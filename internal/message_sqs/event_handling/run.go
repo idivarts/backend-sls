@@ -30,7 +30,10 @@ func RunOpenAI(conv *sqsevents.ConversationEvent) error {
 			return err
 		}
 		additionalInstruction = uProfile.GenerateUserDescription()
-		cData.UpdateProfileFetched()
+		cData.IsProfileFetched = true
+		cData.UserProfile = uProfile
+		cData.Insert()
+		// cData.UpdateProfileFetched()
 	}
 	log.Println("Starting Run")
 	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, additionalInstruction, "")

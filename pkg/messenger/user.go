@@ -9,12 +9,12 @@ import (
 )
 
 type UserProfile struct {
-	Name                 string `json:"name"`
-	Username             string `json:"username"`
-	ProfilePic           string `json:"profile_pic"`
-	FollowerCount        int    `json:"follower_count"`
-	IsUserFollowBusiness bool   `json:"is_user_follow_business"`
-	IsBusinessFollowUser bool   `json:"is_business_follow_user"`
+	Name                 string `json:"name" dynamodbav:"name"`
+	Username             string `json:"username" dynamodbav:"username"`
+	ProfilePic           string `json:"profile_pic" dynamodbav:"profile_pic"`
+	FollowerCount        int    `json:"follower_count" dynamodbav:"follower_count"`
+	IsUserFollowBusiness bool   `json:"is_user_follow_business" dynamodbav:"is_user_follow_business"`
+	IsBusinessFollowUser bool   `json:"is_business_follow_user" dynamodbav:"is_business_follow_user"`
 }
 
 func (user UserProfile) GenerateUserDescription() string {
