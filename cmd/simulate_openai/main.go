@@ -64,7 +64,7 @@ func main() {
 			if run.Status == openai.COMPLETED_STATUS {
 				break
 			} else if run.Status == openai.REQUIRES_ACTION_STATUS {
-				log.Println("Requires Action", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].ID, "\n", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name, run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Arguments)
+				// log.Println("Requires Action", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].ID, "\n", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name, run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Arguments)
 				toolOutput := []openai.ToolOutput{}
 				for _, toolOption := range run.RequiredAction.SubmitToolOutputs.ToolCalls {
 					if toolOption.Function.Name == openai.CanConversationEndFn {

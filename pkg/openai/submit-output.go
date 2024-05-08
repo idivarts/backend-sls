@@ -46,7 +46,7 @@ func SubmitToolOutput(threadID string, runId string, toolOutputs []ToolOutput) (
 	if err != nil {
 		return nil, err
 	}
-	log.Println("Request Body", apiURL, string(body))
+	log.Println("Request Body:\n", string(body))
 
 	// Make the API request
 	resp, err := client.R().

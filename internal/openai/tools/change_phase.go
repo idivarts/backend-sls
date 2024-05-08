@@ -16,21 +16,12 @@ type ChangePhaseOuput struct {
 }
 
 func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall) (*openai.ToolOutput, error) {
-	log.Println("Requires Action", toolOption.ID, "\n", toolOption.Function.Name, toolOption.Function.Arguments)
+	log.Println("Requires Action:\n", toolOption.Function.Name, toolOption.Function.Arguments)
 	cp := &openaifc.ChangePhase{}
 	err := cp.ParseJson(toolOption.Function.Arguments)
 	if err != nil {
 		// log.Printf("Error %s", err.Error())
 		return nil, err
-	}
-	eOutput, err := cp.FindEmptyFields()
-	if err != nil {
-		// log.Printf("Error %s", err.Error())
-		return nil, err
-	}
-
-	oData := ChangePhaseOuput{
-		MissedInformation: eOutput,
 	}
 
 	cData := models.Conversation{}
@@ -66,6 +57,16 @@ func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall
 	}
 	if cp.CollaborationProduct != "" {
 		cData.Information.CollaborationProduct = cp.CollaborationProduct
+	}
+
+	eOutput, err := cData.Information.FindEmptyFields()
+	if err != nil {
+		// log.Printf("Error %s", err.Error())
+		return nil, err
+	}
+
+	oData := ChangePhaseOuput{
+		MissedInformation: eOutput,
 	}
 
 	// Calculate Missed Phase Data here
