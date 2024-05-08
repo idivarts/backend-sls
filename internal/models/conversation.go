@@ -23,7 +23,7 @@ type Conversation struct {
 	UserProfile      *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
 	Phases           []int                  `json:"phases" dynamodbav:"phases"`
 	CurrentPhase     int                    `json:"currentPhase" dynamodbav:"currentPhase"`
-	Information      openaifc.ChangePhase   `json:"information" dynamodbav:"currentPhase"`
+	Information      *openaifc.ChangePhase  `json:"information" dynamodbav:"information"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
