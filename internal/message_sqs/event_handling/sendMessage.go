@@ -20,11 +20,14 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		return err
 	}
 	if run.Status == openai.COMPLETED_STATUS {
-		msgs, err := openai.GetMessages(conv.ThreadID, 1, conv.RunID)
+		msgs, err := openai.GetMessages(conv.ThreadID, 10, conv.RunID)
 		if err != nil {
 			return err
 		}
-		log.Println("Message received", len(msgs.Data[0].Content), msgs.Data[0].Content[0].Text.Value)
+		// log.Println("Message received", len(msgs.Data[0].Content), msgs.Data[0].Content[0].Text.Value)
+		for i, j := 0, len(msgs.Data)-1; i < j; i, j = i+1, j-1 {
+			msgs.Data[i], msgs.Data[j] = msgs.Data[j], msgs.Data[i]
+		}
 
 		for _, v := range msgs.Data {
 			if v.RunID == conv.RunID {
