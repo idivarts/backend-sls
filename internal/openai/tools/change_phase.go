@@ -73,6 +73,9 @@ func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall
 	if cp.Phase == 6 {
 		oData.MissedPhases = []int{}
 	} else {
+		if cData.Phases == nil {
+			cData.Phases = []int{1}
+		}
 		// Fetch data from dynamodb and calculate missed phase
 		if len(cData.Phases) > 0 && cData.Phases[len(cData.Phases)-1] != cp.Phase {
 			cData.Phases = append(cData.Phases, cp.Phase)
