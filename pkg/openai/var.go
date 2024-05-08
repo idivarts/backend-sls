@@ -16,7 +16,8 @@ var (
 type AssistantID string
 
 const (
-	ArjunAssistant AssistantID = "asst_3rJKwjfT1VeXRh6KHLg4hQoM"
+	ArjunAssistant_v1 AssistantID = "asst_3rJKwjfT1VeXRh6KHLg4hQoM"
+	ArjunAssistant    AssistantID = "asst_mIiUVRzX8IcBovzLfGhNQoh3"
 )
 
 func init() {

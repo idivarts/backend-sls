@@ -9,9 +9,16 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
+type FunctionName string
+
+const (
+	CanConversationEndFn FunctionName = "can_conversation_end"
+	ChangePhaseFn        FunctionName = "change_phase"
+)
+
 type ToolFunction struct {
-	Name      string `json:"name"`      // "name": "can_conversation_end"
-	Arguments string `json:"arguments"` // "arguments": "{"enagement":"10k","views":"30K","video_category":"GRWM","brand_category":"Fashion,Beauty"}"
+	Name      FunctionName `json:"name"`      // "name": "can_conversation_end"
+	Arguments string       `json:"arguments"` // "arguments": "{"enagement":"10k","views":"30K","video_category":"GRWM","brand_category":"Fashion,Beauty"}"
 }
 
 type ToolCall struct {

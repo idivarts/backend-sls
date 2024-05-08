@@ -6,7 +6,7 @@ import (
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
+	openaitools "github.com/TrendsHub/th-backend/internal/message_sqs/openai_tools"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
@@ -37,32 +37,22 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		}
 		return errors.New("Cant find the message even after completion of Run --" + conv.RunID)
 	} else if run.Status == openai.REQUIRES_ACTION_STATUS {
-		log.Println("Requires Action", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].ID, "\n", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name, run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Arguments)
-		if run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name == "can_conversation_end" {
-			cce := &openaifc.CanConversationEnd{}
-			err = cce.ParseJson(run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Arguments)
-			if err != nil {
-				// log.Printf("Error %s", err.Error())
-				return err
+		toolOutput := []openai.ToolOutput{}
+		for _, toolOption := range run.RequiredAction.SubmitToolOutputs.ToolCalls {
+			if toolOption.Function.Name == openai.CanConversationEndFn {
+				t, err := openaitools.CanConversationEnd((toolOption))
+				if err != nil {
+					return err
+				}
+				toolOutput = append(toolOutput, *t)
+			} else {
+				return errors.New("Not implemented function -- " + string(toolOption.Function.Name))
 			}
-			eOutput, err := cce.FindEmptyFields()
-			if err != nil {
-				// log.Printf("Error %s", err.Error())
-				return err
-			}
-			log.Println("Output to be send", *eOutput)
-			_, err = openai.SubmitToolOutput(conv.ThreadID, conv.RunID, []openai.ToolOutput{
-				{
-					ToolCallId: run.RequiredAction.SubmitToolOutputs.ToolCalls[0].ID,
-					Output:     *eOutput,
-				},
-			})
-			if err != nil {
-				// log.Printf("Error %s", err.Error())
-				return err
-			}
-		} else {
-			return errors.New("Not implemented function -- " + run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name)
+		}
+		_, err = openai.SubmitToolOutput(conv.ThreadID, conv.RunID, toolOutput)
+		if err != nil {
+			// log.Printf("Error %s", err.Error())
+			return err
 		}
 		// return
 	} else if run.Status == openai.EXPIRED_STATUS {
