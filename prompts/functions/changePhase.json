@@ -10,11 +10,11 @@
         },
         "interestInService": {
           "type": "boolean",
-          "description": "This determines if the user is interested in trendshub service or not. This parameter is typically collected in phase 1 of conversation."
+          "description": "This determines if the user is interested in trendshub service or not. Send true if user is interested. Send false if user not interested. This parameter is typically collected in phase 1 of conversation."
         },
         "interestInApp": {
           "type": "boolean",
-          "description": "This determines if the user is interested in installing trendshub app or not. This parameter is typically collected in phase 3 of conversation."
+          "description": "This determines if the user is interested in installing trendshub app or not. Send true if user is interested. Send false if user not interested. This parameter is typically collected in phase 3 of conversation."
         },
         "engagement": {
           "type": "string",
