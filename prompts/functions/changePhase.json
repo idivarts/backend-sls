@@ -1,6 +1,6 @@
 {
     "name": "change_phase",
-    "description": "This function is called in every run operation. The purpose of this function is to send the current phase of conversation in the function parameters. This function returns a number. If the number returned is same as the current phase, keep proceeding the coversation. If the returned number is different from the current phase, change the phase of conversation swiftly",
+    "description": "This function is called in every run operation. The purpose of this function is to send and process any collected information from the chat. This function returns an array of string. That string array identifies that what all information is yet to be collected from the user before they can end the conversation",
     "parameters": {
       "type": "object",
       "properties": {
@@ -10,11 +10,35 @@
         },
         "interestInService": {
           "type": "boolean",
-          "description": "This determines if the user is interested in trendshub service or not. This parameter is typically collected in phase 1 of conversation"
+          "description": "This determines if the user is interested in trendshub service or not. This parameter is typically collected in phase 1 of conversation."
         },
         "interestInApp": {
           "type": "boolean",
-          "description": "This determines if the user is interested in installing trendshub app or not. This parameter is typically collected in phase 3 of conversation"
+          "description": "This determines if the user is interested in installing trendshub app or not. This parameter is typically collected in phase 3 of conversation."
+        },
+        "engagement": {
+          "type": "string",
+          "description": "The total engagement of user on there instagram account. Eg. 1000 engagement in past 2 weeks. Typically this data is collected in phase 2."
+        },
+        "views": {
+          "type": "string",
+          "description": "Total views on there instagram account. Eg. 1M views in past 30 days. Typically this data is collected in phase 2."
+        },
+        "video_category": {
+            "type": "string",
+            "description": "This defines the type of video the content creator normally make. This can contain multiple video categories too. Eg. Comedy video or Informational Video or Video on Political agenda. Typically this data is collected in phase 2."
+        },
+        "brand_category": {
+            "type": "string",
+            "description": "This defines what kind of brand does user wants to collaborate with. This can contain multiple brand categories. Eg. Fashion brand or shoe brand or electronics brands. Typically this data is collected in phase 2."
+        },
+        "collaboration_brand": {
+          "type": "string",
+          "description": "The brand name that the user wants to collaborate with. Typically this data is collected in phase 4."
+        },
+        "collaboration_product": {
+          "type": "string",
+          "description": "The product or the category of product or the list of product which the user would like to collaborate with. Typically this data is collected in phase 4."
         }
       },
       "required": [
