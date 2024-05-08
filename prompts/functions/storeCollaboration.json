@@ -1,0 +1,18 @@
+{
+    "name": "store_collaboration",
+    "description": "This function is triggered whenever the user fills in any about the collaboration they want to be doing",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "brand": {
+          "type": "string",
+          "description": "The brand name that the user wants to collaborate with"
+        },
+        "product": {
+          "type": "string",
+          "description": "The product or the category of product or the list of product which the user would like to collaborate with"
+        }
+      },
+      "required": ["brand"]
+    }
+  }

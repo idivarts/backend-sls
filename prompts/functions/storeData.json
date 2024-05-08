@@ -1,6 +1,6 @@
 {
-    "name": "can_conversation_end",
-    "description": "This function determines if all the data has been collected from the influencer or not. If few data is missing, then function will return the list of data yet to be collected. If all data is successfully collected, then function will return empty array. Empty array signifies that the chat assistant can end the conversation with the user.",
+    "name": "store_data",
+    "description": "This function is triggered whenever the user fills in any important information mentioned in the parameters. This function returns an array of string identifying that which all parameters are still to be collected from the user",
     "parameters": {
       "type": "object",
       "properties": {

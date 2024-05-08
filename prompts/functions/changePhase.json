@@ -1,16 +1,24 @@
 {
-    "name": "should_send_reminder",
-    "description": "Analyze the last message and decide if the run operation should send any message or not",
+    "name": "change_phase",
+    "description": "This function is called in every run operation. The purpose of this function is to send the current phase of conversation in the function parameters. This function returns a number. If the number returned is same as the current phase, keep proceeding the coversation. If the returned number is different from the current phase, change the phase of conversation swiftly",
     "parameters": {
       "type": "object",
       "properties": {
-        "state": {
+        "phase": {
+          "type": "number",
+          "description": "This is a number identifying the current phase of conversation"
+        },
+        "interestInService": {
           "type": "boolean",
-          "description": "if the boolean is true that means that its worth to send the reminder message to the user. If state is false then dont send any reminder nessage to the user"
+          "description": "This determines if the user is interested in trendshub service or not. This parameter is typically collected in phase 1 of conversation"
+        },
+        "interestInApp": {
+          "type": "boolean",
+          "description": "This determines if the user is interested in installing trendshub app or not. This parameter is typically collected in phase 3 of conversation"
         }
       },
       "required": [
-        "state"
+        "phase"
       ]
     }
 }
