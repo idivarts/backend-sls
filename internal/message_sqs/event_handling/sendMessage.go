@@ -6,7 +6,7 @@ import (
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	openaitools "github.com/TrendsHub/th-backend/internal/message_sqs/openai_tools"
+	openaitools "github.com/TrendsHub/th-backend/internal/openai/tools"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
@@ -40,7 +40,13 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		toolOutput := []openai.ToolOutput{}
 		for _, toolOption := range run.RequiredAction.SubmitToolOutputs.ToolCalls {
 			if toolOption.Function.Name == openai.CanConversationEndFn {
-				t, err := openaitools.CanConversationEnd((toolOption))
+				t, err := openaitools.CanConversationEnd(toolOption)
+				if err != nil {
+					return err
+				}
+				toolOutput = append(toolOutput, *t)
+			} else if toolOption.Function.Name == openai.ChangePhaseFn {
+				t, err := openaitools.ChangePhaseFn(toolOption)
 				if err != nil {
 					return err
 				}

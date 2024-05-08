@@ -25,5 +25,4 @@ func CanConversationEnd(toolOption openai.ToolCall) (*openai.ToolOutput, error) 
 		ToolCallId: toolOption.ID,
 		Output:     *eOutput,
 	}, nil
-
 }
