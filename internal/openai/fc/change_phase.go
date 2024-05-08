@@ -6,15 +6,15 @@ import (
 )
 
 type ChangePhase struct {
-	Phase                string `json:"phase"`
-	Engagement           string `json:"engagement"`
-	Views                string `json:"views"`
-	VideoCategory        string `json:"video_category"`
-	BrandCategory        string `json:"brand_category"`
-	InterestedInService  string `json:"interestInService"`
-	InterestedInApp      string `json:"interestInApp"`
-	CollaborationBrand   string `json:"collaboration_brand"`
-	CollaborationProduct string `json:"collaboration_product"`
+	Phase                int    `json:"phase" dynamodbav:"phase"`
+	Engagement           string `json:"engagement" dynamodbav:"engagement"`
+	Views                string `json:"views" dynamodbav:"views"`
+	VideoCategory        string `json:"video_category" dynamodbav:"video_category"`
+	BrandCategory        string `json:"brand_category" dynamodbav:"brand_category"`
+	InterestedInService  *bool  `json:"interestInService,omitempty" dynamodbav:"interestInService"`
+	InterestedInApp      *bool  `json:"interestInApp,omitempty" dynamodbav:"interestInApp"`
+	CollaborationBrand   string `json:"collaboration_brand" dynamodbav:"collaboration_brand"`
+	CollaborationProduct string `json:"collaboration_product" dynamodbav:"collaboration_product"`
 }
 
 func (c *ChangePhase) ParseJson(str string) error {

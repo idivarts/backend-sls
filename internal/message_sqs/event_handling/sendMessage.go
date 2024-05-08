@@ -46,7 +46,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 				}
 				toolOutput = append(toolOutput, *t)
 			} else if toolOption.Function.Name == openai.ChangePhaseFn {
-				t, err := openaitools.ChangePhaseFn(toolOption)
+				t, err := openaitools.ChangePhaseFn(conv, toolOption)
 				if err != nil {
 					return err
 				}

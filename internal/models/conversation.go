@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 
+	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
 	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -14,10 +15,13 @@ const (
 )
 
 type Conversation struct {
-	IGSID            string `json:"igsid" dynamodbav:"igsid"`
-	ThreadID         string `json:"threadId" dynamodbav:"threadId"`
-	LastMID          string `json:"lastMid" dynamodbav:"lastMid"`
-	IsProfileFetched bool   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
+	IGSID            string               `json:"igsid" dynamodbav:"igsid"`
+	ThreadID         string               `json:"threadId" dynamodbav:"threadId"`
+	LastMID          string               `json:"lastMid" dynamodbav:"lastMid"`
+	IsProfileFetched bool                 `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
+	Phases           []int                `json:"phases" dynamodbav:"phases"`
+	CurrentPhase     int                  `json:"currentPhase" dynamodbav:"currentPhase"`
+	Information      openaifc.ChangePhase `json:"information" dynamodbav:"currentPhase"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
