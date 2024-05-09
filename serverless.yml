@@ -42,6 +42,8 @@ provider:
 
 plugins:
   - serverless-go-plugin
+  - serverless-domain-manager
+  - serverless-certificate-creator
   # - serverless-lift
 
 custom:
@@ -53,6 +55,23 @@ custom:
     monorepo: false # if enabled, builds function every directory (useful for monorepo where go.mod is managed by each function
     supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level) 
     buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
+  customCertificate:
+    certificateName: '*.trendshub.co.in'
+    # idempotencyToken: 'abcsomedomainio' //optional
+    # hostedZoneNames: 'trendshub.co.in'
+    hostedZoneIds: Z080267715NZAAP58PC3U
+    # region: eu-west-1 // optional - default is us-east-1 which is required for custom api gateway domains of Type Edge (default)
+    enabled: true
+    rewriteRecords: false
+  customDomain:
+    rest:
+      domainName: backend.trendshub.co.in
+      basePath: api
+      certificateName: '*.trendshub.co.in'
+      createRoute53Record: true
+      createRoute53IPv6Record: true
+      endpointType: 'regional'
+      securityPolicy: tls_1_2
 
 functions:
   message_wh:

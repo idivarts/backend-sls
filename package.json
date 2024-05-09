@@ -1,5 +1,7 @@
 {
   "devDependencies": {
+    "serverless-certificate-creator": "^1.6.0",
+    "serverless-domain-manager": "^7.3.8",
     "serverless-go-plugin": "^2.4.0",
     "serverless-lift": "^1.28.1"
   },
