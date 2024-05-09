@@ -34,7 +34,9 @@ func main() {
 	}
 	cData.Insert()
 
-	openai.SendMessage(thread.ID, "Hello Rahul, How are you doing?\nI came across your profile. Would you be interested to collab with brands?", true)
+	fMsg := "Hello Debangana, How are you doing?\nI came across your profile. Would you be interested to collab with brands?"
+	openai.SendMessage(thread.ID, fMsg, true)
+	log.Println("\n---------------------\nArjun :", fMsg, "\n---------------------")
 
 	for i := 0; i < 100; i++ {
 		fmt.Print("Enter your input: ")
@@ -106,7 +108,7 @@ func main() {
 		}
 
 		for _, v := range messages.Data {
-			log.Println("Arjun :", v.Content[0].Text.Value)
+			log.Println("\n---------------------\nArjun :", v.Content[0].Text.Value, "\n---------------------")
 		}
 	}
 
