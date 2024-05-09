@@ -64,14 +64,14 @@ custom:
     enabled: true
     rewriteRecords: false
   customDomain:
-    rest:
-      domainName: backend.trendshub.co.in
-      basePath: api
-      certificateName: '*.trendshub.co.in'
-      createRoute53Record: true
-      createRoute53IPv6Record: true
-      endpointType: 'regional'
-      securityPolicy: tls_1_2
+    domainName: backend.trendshub.co.in
+    basePath: ''
+    stage: dev
+    certificateName: '*.trendshub.co.in'
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: 'regional'
+    securityPolicy: tls_1_2
 
 functions:
   message_wh:
