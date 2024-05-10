@@ -24,6 +24,8 @@ type Conversation struct {
 	Phases           []int                  `json:"phases" dynamodbav:"phases"`
 	CurrentPhase     int                    `json:"currentPhase" dynamodbav:"currentPhase"`
 	Information      openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
+	MessageQueue     *string                `json:"messageQueue" dynamodbav:"messageQueue"`
+	ReminderQueue    *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
@@ -127,3 +129,61 @@ func (c *Conversation) UpdateProfileFetched() (*dynamodb.UpdateItemOutput, error
 	}
 	return result, nil
 }
+
+// // Function to update the MessageQueue field in DynamoDB
+// func (conversation Conversation) UpdateMessageQueue() error {
+// 	// Update the MessageQueue field in the DynamoDB item
+// 	input := &dynamodb.UpdateItemInput{
+// 		TableName: aws.String(tableName),
+// 		Key: map[string]*dynamodb.AttributeValue{
+// 			"igsid": {
+// 				S: aws.String(conversation.IGSID),
+// 			},
+// 		},
+// 		ExpressionAttributeNames: map[string]*string{
+// 			"#MQ": aws.String("messageQueue"),
+// 		},
+// 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+// 			":mq": {
+// 				SS: aws.StringSlice(conversation.MessageQueue),
+// 			},
+// 		},
+// 		UpdateExpression: aws.String("SET #MQ = :mq"),
+// 	}
+
+// 	_, err := dynamodbhandler.Client.UpdateItem(input)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }
+
+// // Function to update the MessageQueue field in DynamoDB
+// func (conversation Conversation) UpdateReminderQueue() error {
+// 	// Update the MessageQueue field in the DynamoDB item
+// 	input := &dynamodb.UpdateItemInput{
+// 		TableName: aws.String(tableName),
+// 		Key: map[string]*dynamodb.AttributeValue{
+// 			"igsid": {
+// 				S: aws.String(conversation.IGSID),
+// 			},
+// 		},
+// 		ExpressionAttributeNames: map[string]*string{
+// 			"#MQ": aws.String("reminderQueue"),
+// 		},
+// 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+// 			":mq": {
+// 				SS: aws.StringSlice(conversation.ReminderQueue),
+// 			},
+// 		},
+// 		UpdateExpression: aws.String("SET #MQ = :mq"),
+// 	}
+
+// 	_, err := dynamodbhandler.Client.UpdateItem(input)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }

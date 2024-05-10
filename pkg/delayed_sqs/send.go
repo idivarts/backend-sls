@@ -31,7 +31,7 @@ type SFNMessage struct {
 	Message      string `json:"message"`
 }
 
-func Send(message string, delayInSeconds int64) error {
+func Send(message string, delayInSeconds int64) (*sfn.StartExecutionOutput, error) {
 
 	// Specify the ARN of your Step Functions state machine
 	topicARN := os.Getenv("SEND_MESSAGE_QUEUE_ARN")
@@ -44,7 +44,7 @@ func Send(message string, delayInSeconds int64) error {
 	}
 	input, err := json.Marshal(&inputObj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Println("Input Object", inputObj)
@@ -55,11 +55,14 @@ func Send(message string, delayInSeconds int64) error {
 		Input:           aws.String(string(input)),
 	})
 
+	// svc.StopExecution(&sfn.StopExecutionInput{
+
+	// })
 	if err != nil {
 		fmt.Println("Error starting execution:", err)
-		return err
+		return nil, err
 	}
 
 	fmt.Println("Execution started successfully:", *result.ExecutionArn)
-	return nil
+	return result, nil
 }
