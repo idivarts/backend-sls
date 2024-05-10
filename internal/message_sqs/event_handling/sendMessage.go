@@ -6,6 +6,7 @@ import (
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
+	"github.com/TrendsHub/th-backend/internal/models"
 	openaitools "github.com/TrendsHub/th-backend/internal/openai/tools"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
@@ -29,16 +30,33 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 			msgs.Data[i], msgs.Data[j] = msgs.Data[j], msgs.Data[i]
 		}
 
+		mID := ""
 		for _, v := range msgs.Data {
 			if v.RunID == conv.RunID {
 				aMsg := v.Content[0].Text
 				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
-				messenger.SendTextMessage(conv.IGSID, aMsg.Value)
-
-				return nil
+				mResp, err := messenger.SendTextMessage(conv.IGSID, aMsg.Value)
+				if err != nil {
+					return err
+				}
+				mID = mResp.MessageID
+				// return nil
 			}
 		}
-		return errors.New("Cant find the message even after completion of Run --" + conv.RunID)
+		if mID == "" {
+			return errors.New("Cant find the message even after completion of Run --" + conv.RunID)
+		}
+		cData := &models.Conversation{}
+		err = cData.Get(conv.IGSID)
+		if err != nil {
+			return err
+		}
+		cData.LastMID = mID
+		_, err = cData.Insert()
+		if err != nil {
+			return err
+		}
+		return nil
 	} else if run.Status == openai.REQUIRES_ACTION_STATUS {
 		toolOutput := []openai.ToolOutput{}
 		for _, toolOption := range run.RequiredAction.SubmitToolOutputs.ToolCalls {

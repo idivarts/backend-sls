@@ -26,7 +26,7 @@ func TestGetAll(t *testing.T) {
 	}
 }
 func messageParticipant(igSid string, t *testing.T) {
-	err := messenger.SendTextMessage(igSid, "Hello Everyone! Final test is here")
+	_, err := messenger.SendTextMessage(igSid, "Hello Everyone! Final test is here")
 	if err != nil {
 		t.Log(err)
 		t.Fail()

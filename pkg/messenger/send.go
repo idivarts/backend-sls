@@ -51,6 +51,10 @@ type ISendMessage struct {
 	Recipient Recipient   `json:"recipient"`
 	Message   MessageUnit `json:"message"`
 }
+type IMessageResponse struct {
+	RecipientID string `json:"recipient_id"`
+	MessageID   string `json:"message_id"`
+}
 
 func GetRecepientIDFromParticipants(participants Participants) string {
 	if len(participants.Data) > 2 {
@@ -64,7 +68,7 @@ func GetRecepientIDFromParticipants(participants Participants) string {
 
 	return "Not Found"
 }
-func SendTextMessage(recipientID string, msg string) error {
+func SendTextMessage(recipientID string, msg string) (*IMessageResponse, error) {
 	message := ISendMessage{
 		Recipient: Recipient{
 			ID: recipientID,
@@ -75,11 +79,11 @@ func SendTextMessage(recipientID string, msg string) error {
 	}
 	return sendMessage(message)
 }
-func sendMessage(message ISendMessage) error {
+func sendMessage(message ISendMessage) (*IMessageResponse, error) {
 	// Convert the message struct to JSON
 	jsonBytes, err := json.Marshal(message)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	url := baseURL + "/" + apiVersion + "/me/messages?access_token=" + pageAccessToken
 	fmt.Println(url)
@@ -87,20 +91,26 @@ func sendMessage(message ISendMessage) error {
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		fmt.Println(err.Error())
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	rData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	// rStr := string(rData)
 	fmt.Println("Status Code", resp.StatusCode, string(rData))
 
 	// Check the response status
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	return nil
+	rObj := &IMessageResponse{}
+	err = json.Unmarshal(rData, rObj)
+	if err != nil {
+		return nil, err
+	}
+	return rObj, nil
 }
