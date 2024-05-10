@@ -49,6 +49,15 @@ func Receive(c *gin.Context) {
 				if err != nil {
 					log.Println(err.Error())
 				}
+			} else if mType == instainterfaces.MessageTypeRead {
+				err = mwh_handler.IGMessagehandler{
+					IGSID: entry.Sender.ID,
+					Read:  entry.Read,
+					// ConversationID: ,
+				}.HandleMessage()
+				if err != nil {
+					log.Println(err.Error())
+				}
 			}
 		}
 	}

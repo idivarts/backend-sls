@@ -18,12 +18,13 @@ type IGMessagehandler struct {
 	ConversationID   string
 	IGSID            string
 	Message          *instainterfaces.Message
+	Read             *instainterfaces.Read
 	conversationData *models.Conversation
 }
 
 func (msg IGMessagehandler) HandleMessage() error {
-	if msg.Message == nil {
-		return errors.New("Message Body is empty")
+	if msg.Message == nil && msg.Read == nil {
+		return errors.New("Message and Read Body is empty")
 	}
 
 	log.Println("Getting the conversation from dynamoDB")
@@ -39,8 +40,46 @@ func (msg IGMessagehandler) HandleMessage() error {
 		}
 		// return nil
 	}
-	err = msg.handleMessageThreadOperation()
+	if msg.Message != nil {
+		err = msg.handleMessageThreadOperation()
+	} else if msg.Read != nil {
+		err = msg.handleReadOperation()
+	}
 	return err
+}
+func (msg IGMessagehandler) handleReadOperation() error {
+	oList, err := messenger.GetConversationMessages(msg.ConversationID)
+	if err != nil {
+		return err
+	}
+	if len(oList.Messages.Data) == 0 {
+		return errors.New("No Messages")
+	}
+	log.Println("Last Message Stat", oList.Messages.Data[0].From.ID, oList.ID)
+	if oList.Messages.Data[0].From.ID == oList.ID && msg.conversationData.CurrentPhase < 5 {
+		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
+		event := sqsevents.ConversationEvent{
+			IGSID:    msg.conversationData.IGSID,
+			ThreadID: msg.conversationData.ThreadID,
+			MID:      msg.conversationData.LastMID,
+			Action:   sqsevents.REMINDER,
+		}
+		jData, err := json.Marshal(event)
+		if err != nil {
+			return err
+		}
+		execArn, err := delayedsqs.Send(string(jData), int64(READ_REMINDER_SECONDS))
+		if err != nil {
+			return err
+		}
+		msg.conversationData.ReminderQueue = execArn.ExecutionArn
+
+		_, err = msg.conversationData.Insert()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
@@ -135,7 +174,7 @@ func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) 
 		if err != nil {
 			return nil, err
 		}
-		lastMid = msg.Message.Mid
+		lastMid = entry.ID
 	}
 
 	log.Println("Inserting the Conversation Model", msg.IGSID, threadId)
