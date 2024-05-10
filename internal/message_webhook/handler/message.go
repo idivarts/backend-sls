@@ -10,7 +10,6 @@ import (
 	timehandler "github.com/TrendsHub/th-backend/internal/time_handler"
 	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 )
 
@@ -47,40 +46,7 @@ func (msg IGMessagehandler) HandleMessage() error {
 	}
 	return err
 }
-func (msg IGMessagehandler) handleReadOperation() error {
-	oList, err := messenger.GetConversationMessages(msg.ConversationID)
-	if err != nil {
-		return err
-	}
-	if len(oList.Messages.Data) == 0 {
-		return errors.New("No Messages")
-	}
-	log.Println("Last Message Stat", oList.Messages.Data[0].From.ID, oList.ID)
-	if oList.Messages.Data[0].From.ID == oList.ID && msg.conversationData.CurrentPhase < 5 {
-		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
-		event := sqsevents.ConversationEvent{
-			IGSID:    msg.conversationData.IGSID,
-			ThreadID: msg.conversationData.ThreadID,
-			MID:      msg.conversationData.LastMID,
-			Action:   sqsevents.REMINDER,
-		}
-		jData, err := json.Marshal(event)
-		if err != nil {
-			return err
-		}
-		execArn, err := delayedsqs.Send(string(jData), int64(READ_REMINDER_SECONDS))
-		if err != nil {
-			return err
-		}
-		msg.conversationData.ReminderQueue = execArn.ExecutionArn
 
-		_, err = msg.conversationData.Insert()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
 	_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, false)
@@ -146,48 +112,4 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	log.Println("Message sent to the queue after", *sendTimeDuration)
 
 	return nil
-}
-func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) {
-	log.Println("Creating new Message Thread")
-	thread, err := openai.CreateThread()
-	if err != nil {
-		return nil, err
-	}
-	threadId := thread.ID
-
-	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(msg.IGSID)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(convIds.Data) == 0 {
-		return nil, errors.New("Cant find any conversation with this userid")
-	}
-
-	lastMid := ""
-	conv := convIds.Data[0]
-	for i := len(conv.Messages.Data) - 1; i >= 1; i-- {
-		entry := &conv.Messages.Data[i]
-		log.Println("Sending Message", threadId, entry.Message, msg.IGSID != entry.From.ID)
-		_, err = openai.SendMessage(threadId, entry.Message, msg.IGSID != entry.From.ID)
-		if err != nil {
-			return nil, err
-		}
-		lastMid = entry.ID
-	}
-
-	log.Println("Inserting the Conversation Model", msg.IGSID, threadId)
-	data := &models.Conversation{
-		IGSID:    msg.IGSID,
-		ThreadID: threadId,
-		LastMID:  lastMid,
-	}
-	_, err = (data).Insert()
-	if err != nil {
-		return nil, err
-	}
-
-	// openai.SendMessage(threadId, msg.Message.Text, false)
-	return data, nil
 }
