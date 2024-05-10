@@ -22,6 +22,7 @@ provider:
         - Effect: "Allow"
           Action:
             - "states:StartExecution"
+            - "states:StopExecution"
           Resource: { "Fn::GetAtt" : ["StepFunctionsStateMachine","Arn"]  }
         - Effect: "Allow"
           Action:
