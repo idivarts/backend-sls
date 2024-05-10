@@ -35,12 +35,13 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 			if v.RunID == conv.RunID {
 				aMsg := v.Content[0].Text
 				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
-				mResp, err := messenger.SendTextMessage(conv.IGSID, aMsg.Value)
-				if err != nil {
-					return err
+				mResp, _ := messenger.SendTextMessage(conv.IGSID, aMsg.Value)
+				// if err != nil {
+				// 	return err
+				// }
+				if mResp != nil {
+					mID = mResp.MessageID
 				}
-				mID = mResp.MessageID
-				// return nil
 			}
 		}
 		if mID == "" {
