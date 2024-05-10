@@ -22,8 +22,12 @@ provider:
         - Effect: "Allow"
           Action:
             - "states:StartExecution"
-            - "states:StopExecution"
           Resource: { "Fn::GetAtt" : ["StepFunctionsStateMachine","Arn"]  }
+        - Effect: "Allow"
+          Action:
+            - "states:StopExecution"
+          Resource: { "Fn::Join" : ["", ["arn:aws:states:*:*:execution:", { "Fn::GetAtt" : ["StepFunctionsStateMachine","Name"]  }, ":*" ] ]  }
+          # "arn:aws:states:::execution::*"
         - Effect: "Allow"
           Action:
             - "sqs:sendmessage"
