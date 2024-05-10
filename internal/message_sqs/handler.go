@@ -36,6 +36,8 @@ func sendMessage(message string) error {
 
 	if conv.Action == sqsevents.SEND_MESSAGE {
 		return eventhandling.WaitAndSend(conv)
+	} else if conv.Action == sqsevents.REMINDER {
+		return eventhandling.SendReminder(conv)
 	} else {
 		return eventhandling.RunOpenAI(conv)
 	}
