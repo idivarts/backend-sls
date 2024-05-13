@@ -74,6 +74,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 
 	if msg.PageID != msg.IGSID {
 		delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
+		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
 
 		log.Println("Timing the Duration for the next message")
 		// Generate a random integer between 0 and 10
