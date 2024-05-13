@@ -9,7 +9,7 @@ import (
 	"github.com/TrendsHub/th-backend/pkg/openai"
 )
 
-func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) {
+func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessage bool) (*models.Conversation, error) {
 	log.Println("Creating new Message Thread")
 	thread, err := openai.CreateThread()
 	if err != nil {
@@ -18,7 +18,7 @@ func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) 
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(msg.IGSID)
+	convIds, err := messenger.GetConversationsByUserId(convId)
 	if err != nil {
 		return nil, err
 	}
@@ -29,27 +29,35 @@ func (msg IGMessagehandler) createMessageThread() (*models.Conversation, error) 
 
 	lastMid := ""
 	conv := convIds.Data[0]
-	for i := len(conv.Messages.Data) - 1; i >= 1; i-- {
+
+	lastindex := 1
+	if includeLastMessage {
+		lastindex = 0
+	}
+	for i := len(conv.Messages.Data) - 1; i >= lastindex; i-- {
 		entry := &conv.Messages.Data[i]
-		log.Println("Sending Message", threadId, entry.Message, msg.IGSID != entry.From.ID)
-		_, err = openai.SendMessage(threadId, entry.Message, msg.IGSID != entry.From.ID)
+		log.Println("Sending Message", threadId, entry.Message, msg.PageID == entry.From.ID)
+		_, err = openai.SendMessage(threadId, entry.Message, msg.PageID == entry.From.ID)
 		if err != nil {
 			return nil, err
 		}
 		lastMid = entry.ID
 	}
 
-	log.Println("Inserting the Conversation Model", msg.IGSID, threadId)
-	data := &models.Conversation{
-		IGSID:    msg.IGSID,
-		ThreadID: threadId,
-		LastMID:  lastMid,
-	}
-	_, err = (data).Insert()
+	log.Println("Inserting the Conversation Model", convId, threadId)
+	msg.conversationData.IGSID = convId
+	msg.conversationData.ThreadID = threadId
+	msg.conversationData.LastMID = lastMid
+	// data := &models.Conversation{
+	// 	IGSID:    convId,
+	// 	ThreadID: threadId,
+	// 	LastMID:  lastMid,
+	// }
+	_, err = (msg.conversationData).Insert()
 	if err != nil {
 		return nil, err
 	}
 
 	// openai.SendMessage(threadId, msg.Message.Text, false)
-	return data, nil
+	return msg.conversationData, nil
 }

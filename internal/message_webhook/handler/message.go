@@ -35,20 +35,26 @@ func (msg IGMessagehandler) HandleMessage() error {
 		convId = msg.Entry.Recipient.ID
 	}
 	err := msg.conversationData.Get(convId)
-
-	if err != nil || msg.conversationData.IGSID == "" {
+	if msg.Message.IsDeleted {
+		log.Println("Deleting and creating a brand new thread")
+		msg.conversationData, err = msg.createMessageThread(convId, true)
+		if err != nil {
+			return err
+		}
+		return nil
+	} else if err != nil || msg.conversationData.IGSID == "" {
 		// This is where I would need to create a new instance
 		log.Println("Error Finding IGSID")
-		msg.conversationData, err = msg.createMessageThread()
+		msg.conversationData, err = msg.createMessageThread(convId, false)
 		if err != nil {
 			return err
 		}
 	}
-	if msg.Message != nil {
-		err = msg.handleMessageThreadOperation()
-	} else if msg.Read != nil {
-		err = msg.handleReadOperation()
-	}
+	// if msg.Message != nil {
+	err = msg.handleMessageThreadOperation()
+	// } else if msg.Read != nil {
+	// 	err = msg.handleReadOperation()
+	// }
 	return err
 }
 
