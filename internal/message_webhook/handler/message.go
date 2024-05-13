@@ -16,6 +16,8 @@ import (
 type IGMessagehandler struct {
 	ConversationID   string
 	IGSID            string
+	PageID           string
+	Entry            *instainterfaces.Messaging
 	Message          *instainterfaces.Message
 	Read             *instainterfaces.Read
 	conversationData *models.Conversation
@@ -29,15 +31,14 @@ func (msg IGMessagehandler) HandleMessage() error {
 	log.Println("Getting the conversation from dynamoDB")
 	msg.conversationData = &models.Conversation{}
 	err := msg.conversationData.Get(msg.IGSID)
+
 	if err != nil || msg.conversationData.IGSID == "" {
-		// return err
 		// This is where I would need to create a new instance
 		log.Println("Error Finding IGSID")
 		msg.conversationData, err = msg.createMessageThread()
 		if err != nil {
 			return err
 		}
-		// return nil
 	}
 	if msg.Message != nil {
 		err = msg.handleMessageThreadOperation()
@@ -48,68 +49,74 @@ func (msg IGMessagehandler) HandleMessage() error {
 }
 
 func (msg IGMessagehandler) handleMessageThreadOperation() error {
-	log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
-	_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, false)
-	if err != nil {
-		return err
+
+	msg.conversationData.LastMID = msg.Message.Mid
+
+	if msg.PageID != msg.IGSID ||
+		//Checking last time bot processed the message was more than 20 seconds before the recorded time
+		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-20000) {
+		log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
+		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, msg.PageID == msg.IGSID)
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err = msg.conversationData.UpdateLastMID(msg.Message.Mid)
-	if err != nil {
-		return err
-	}
+	if msg.PageID != msg.IGSID {
+		delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
 
-	// TODO Write code to time the send of message
-	log.Println("Timing the Duration for the next message")
+		log.Println("Timing the Duration for the next message")
+		// Generate a random integer between 0 and 10
+		sendTimeDuration, err := timehandler.CalculateMessageDelay(msg.conversationData) // Generates a random integer in [0, 11)
+		if err != nil {
+			return err
+		}
 
-	// Generate a random integer between 0 and 10
-	sendTimeDuration, err := timehandler.CalculateMessageDelay(msg.conversationData) // Generates a random integer in [0, 11)
-	if err != nil {
-		return err
-	}
-
-	delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
-	delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
-
-	event := sqsevents.ConversationEvent{
-		IGSID:    msg.conversationData.IGSID,
-		ThreadID: msg.conversationData.ThreadID,
-		MID:      msg.conversationData.LastMID,
-		Action:   sqsevents.RUN_OPENAI,
-	}
-	jData, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-	execArn, err := delayedsqs.Send(string(jData), int64(*sendTimeDuration))
-	if err != nil {
-		return err
-	}
-	msg.conversationData.MessageQueue = execArn.ExecutionArn
-
-	if msg.conversationData.CurrentPhase < 5 {
 		event := sqsevents.ConversationEvent{
 			IGSID:    msg.conversationData.IGSID,
 			ThreadID: msg.conversationData.ThreadID,
 			MID:      msg.conversationData.LastMID,
-			Action:   sqsevents.REMINDER,
+			Action:   sqsevents.RUN_OPENAI,
 		}
 		jData, err := json.Marshal(event)
 		if err != nil {
 			return err
 		}
-		execArn, err := delayedsqs.Send(string(jData), int64(REMINDER_SECONDS+(*sendTimeDuration)))
+		execArn, err := delayedsqs.Send(string(jData), int64(*sendTimeDuration))
 		if err != nil {
 			return err
 		}
-		msg.conversationData.ReminderQueue = execArn.ExecutionArn
+		msg.conversationData.MessageQueue = execArn.ExecutionArn
+		log.Println("Message sent to the queue after", *sendTimeDuration)
 	}
-	_, err = msg.conversationData.Insert()
+
+	if msg.PageID == msg.IGSID {
+		log.Println("Handling Reminder Logics", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
+		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
+		if msg.conversationData.CurrentPhase < 5 {
+			event := sqsevents.ConversationEvent{
+				IGSID:    msg.conversationData.IGSID,
+				ThreadID: msg.conversationData.ThreadID,
+				MID:      msg.conversationData.LastMID,
+				Action:   sqsevents.REMINDER,
+			}
+			jData, err := json.Marshal(event)
+			if err != nil {
+				return err
+			}
+			execArn, err := delayedsqs.Send(string(jData), int64(REMINDER_SECONDS))
+			if err != nil {
+				return err
+			}
+			msg.conversationData.ReminderQueue = execArn.ExecutionArn
+			log.Println("Reminder Set after", REMINDER_SECONDS, msg.IGSID)
+		} else {
+			log.Println("Ignoring reminder", msg.IGSID)
+		}
+	}
+	_, err := msg.conversationData.Insert()
 	if err != nil {
 		return err
 	}
-
-	log.Println("Message sent to the queue after", *sendTimeDuration)
-
 	return nil
 }

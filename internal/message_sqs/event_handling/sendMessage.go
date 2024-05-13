@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"time"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
@@ -25,9 +26,21 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		if err != nil {
 			return err
 		}
+		cData := &models.Conversation{}
+		err = cData.Get(conv.IGSID)
+		if err != nil {
+			return err
+		}
+
 		// log.Println("Message received", len(msgs.Data[0].Content), msgs.Data[0].Content[0].Text.Value)
 		for i, j := 0, len(msgs.Data)-1; i < j; i, j = i+1, j-1 {
 			msgs.Data[i], msgs.Data[j] = msgs.Data[j], msgs.Data[i]
+		}
+
+		cData.LastBotMessageTime = time.Now().UnixMilli()
+		_, err = cData.Insert()
+		if err != nil {
+			return err
 		}
 
 		mID := ""
@@ -47,16 +60,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		if mID == "" {
 			return errors.New("Cant find the message even after completion of Run --" + conv.RunID)
 		}
-		cData := &models.Conversation{}
-		err = cData.Get(conv.IGSID)
-		if err != nil {
-			return err
-		}
-		cData.LastMID = mID
-		_, err = cData.Insert()
-		if err != nil {
-			return err
-		}
+		// cData.LastMID = mID
 		return nil
 	} else if run.Status == openai.REQUIRES_ACTION_STATUS {
 		toolOutput := []openai.ToolOutput{}

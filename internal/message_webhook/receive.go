@@ -35,30 +35,34 @@ func Receive(c *gin.Context) {
 		pageId := message.Entry[i].ID
 		for j := 0; j < len(message.Entry[i].Messaging); j++ {
 			entry := &message.Entry[i].Messaging[j]
-			if pageId == entry.Sender.ID {
-				continue
-			}
+			// if pageId == entry.Sender.ID {
+			// 	continue
+			// }
 
 			mType := instainterfaces.CalcualateMessageType(entry)
 			if mType == instainterfaces.MessageTypeMessage {
 				err = mwh_handler.IGMessagehandler{
 					IGSID:   entry.Sender.ID,
 					Message: entry.Message,
-					// ConversationID: ,
-				}.HandleMessage()
-				if err != nil {
-					log.Println(err.Error())
-				}
-			} else if mType == instainterfaces.MessageTypeRead {
-				err = mwh_handler.IGMessagehandler{
-					IGSID: entry.Sender.ID,
-					Read:  entry.Read,
+					PageID:  pageId,
+					Entry:   entry,
 					// ConversationID: ,
 				}.HandleMessage()
 				if err != nil {
 					log.Println(err.Error())
 				}
 			}
+			// else if mType == instainterfaces.MessageTypeRead {
+			// 	err = mwh_handler.IGMessagehandler{
+			// 		IGSID:  entry.Sender.ID,
+			// 		Read:   entry.Read,
+			// 		PageID: pageId,
+			// 		// ConversationID: ,
+			// 	}.HandleMessage()
+			// 	if err != nil {
+			// 		log.Println(err.Error())
+			// 	}
+			// }
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{

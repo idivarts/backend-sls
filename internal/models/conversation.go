@@ -16,16 +16,17 @@ const (
 )
 
 type Conversation struct {
-	IGSID            string                 `json:"igsid" dynamodbav:"igsid"`
-	ThreadID         string                 `json:"threadId" dynamodbav:"threadId"`
-	LastMID          string                 `json:"lastMid" dynamodbav:"lastMid"`
-	IsProfileFetched bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
-	UserProfile      *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
-	Phases           []int                  `json:"phases" dynamodbav:"phases"`
-	CurrentPhase     int                    `json:"currentPhase" dynamodbav:"currentPhase"`
-	Information      openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
-	MessageQueue     *string                `json:"messageQueue" dynamodbav:"messageQueue"`
-	ReminderQueue    *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
+	IGSID              string                 `json:"igsid" dynamodbav:"igsid"`
+	ThreadID           string                 `json:"threadId" dynamodbav:"threadId"`
+	LastMID            string                 `json:"lastMid" dynamodbav:"lastMid"`
+	LastBotMessageTime int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
+	IsProfileFetched   bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
+	UserProfile        *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
+	Phases             []int                  `json:"phases" dynamodbav:"phases"`
+	CurrentPhase       int                    `json:"currentPhase" dynamodbav:"currentPhase"`
+	Information        openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
+	MessageQueue       *string                `json:"messageQueue" dynamodbav:"messageQueue"`
+	ReminderQueue      *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
