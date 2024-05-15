@@ -8,4 +8,6 @@ const (
 	pageID             = "me"
 	platform           = "instagram"
 	MyUserName         = "trendshub.ai"
+	ClientID           = "425629530178452"
+	ClientSecret       = "0babd776dab621585c2370dccec78f2f"
 )
