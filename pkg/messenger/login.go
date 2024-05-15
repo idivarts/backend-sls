@@ -12,11 +12,12 @@ type FacebookLoginRequest struct {
 
 	Accounts struct {
 		Data []struct {
+			AccessToken              string `json:"access_token"`
+			ID                       string `json:"id"`
 			InstagramBusinessAccount struct {
 				ID string `json:"id"`
 			} `json:"instagram_business_account"`
 			Name string `json:"name"`
-			ID   string `json:"id"`
 		} `json:"data"`
 		Paging struct {
 			Cursors struct {
