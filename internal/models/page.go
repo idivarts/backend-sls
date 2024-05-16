@@ -13,7 +13,8 @@ import (
 type Page struct {
 	PageID      string `json:"pageId" dynamodbav:"pageId"`
 	UserID      string `json:"userId" dynamodbav:"userId"`
-	AccessToken string
+	AccessToken string `json:"accessToken" dynamodbav:"accessToken"`
+	Status      int    `json:"status" dynamodbav:"status"`
 }
 
 func (c *Page) Insert() (*dynamodb.PutItemOutput, error) {
