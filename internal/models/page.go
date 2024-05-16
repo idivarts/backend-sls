@@ -2,7 +2,6 @@ package models
 
 import (
 	"fmt"
-	"os"
 
 	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
 	"github.com/aws/aws-sdk-go/aws"
@@ -70,7 +69,7 @@ func GetPagesByUserId(userId string) ([]Page, error) {
 	result, err := dynamodbhandler.Client.Scan(input)
 	if err != nil {
 		fmt.Println("Error scanning DynamoDB table:", err)
-		os.Exit(1)
+		return nil, err
 	}
 
 	pages := []Page{}
