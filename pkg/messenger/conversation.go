@@ -2,9 +2,9 @@ package messenger
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -99,9 +99,13 @@ func GetAllConversationInfo() (*ConversationData, error) {
 	defer resp.Body.Close()
 
 	// Read the response body
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
 	}
 
 	// Print the response body

@@ -2,6 +2,7 @@ package messenger
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -28,6 +29,11 @@ func GetLongLivedAccessToken(accessToken string) (*TokenResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(b))
+	}
+
 	log.Println("Token Url output", string(b))
 	token := &TokenResponse{}
 	err = json.Unmarshal(b, token)

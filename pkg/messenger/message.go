@@ -2,6 +2,7 @@ package messenger
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,6 +46,10 @@ func GetMessageInfo(messageID string) (*Message, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
 	}
 
 	// Print the response body

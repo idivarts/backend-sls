@@ -2,6 +2,7 @@ package messenger
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -55,6 +56,10 @@ func GetUser(igsid string) (*UserProfile, error) {
 	if err != nil {
 		fmt.Println("Error reading response body:", err)
 		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
 	}
 
 	data := &UserProfile{}
