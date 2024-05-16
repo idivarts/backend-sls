@@ -41,8 +41,11 @@ provider:
             - dynamodb:Query
             - dynamodb:Scan
           Resource:
-            Fn::GetAtt:
+            - Fn::GetAtt:
               - conversationTable
+              - Arn
+            - Fn::GetAtt:
+              - pageTable
               - Arn
 
 plugins:
@@ -115,6 +118,19 @@ resources:
             AttributeType: S
         KeySchema:
           - AttributeName: igsid
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    pageTable:
+      Type: AWS::DynamoDB::Table
+      Properties: 
+        TableName: pageTable
+        AttributeDefinitions: 
+          - AttributeName: pageId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pageId
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 1

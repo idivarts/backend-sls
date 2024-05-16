@@ -11,10 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
-const (
-	tableName string = "conversationTable"
-)
-
 type Conversation struct {
 	IGSID              string                 `json:"igsid" dynamodbav:"igsid"`
 	ThreadID           string                 `json:"threadId" dynamodbav:"threadId"`
@@ -35,7 +31,7 @@ func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
 		return nil, err
 	}
 	res, err := dynamodbhandler.Client.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String(tableName),
+		TableName: aws.String(conversationTable),
 		Item:      data,
 	})
 	return res, err
@@ -43,7 +39,7 @@ func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
 
 func (c *Conversation) Get(igsid string) error {
 	result, err := dynamodbhandler.Client.GetItem(&dynamodb.GetItemInput{
-		TableName: aws.String(tableName),
+		TableName: aws.String(conversationTable),
 		Key: map[string]*dynamodb.AttributeValue{
 			"igsid": {
 				S: aws.String(igsid),
@@ -76,7 +72,7 @@ func (c *Conversation) UpdateLastMID(mid string) (*dynamodb.UpdateItemOutput, er
 
 	// Construct the update input
 	input := &dynamodb.UpdateItemInput{
-		TableName: aws.String(tableName),
+		TableName: aws.String(conversationTable),
 		Key: map[string]*dynamodb.AttributeValue{
 			"igsid": {
 				S: aws.String(c.IGSID),
@@ -110,7 +106,7 @@ func (c *Conversation) UpdateProfileFetched() (*dynamodb.UpdateItemOutput, error
 
 	// Construct the update input
 	input := &dynamodb.UpdateItemInput{
-		TableName: aws.String(tableName),
+		TableName: aws.String(conversationTable),
 		Key: map[string]*dynamodb.AttributeValue{
 			"igsid": {
 				S: aws.String(c.IGSID),
