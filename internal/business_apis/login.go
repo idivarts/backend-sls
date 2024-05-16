@@ -1,6 +1,7 @@
 package businessapis
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/TrendsHub/th-backend/internal/models"
@@ -32,6 +33,7 @@ func Login(c *gin.Context) {
 
 	for _, v := range person.Accounts.Data {
 		lRes, err := messenger.GetLongLivedAccessToken(v.AccessToken)
+		log.Println("Token", v.AccessToken, lRes.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

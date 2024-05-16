@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -27,6 +28,7 @@ func GetLongLivedAccessToken(accessToken string) (*TokenResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("Token Url output", string(b))
 	token := &TokenResponse{}
 	err = json.Unmarshal(b, token)
 	if err != nil {
