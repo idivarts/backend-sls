@@ -53,9 +53,9 @@ func (c *Page) Get(pageId string) error {
 
 func GetPagesByUserId(userId string) ([]Page, error) {
 	// Create the input for the query operation
-	input := &dynamodb.QueryInput{
-		TableName:              aws.String(pageTable),
-		KeyConditionExpression: aws.String("#userId = :v_userId"),
+	input := &dynamodb.ScanInput{
+		TableName:        aws.String(pageTable),
+		FilterExpression: aws.String("#userId = :v_userId"),
 		ExpressionAttributeNames: map[string]*string{
 			"#userId": aws.String("userId"),
 		},
@@ -67,9 +67,9 @@ func GetPagesByUserId(userId string) ([]Page, error) {
 	}
 
 	// Perform the query operation
-	result, err := dynamodbhandler.Client.Query(input)
+	result, err := dynamodbhandler.Client.Scan(input)
 	if err != nil {
-		fmt.Println("Error querying DynamoDB table:", err)
+		fmt.Println("Error scanning DynamoDB table:", err)
 		os.Exit(1)
 	}
 
