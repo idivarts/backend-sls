@@ -33,11 +33,11 @@ func Login(c *gin.Context) {
 
 	for _, v := range person.Accounts.Data {
 		lRes, err := messenger.GetLongLivedAccessToken(v.AccessToken)
-		log.Println("Token", v.AccessToken, lRes.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		log.Println("Token", v.AccessToken, lRes.AccessToken)
 		page := models.Page{
 			PageID:      v.ID,
 			UserID:      person.ID,
