@@ -82,6 +82,12 @@ custom:
     securityPolicy: tls_1_2
 
 functions:
+  business_api:
+    handler: functions/business_apis/main.go
+    events:
+      - http: POST /business/login
+      - http: GET /business/pages
+  
   message_wh:
     handler: functions/message_webhook/main.go
     events:

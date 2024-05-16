@@ -7,7 +7,7 @@ import (
 
 func main() {
 	apihandler.GinEngine.POST("/business/login", businessapis.Login)
-	apihandler.GinEngine.POST("/business/pages", businessapis.GetPages)
+	apihandler.GinEngine.GET("/business/pages", businessapis.GetPages)
 
 	apihandler.StartLambda()
 }
