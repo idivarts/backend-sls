@@ -25,7 +25,7 @@ func GetConversationsByUserId(userID string) (*ConversationData, error) {
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s/conversations?platform=%s&fields=name,id,messages{%s}&user_id=%s&access_token=%s", baseURL, apiVersion, pageID, platform, messageInfoFields, userID, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=name,id,messages{%s}&user_id=%s&access_token=%s", baseURL, apiVersion, platform, messageInfoFields, userID, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -89,7 +89,7 @@ func GetAllConversationInfo() (*ConversationData, error) {
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s/conversations?platform=%s&fields=id,name,participants&access_token=%s", baseURL, apiVersion, pageID, platform, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&access_token=%s", baseURL, apiVersion, platform, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
