@@ -33,8 +33,9 @@ func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
 	} else {
 		calcTime = rand.Intn(60) + (45)
 	}
-	// calcTime = rand.Intn(calcTime)
-	// calcTime = int(math.Min(900, float64(calcTime)))
+
+	// TODO: Remove this one the testing phase is crossed
+	calcTime = int(15)
 
 	return &calcTime, nil
 }
