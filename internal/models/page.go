@@ -101,3 +101,30 @@ func GetPagesByUserId(userId string) ([]Page, error) {
 
 	return pages, nil
 }
+
+func FetchAllPages() ([]Page, error) {
+
+	// Input parameters for Scan operation
+	input := &dynamodb.ScanInput{
+		TableName: aws.String(pageTable),
+	}
+
+	// Perform a Scan operation to fetch all items
+	result, err := dynamodbhandler.Client.Scan(input)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the DynamoDB items into a slice of Page structs
+	pages := make([]Page, 0)
+	for _, item := range result.Items {
+		page := Page{}
+		err = dynamodbattribute.UnmarshalMap(item, &page)
+		if err != nil {
+			return nil, err
+		}
+		pages = append(pages, page)
+	}
+
+	return pages, nil
+}
