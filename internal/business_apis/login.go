@@ -6,6 +6,7 @@ import (
 
 	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
+	"github.com/TrendsHub/th-backend/pkg/openai"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,10 +39,29 @@ func Login(c *gin.Context) {
 			return
 		}
 		log.Println("Token", v.AccessToken, lRes.AccessToken)
+
+		var instagram *models.InstagramObject = nil
+		if v.InstagramBusinessAccount.ID != "" {
+			inst, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			instagram = &models.InstagramObject{
+				ID:       inst.ID,
+				Name:     inst.Name,
+				UserName: inst.Username,
+				Bio:      inst.Biography,
+			}
+		}
+
 		page := models.Page{
 			PageID:      v.ID,
 			UserID:      person.ID,
+			Name:        v.Name,
+			Instagram:   instagram,
 			AccessToken: lRes.AccessToken,
+			AssistantID: string(openai.ArjunAssistant),
 			Status:      1,
 		}
 		_, err = page.Insert()

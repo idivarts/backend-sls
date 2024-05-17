@@ -13,7 +13,7 @@ type InstagramObject struct {
 	ID       string `json:"id" dynamodbav:"id"`
 	Name     string `json:"name" dynamodbav:"name"`
 	UserName string `json:"userName" dynamodbav:"userName"`
-	BIO      string `json:"bio" dynamodbav:"bio"`
+	Bio      string `json:"bio" dynamodbav:"bio"`
 }
 type Page struct {
 	PageID      string           `json:"pageId" dynamodbav:"pageId"`
@@ -21,6 +21,7 @@ type Page struct {
 	Name        string           `json:"name" dynamodbav:"name"`
 	Instagram   *InstagramObject `json:"instagram,omitempty" dynamodbav:"instagram"`
 	AccessToken string           `json:"accessToken" dynamodbav:"accessToken"`
+	AssistantID string           `json:"assistantId" dynamodbav:"assistantId"`
 	Status      int              `json:"status" dynamodbav:"status"`
 }
 
