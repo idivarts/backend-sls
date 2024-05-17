@@ -9,11 +9,19 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
+type InstagramObject struct {
+	ID       string `json:"id" dynamodbav:"id"`
+	Name     string `json:"name" dynamodbav:"name"`
+	UserName string `json:"userName" dynamodbav:"userName"`
+	BIO      string `json:"bio" dynamodbav:"bio"`
+}
 type Page struct {
-	PageID      string `json:"pageId" dynamodbav:"pageId"`
-	UserID      string `json:"userId" dynamodbav:"userId"`
-	AccessToken string `json:"accessToken" dynamodbav:"accessToken"`
-	Status      int    `json:"status" dynamodbav:"status"`
+	PageID      string           `json:"pageId" dynamodbav:"pageId"`
+	UserID      string           `json:"userId" dynamodbav:"userId"`
+	Name        string           `json:"name" dynamodbav:"name"`
+	Instagram   *InstagramObject `json:"instagram,omitempty" dynamodbav:"instagram"`
+	AccessToken string           `json:"accessToken" dynamodbav:"accessToken"`
+	Status      int              `json:"status" dynamodbav:"status"`
 }
 
 func (c *Page) Insert() (*dynamodb.PutItemOutput, error) {
