@@ -61,6 +61,9 @@ func (c *Page) Get(pageId string) error {
 		fmt.Println("Error unmarshalling item:", err)
 		return err
 	}
+	if c.Status != 1 {
+		return fmt.Errorf("page %s is deactivated", c.PageID)
+	}
 	return nil
 }
 
