@@ -56,12 +56,12 @@ type IMessageResponse struct {
 	MessageID   string `json:"message_id"`
 }
 
-func GetRecepientIDFromParticipants(participants Participants) string {
+func GetRecepientIDFromParticipants(participants Participants, userName string) string {
 	if len(participants.Data) > 2 {
 		return "Multi user group not supported"
 	}
 	for i := 0; i < len(participants.Data); i++ {
-		if participants.Data[i].Username != MyUserName {
+		if participants.Data[i].Username != userName {
 			return participants.Data[i].ID
 		}
 	}

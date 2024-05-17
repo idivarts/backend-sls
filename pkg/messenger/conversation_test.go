@@ -22,7 +22,7 @@ func TestGetAll(t *testing.T) {
 		conversationID = data.Data[0].ID
 		getMessages(t)
 		// fmt.Println("Sending Message to", data.Data[0].Participants.Data[0].ID, data.Data[0].Participants.Data[0].Username)
-		messageParticipant(messenger.GetRecepientIDFromParticipants(data.Data[0].Participants), t)
+		messageParticipant(messenger.GetRecepientIDFromParticipants(data.Data[0].Participants, messenger.TestUserName), t)
 	}
 }
 func messageParticipant(igSid string, t *testing.T) {
