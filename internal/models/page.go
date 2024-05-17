@@ -41,7 +41,7 @@ func (c *Page) Get(pageId string) error {
 	result, err := dynamodbhandler.Client.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(pageTable),
 		Key: map[string]*dynamodb.AttributeValue{
-			"pageeId": {
+			"pageId": {
 				S: aws.String(pageId),
 			},
 		},
