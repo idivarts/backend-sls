@@ -122,12 +122,35 @@ resources:
         AttributeDefinitions: 
           - AttributeName: igsid
             AttributeType: S
+          - AttributeName: pageId
+            AttributeType: S
+          - AttributeName: currentPhase
+            AttributeType: N    # N indicates number (integer)
         KeySchema:
           - AttributeName: igsid
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
+        GlobalSecondaryIndexes:
+          - IndexName: PageIdIndex
+            KeySchema:
+              - AttributeName: pageId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: PhaseIndex
+            KeySchema:
+              - AttributeName: currentPhase
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
     pageTable:
       Type: AWS::DynamoDB::Table
       Properties: 

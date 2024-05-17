@@ -46,6 +46,7 @@ func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessa
 
 	log.Println("Inserting the Conversation Model", convId, threadId)
 	msg.conversationData.IGSID = convId
+	msg.conversationData.PageID = msg.PageID
 	msg.conversationData.ThreadID = threadId
 	msg.conversationData.LastMID = lastMid
 	// data := &models.Conversation{

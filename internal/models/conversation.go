@@ -13,6 +13,7 @@ import (
 
 type Conversation struct {
 	IGSID              string                 `json:"igsid" dynamodbav:"igsid"`
+	PageID             string                 `json:"pageId" dynamodbav:"pageId"`
 	ThreadID           string                 `json:"threadId" dynamodbav:"threadId"`
 	LastMID            string                 `json:"lastMid" dynamodbav:"lastMid"`
 	LastBotMessageTime int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
