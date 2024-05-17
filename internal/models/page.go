@@ -9,20 +9,24 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
-type InstagramObject struct {
-	ID       string `json:"id" dynamodbav:"id"`
-	Name     string `json:"name" dynamodbav:"name"`
-	UserName string `json:"userName" dynamodbav:"userName"`
-	Bio      string `json:"bio" dynamodbav:"bio"`
-}
+//	type InstagramObject struct {
+//		ID       string `json:"id" dynamodbav:"id"`
+//		Name     string `json:"name" dynamodbav:"name"`
+//		UserName string `json:"userName" dynamodbav:"userName"`
+//		Bio      string `json:"bio" dynamodbav:"bio"`
+//	}
 type Page struct {
-	PageID      string           `json:"pageId" dynamodbav:"pageId"`
-	UserID      string           `json:"userId" dynamodbav:"userId"`
-	Name        string           `json:"name" dynamodbav:"name"`
-	Instagram   *InstagramObject `json:"instagram,omitempty" dynamodbav:"instagram"`
-	AccessToken string           `json:"accessToken" dynamodbav:"accessToken"`
-	AssistantID string           `json:"assistantId" dynamodbav:"assistantId"`
-	Status      int              `json:"status" dynamodbav:"status"`
+	PageID      string `json:"pageId" dynamodbav:"pageId"`
+	ConnectedID string `json:"connectedId" dynamodbav:"connectedId"`
+	UserID      string `json:"userId" dynamodbav:"userId"`
+	Name        string `json:"name" dynamodbav:"name"`
+	UserName    string `json:"userName" dynamodbav:"userName"`
+	Bio         string `json:"bio" dynamodbav:"bio"`
+	IsInstagram bool   `json:"isInstagram" dynamodbav:"isInstagram"`
+	AccessToken string `json:"accessToken" dynamodbav:"accessToken"`
+	AssistantID string `json:"assistantId" dynamodbav:"assistantId"`
+	Status      int    `json:"status" dynamodbav:"status"`
+	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
 
 func (c *Page) Insert() (*dynamodb.PutItemOutput, error) {

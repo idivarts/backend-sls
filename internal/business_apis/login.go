@@ -40,31 +40,47 @@ func Login(c *gin.Context) {
 		}
 		log.Println("Token", v.AccessToken, lRes.AccessToken)
 
-		var instagram *models.InstagramObject = nil
+		// var instagram *models.InstagramObject = nil
 		if v.InstagramBusinessAccount.ID != "" {
 			inst, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			instagram = &models.InstagramObject{
-				ID:       inst.ID,
-				Name:     inst.Name,
-				UserName: inst.Username,
-				Bio:      inst.Biography,
+			instaPage := models.Page{
+				PageID:      inst.ID,
+				ConnectedID: v.ID,
+				IsInstagram: true,
+				Name:        inst.Name,
+				UserName:    inst.Username,
+				Bio:         inst.Biography,
+				UserID:      person.ID,
+				// Instagram:   nil,
+				AccessToken: lRes.AccessToken,
+				AssistantID: string(openai.ArjunAssistant),
+				Status:      1,
+			}
+			_, err = instaPage.Insert()
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
 			}
 		}
 
-		page := models.Page{
+		fbPage := models.Page{
 			PageID:      v.ID,
 			UserID:      person.ID,
+			ConnectedID: v.InstagramBusinessAccount.ID,
+			IsInstagram: false,
 			Name:        v.Name,
-			Instagram:   instagram,
+			UserName:    "",
+			Bio:         "",
+			// Instagram:   nil,
 			AccessToken: lRes.AccessToken,
 			AssistantID: string(openai.ArjunAssistant),
 			Status:      1,
 		}
-		_, err = page.Insert()
+		_, err = fbPage.Insert()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
