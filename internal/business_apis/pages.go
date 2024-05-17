@@ -48,6 +48,9 @@ func GetPages(c *gin.Context) {
 	}
 
 	for _, v := range pages {
+		if v.Status != 1 {
+			continue
+		}
 		if v.UserID == req.UserID {
 			pagesResp.MyPages = append(pagesResp.MyPages, PageUnit{
 				Id:          v.PageID,
