@@ -86,7 +86,9 @@ functions:
     handler: functions/business_apis/main.go
     events:
       - http: POST /business/login
+      - http: OPTIONS /business/login
       - http: GET /business/pages
+      - http: OPTIONS /business/pages
   
   message_wh:
     handler: functions/message_webhook/main.go
