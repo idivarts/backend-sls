@@ -20,7 +20,7 @@ type ConversationMessagesData struct {
 	} `json:"messages"`
 }
 
-func GetConversationsByUserId(userID string) (*ConversationData, error) {
+func GetConversationsByUserId(userID string, pageAccessToken string) (*ConversationData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
@@ -52,7 +52,7 @@ func GetConversationsByUserId(userID string) (*ConversationData, error) {
 	return &data, nil
 }
 
-func GetConversationMessages(conversationID string) (*ConversationMessagesData, error) {
+func GetConversationMessages(conversationID string, pageAccessToken string) (*ConversationMessagesData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
@@ -84,7 +84,7 @@ func GetConversationMessages(conversationID string) (*ConversationMessagesData, 
 	return &data, nil
 }
 
-func GetAllConversationInfo() (*ConversationData, error) {
+func GetAllConversationInfo(pageAccessToken string) (*ConversationData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 

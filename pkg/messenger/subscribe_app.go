@@ -9,7 +9,7 @@ import (
 
 const webhook_events = "messages,message_reads"
 
-func SubscribeApp() error {
+func SubscribeApp(pageAccessToken string) error {
 	// Convert the message struct to JSON
 	url := baseURL + "/" + apiVersion + "/me/subscribed_apps?subscribed_fields=" + webhook_events + "&access_token=" + pageAccessToken
 	fmt.Println(url)
@@ -45,7 +45,7 @@ type SubscribedAppData struct {
 	} `json:"data"`
 }
 
-func GetSubscribedApps() (*SubscribedAppData, error) {
+func GetSubscribedApps(pageAccessToken string) (*SubscribedAppData, error) {
 	// Convert the message struct to JSON
 	url := baseURL + "/" + apiVersion + "/me/subscribed_apps?access_token=" + pageAccessToken
 	fmt.Println(url)

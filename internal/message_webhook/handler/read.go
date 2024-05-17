@@ -6,12 +6,19 @@ import (
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
+	"github.com/TrendsHub/th-backend/internal/models"
 	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 )
 
 func (msg IGMessagehandler) handleReadOperation() error {
-	oList, err := messenger.GetConversationMessages(msg.ConversationID)
+	pData := models.Page{}
+	err := pData.Get(msg.PageID)
+	if err != nil || pData.PageID == "" {
+		return err
+	}
+
+	oList, err := messenger.GetConversationMessages(msg.ConversationID, pData.AccessToken)
 	if err != nil {
 		return err
 	}

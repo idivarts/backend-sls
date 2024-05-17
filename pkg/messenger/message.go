@@ -28,7 +28,7 @@ type Message struct {
 	Message string `json:"message"`
 }
 
-func GetMessageInfo(messageID string) (*Message, error) {
+func GetMessageInfo(messageID string, pageAccessToken string) (*Message, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 

@@ -11,6 +11,12 @@ import (
 
 func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessage bool) (*models.Conversation, error) {
 	log.Println("Creating new Message Thread")
+	pData := models.Page{}
+	err := pData.Get(msg.PageID)
+	if err != nil || pData.PageID == "" {
+		return nil, err
+	}
+
 	thread, err := openai.CreateThread()
 	if err != nil {
 		return nil, err
@@ -18,7 +24,7 @@ func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessa
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(convId)
+	convIds, err := messenger.GetConversationsByUserId(convId, pData.AccessToken)
 	if err != nil {
 		return nil, err
 	}

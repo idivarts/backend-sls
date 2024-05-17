@@ -68,7 +68,7 @@ func GetRecepientIDFromParticipants(participants Participants) string {
 
 	return "Not Found"
 }
-func SendTextMessage(recipientID string, msg string) (*IMessageResponse, error) {
+func SendTextMessage(recipientID string, msg string, pageAccessToken string) (*IMessageResponse, error) {
 	message := ISendMessage{
 		Recipient: Recipient{
 			ID: recipientID,
@@ -77,9 +77,9 @@ func SendTextMessage(recipientID string, msg string) (*IMessageResponse, error) 
 			Text: &msg,
 		},
 	}
-	return sendMessage(message)
+	return sendMessage(message, pageAccessToken)
 }
-func sendMessage(message ISendMessage) (*IMessageResponse, error) {
+func sendMessage(message ISendMessage, pageAccessToken string) (*IMessageResponse, error) {
 	// Convert the message struct to JSON
 	jsonBytes, err := json.Marshal(message)
 	if err != nil {

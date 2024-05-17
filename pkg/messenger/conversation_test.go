@@ -9,7 +9,7 @@ import (
 var conversationID = ""
 
 func TestGetAll(t *testing.T) {
-	data, err := messenger.GetAllConversationInfo()
+	data, err := messenger.GetAllConversationInfo(messenger.TestPageAccessToken)
 	if err != nil {
 		t.Fail()
 	}
@@ -26,14 +26,14 @@ func TestGetAll(t *testing.T) {
 	}
 }
 func messageParticipant(igSid string, t *testing.T) {
-	_, err := messenger.SendTextMessage(igSid, "Hello Everyone! Final test is here")
+	_, err := messenger.SendTextMessage(igSid, "Hello Everyone! Final test is here", messenger.TestPageAccessToken)
 	if err != nil {
 		t.Log(err)
 		t.Fail()
 	}
 }
 func getMessages(t *testing.T) {
-	messages, err := messenger.GetConversationMessages(conversationID)
+	messages, err := messenger.GetConversationMessages(conversationID, messenger.TestPageAccessToken)
 	if err != nil {
 		// t.Log(err)
 		t.Fail()
@@ -44,7 +44,7 @@ func getMessages(t *testing.T) {
 	// }
 	// t.Log("Print Messages Data", string(str))
 	if len(messages.Messages.Data) > 0 {
-		msg, err := messenger.GetMessageInfo(messages.Messages.Data[0].ID)
+		msg, err := messenger.GetMessageInfo(messages.Messages.Data[0].ID, messenger.TestPageAccessToken)
 		if err != nil {
 			// t.Log(err)
 			t.Fail()

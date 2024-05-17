@@ -8,7 +8,7 @@ import (
 
 func TestUser(t *testing.T) {
 	igsid := "739486008356543"
-	profile, err := messenger.GetUser(igsid)
+	profile, err := messenger.GetUser(igsid, messenger.TestPageAccessToken)
 	if err != nil {
 		t.Errorf("Error %s", err.Error())
 	}

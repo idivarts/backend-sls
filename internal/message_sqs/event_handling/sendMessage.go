@@ -28,7 +28,12 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		}
 		cData := &models.Conversation{}
 		err = cData.Get(conv.IGSID)
-		if err != nil {
+		if err != nil || cData.IGSID == "" {
+			return err
+		}
+		pData := &models.Page{}
+		err = pData.Get(cData.PageID)
+		if err != nil || pData.PageID == "" {
 			return err
 		}
 
@@ -48,7 +53,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 			if v.RunID == conv.RunID {
 				aMsg := v.Content[0].Text
 				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
-				mResp, _ := messenger.SendTextMessage(conv.IGSID, aMsg.Value)
+				mResp, _ := messenger.SendTextMessage(conv.IGSID, aMsg.Value, pData.AccessToken)
 				// if err != nil {
 				// 	return err
 				// }
