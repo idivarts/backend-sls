@@ -7,8 +7,10 @@ import (
 )
 
 type PageUnit struct {
-	PageId   string
-	PageName string
+	Id          string
+	Name        string
+	UserName    string
+	IsInstagram bool
 }
 type PagesGetResponse struct {
 	Start      int

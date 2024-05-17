@@ -55,6 +55,7 @@ func Login(c *gin.Context) {
 				UserName:    inst.Username,
 				Bio:         inst.Biography,
 				UserID:      person.ID,
+				OwnerName:   person.Name,
 				// Instagram:   nil,
 				AccessToken: lRes.AccessToken,
 				AssistantID: string(openai.ArjunAssistant),
@@ -69,12 +70,13 @@ func Login(c *gin.Context) {
 
 		fbPage := models.Page{
 			PageID:      v.ID,
-			UserID:      person.ID,
 			ConnectedID: v.InstagramBusinessAccount.ID,
 			IsInstagram: false,
 			Name:        v.Name,
 			UserName:    "",
 			Bio:         "",
+			UserID:      person.ID,
+			OwnerName:   person.Name,
 			// Instagram:   nil,
 			AccessToken: lRes.AccessToken,
 			AssistantID: string(openai.ArjunAssistant),

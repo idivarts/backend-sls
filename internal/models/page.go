@@ -19,6 +19,7 @@ type Page struct {
 	PageID      string `json:"pageId" dynamodbav:"pageId"`
 	ConnectedID string `json:"connectedId" dynamodbav:"connectedId"`
 	UserID      string `json:"userId" dynamodbav:"userId"`
+	OwnerName   string `json:"ownerName" dynamodbav:"ownerName"`
 	Name        string `json:"name" dynamodbav:"name"`
 	UserName    string `json:"userName" dynamodbav:"userName"`
 	Bio         string `json:"bio" dynamodbav:"bio"`
