@@ -29,8 +29,12 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		log.Println("Fetching Conversation", conv.IGSID)
 		cData := &models.Conversation{}
 		err = cData.Get(conv.IGSID)
-		if err != nil || cData.IGSID == "" {
+		if err != nil {
 			return err
+		}
+		if cData.IGSID == "" {
+			return errors.New("Cant find this entry")
+			// return
 		}
 		log.Println("Fetching Page", cData.PageID)
 		pData := &models.Page{}
