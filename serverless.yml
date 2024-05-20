@@ -132,7 +132,7 @@ resources:
           - AttributeName: currentPhase
             AttributeType: N
           - AttributeName: isConversationPaused
-            AttributeType: BOOL  # Define the new boolean attribute
+            AttributeType: B  # Define the new boolean attribute
         KeySchema:
           - AttributeName: igsid
             KeyType: HASH
