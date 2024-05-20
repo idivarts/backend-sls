@@ -122,15 +122,17 @@ resources:
 
     conversationTable:
       Type: AWS::DynamoDB::Table
-      Properties: 
+      Properties:
         TableName: conversationTable
-        AttributeDefinitions: 
+        AttributeDefinitions:
           - AttributeName: igsid
             AttributeType: S
           - AttributeName: pageId
             AttributeType: S
           - AttributeName: currentPhase
-            AttributeType: N    # N indicates number (integer)
+            AttributeType: N
+          - AttributeName: isConversationPaused
+            AttributeType: BOOL  # Define the new boolean attribute
         KeySchema:
           - AttributeName: igsid
             KeyType: HASH
@@ -149,6 +151,16 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
+          - IndexName: IsConversationPausedIndex  # Define the new index
+            KeySchema:
+              - AttributeName: isConversationPaused
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+    
     pageTable:
       Type: AWS::DynamoDB::Table
       Properties: 
