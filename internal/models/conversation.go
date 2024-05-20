@@ -24,6 +24,7 @@ type Conversation struct {
 	Information        openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
 	MessageQueue       *string                `json:"messageQueue" dynamodbav:"messageQueue"`
 	ReminderQueue      *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
+	ReminderCount      int                    `json:"reminderCount" dynamodbav:"reminderCount"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {

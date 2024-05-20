@@ -76,6 +76,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
 		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
 
+		msg.conversationData.ReminderCount = 0
 		log.Println("Timing the Duration for the next message")
 		// Generate a random integer between 0 and 10
 		sendTimeDuration, err := timehandler.CalculateMessageDelay(msg.conversationData) // Generates a random integer in [0, 11)
@@ -104,6 +105,11 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	if msg.PageID == msg.IGSID {
 		log.Println("Handling Reminder Logics", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
 		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
+		if msg.conversationData.ReminderQueue == nil {
+			msg.conversationData.ReminderCount = msg.conversationData.ReminderCount + 1
+		} else {
+			msg.conversationData.ReminderCount = 0
+		}
 		if msg.conversationData.CurrentPhase < 5 {
 			event := sqsevents.ConversationEvent{
 				IGSID:    msg.conversationData.IGSID,
@@ -115,7 +121,8 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			if err != nil {
 				return err
 			}
-			execArn, err := delayedsqs.Send(string(jData), int64(REMINDER_SECONDS))
+			sendTimeDuration := timehandler.CalculateRemiderDelay(msg.conversationData) // Generates a random integer in [0, 11)
+			execArn, err := delayedsqs.Send(string(jData), int64(sendTimeDuration))
 			if err != nil {
 				return err
 			}

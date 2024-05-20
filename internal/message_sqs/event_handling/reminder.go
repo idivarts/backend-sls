@@ -2,6 +2,7 @@ package eventhandling
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
@@ -24,7 +25,11 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 		return err
 	}
 
-	additionalInstruction := "The user has not replied in 6 hours. Remind them gently!"
+	timeData := "some time"
+	if cData.ReminderCount > 0 {
+		timeData = fmt.Sprintf("%d hours", (6 * (cData.ReminderCount + 1)))
+	}
+	additionalInstruction := fmt.Sprintf("The user has not replied in %s. Remind them gently. This is reminder %d", timeData, (cData.ReminderCount + 1))
 	log.Println("Starting Reminder Run")
 	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, additionalInstruction, "")
 	if err != nil {
