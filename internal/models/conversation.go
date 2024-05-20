@@ -12,20 +12,20 @@ import (
 )
 
 type Conversation struct {
-	IGSID              string                 `json:"igsid" dynamodbav:"igsid"`
-	PageID             string                 `json:"pageId" dynamodbav:"pageId"`
-	ThreadID           string                 `json:"threadId" dynamodbav:"threadId"`
-	LastMID            string                 `json:"lastMid" dynamodbav:"lastMid"`
-	LastBotMessageTime int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
-	IsProfileFetched   bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
-	IsProcessingPaused bool                   `json:"isProcessingPaused" dynamodbav:"isProcessingPaused"`
-	UserProfile        *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
-	Phases             []int                  `json:"phases" dynamodbav:"phases"`
-	CurrentPhase       int                    `json:"currentPhase" dynamodbav:"currentPhase"`
-	Information        openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
-	MessageQueue       *string                `json:"messageQueue" dynamodbav:"messageQueue"`
-	ReminderQueue      *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
-	ReminderCount      int                    `json:"reminderCount" dynamodbav:"reminderCount"`
+	IGSID                string                 `json:"igsid" dynamodbav:"igsid"`
+	PageID               string                 `json:"pageId" dynamodbav:"pageId"`
+	ThreadID             string                 `json:"threadId" dynamodbav:"threadId"`
+	LastMID              string                 `json:"lastMid" dynamodbav:"lastMid"`
+	LastBotMessageTime   int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
+	IsProfileFetched     bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
+	IsConversationPaused bool                   `json:"isConversationPaused" dynamodbav:"isConversationPaused"`
+	UserProfile          *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
+	Phases               []int                  `json:"phases" dynamodbav:"phases"`
+	CurrentPhase         int                    `json:"currentPhase" dynamodbav:"currentPhase"`
+	Information          openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
+	MessageQueue         *string                `json:"messageQueue" dynamodbav:"messageQueue"`
+	ReminderQueue        *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
+	ReminderCount        int                    `json:"reminderCount" dynamodbav:"reminderCount"`
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
