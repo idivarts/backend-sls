@@ -18,6 +18,7 @@ type Conversation struct {
 	LastMID            string                 `json:"lastMid" dynamodbav:"lastMid"`
 	LastBotMessageTime int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
 	IsProfileFetched   bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
+	IsProcessingPaused bool                   `json:"isProcessingPaused" dynamodbav:"isProcessingPaused"`
 	UserProfile        *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
 	Phases             []int                  `json:"phases" dynamodbav:"phases"`
 	CurrentPhase       int                    `json:"currentPhase" dynamodbav:"currentPhase"`

@@ -62,10 +62,30 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 
 	msg.conversationData.LastMID = msg.Message.Mid
 
+	if msg.conversationData.IsProcessingPaused {
+		log.Println("Processing is paused for this message thread")
+		return nil
+	}
+
 	if msg.PageID != msg.IGSID ||
 		//Checking last time bot processed the message was more than 20 seconds before the recorded time
 		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-20000) {
 		log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
+
+		if msg.Message.Attachments != nil && len(*msg.Message.Attachments) > 0 {
+			log.Println("Handling Attachments. Setting status and exiting")
+
+			delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
+			delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
+
+			msg.conversationData.IsProcessingPaused = true
+			_, err := msg.conversationData.Insert()
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
 		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, msg.PageID == msg.IGSID)
 		if err != nil {
 			return err
