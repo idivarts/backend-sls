@@ -2,6 +2,7 @@ package eventhandling
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
@@ -11,7 +12,7 @@ import (
 	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
 )
 
-func RunOpenAI(conv *sqsevents.ConversationEvent) error {
+func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) error {
 	cData := &models.Conversation{}
 	err := cData.Get(conv.IGSID)
 	if err != nil || cData.IGSID == "" {
@@ -29,13 +30,17 @@ func RunOpenAI(conv *sqsevents.ConversationEvent) error {
 		return nil
 	}
 
-	additionalInstruction := ""
 	if !cData.IsProfileFetched {
 		uProfile, err := messenger.GetUser(cData.IGSID, pData.AccessToken)
 		if err != nil {
 			return err
 		}
-		additionalInstruction = uProfile.GenerateUserDescription()
+		if additionalInstruction != "" {
+			additionalInstruction = fmt.Sprintf("%s\n-------------\n%s", additionalInstruction, uProfile.GenerateUserDescription())
+		} else {
+			additionalInstruction = uProfile.GenerateUserDescription()
+		}
+
 		cData.IsProfileFetched = true
 		cData.UserProfile = uProfile
 		cData.Insert()

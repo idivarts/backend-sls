@@ -39,7 +39,7 @@ func sendMessage(message string) error {
 	} else if conv.Action == sqsevents.REMINDER {
 		return eventhandling.SendReminder(conv)
 	} else {
-		return eventhandling.RunOpenAI(conv)
+		return eventhandling.RunOpenAI(conv, "")
 	}
 
 }
