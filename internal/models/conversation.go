@@ -187,3 +187,39 @@ func (c *Conversation) UpdateProfileFetched() (*dynamodb.UpdateItemOutput, error
 
 // 	return nil
 // }
+
+func GetPausedConversations() ([]Conversation, error) {
+	// Initialize AWS SDK and DynamoDB client
+
+	// Initialize variables
+	var conversations []Conversation
+
+	// Create the input for the Scan operation
+	input := &dynamodb.ScanInput{
+		TableName:        aws.String(conversationTable),
+		FilterExpression: aws.String("isConversationPaused = :active"),
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":active": {
+				BOOL: aws.Bool(true),
+			},
+		},
+	}
+
+	// Perform the Scan operation
+	result, err := dynamodbhandler.Client.Scan(input)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response into Conversation structs
+	for _, item := range result.Items {
+		conv := Conversation{}
+		err = dynamodbattribute.UnmarshalMap(item, &conv)
+		if err != nil {
+			return nil, err
+		}
+		conversations = append(conversations, conv)
+	}
+
+	return conversations, nil
+}
