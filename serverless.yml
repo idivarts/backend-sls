@@ -89,6 +89,9 @@ functions:
       - http: OPTIONS /business/login
       - http: GET /business/pages
       - http: OPTIONS /business/pages
+      - http: GET /business/conversations
+      - http: POST /business/conversations
+      - http: OPTIONS /business/conversations
   
   message_wh:
     handler: functions/message_webhook/main.go

@@ -8,6 +8,8 @@ import (
 func main() {
 	apihandler.GinEngine.POST("/business/login", businessapis.Login)
 	apihandler.GinEngine.GET("/business/pages", businessapis.GetPages)
+	apihandler.GinEngine.GET("/business/conversations", businessapis.GetPausedConversations)
+	apihandler.GinEngine.POST("/business/conversations", businessapis.StartPausedConversations)
 
 	apihandler.StartLambda()
 }
