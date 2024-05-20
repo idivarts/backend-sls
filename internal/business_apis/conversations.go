@@ -72,7 +72,7 @@ func StartPausedConversation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	cData.IsConversationPaused = false
+	cData.IsConversationPaused = 0
 	_, err = cData.Insert()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

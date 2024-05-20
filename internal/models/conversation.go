@@ -18,7 +18,7 @@ type Conversation struct {
 	LastMID              string                 `json:"lastMid" dynamodbav:"lastMid"`
 	LastBotMessageTime   int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
 	IsProfileFetched     bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
-	IsConversationPaused bool                   `json:"isConversationPaused" dynamodbav:"isConversationPaused"`
+	IsConversationPaused int                    `json:"isConversationPaused" dynamodbav:"isConversationPaused"`
 	UserProfile          *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
 	Phases               []int                  `json:"phases" dynamodbav:"phases"`
 	CurrentPhase         int                    `json:"currentPhase" dynamodbav:"currentPhase"`
@@ -200,7 +200,7 @@ func GetPausedConversations() ([]Conversation, error) {
 		FilterExpression: aws.String("isConversationPaused = :active"),
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":active": {
-				BOOL: aws.Bool(true),
+				N: aws.String("1"),
 			},
 		},
 	}

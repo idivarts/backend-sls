@@ -62,7 +62,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 
 	msg.conversationData.LastMID = msg.Message.Mid
 
-	if msg.conversationData.IsConversationPaused {
+	if msg.conversationData.IsConversationPaused > 0 {
 		log.Println("Processing is paused for this message thread")
 		return nil
 	}
@@ -78,7 +78,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
 			delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
 
-			msg.conversationData.IsConversationPaused = true
+			msg.conversationData.IsConversationPaused = 1
 			_, err := msg.conversationData.Insert()
 			if err != nil {
 				return err

@@ -132,7 +132,7 @@ resources:
           - AttributeName: currentPhase
             AttributeType: N
           - AttributeName: isConversationPaused
-            AttributeType: B  # Define the new boolean attribute
+            AttributeType: N  # Define the new boolean attribute
         KeySchema:
           - AttributeName: igsid
             KeyType: HASH
@@ -151,7 +151,7 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
-          - IndexName: IsConversationPausedIndex  # Define the new index
+          - IndexName: PauseIndex  # Define the new index
             KeySchema:
               - AttributeName: isConversationPaused
                 KeyType: HASH
