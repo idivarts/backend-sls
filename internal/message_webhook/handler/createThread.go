@@ -42,8 +42,12 @@ func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessa
 	}
 	for i := len(conv.Messages.Data) - 1; i >= lastindex; i-- {
 		entry := &conv.Messages.Data[i]
-		log.Println("Sending Message", threadId, entry.Message, msg.PageID == entry.From.ID)
-		_, err = openai.SendMessage(threadId, entry.Message, msg.PageID == entry.From.ID)
+		message := entry.Message
+		if entry.Message != "" {
+			message = "[Attached Image/Video/Link here]"
+		}
+		log.Println("Sending Message", threadId, message, msg.PageID == entry.From.ID)
+		_, err = openai.SendMessage(threadId, message, msg.PageID == entry.From.ID)
 		if err != nil {
 			return nil, err
 		}
