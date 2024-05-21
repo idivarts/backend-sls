@@ -43,7 +43,7 @@ func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessa
 	for i := len(conv.Messages.Data) - 1; i >= lastindex; i-- {
 		entry := &conv.Messages.Data[i]
 		message := entry.Message
-		if entry.Message != "" {
+		if entry.Message == "" {
 			message = "[Attached Image/Video/Link here]"
 		}
 		log.Println("Sending Message", threadId, message, msg.PageID == entry.From.ID)
