@@ -23,8 +23,8 @@ func Receive(c *gin.Context) {
 
 	// openai.SendMessage(message.Entry[0].Messaging[0].Sender.ID, message.Entry[0].Messaging[0].Message.Text)
 
-	log.Printf("Received Message of Type %s", instainterfaces.CalcualateMessageType(&message.Entry[0].Messaging[0]))
-	log.Println("Complete Message", message.Entry[0].Messaging[0].Message.Text)
+	// log.Printf("Received Message of Type %s", instainterfaces.CalcualateMessageType(&message.Entry[0].Messaging[0]))
+	// log.Println("Complete Message", message.Entry[0].Messaging[0].Message.Text)
 
 	data, err := json.Marshal(&message)
 	if err == nil {
