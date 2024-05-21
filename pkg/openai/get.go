@@ -20,8 +20,8 @@ type Message struct {
 	Content     []struct {
 		Type string `json:"type"`
 		Text struct {
-			Value       string   `json:"value"`
-			Annotations []string `json:"annotations"`
+			Value       string        `json:"value"`
+			Annotations []interface{} `json:"annotations"`
 		} `json:"text"`
 	} `json:"content"`
 	Attachments []interface{} `json:"attachments"`
