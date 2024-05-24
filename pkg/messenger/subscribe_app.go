@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-const webhook_events = "messages,message_reads"
+const webhook_events = "messages,message_echoes"
 
 func SubscribeApp(pageAccessToken string) error {
 	// Convert the message struct to JSON
