@@ -22,6 +22,11 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 		return errors.New("Cant find this entry")
 		// return
 	}
+	pData := &models.Page{}
+	err = pData.Get(cData.PageID)
+	if err != nil || pData.PageID == "" {
+		return err
+	}
 
 	cData.ReminderQueue = nil
 
@@ -36,7 +41,7 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 	}
 	additionalInstruction := fmt.Sprintf("The user has not replied in %s. Remind them gently. This is reminder %d", timeData, (cData.ReminderCount + 1))
 	log.Println("Starting Reminder Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.ArjunAssistant, additionalInstruction, "")
+	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(pData.AssistantID), additionalInstruction, "")
 	if err != nil {
 		return err
 	}
