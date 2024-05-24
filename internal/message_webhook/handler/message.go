@@ -3,6 +3,7 @@ package mwh_handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
@@ -52,9 +53,17 @@ func (msg IGMessagehandler) HandleMessage() error {
 	}
 	// if msg.Message != nil {
 	err = msg.handleMessageThreadOperation()
-	// } else if msg.Read != nil {
-	// 	err = msg.handleReadOperation()
-	// }
+	if err != nil {
+		delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
+		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
+
+		msg.conversationData.IsConversationPaused = 1
+		_, err := msg.conversationData.Insert()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 	return err
 }
 
@@ -77,15 +86,6 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		if msg.Message.Attachments != nil && len(*msg.Message.Attachments) > 0 {
 			log.Println("Handling Attachments. Setting status and exiting")
 
-			// delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
-			// delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
-
-			// msg.conversationData.IsConversationPaused = 1
-			// _, err := msg.conversationData.Insert()
-			// if err != nil {
-			// 	return err
-			// }
-			// return nil
 			richContent = []openai.ContentRequest{}
 			for _, v := range *msg.Message.Attachments {
 				if v.Type == "image" {
@@ -106,6 +106,11 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 					Text: msg.Message.Text,
 				})
 			}
+		}
+
+		if msg.Message.Text == "" && richContent == nil {
+			log.Println("Both Message and Rich Content is empty")
+			return fmt.Errorf("error with webhook data : %s", "Both Message and Rich content is empty")
 		}
 
 		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, richContent, msg.PageID == msg.IGSID)
