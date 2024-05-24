@@ -17,7 +17,8 @@ type AssistantID string
 
 const (
 	ArjunAssistant_v1 AssistantID = "asst_3rJKwjfT1VeXRh6KHLg4hQoM"
-	ArjunAssistant    AssistantID = "asst_mIiUVRzX8IcBovzLfGhNQoh3"
+	ArjunAssistant_v2 AssistantID = "asst_mIiUVRzX8IcBovzLfGhNQoh3"
+	ArjunAssistant    AssistantID = "asst_JDXM0Tqx60PAdqrANtNvd5PB"
 )
 
 func init() {
