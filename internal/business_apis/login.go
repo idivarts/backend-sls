@@ -87,11 +87,11 @@ func Login(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		err = messenger.SubscribeApp(lRes.AccessToken)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+		// err = messenger.SubscribeApp(true, lRes.AccessToken)
+		// if err != nil {
+		// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// 	return
+		// }
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": person})

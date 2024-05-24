@@ -63,13 +63,44 @@ func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessa
 	for i := len(messages) - 1; i >= lastindex; i-- {
 		entry := &messages[i]
 		message := entry.Message
-		if entry.Message == "" {
-			message = "[Attached Image/Video/Link here]"
+
+		var richContent []openai.ContentRequest = nil
+		if entry.Attachments != nil && len(entry.Attachments.Data) > 0 {
+			log.Println("Handling Attachments. Setting status and exiting")
+
+			richContent = []openai.ContentRequest{}
+			for _, v := range entry.Attachments.Data {
+				if v.ImageData != nil {
+					f, err := openai.UploadImage(v.ImageData.URL)
+					if err != nil {
+						log.Println("File upload error", err.Error())
+						// return nil, err
+					} else {
+						richContent = append(richContent, openai.ContentRequest{
+							Type:      openai.ImageContentType,
+							ImageFile: openai.ImageFile{FileID: f.ID},
+						})
+					}
+				}
+			}
+
+			if message != "" {
+				richContent = append(richContent, openai.ContentRequest{
+					Type: openai.Text,
+					Text: message,
+				})
+			}
+		}
+
+		if message == "" && len(richContent) == 0 {
+			log.Println("Both Message and Rich Content is empty")
+			message = "[Attached Video/Link/Shares that cant be read by Chat Assistant]"
 		}
 		log.Println("Sending Message", threadId, message, msg.PageID == entry.From.ID)
-		_, err = openai.SendMessage(threadId, message, nil, msg.PageID == entry.From.ID)
+		_, err = openai.SendMessage(threadId, message, richContent, msg.PageID == entry.From.ID)
 		if err != nil {
-			return nil, err
+			log.Println("Something went wrong while inseting the message", err.Error())
+			// return nil, err
 		}
 		lastMid = entry.ID
 	}

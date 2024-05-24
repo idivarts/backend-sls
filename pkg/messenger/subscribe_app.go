@@ -9,9 +9,13 @@ import (
 
 const webhook_events = "messages,message_echoes"
 
-func SubscribeApp(pageAccessToken string) error {
+func SubscribeApp(doSubsription bool, pageAccessToken string) error {
 	// Convert the message struct to JSON
-	url := baseURL + "/" + apiVersion + "/me/subscribed_apps?subscribed_fields=" + webhook_events + "&access_token=" + pageAccessToken
+	fields := ""
+	if doSubsription {
+		fields = webhook_events
+	}
+	url := baseURL + "/" + apiVersion + "/me/subscribed_apps?subscribed_fields=" + fields + "&access_token=" + pageAccessToken
 	fmt.Println(url)
 	// Make the HTTP request
 	resp, err := http.Post(url, "application/json", nil)

@@ -108,7 +108,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			}
 		}
 
-		if msg.Message.Text == "" && richContent == nil {
+		if msg.Message.Text == "" && len(richContent) == 0 {
 			log.Println("Both Message and Rich Content is empty")
 			return fmt.Errorf("error with webhook data : %s", "Both Message and Rich content is empty")
 		}
