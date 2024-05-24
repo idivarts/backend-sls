@@ -28,7 +28,23 @@ type ISendMessage struct {
 	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-func SendMessage(threadID string, message string, isAssistant bool) (*ISendMessage, error) {
+type ContentRequest struct {
+	Type      ContentType `json:"type"`
+	ImageFile ImageFile   `json:"image_file,omitempty"`
+	Text      string      `json:"text,omitempty"`
+}
+type ContentType string
+
+const (
+	ImageContentType ContentType = "image_file"
+	Text             ContentType = "text"
+)
+
+type ImageFile struct {
+	FileID string `json:"file_id"`
+}
+
+func SendMessage(threadID string, message string, richContent []ContentRequest, isAssistant bool) (*ISendMessage, error) {
 	// Set up the REST client
 	client := resty.New()
 
@@ -43,6 +59,12 @@ func SendMessage(threadID string, message string, isAssistant bool) (*ISendMessa
 	requestBody := map[string]interface{}{
 		"role":    role,
 		"content": message,
+	}
+	if richContent != nil {
+		requestBody = map[string]interface{}{
+			"role":    role,
+			"content": richContent,
+		}
 	}
 
 	// Make the API request

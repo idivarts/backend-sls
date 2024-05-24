@@ -86,7 +86,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			return nil
 		}
 
-		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, msg.PageID == msg.IGSID)
+		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, nil, msg.PageID == msg.IGSID)
 		if err != nil {
 			return err
 		}

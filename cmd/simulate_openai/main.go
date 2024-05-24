@@ -35,7 +35,7 @@ func main() {
 	cData.Insert()
 
 	fMsg := "Hello Debangana, How are you doing?\nI came across your profile. Would you be interested to collab with brands?"
-	openai.SendMessage(thread.ID, fMsg, true)
+	openai.SendMessage(thread.ID, fMsg, nil, true)
 	log.Println("\n---------------------\nArjun :", fMsg, "\n---------------------")
 
 	for i := 0; i < 100; i++ {
@@ -45,7 +45,7 @@ func main() {
 			log.Printf("Error %s", err.Error())
 			return
 		}
-		_, err = openai.SendMessage(thread.ID, input, false)
+		_, err = openai.SendMessage(thread.ID, input, nil, false)
 		if err != nil {
 			log.Printf("Error %s", err.Error())
 			return

@@ -47,7 +47,7 @@ func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessa
 			message = "[Attached Image/Video/Link here]"
 		}
 		log.Println("Sending Message", threadId, message, msg.PageID == entry.From.ID)
-		_, err = openai.SendMessage(threadId, message, msg.PageID == entry.From.ID)
+		_, err = openai.SendMessage(threadId, message, nil, msg.PageID == entry.From.ID)
 		if err != nil {
 			return nil, err
 		}

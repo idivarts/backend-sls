@@ -67,7 +67,7 @@ func StartPausedConversation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errors.New("Can't find this entry")})
 		return
 	}
-	_, err = openai.SendMessage(cData.ThreadID, req.Message, false)
+	_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, false)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
