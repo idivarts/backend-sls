@@ -34,7 +34,7 @@ func GetConversationsByUserId(userID string, pageAccessToken string) (*Conversat
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=name,id,messages{%s}&user_id=%s&access_token=%s", baseURL, apiVersion, platform, messageInfoFields, userID, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=name,id&user_id=%s&access_token=%s", baseURL, apiVersion, platform, userID, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)

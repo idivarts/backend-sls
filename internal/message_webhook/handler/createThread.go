@@ -1,13 +1,31 @@
 package mwh_handler
 
 import (
-	"errors"
+	"fmt"
 	"log"
 
 	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 )
+
+func (msg *IGMessagehandler) _fetchMessages(convId string, after *string, pageAccessToken string) []messenger.Message {
+	if after != nil && *after == "" {
+		return []messenger.Message{}
+	}
+	messages := []messenger.Message{}
+	aStr := ""
+	if after != nil {
+		aStr = *after
+	}
+	data, err := messenger.GetMessagesWithPagination(convId, aStr, 20, pageAccessToken)
+	if err != nil {
+		return []messenger.Message{}
+	}
+	messages = append(messages, data.Data...)
+	messages = append(messages, msg._fetchMessages(convId, &data.Paging.Cursors.After, pageAccessToken)...)
+	return messages
+}
 
 func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessage bool) (*models.Conversation, error) {
 	log.Println("Creating new Message Thread")
@@ -30,18 +48,20 @@ func (msg *IGMessagehandler) createMessageThread(convId string, includeLastMessa
 	}
 
 	if len(convIds.Data) == 0 {
-		return nil, errors.New("Cant find any conversation with this userid")
+		return nil, fmt.Errorf("error : %s", "Cant find any conversation with this userid")
 	}
 
 	lastMid := ""
 	conv := convIds.Data[0]
 
+	messages := msg._fetchMessages(conv.ID, nil, pData.AccessToken)
+
 	lastindex := 1
 	if includeLastMessage {
 		lastindex = 0
 	}
-	for i := len(conv.Messages.Data) - 1; i >= lastindex; i-- {
-		entry := &conv.Messages.Data[i]
+	for i := len(messages) - 1; i >= lastindex; i-- {
+		entry := &messages[i]
 		message := entry.Message
 		if entry.Message == "" {
 			message = "[Attached Image/Video/Link here]"
