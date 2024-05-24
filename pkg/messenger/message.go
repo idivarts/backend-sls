@@ -8,13 +8,49 @@ import (
 	"net/http"
 )
 
-const messageInfoFields = "id,created_time,from,to,message,attachment"
+const messageInfoFields = "id,created_time,from,to,message,attachments"
 
 type Participants struct {
 	Data []struct {
 		Username string `json:"username"`
 		ID       string `json:"id"`
 	} `json:"data"`
+}
+
+type VideoData struct {
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	URL        string `json:"url"`
+	PreviewURL string `json:"preview_url"`
+}
+
+type ImageData struct {
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	MaxWidth   int    `json:"max_width"`
+	MaxHeight  int    `json:"max_height"`
+	URL        string `json:"url"`
+	PreviewURL string `json:"preview_url"`
+}
+
+type Cursors struct {
+	Before string `json:"before"`
+	After  string `json:"after"`
+}
+
+type Paging struct {
+	Cursors Cursors `json:"cursors"`
+	Next    string  `json:"next"`
+}
+
+type DataItem struct {
+	ImageData *ImageData `json:"image_data,omitempty"`
+	VideoData *VideoData `json:"video_data,omitempty"`
+}
+
+type Attachments struct {
+	Data   []DataItem `json:"data"`
+	Paging Paging     `json:"paging"`
 }
 
 type Message struct {
@@ -25,7 +61,8 @@ type Message struct {
 		Username string `json:"username"`
 		ID       string `json:"id"`
 	} `json:"from"`
-	Message string `json:"message"`
+	Message     string       `json:"message"`
+	Attachments *Attachments `json:"attachments,omitempty"`
 }
 
 func GetMessageInfo(messageID string, pageAccessToken string) (*Message, error) {
