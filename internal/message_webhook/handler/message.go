@@ -72,21 +72,43 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-20000) {
 		log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
 
+		var richContent []openai.ContentRequest = nil
+
 		if msg.Message.Attachments != nil && len(*msg.Message.Attachments) > 0 {
 			log.Println("Handling Attachments. Setting status and exiting")
 
-			delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
-			delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
+			// delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
+			// delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
 
-			msg.conversationData.IsConversationPaused = 1
-			_, err := msg.conversationData.Insert()
-			if err != nil {
-				return err
+			// msg.conversationData.IsConversationPaused = 1
+			// _, err := msg.conversationData.Insert()
+			// if err != nil {
+			// 	return err
+			// }
+			// return nil
+			richContent = []openai.ContentRequest{}
+			for _, v := range *msg.Message.Attachments {
+				if v.Type == "image" {
+					f, err := openai.UploadImage(v.Payload.URL)
+					if err != nil {
+						return err
+					}
+					richContent = append(richContent, openai.ContentRequest{
+						Type:      openai.ImageContentType,
+						ImageFile: openai.ImageFile{FileID: f.ID},
+					})
+				}
 			}
-			return nil
+
+			if msg.Message.Text != "" {
+				richContent = append(richContent, openai.ContentRequest{
+					Type: openai.Text,
+					Text: msg.Message.Text,
+				})
+			}
 		}
 
-		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, nil, msg.PageID == msg.IGSID)
+		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, richContent, msg.PageID == msg.IGSID)
 		if err != nil {
 			return err
 		}
