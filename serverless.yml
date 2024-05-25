@@ -89,9 +89,29 @@ functions:
       - http: OPTIONS /business/login
       - http: GET /business/pages
       - http: OPTIONS /business/pages
+
+      - http: POST /business/pages/{pageId}/webhook
+      - http: OPTIONS /business/pages/{pageId}/webhook
+      - http: POST /business/pages/{pageId}/assistant
+      - http: OPTIONS /business/pages/{pageId}/assistant
+      - http: POST /business/pages/{pageId}/sync
+      - http: OPTIONS /business/pages/{pageId}/sync
+
       - http: GET /business/conversations
-      - http: POST /business/conversations
       - http: OPTIONS /business/conversations
+
+      - http: GET /business/conversations/{igsid}
+      - http: PUT /business/conversations/{igsid} # This will be used to enable or disable user conversation status
+      - http: OPTIONS /business/conversations/{igsid}
+
+      - http: GET /business/messages/{igsid}
+      - http: POST /business/messages/{igsid} # Send Message / Send Bot Prompt / Send and Resume Conversation on behalf of user
+      - http: OPTIONS /business/messages/{igsid}
+
+      # - http: GET /business/board # This will be used later when we have a more customizable boards
+      # - http: PUT /business/board # This will be used to move tickets in the board
+      # - http: OPTIONS /business/board
+      # - http: POST /business/conversations - This is no longer needed as we will be merging it with messages api
   
   message_wh:
     handler: functions/message_webhook/main.go
