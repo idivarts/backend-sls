@@ -8,11 +8,12 @@ import (
 )
 
 type PageUnit struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	UserName    string `json:"userName"`
-	OwnerName   string `json:"ownerName"`
-	IsInstagram bool   `json:"isInstagram"`
+	Id                 string `json:"id"`
+	Name               string `json:"name"`
+	UserName           string `json:"userName"`
+	OwnerName          string `json:"ownerName"`
+	IsInstagram        bool   `json:"isInstagram"`
+	IsWebhookConnected bool   `json:"isWebHookConnected"`
 }
 
 type PagesGetResponse struct {
@@ -53,19 +54,21 @@ func GetPages(c *gin.Context) {
 		}
 		if v.UserID == req.UserID {
 			pagesResp.MyPages = append(pagesResp.MyPages, PageUnit{
-				Id:          v.PageID,
-				Name:        v.Name,
-				UserName:    v.UserName,
-				OwnerName:   v.OwnerName,
-				IsInstagram: v.IsInstagram,
+				Id:                 v.PageID,
+				Name:               v.Name,
+				UserName:           v.UserName,
+				OwnerName:          v.OwnerName,
+				IsInstagram:        v.IsInstagram,
+				IsWebhookConnected: v.IsWebhookConnected,
 			})
 		} else {
 			pagesResp.OtherPages = append(pagesResp.OtherPages, PageUnit{
-				Id:          v.PageID,
-				Name:        v.Name,
-				UserName:    v.UserName,
-				OwnerName:   v.OwnerName,
-				IsInstagram: v.IsInstagram,
+				Id:                 v.PageID,
+				Name:               v.Name,
+				UserName:           v.UserName,
+				OwnerName:          v.OwnerName,
+				IsInstagram:        v.IsInstagram,
+				IsWebhookConnected: v.IsWebhookConnected,
 			})
 		}
 	}

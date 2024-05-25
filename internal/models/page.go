@@ -16,17 +16,18 @@ import (
 //		Bio      string `json:"bio" dynamodbav:"bio"`
 //	}
 type Page struct {
-	PageID      string `json:"pageId" dynamodbav:"pageId"`
-	ConnectedID string `json:"connectedId" dynamodbav:"connectedId"`
-	UserID      string `json:"userId" dynamodbav:"userId"`
-	OwnerName   string `json:"ownerName" dynamodbav:"ownerName"`
-	Name        string `json:"name" dynamodbav:"name"`
-	UserName    string `json:"userName" dynamodbav:"userName"`
-	Bio         string `json:"bio" dynamodbav:"bio"`
-	IsInstagram bool   `json:"isInstagram" dynamodbav:"isInstagram"`
-	AccessToken string `json:"accessToken" dynamodbav:"accessToken"`
-	AssistantID string `json:"assistantId" dynamodbav:"assistantId"`
-	Status      int    `json:"status" dynamodbav:"status"`
+	PageID             string `json:"pageId" dynamodbav:"pageId"`
+	ConnectedID        string `json:"connectedId" dynamodbav:"connectedId"`
+	UserID             string `json:"userId" dynamodbav:"userId"`
+	OwnerName          string `json:"ownerName" dynamodbav:"ownerName"`
+	Name               string `json:"name" dynamodbav:"name"`
+	UserName           string `json:"userName" dynamodbav:"userName"`
+	Bio                string `json:"bio" dynamodbav:"bio"`
+	IsInstagram        bool   `json:"isInstagram" dynamodbav:"isInstagram"`
+	AccessToken        string `json:"accessToken" dynamodbav:"accessToken"`
+	AssistantID        string `json:"assistantId" dynamodbav:"assistantId"`
+	IsWebhookConnected bool   `json:"isWebhookConnected" dynamodbav:"isWebhookConnected"`
+	Status             int    `json:"status" dynamodbav:"status"`
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
 
