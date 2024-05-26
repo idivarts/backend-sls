@@ -48,6 +48,12 @@ func InstaSend(conv *sqsevents.ConversationEvent) error {
 	if err != nil {
 		return err
 	}
+	if conv.LastMessage != nil && !*conv.LastMessage {
+		_, err = messenger.SendAction(conv.IGSID, messenger.TYPING_ON, conv.PageToken)
+		if err != nil {
+			log.Println("Error while send Action", err.Error())
+		}
+	}
 	// if mResp != nil {
 	// 	mID = mResp.MessageID
 	// }
@@ -96,12 +102,18 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
 				pInp := processInput(aMsg.Value)
 				secondsElapsed := 0
-				for _, v := range pInp {
+				_, err = messenger.SendAction(cData.IGSID, messenger.TYPING_ON, pData.AccessToken)
+				if err != nil {
+					log.Println("Error while send Action", err.Error())
+				}
+				for i, v := range pInp {
+					isLast := (i == len(pInp))
 					st := sqsevents.ConversationEvent{
-						IGSID:     conv.IGSID,
-						Message:   v.StringVal,
-						PageToken: pData.AccessToken,
-						Action:    sqsevents.INSTA_SEND,
+						IGSID:       conv.IGSID,
+						Message:     v.StringVal,
+						PageToken:   pData.AccessToken,
+						Action:      sqsevents.INSTA_SEND,
+						LastMessage: &isLast,
 					}
 					b, err := json.Marshal(&st)
 					secondsElapsed = secondsElapsed + v.Number

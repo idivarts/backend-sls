@@ -10,6 +10,7 @@ type ConversationEvent struct {
 
 	PageID string `json:"pageId,omitempty"`
 
-	PageToken string `json:"pageToken,omitempty"`
-	Message   string `json:"message,omitempty"`
+	PageToken   string `json:"pageToken,omitempty"`
+	Message     string `json:"message,omitempty"`
+	LastMessage *bool  `json:"lastMessage,omitempty"`
 }
