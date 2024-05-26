@@ -21,9 +21,9 @@ type ConversationMessagesData struct {
 	Name         string       `json:"name"`
 	Participants Participants `json:"participants"`
 	ID           string       `json:"id"`
-	Messages     struct {
+	Messages     *struct {
 		Data []Message `json:"data"`
-	} `json:"messages"`
+	} `json:"messages,omitempty"`
 }
 type ConversationPaginatedMessageData struct {
 	Data   []Message `json:"data"`

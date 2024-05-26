@@ -1,6 +1,7 @@
 package businessapis
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/TrendsHub/th-backend/internal/models"
@@ -96,7 +97,35 @@ func PageSync(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// pageId := c.Param("pageId")
-
+	pageId := c.Param("pageId")
+	pData := &models.Page{}
+	err := pData.Get(pageId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	conversations := messenger.FetchAllConversations(nil, pData.AccessToken)
 	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background"})
+
+	for _, v := range conversations {
+		igsid := messenger.GetRecepientIDFromParticipants(v.Participants, pData.UserName)
+		log.Println("IGSID", igsid)
+		conv := &models.Conversation{}
+		err := conv.Get(igsid)
+		if err != nil {
+			conv = &models.Conversation{
+				PageID: pageId,
+				IGSID:  igsid,
+			}
+			err := conv.CreateThread(true)
+			if err != nil {
+				log.Println("Errorr Creating Thread", err.Error())
+			}
+		} else if req.All {
+			err := conv.CreateThread(true)
+			if err != nil {
+				log.Println("Errorr Creating Thread", err.Error())
+			}
+		}
+	}
 }

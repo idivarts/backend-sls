@@ -2,10 +2,12 @@ package models
 
 import (
 	"fmt"
+	"log"
 
 	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
 	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
+	"github.com/TrendsHub/th-backend/pkg/openai"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -26,6 +28,101 @@ type Conversation struct {
 	MessageQueue         *string                `json:"messageQueue" dynamodbav:"messageQueue"`
 	ReminderQueue        *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
 	ReminderCount        int                    `json:"reminderCount" dynamodbav:"reminderCount"`
+}
+
+func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
+	pData := Page{}
+	err := pData.Get(conversation.PageID)
+	if err != nil || pData.PageID == "" {
+		return err
+	}
+
+	thread, err := openai.CreateThread()
+	if err != nil {
+		return err
+	}
+	threadId := thread.ID
+
+	log.Println("Getting all conversations for this user")
+	convIds, err := messenger.GetConversationsByUserId(conversation.IGSID, pData.AccessToken)
+	if err != nil {
+		return err
+	}
+
+	if len(convIds.Data) == 0 {
+		return fmt.Errorf("error : %s", "Cant find any conversation with this userid")
+	}
+
+	lastMid := ""
+	conv := convIds.Data[0]
+
+	messages := messenger.FetchAllMessages(conv.ID, nil, pData.AccessToken)
+
+	lastindex := 1
+	if includeLastMessage {
+		lastindex = 0
+	}
+	for i := len(messages) - 1; i >= lastindex; i-- {
+		entry := &messages[i]
+		message := entry.Message
+
+		var richContent []openai.ContentRequest = nil
+		if entry.Attachments != nil && len(entry.Attachments.Data) > 0 {
+			log.Println("Handling Attachments. Setting status and exiting")
+
+			richContent = []openai.ContentRequest{}
+			for _, v := range entry.Attachments.Data {
+				if v.ImageData != nil {
+					f, err := openai.UploadImage(v.ImageData.URL)
+					if err != nil {
+						log.Println("File upload error", err.Error())
+						// return nil, err
+					} else {
+						richContent = append(richContent, openai.ContentRequest{
+							Type:      openai.ImageContentType,
+							ImageFile: openai.ImageFile{FileID: f.ID},
+						})
+					}
+				}
+			}
+
+			if message != "" {
+				richContent = append(richContent, openai.ContentRequest{
+					Type: openai.Text,
+					Text: message,
+				})
+			}
+		}
+
+		if message == "" && len(richContent) == 0 {
+			log.Println("Both Message and Rich Content is empty")
+			message = "[Attached Video/Link/Shares that cant be read by Chat Assistant]"
+		}
+		log.Println("Sending Message", threadId, message, conversation.PageID == entry.From.ID)
+		_, err = openai.SendMessage(threadId, message, richContent, conversation.PageID == entry.From.ID)
+		if err != nil {
+			log.Println("Something went wrong while inseting the message", err.Error())
+			// return nil, err
+		}
+		lastMid = entry.ID
+	}
+
+	log.Println("Inserting the Conversation Model", conversation.IGSID, threadId)
+	// conversation.IGSID = igsid
+	// conversation.PageID = pageId
+	conversation.ThreadID = threadId
+	conversation.LastMID = lastMid
+	// data := &models.Conversation{
+	// 	IGSID:    convId,
+	// 	ThreadID: threadId,
+	// 	LastMID:  lastMid,
+	// }
+	_, err = conversation.Insert()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {

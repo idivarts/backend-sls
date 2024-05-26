@@ -36,20 +36,24 @@ func (msg IGMessagehandler) HandleMessage() error {
 		convId = msg.Entry.Recipient.ID
 	}
 	err := msg.conversationData.Get(convId)
-	if msg.Message.IsDeleted {
+	if err != nil {
+		// This is where I would need to create a new instance
+		log.Println("Error Finding IGSID", err.Error())
+		msg.conversationData = &models.Conversation{
+			PageID: msg.PageID,
+			IGSID:  convId,
+		}
+		msg.conversationData, err = msg.createMessageThread(false)
+		if err != nil {
+			return err
+		}
+	} else if msg.Message.IsDeleted {
 		log.Println("Deleting and creating a brand new thread")
-		msg.conversationData, err = msg.createMessageThread(convId, true)
+		msg.conversationData, err = msg.createMessageThread(true)
 		if err != nil {
 			return err
 		}
 		return nil
-	} else if err != nil {
-		// This is where I would need to create a new instance
-		log.Println("Error Finding IGSID", err.Error())
-		msg.conversationData, err = msg.createMessageThread(convId, false)
-		if err != nil {
-			return err
-		}
 	}
 	// if msg.Message != nil {
 	err = msg.handleMessageThreadOperation()
