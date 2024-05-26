@@ -105,7 +105,7 @@ func PageSync(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	var conversations []messenger.ConversationMessagesData = make([]messenger.ConversationMessagesData, 0)
+	var conversations []messenger.ConversationMessagesData
 	if req.IGSID != nil {
 		data, err := messenger.GetConversationsByUserId(*req.IGSID, pData.AccessToken)
 		if err != nil {
@@ -115,6 +115,10 @@ func PageSync(c *gin.Context) {
 		conversations = data.Data
 	} else {
 		conversations = messenger.FetchAllConversations(nil, pData.AccessToken)
+	}
+	if len(conversations) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No Conversation found"})
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background"})
 
