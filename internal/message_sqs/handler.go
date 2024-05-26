@@ -38,8 +38,10 @@ func sendMessage(message string) error {
 		return eventhandling.WaitAndSend(conv)
 	} else if conv.Action == sqsevents.REMINDER {
 		return eventhandling.SendReminder(conv)
-	} else {
+	} else if conv.Action == sqsevents.RUN_OPENAI {
 		return eventhandling.RunOpenAI(conv, "")
+	} else if conv.Action == sqsevents.CREATE_THREAD || conv.Action == sqsevents.CREATE_OR_UPDATE_THREAD {
+		return eventhandling.CreateOrUpdateThread(conv)
 	}
-
+	return nil
 }
