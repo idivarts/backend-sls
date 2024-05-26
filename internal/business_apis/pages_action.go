@@ -10,7 +10,7 @@ import (
 )
 
 type IPageWebhook struct {
-	Enable bool `json:"enable" binding:"required"`
+	Enable bool `json:"enable" form:"enable" binding:"required"`
 }
 
 func PageWebhook(c *gin.Context) {
@@ -88,7 +88,7 @@ func PageAssistant(c *gin.Context) {
 }
 
 type IPageSync struct {
-	All bool `json:"all"`
+	All bool `json:"all" form:"all"`
 }
 
 func PageSync(c *gin.Context) {
