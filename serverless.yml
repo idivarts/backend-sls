@@ -122,6 +122,7 @@ functions:
 
   message_sqs:
     handler: functions/message_sqs/main.go
+    timeout: 60
     events:
       - sqs:
           arn:
