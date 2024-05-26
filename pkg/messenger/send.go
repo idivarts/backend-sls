@@ -51,6 +51,19 @@ type ISendMessage struct {
 	Recipient Recipient   `json:"recipient"`
 	Message   MessageUnit `json:"message"`
 }
+
+type SenderAction string
+
+const (
+	MARK_SEEN  SenderAction = "mark_seen"
+	TYPING_ON  SenderAction = "typing_on"
+	TYPING_OFF SenderAction = "typing_off"
+)
+
+type ISendAction struct {
+	Recipient Recipient    `json:"recipient"`
+	Action    SenderAction `json:"sender_action"`
+}
 type IMessageResponse struct {
 	RecipientID string `json:"recipient_id"`
 	MessageID   string `json:"message_id"`
@@ -79,7 +92,18 @@ func SendTextMessage(recipientID string, msg string, pageAccessToken string) (*I
 	}
 	return sendMessage(message, pageAccessToken)
 }
-func sendMessage(message ISendMessage, pageAccessToken string) (*IMessageResponse, error) {
+
+func SendAction(recipientID string, action SenderAction, pageAccessToken string) (*IMessageResponse, error) {
+	message := ISendAction{
+		Recipient: Recipient{
+			ID: recipientID,
+		},
+		Action: action,
+	}
+	return sendMessage(message, pageAccessToken)
+}
+
+func sendMessage(message interface{}, pageAccessToken string) (*IMessageResponse, error) {
 	// Convert the message struct to JSON
 	jsonBytes, err := json.Marshal(message)
 	if err != nil {
