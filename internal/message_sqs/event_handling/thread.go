@@ -9,7 +9,7 @@ import (
 
 func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 	igsid := ev.IGSID
-	pageId := ev.RunID
+	pageId := ev.PageID
 	conv := &models.Conversation{}
 	err := conv.Get(igsid)
 	run := true

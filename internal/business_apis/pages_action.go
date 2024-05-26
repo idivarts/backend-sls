@@ -133,10 +133,10 @@ func PageSync(c *gin.Context) {
 		}
 		x := sqsevents.ConversationEvent{
 			IGSID:  igsid,
-			RunID:  pageId,
+			PageID: pageId,
 			Action: event,
 		}
-		b, err := json.Marshal(x)
+		b, err := json.Marshal(&x)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
