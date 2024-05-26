@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
@@ -14,6 +15,43 @@ import (
 	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
 )
 
+type IProcessedInput struct {
+	StringVal string
+	Number    int
+}
+
+func processInput(input string) []IProcessedInput {
+	// Split the input string by "\n" delimiter
+	lines := strings.Split(input, "\n")
+
+	var result []IProcessedInput
+
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		// Calculate the weight based on the length of the string
+		weight := (len(line) / 7)
+
+		obj := IProcessedInput{
+			StringVal: line,
+			Number:    weight,
+		}
+		result = append(result, obj)
+	}
+
+	return result
+}
+func InstaSend(conv *sqsevents.ConversationEvent) error {
+	_, err := messenger.SendTextMessage(conv.IGSID, conv.Message, conv.PageToken)
+	if err != nil {
+		return err
+	}
+	// if mResp != nil {
+	// 	mID = mResp.MessageID
+	// }
+	return nil
+}
 func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 	log.Println("Getting messaged from thread", conv.ThreadID)
 
@@ -50,23 +88,31 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 			return err
 		}
 
-		mID := ""
+		// mID := ""
 		for _, v := range msgs.Data {
 			if v.RunID == conv.RunID {
 				aMsg := v.Content[0].Text
 				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
-				mResp, _ := messenger.SendTextMessage(conv.IGSID, aMsg.Value, pData.AccessToken)
-				// if err != nil {
-				// 	return err
-				// }
-				if mResp != nil {
-					mID = mResp.MessageID
+				pInp := processInput(aMsg.Value)
+				secondsElapsed := 0
+				for _, v := range pInp {
+					st := sqsevents.ConversationEvent{
+						IGSID:     conv.IGSID,
+						Message:   v.StringVal,
+						PageToken: pData.AccessToken,
+						Action:    sqsevents.INSTA_SEND,
+					}
+					b, err := json.Marshal(&st)
+					secondsElapsed = secondsElapsed + v.Number
+					if err == nil {
+						sqshandler.SendToMessageQueue(string(b), int64(secondsElapsed))
+					}
 				}
 			}
 		}
-		if mID == "" {
-			return errors.New("Cant find the message even after completion of Run --" + conv.RunID)
-		}
+		// if mID == "" {
+		// 	return errors.New("Cant find the message even after completion of Run --" + conv.RunID)
+		// }
 		// cData.LastMID = mID
 		return nil
 	} else if run.Status == openai.REQUIRES_ACTION_STATUS {

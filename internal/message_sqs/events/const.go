@@ -6,6 +6,7 @@ const (
 	REMINDER                SQSEvents = "reminder"
 	CREATE_THREAD           SQSEvents = "createThread"
 	CREATE_OR_UPDATE_THREAD SQSEvents = "createUpdateThread"
+	INSTA_SEND              SQSEvents = "sendToInstagram"
 )
 
 type SQSEvents string

@@ -29,8 +29,8 @@ func sendMessage(message string) error {
 		return err
 	}
 
-	if conv.IGSID == "" {
-		return fmt.Errorf("error - empty field - %s", "IGSID")
+	if conv.IGSID == "" || conv.Action == "" {
+		return fmt.Errorf("error - empty field - %s", "IGSID or Action")
 	}
 
 	if conv.Action == sqsevents.SEND_MESSAGE {
@@ -40,6 +40,8 @@ func sendMessage(message string) error {
 	} else if conv.Action == sqsevents.RUN_OPENAI {
 		return eventhandling.RunOpenAI(conv, "")
 	} else if conv.Action == sqsevents.CREATE_THREAD || conv.Action == sqsevents.CREATE_OR_UPDATE_THREAD {
+		return eventhandling.CreateOrUpdateThread(conv)
+	} else if conv.Action == sqsevents.INSTA_SEND {
 		return eventhandling.CreateOrUpdateThread(conv)
 	}
 	return nil
