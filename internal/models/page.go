@@ -28,6 +28,11 @@ type Page struct {
 	AssistantID        string `json:"assistantId" dynamodbav:"assistantId"`
 	IsWebhookConnected bool   `json:"isWebhookConnected" dynamodbav:"isWebhookConnected"`
 	Status             int    `json:"status" dynamodbav:"status"`
+
+	ReminderTimeMultiplier int `json:"reminderTimeMultiplier" dynamodbav:"reminderTimeMultiplier"`
+	ReplyTimeMin           int `json:"replyTimeMin" dynamodbav:"replyTimeMin"`
+	ReplyTimeMax           int `json:"replyTimeMax" dynamodbav:"replyTimeMax"`
+
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
 
