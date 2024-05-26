@@ -88,7 +88,8 @@ func PageAssistant(c *gin.Context) {
 }
 
 type IPageSync struct {
-	All bool `json:"all" form:"all"`
+	All   bool    `json:"all"`
+	IGSID *string `json:"igsid,omitempty"`
 }
 
 func PageSync(c *gin.Context) {
@@ -104,7 +105,17 @@ func PageSync(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	conversations := messenger.FetchAllConversations(nil, pData.AccessToken)
+	var conversations []messenger.ConversationMessagesData = make([]messenger.ConversationMessagesData, 0)
+	if req.IGSID != nil {
+		data, err := messenger.GetConversationsByUserId(*req.IGSID, pData.AccessToken)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		conversations = data.Data
+	} else {
+		conversations = messenger.FetchAllConversations(nil, pData.AccessToken)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background"})
 
 	for _, v := range conversations {
