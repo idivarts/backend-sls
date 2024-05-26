@@ -20,6 +20,7 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 		}
 	} else {
 		if ev.Action != sqsevents.CREATE_OR_UPDATE_THREAD {
+			log.Println("Wont be updating this thread", igsid)
 			run = false
 		}
 	}
