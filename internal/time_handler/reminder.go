@@ -14,7 +14,7 @@ func CalculateRemiderDelay(conv *models.Conversation) int {
 	if err != nil {
 		// Do nothing
 	} else {
-		calcTime = (pData.ReminderTimeMultiplier) * 60
+		calcTime = (pData.ReminderTimeMultiplier)
 	}
 
 	calcTime = calcTime + calcTime*conv.ReminderCount

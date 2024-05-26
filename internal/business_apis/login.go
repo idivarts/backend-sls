@@ -57,9 +57,13 @@ func Login(c *gin.Context) {
 				UserID:      person.ID,
 				OwnerName:   person.Name,
 				// Instagram:   nil,
-				AccessToken: lRes.AccessToken,
-				AssistantID: string(openai.ArjunAssistant),
-				Status:      1,
+				AccessToken:            lRes.AccessToken,
+				AssistantID:            string(openai.ArjunAssistant),
+				Status:                 1,
+				IsWebhookConnected:     false,
+				ReminderTimeMultiplier: 60 * 60 * 6,
+				ReplyTimeMin:           15,
+				ReplyTimeMax:           120,
 			}
 			_, err = instaPage.Insert()
 			if err != nil {
@@ -78,9 +82,13 @@ func Login(c *gin.Context) {
 			UserID:      person.ID,
 			OwnerName:   person.Name,
 			// Instagram:   nil,
-			AccessToken: lRes.AccessToken,
-			AssistantID: string(openai.ArjunAssistant),
-			Status:      1,
+			AccessToken:            lRes.AccessToken,
+			AssistantID:            string(openai.ArjunAssistant),
+			Status:                 1,
+			IsWebhookConnected:     false,
+			ReminderTimeMultiplier: 60 * 60 * 6,
+			ReplyTimeMin:           15,
+			ReplyTimeMax:           120,
 		}
 		_, err = fbPage.Insert()
 		if err != nil {

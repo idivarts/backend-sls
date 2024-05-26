@@ -22,7 +22,7 @@ func splitRange(min, max int) (int, int) {
 func generateRandomNumberInSeconds(min, max int) int {
 	// rand.Seed(time.Now().UnixNano()) // Seed the random number generator
 
-	return (rand.Intn(max-min+1) + min) * 60
+	return (rand.Intn(max-min+1) + min)
 }
 
 func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
