@@ -43,6 +43,7 @@ func processInput(input string) []IProcessedInput {
 	return result
 }
 func InstaSend(conv *sqsevents.ConversationEvent) error {
+	log.Println("Sending Message to instagram", conv.Message)
 	_, err := messenger.SendTextMessage(conv.IGSID, conv.Message, conv.PageToken)
 	if err != nil {
 		return err

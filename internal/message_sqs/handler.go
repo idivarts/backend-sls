@@ -42,7 +42,7 @@ func sendMessage(message string) error {
 	} else if conv.Action == sqsevents.CREATE_THREAD || conv.Action == sqsevents.CREATE_OR_UPDATE_THREAD {
 		return eventhandling.CreateOrUpdateThread(conv)
 	} else if conv.Action == sqsevents.INSTA_SEND {
-		return eventhandling.CreateOrUpdateThread(conv)
+		return eventhandling.InstaSend(conv)
 	}
 	return nil
 }
