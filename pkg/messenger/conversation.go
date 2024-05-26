@@ -9,7 +9,13 @@ import (
 )
 
 type ConversationData struct {
-	Data []ConversationMessagesData `json:"data"`
+	Data   []ConversationMessagesData `json:"data"`
+	Paging struct {
+		Cursors struct {
+			After string `json:"after"`
+		} `json:"cursors"`
+		Next string `json:"next"`
+	} `json:"paging"`
 }
 type ConversationMessagesData struct {
 	Name         string       `json:"name"`
@@ -61,12 +67,12 @@ func GetConversationsByUserId(userID string, pageAccessToken string) (*Conversat
 	return &data, nil
 }
 
-func GetConversationMessages(conversationID string, pageAccessToken string) (*ConversationMessagesData, error) {
+func GetConversationById(conversationID string, pageAccessToken string) (*ConversationMessagesData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,id,messages{%s}&access_token=%s", baseURL, apiVersion, conversationID, messageInfoFields, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,id,participants&access_token=%s", baseURL, apiVersion, conversationID, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -93,44 +99,12 @@ func GetConversationMessages(conversationID string, pageAccessToken string) (*Co
 	return &data, nil
 }
 
-func GetMessagesWithPagination(conversationID string, after string, limit int, pageAccessToken string) (*ConversationPaginatedMessageData, error) {
+func GetConversationsPaginated(after string, limit int, pageAccessToken string) (*ConversationData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s/messages?fields=%s&limit=%d&after=%s&access_token=%s", baseURL, apiVersion, conversationID, messageInfoFields, limit, after, pageAccessToken)
-
-	// Make the API request
-	resp, err := client.Get(apiURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// Print the response body
-	// fmt.Println(string(body))
-	data := ConversationPaginatedMessageData{}
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		fmt.Print(err.Error())
-		return nil, err
-	}
-
-	return &data, nil
-}
-
-func GetAllConversationInfo(pageAccessToken string) (*ConversationData, error) {
-	// Set up the HTTP client
-	client := http.Client{}
-
-	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&access_token=%s", baseURL, apiVersion, platform, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&limit=%d&access_token=%s&after=%s", baseURL, apiVersion, platform, limit, pageAccessToken, after)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)

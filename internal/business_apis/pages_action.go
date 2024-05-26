@@ -84,9 +84,19 @@ func PageAssistant(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON"})
+}
 
+type IPageSync struct {
+	All bool `json:"all"`
 }
 
 func PageSync(c *gin.Context) {
+	var req IPageSync
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// pageId := c.Param("pageId")
 
+	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background"})
 }

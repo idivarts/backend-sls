@@ -9,7 +9,7 @@ import (
 var conversationID = ""
 
 func TestGetAll(t *testing.T) {
-	data, err := messenger.GetAllConversationInfo(messenger.TestPageAccessToken)
+	data, err := messenger.GetConversationsPaginated("", 10, messenger.TestPageAccessToken)
 	if err != nil {
 		t.Fail()
 	}
@@ -33,7 +33,7 @@ func messageParticipant(igSid string, t *testing.T) {
 	}
 }
 func getMessages(t *testing.T) {
-	messages, err := messenger.GetConversationMessages(conversationID, messenger.TestPageAccessToken)
+	messages, err := messenger.GetConversationById(conversationID, messenger.TestPageAccessToken)
 	if err != nil {
 		// t.Log(err)
 		t.Fail()

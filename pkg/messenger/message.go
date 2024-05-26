@@ -98,3 +98,35 @@ func GetMessageInfo(messageID string, pageAccessToken string) (*Message, error) 
 	}
 	return &data, nil
 }
+
+func GetMessagesWithPagination(conversationID string, after string, limit int, pageAccessToken string) (*ConversationPaginatedMessageData, error) {
+	// Set up the HTTP client
+	client := http.Client{}
+
+	// Set the API endpoint
+	apiURL := fmt.Sprintf("%s/%s/%s/messages?fields=%s&limit=%d&after=%s&access_token=%s", baseURL, apiVersion, conversationID, messageInfoFields, limit, after, pageAccessToken)
+
+	// Make the API request
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Print the response body
+	// fmt.Println(string(body))
+	data := ConversationPaginatedMessageData{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		fmt.Print(err.Error())
+		return nil, err
+	}
+
+	return &data, nil
+}
