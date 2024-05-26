@@ -19,7 +19,7 @@ type UserProfile struct {
 }
 
 func (user UserProfile) GenerateUserDescription() string {
-	description := "Here are the details about the user(ignore if anything is blank) -\n"
+	description := "Address the user with there name to make the message personalized. If name is missing, address them with there username.\n-----------------\nBelow are the details about the user -\n"
 	description += "Name: " + user.Name + "\n"
 	description += "Username: " + user.Username + "\n"
 	// description += "Profile Picture: " + user.ProfilePic + "\n"
