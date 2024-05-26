@@ -70,6 +70,9 @@ func (c *Page) Get(pageId string) error {
 	if c.Status != 1 {
 		return fmt.Errorf("page %s is deactivated", c.PageID)
 	}
+	if c.PageID == "" {
+		return fmt.Errorf("error finding page %s", pageId)
+	}
 	return nil
 }
 

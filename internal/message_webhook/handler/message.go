@@ -43,9 +43,9 @@ func (msg IGMessagehandler) HandleMessage() error {
 			return err
 		}
 		return nil
-	} else if err != nil || msg.conversationData.IGSID == "" {
+	} else if err != nil {
 		// This is where I would need to create a new instance
-		log.Println("Error Finding IGSID")
+		log.Println("Error Finding IGSID", err.Error())
 		msg.conversationData, err = msg.createMessageThread(convId, false)
 		if err != nil {
 			return err

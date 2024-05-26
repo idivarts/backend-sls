@@ -59,6 +59,11 @@ func (c *Conversation) Get(igsid string) error {
 		fmt.Println("Error unmarshalling item:", err)
 		return err
 	}
+
+	if c.IGSID == "" {
+		return fmt.Errorf("error finding conversation %s", igsid)
+	}
+
 	return nil
 }
 

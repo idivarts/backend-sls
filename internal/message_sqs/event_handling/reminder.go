@@ -2,7 +2,6 @@ package eventhandling
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 
@@ -17,10 +16,6 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 	err := cData.Get(conv.IGSID)
 	if err != nil {
 		return err
-	}
-	if cData.IGSID == "" {
-		return errors.New("Cant find this entry")
-		// return
 	}
 	pData := &models.Page{}
 	err = pData.Get(cData.PageID)

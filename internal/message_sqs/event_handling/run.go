@@ -2,7 +2,6 @@ package eventhandling
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 
@@ -18,10 +17,6 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 	err := cData.Get(conv.IGSID)
 	if err != nil {
 		return err
-	}
-	if cData.IGSID == "" {
-		return errors.New("Cant find this entry")
-		// return
 	}
 
 	pData := &models.Page{}

@@ -1,7 +1,6 @@
 package businessapis
 
 import (
-	"errors"
 	"net/http"
 
 	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
@@ -32,10 +31,6 @@ func SendMessage(c *gin.Context) {
 	err := cData.Get(req.IGSID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if cData.IGSID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": errors.New("Can't find this entry")})
 		return
 	}
 	_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, false)
