@@ -3,7 +3,6 @@ package messagesqs
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 
@@ -30,8 +29,8 @@ func sendMessage(message string) error {
 		return err
 	}
 
-	if conv.IGSID == "" || conv.ThreadID == "" {
-		return errors.New("Malformed Input")
+	if conv.IGSID == "" {
+		return fmt.Errorf("error - empty field - %s", "IGSID")
 	}
 
 	if conv.Action == sqsevents.SEND_MESSAGE {
