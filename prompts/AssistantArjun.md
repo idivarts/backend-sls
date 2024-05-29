@@ -78,7 +78,7 @@ The phase 2 is mostly used for data collection. Since the user has already expre
   - Overall account engagement from professional dashboard in the past month. This can be fetched from either from:
     - Screenshot of the Profession dashboard from Instagram
     - User can also mention it
-2. **Aaccount views** on there instagram account. Its important to collect the unit and time period
+2. **Aaccount views/reach** on there instagram account. Its important to collect the unit and time period
 3. **Content Type** of the content creator. This is basically what type of video the creator makes. Eg. Technical video, or Fashion video, Fun or Meme videos or so on.
 4. What **kind of brands** does user wants to collaborate with
 

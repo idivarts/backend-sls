@@ -1,48 +1,56 @@
 {
-    "name": "change_phase",
-    "description": "This function is called whenever there is a change in phase or addition/updation of any of the data/information to be collected. The purpose of this function is to send and process any collected information from the chat. This function returns two variables missed_information and missed_phases.\n1. missed_information is an array of string that identifies what all information is yet to be collected from the user before they can end the conversation. The assistant need to make sure that it collects all the information in this.\n2. missed_phases is an array of integer identifying is the chat had to skip any phases of conversation. The assistant need to make sure that they cover all the phase mentioned in this return",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "phase": {
-          "type": "number",
-          "description": "This is a number identifying the current phase of conversation"
-        },
-        "interestInService": {
-          "type": "boolean",
-          "description": "This determines if the user is interested in trendshub service or not. Send true if user is interested. Send false if user not interested. This parameter is typically collected in phase 1 of conversation."
-        },
-        "interestInApp": {
-          "type": "boolean",
-          "description": "This determines if the user is interested in installing trendshub app or not. Send true if user is interested. Send false if user not interested. This parameter is typically collected in phase 3 of conversation."
-        },
-        "engagement": {
-          "type": "string",
-          "description": "The total engagement of user on there instagram account. Eg. 1000 engagement in past 2 weeks. Typically this data is collected in phase 2."
-        },
-        "views": {
-          "type": "string",
-          "description": "Total views on there instagram account. Eg. 1M views in past 30 days. Typically this data is collected in phase 2."
-        },
-        "video_category": {
-            "type": "string",
-            "description": "This defines the type of video the content creator normally make. This can contain multiple video categories too. Eg. Comedy video or Informational Video or Video on Political agenda. Typically this data is collected in phase 2."
-        },
-        "brand_category": {
-            "type": "string",
-            "description": "This defines what kind of brand does user wants to collaborate with. This can contain multiple brand categories. Eg. Fashion brand or shoe brand or electronics brands. Typically this data is collected in phase 2."
-        },
-        "collaboration_brand": {
-          "type": "string",
-          "description": "The brand name that the user wants to collaborate with. Typically this data is collected in phase 4."
-        },
-        "collaboration_product": {
-          "type": "string",
-          "description": "The product or the category of product or the list of product which the user would like to collaborate with. Typically this data is collected in phase 4."
-        }
+  "name": "change_phase",
+  "description": "This function is called whenever there is a change in phase or addition/updation of any of the data/information to be collected. The purpose of this function is to send and process any collected information from the chat. This function returns two variables missed_information and missed_phases.\n1. missed_information is an array of string that identifies what all information is yet to be collected from the user before they can end the conversation. The assistant need to make sure that it collects all the information in this.\n2. missed_phases is an array of integer identifying is the chat had to skip any phases of conversation. The assistant need to make sure that they cover all the phase mentioned in this return",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "phase": {
+        "type": "number",
+        "description": "This is a number identifying the current phase of conversation"
       },
-      "required": [
-        "phase"
-      ]
-    }
+      "interestInService": {
+        "type": "boolean",
+        "description": "This determines if the user is interested in trendshub service or not. Send true if user is interested. Send false if user not interested. This parameter is typically collected in phase 1 of conversation."
+      },
+      "interestInApp": {
+        "type": "boolean",
+        "description": "This determines if the user is interested in installing trendshub app or not. Send true if user is interested. Send false if user not interested. This parameter is typically collected in phase 3 of conversation."
+      },
+      "engagement": {
+        "type": "string",
+        "description": "The total engagement of user on there instagram account. Eg. 1000 engagement in past 2 weeks. Typically this data is collected in phase 2."
+      },
+      "engagement_unit": {
+        "type": "string",
+        "description": "Engagement data should be having a time period like in past 1 month or a unit like overall engagement in top performing videos or so."
+      },
+      "views": {
+        "type": "string",
+        "description": "Total views/reach on there instagram account. Eg. 1M views in past 30 days. Typically this data is collected in phase 2."
+      },
+      "views_unit": {
+        "type": "string",
+        "description": "View data should always be accompanied with a unit like - total account reach in 1 month or average views on video"
+      },
+      "video_category": {
+        "type": "string",
+        "description": "This defines the type of video the content creator normally make. This can contain multiple video categories too. Eg. Comedy video or Informational Video or Video on Political agenda. Typically this data is collected in phase 2."
+      },
+      "brand_category": {
+        "type": "string",
+        "description": "This defines what kind of brand does user wants to collaborate with. This can contain multiple brand categories. Eg. Fashion brand or shoe brand or electronics brands. Typically this data is collected in phase 2."
+      },
+      "collaboration_brand": {
+        "type": "string",
+        "description": "The brand name that the user wants to collaborate with. Typically this data is collected in phase 4."
+      },
+      "collaboration_product": {
+        "type": "string",
+        "description": "The product or the category of product or the list of product which the user would like to collaborate with. Typically this data is collected in phase 4."
+      }
+    },
+    "required": [
+      "phase"
+    ]
+  }
 }
