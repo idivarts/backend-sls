@@ -40,8 +40,14 @@ func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall
 	if cp.Engagement != "" {
 		cData.Information.Engagement = cp.Engagement
 	}
+	if cp.EngagementUnit != "" {
+		cData.Information.EngagementUnit = cp.EngagementUnit
+	}
 	if cp.Views != "" {
 		cData.Information.Views = cp.Views
+	}
+	if cp.ViewsUnit != "" {
+		cData.Information.ViewsUnit = cp.ViewsUnit
 	}
 	if cp.BrandCategory != "" {
 		cData.Information.BrandCategory = cp.BrandCategory
