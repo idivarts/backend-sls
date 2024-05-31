@@ -39,13 +39,23 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	igConvs, err := messenger.GetConversationsPaginated(req.After, req.Limit, pData.AccessToken)
+	igConvs, err := messenger.GetConversationsByUserId(igsid, pData.AccessToken)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(igConvs.Data) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No conversation found"})
+		return
+	}
+	convId := igConvs.Data[0].ID
+	messages, err := messenger.GetMessagesWithPagination(convId, req.After, req.Limit, pData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, *igConvs)
+	c.JSON(http.StatusOK, *messages)
 }
 
 type SendType string

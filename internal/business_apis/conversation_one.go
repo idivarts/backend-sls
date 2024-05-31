@@ -25,11 +25,11 @@ func GetConversationById(c *gin.Context) {
 		return
 	}
 	pData.AccessToken = ""
-	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background", "conversation": *cData, "page": *pData})
+	c.JSON(http.StatusOK, gin.H{"message": "Fetched successfully", "conversation": *cData, "page": *pData})
 }
 
 type IUpdateConversation struct {
-	*models.Conversation
+	models.Conversation
 	Information  *openaifc.ChangePhase `json:"information,omitempty"`
 	CurrentPhase *int                  `json:"currentPhase,omitempty"`
 	Status       *int                  `json:"status,omitempty"`
