@@ -114,11 +114,8 @@ func SendMessage(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, true)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+		// No need to send message on open ai as that would be automatically processed in the webhook loop
+
 		cData.LastMID = msg.MessageID
 		_, err = cData.Insert()
 		if err != nil {

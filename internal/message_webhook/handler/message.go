@@ -82,8 +82,8 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	}
 
 	if msg.PageID != msg.IGSID ||
-		//Checking last time bot processed the message was more than 20 seconds before the recorded time
-		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-20000) {
+		//Checking last time bot processed the message was more than 2 minutes before the recorded time
+		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-120000) {
 		log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
 
 		var richContent []openai.ContentRequest = nil
