@@ -77,7 +77,7 @@ func main() {
 						}
 						toolOutput = append(toolOutput, *t)
 					} else if toolOption.Function.Name == openai.ChangePhaseFn {
-						t, err := openaitools.ChangePhaseSimulateFn(&cData, conv, toolOption)
+						t, err := openaitools.ChangePhaseFn(conv, toolOption, &cData)
 						if err != nil {
 							log.Printf("Error %s", err.Error())
 							return
