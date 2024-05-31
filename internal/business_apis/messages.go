@@ -57,7 +57,7 @@ const (
 type IStartConversationRequest struct {
 	IGSID          string   `json:"igsid" binding:"required"`
 	SendType       SendType `json:"sendType" binding:"required"`
-	Message        string   `json:"message" binding:"required"`
+	Message        string   `json:"message"`
 	BotInstruction string   `json:"botInstruction"`
 }
 
@@ -82,7 +82,7 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
-	if req.SendType == User {
+	if req.SendType == User && req.Message != "" {
 		_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, false)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -108,7 +108,7 @@ func SendMessage(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-	} else if req.SendType == Page {
+	} else if req.SendType == Page && req.Message != "" {
 		msg, err := messenger.SendTextMessage(cData.IGSID, req.Message, pData.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -125,7 +125,7 @@ func SendMessage(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-	} else if req.SendType == Bot {
+	} else if req.SendType == Bot && req.BotInstruction != "" {
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
 			IGSID:    req.IGSID,
@@ -138,7 +138,7 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("error : Send type invalida - %s", req.SendType)})
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("error : Request invalid - %s, %s, %s", req.SendType, req.Message, req.BotInstruction)})
 		return
 	}
 
