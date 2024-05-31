@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/TrendsHub/th-backend/internal/models"
+	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
 	"github.com/gin-gonic/gin"
 )
 
@@ -34,7 +35,9 @@ func GetConversationById(c *gin.Context) {
 }
 
 type IUpdateConversation struct {
-	IGSID string `json:"igsid" binding:"required"`
+	*models.Conversation
+	IGSID       string                `json:"igsid" binding:"required"`
+	Information *openaifc.ChangePhase `json:"information,omitempty"`
 }
 
 func UpdateConversation(c *gin.Context) {
@@ -43,7 +46,14 @@ func UpdateConversation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// messenger.GetConversationsPaginated()
+	// req.
+	cData := &models.Conversation{}
+	err := cData.Get(req.IGSID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// req.Information
 
 	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background"})
 }
