@@ -6,12 +6,43 @@ import (
 	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
+	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 	"github.com/gin-gonic/gin"
 )
 
-func GetMessages(c *gin.Context) {
+type IMessagesByID struct {
+	IGSID string `form:"igsid" binding:"required"`
+	After string `form:"after"`
+	Limit int    `form:"limit"`
+}
 
+func GetMessages(c *gin.Context) {
+	var req IMessagesByID
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cData := &models.Conversation{}
+	err := cData.Get(req.IGSID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	pData := &models.Page{}
+	err = pData.Get(cData.PageID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	igConvs, err := messenger.GetConversationsPaginated(req.After, req.Limit, pData.AccessToken)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, *igConvs)
 }
 
 type IStartConversationRequest struct {

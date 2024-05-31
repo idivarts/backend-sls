@@ -4,14 +4,11 @@ import (
 	"net/http"
 
 	"github.com/TrendsHub/th-backend/internal/models"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/gin-gonic/gin"
 )
 
 type IConversationByID struct {
 	IGSID string `form:"igsid" binding:"required"`
-	After string `form:"after"`
-	Limit int    `form:"limit"`
 }
 
 func GetConversationById(c *gin.Context) {
@@ -32,14 +29,8 @@ func GetConversationById(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	igConvs, err := messenger.GetConversationsPaginated(req.After, req.Limit, pData.AccessToken)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background", "conversation": *igConvs})
+	pData.AccessToken = ""
+	c.JSON(http.StatusOK, gin.H{"message": "Sync is running in background", "conversation": *cData, "page": *pData})
 }
 
 type IUpdateConversation struct {
