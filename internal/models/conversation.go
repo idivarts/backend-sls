@@ -25,6 +25,8 @@ type Conversation struct {
 	CurrentPhase       int                    `json:"currentPhase" dynamodbav:"currentPhase"`
 	Information        openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
 	MessageQueue       *string                `json:"messageQueue" dynamodbav:"messageQueue"`
+	NextMessageTime    *int64                 `json:"nextMessageTime" dynamodbav:"nextMessageTime"`
+	NextReminderTime   *int64                 `json:"nextReminderTime" dynamodbav:"nextReminderTime"`
 	ReminderQueue      *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
 	ReminderCount      int                    `json:"reminderCount" dynamodbav:"reminderCount"`
 	Status             int                    `json:"status" dynamodbav:"status"`

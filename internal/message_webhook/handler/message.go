@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
@@ -149,6 +150,8 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		if err != nil {
 			return err
 		}
+		nextMessageTime := time.Now().Unix() + int64(*sendTimeDuration)
+		msg.conversationData.NextReminderTime = &nextMessageTime
 		msg.conversationData.MessageQueue = execArn.ExecutionArn
 		log.Println("Message sent to the queue after", *sendTimeDuration)
 	}
@@ -177,6 +180,8 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			if err != nil {
 				return err
 			}
+			nextReminderTime := time.Now().Unix() + int64(sendTimeDuration)
+			msg.conversationData.NextReminderTime = &nextReminderTime
 			msg.conversationData.ReminderQueue = execArn.ExecutionArn
 			log.Println("Reminder Set after", REMINDER_SECONDS, msg.IGSID)
 		} else {
