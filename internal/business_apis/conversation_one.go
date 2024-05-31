@@ -78,6 +78,9 @@ func UpdateConversation(c *gin.Context) {
 		cData.MessageQueue = nil
 		cData.NextMessageTime = nil
 	}
+	if req.UserProfile != nil {
+		cData.UserProfile = req.UserProfile
+	}
 	// if req. != nil {
 	// 	cData.CurrentPhase = *req.CurrentPhase
 	// }
