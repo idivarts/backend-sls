@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
 	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
@@ -19,6 +20,7 @@ type Conversation struct {
 	ThreadID           string                 `json:"threadId" dynamodbav:"threadId"`
 	LastMID            string                 `json:"lastMid" dynamodbav:"lastMid"`
 	LastBotMessageTime int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
+	BotMessageCount    int                    `json:"botMessageCount" dynamodbav:"botMessageCount"`
 	IsProfileFetched   bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
 	UserProfile        *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
 	Phases             []int                  `json:"phases" dynamodbav:"phases"`
@@ -293,7 +295,7 @@ func (c *Conversation) UpdateProfileFetched() (*dynamodb.UpdateItemOutput, error
 // 	return nil
 // }
 
-func GetPausedConversations() ([]Conversation, error) {
+func GetConversations(pageId *string, phase *int) ([]Conversation, error) {
 	// Initialize AWS SDK and DynamoDB client
 
 	// Initialize variables
@@ -301,13 +303,29 @@ func GetPausedConversations() ([]Conversation, error) {
 
 	// Create the input for the Scan operation
 	input := &dynamodb.ScanInput{
-		TableName:        aws.String(conversationTable),
-		FilterExpression: aws.String("isConversationPaused = :active"),
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":active": {
-				N: aws.String("1"),
+		TableName: aws.String(conversationTable),
+	}
+	if pageId != nil {
+		input = &dynamodb.ScanInput{
+			TableName:        aws.String(conversationTable),
+			FilterExpression: aws.String("pageId = :pageId"),
+			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+				":pageId": {
+					S: pageId,
+				},
 			},
-		},
+		}
+	}
+	if pageId != nil {
+		input = &dynamodb.ScanInput{
+			TableName:        aws.String(conversationTable),
+			FilterExpression: aws.String("currentPhase = :phase"),
+			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+				":pahse": {
+					N: aws.String(strconv.Itoa(*phase)),
+				},
+			},
+		}
 	}
 
 	// Perform the Scan operation

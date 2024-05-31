@@ -90,6 +90,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		}
 
 		cData.LastBotMessageTime = time.Now().UnixMilli()
+		cData.BotMessageCount = cData.BotMessageCount + 1
 		_, err = cData.Insert()
 		if err != nil {
 			return err
