@@ -5,6 +5,7 @@ import (
 
 	"github.com/TrendsHub/th-backend/internal/models"
 	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
+	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	"github.com/gin-gonic/gin"
 )
 
@@ -66,6 +67,16 @@ func UpdateConversation(c *gin.Context) {
 	}
 	if req.Status != nil {
 		cData.Status = *req.Status
+	}
+	if req.ReminderQueue != nil {
+		delayedsqs.StopExecutions(cData.ReminderQueue)
+		cData.ReminderQueue = nil
+		cData.NextReminderTime = nil
+	}
+	if req.MessageQueue != nil {
+		delayedsqs.StopExecutions(cData.MessageQueue)
+		cData.MessageQueue = nil
+		cData.NextMessageTime = nil
 	}
 	// if req. != nil {
 	// 	cData.CurrentPhase = *req.CurrentPhase
