@@ -1,6 +1,7 @@
 package businessapis
 
 import (
+	"fmt"
 	"net/http"
 
 	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
@@ -45,10 +46,19 @@ func GetMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, *igConvs)
 }
 
+type SendType string
+
+const (
+	User SendType = "user"
+	Bot  SendType = "bot"
+	Page SendType = "page"
+)
+
 type IStartConversationRequest struct {
-	IGSID                 string `json:"igsid" binding:"required"`
-	Message               string `json:"Message" binding:"required"`
-	AdditionalInstruction string `json:"AdditionalInstruction"`
+	IGSID          string   `json:"igsid" binding:"required"`
+	SendType       SendType `json:"sendType" binding:"required"`
+	Message        string   `json:"message" binding:"required"`
+	BotInstruction string   `json:"botInstruction"`
 }
 
 func SendMessage(c *gin.Context) {
@@ -64,29 +74,73 @@ func SendMessage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, false)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	cData.IsConversationPaused = 0
-	_, err = cData.Insert()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	// openai.SendMessage()
-	conv := &sqsevents.ConversationEvent{
-		Action:   sqsevents.RUN_OPENAI,
-		IGSID:    req.IGSID,
-		ThreadID: cData.ThreadID,
-		MID:      cData.LastMID,
-	}
-	err = eventhandling.RunOpenAI(conv, req.AdditionalInstruction)
+
+	pData := &models.Page{}
+	err = pData.Get(cData.PageID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Conversation started successfully"})
+	if req.SendType == User {
+		_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, false)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if len(cData.Phases) > 0 {
+			cData.CurrentPhase = cData.Phases[len(cData.Phases)-1]
+		}
+		_, err = cData.Insert()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		// openai.SendMessage()
+		conv := &sqsevents.ConversationEvent{
+			Action:   sqsevents.RUN_OPENAI,
+			IGSID:    req.IGSID,
+			ThreadID: cData.ThreadID,
+			MID:      cData.LastMID,
+		}
+		err = eventhandling.RunOpenAI(conv, req.BotInstruction)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	} else if req.SendType == Page {
+		msg, err := messenger.SendTextMessage(cData.IGSID, req.Message, pData.AccessToken)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, true)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		cData.LastMID = msg.MessageID
+		_, err = cData.Insert()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	} else if req.SendType == Bot {
+		conv := &sqsevents.ConversationEvent{
+			Action:   sqsevents.RUN_OPENAI,
+			IGSID:    req.IGSID,
+			ThreadID: cData.ThreadID,
+			MID:      cData.LastMID,
+		}
+		err = eventhandling.RunOpenAI(conv, req.BotInstruction)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("error : Send type invalida - %s", req.SendType)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Conversation sent"})
 }

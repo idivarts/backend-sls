@@ -39,6 +39,7 @@ type IUpdateConversation struct {
 	IGSID        string                `json:"igsid" binding:"required"`
 	Information  *openaifc.ChangePhase `json:"information,omitempty"`
 	CurrentPhase *int                  `json:"currentPhase,omitempty"`
+	Status       *int                  `json:"status,omitempty"`
 }
 
 func UpdateConversation(c *gin.Context) {
@@ -62,6 +63,9 @@ func UpdateConversation(c *gin.Context) {
 	}
 	if req.CurrentPhase != nil {
 		cData.CurrentPhase = *req.CurrentPhase
+	}
+	if req.Status != nil {
+		cData.Status = *req.Status
 	}
 	// if req. != nil {
 	// 	cData.CurrentPhase = *req.CurrentPhase
