@@ -94,5 +94,5 @@ func UpdateConversation(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Update done"})
+	c.JSON(http.StatusOK, gin.H{"message": "Update done", "conversation": *cData})
 }
