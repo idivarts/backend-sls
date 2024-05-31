@@ -9,18 +9,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type IConversationByID struct {
-	IGSID string `form:"igsid" binding:"required"`
-}
-
 func GetConversationById(c *gin.Context) {
-	var req IConversationByID
-	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	igsid := c.Param("igsid")
+
 	cData := &models.Conversation{}
-	err := cData.Get(req.IGSID)
+	err := cData.Get(igsid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -37,7 +30,6 @@ func GetConversationById(c *gin.Context) {
 
 type IUpdateConversation struct {
 	*models.Conversation
-	IGSID        string                `json:"igsid" binding:"required"`
 	Information  *openaifc.ChangePhase `json:"information,omitempty"`
 	CurrentPhase *int                  `json:"currentPhase,omitempty"`
 	Status       *int                  `json:"status,omitempty"`
@@ -49,9 +41,10 @@ func UpdateConversation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// req.
+	igsid := c.Param("igsid")
+
 	cData := &models.Conversation{}
-	err := cData.Get(req.IGSID)
+	err := cData.Get(igsid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

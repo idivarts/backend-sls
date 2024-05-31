@@ -13,7 +13,6 @@ import (
 )
 
 type IMessagesByID struct {
-	IGSID string `form:"igsid" binding:"required"`
 	After string `form:"after"`
 	Limit int    `form:"limit"`
 }
@@ -24,8 +23,11 @@ func GetMessages(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	igsid := c.Param("igsid")
+
 	cData := &models.Conversation{}
-	err := cData.Get(req.IGSID)
+	err := cData.Get(igsid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -55,7 +57,6 @@ const (
 )
 
 type IStartConversationRequest struct {
-	IGSID          string   `json:"igsid" binding:"required"`
 	SendType       SendType `json:"sendType" binding:"required"`
 	Message        string   `json:"message"`
 	BotInstruction string   `json:"botInstruction"`
@@ -68,8 +69,10 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
+	igsid := c.Param("igsid")
+
 	cData := &models.Conversation{}
-	err := cData.Get(req.IGSID)
+	err := cData.Get(igsid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -99,7 +102,7 @@ func SendMessage(c *gin.Context) {
 		// openai.SendMessage()
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    req.IGSID,
+			IGSID:    igsid,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}
@@ -125,7 +128,7 @@ func SendMessage(c *gin.Context) {
 	} else if req.SendType == Bot && req.BotInstruction != "" {
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    req.IGSID,
+			IGSID:    igsid,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}
