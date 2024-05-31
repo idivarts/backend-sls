@@ -69,14 +69,18 @@ func UpdateConversation(c *gin.Context) {
 		cData.Status = *req.Status
 	}
 	if req.ReminderQueue != nil {
-		delayedsqs.StopExecutions(cData.ReminderQueue)
-		cData.ReminderQueue = nil
-		cData.NextReminderTime = nil
+		delayedsqs.StopExecutions(req.ReminderQueue)
+		if *req.ReminderQueue == *cData.ReminderQueue {
+			cData.ReminderQueue = nil
+			cData.NextReminderTime = nil
+		}
 	}
 	if req.MessageQueue != nil {
-		delayedsqs.StopExecutions(cData.MessageQueue)
-		cData.MessageQueue = nil
-		cData.NextMessageTime = nil
+		delayedsqs.StopExecutions(req.MessageQueue)
+		if *req.MessageQueue == *cData.MessageQueue {
+			cData.MessageQueue = nil
+			cData.NextMessageTime = nil
+		}
 	}
 	if req.UserProfile != nil {
 		cData.UserProfile = req.UserProfile
