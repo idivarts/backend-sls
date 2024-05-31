@@ -1,7 +1,6 @@
 package businessapis
 
 import (
-	"fmt"
 	"net/http"
 
 	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
@@ -148,7 +147,7 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Errorf("error : Request invalid - %s, %s, %s", req.SendType, req.Message, req.BotInstruction)})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Request invalid", "request": req})
 		return
 	}
 
