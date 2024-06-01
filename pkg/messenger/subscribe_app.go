@@ -11,17 +11,32 @@ const webhook_events = "messages,message_echoes"
 
 func SubscribeApp(doSubsription bool, pageAccessToken string) error {
 	// Convert the message struct to JSON
-	fields := ""
-	if doSubsription {
-		fields = webhook_events
-	}
+	fields := webhook_events
 	url := baseURL + "/" + apiVersion + "/me/subscribed_apps?subscribed_fields=" + fields + "&access_token=" + pageAccessToken
 	fmt.Println(url)
+
+	var resp *http.Response
+	var err error
 	// Make the HTTP request
-	resp, err := http.Post(url, "application/json", nil)
-	if err != nil {
-		fmt.Println(err.Error())
-		return err
+	if doSubsription {
+		resp, err = http.Post(url, "application/json", nil)
+		if err != nil {
+			fmt.Println(err.Error())
+			return err
+		}
+	} else {
+		req, err := http.NewRequest(http.MethodDelete, url, nil)
+		if err != nil {
+			fmt.Println("Error creating request:", err)
+			return err
+		}
+
+		client := &http.Client{}
+		resp, err = client.Do(req)
+		if err != nil {
+			fmt.Println(err.Error())
+			return err
+		}
 	}
 	defer resp.Body.Close()
 
