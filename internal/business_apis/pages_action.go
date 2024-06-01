@@ -13,7 +13,7 @@ import (
 )
 
 type IPageWebhook struct {
-	Enable bool `json:"enable" form:"enable" binding:"required"`
+	Enable *bool `json:"enable" form:"enable" binding:"required"`
 }
 
 func PageWebhook(c *gin.Context) {
