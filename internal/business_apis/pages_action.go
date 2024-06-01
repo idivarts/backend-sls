@@ -34,12 +34,12 @@ func PageWebhook(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page cant be found"})
 		return
 	}
-	err = messenger.SubscribeApp(req.Enable, cPage.AccessToken)
+	err = messenger.SubscribeApp(*req.Enable, cPage.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	cPage.IsWebhookConnected = req.Enable
+	cPage.IsWebhookConnected = *req.Enable
 	_, err = cPage.Insert()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
