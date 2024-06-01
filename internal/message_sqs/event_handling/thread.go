@@ -5,6 +5,7 @@ import (
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
+	"github.com/TrendsHub/th-backend/pkg/messenger"
 )
 
 func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
@@ -29,6 +30,22 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 		err = conv.CreateThread(true)
 		if err != nil {
 			log.Println("Errorr Creating Thread", err.Error())
+			return err
+		}
+	}
+	if ev.Action == sqsevents.CREATE_THREAD || ev.Action == sqsevents.CREATE_OR_UPDATE_THREAD {
+		pData := &models.Page{}
+		err := pData.Get(pageId)
+		if err != nil {
+			return err
+		}
+		user, err := messenger.GetUser(igsid, pData.AccessToken)
+		if err != nil {
+			return err
+		}
+		conv.UserProfile = user
+		_, err = conv.Insert()
+		if err != nil {
 			return err
 		}
 	}
