@@ -51,7 +51,7 @@ func main() {
 			return
 		}
 
-		run, err := openai.StartRun(thread.ID, openai.ArjunAssistant, "", "")
+		run, err := openai.StartRun(thread.ID, openai.ArjunAssistant, "", string(openai.ChangePhaseFn))
 		if err != nil {
 			log.Printf("Error %s", err.Error())
 			return
@@ -67,6 +67,7 @@ func main() {
 				break
 			} else if run.Status == openai.REQUIRES_ACTION_STATUS {
 				// log.Println("Requires Action", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].ID, "\n", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name, run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Arguments)
+				log.Println("\n-------------------------")
 				toolOutput := []openai.ToolOutput{}
 				for _, toolOption := range run.RequiredAction.SubmitToolOutputs.ToolCalls {
 					if toolOption.Function.Name == openai.CanConversationEndFn {

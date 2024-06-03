@@ -51,7 +51,7 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		// cData.UpdateProfileFetched()
 	}
 	log.Println("Starting Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(pData.AssistantID), additionalInstruction, "")
+	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(pData.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
 	if err != nil {
 		return err
 	}

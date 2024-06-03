@@ -74,7 +74,7 @@ type IRunObject struct {
 	IncompleteDetails   interface{}        `json:"incomplete_details"`     // "incomplete_details": null
 	Usage               interface{}        `json:"usage"`                  // "usage": null
 	ResponseFormat      string             `json:"response_format"`        // "response_format": "auto"
-	ToolChoice          string             `json:"tool_choice"`            // "tool_choice": "auto"
+	ToolChoice          interface{}        `json:"tool_choice"`            // "tool_choice": "auto"
 }
 
 func StartRun(threadID string, assistantID AssistantID, additionalInstructions string, requireFunction string) (*IRunObject, error) {
