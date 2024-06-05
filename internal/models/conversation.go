@@ -316,12 +316,26 @@ func GetConversations(pageId *string, phase *int) ([]Conversation, error) {
 			},
 		}
 	}
-	if pageId != nil {
+	if phase != nil {
 		input = &dynamodb.ScanInput{
 			TableName:        aws.String(conversationTable),
 			FilterExpression: aws.String("currentPhase = :phase"),
 			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":pahse": {
+				":phase": {
+					N: aws.String(strconv.Itoa(*phase)),
+				},
+			},
+		}
+	}
+	if pageId != nil && phase != nil {
+		input = &dynamodb.ScanInput{
+			TableName:        aws.String(conversationTable),
+			FilterExpression: aws.String("pageId = :pageId AND currentPhase = :phase"),
+			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+				":pageId": {
+					S: pageId,
+				},
+				":phase": {
 					N: aws.String(strconv.Itoa(*phase)),
 				},
 			},
