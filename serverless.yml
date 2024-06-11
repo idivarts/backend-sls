@@ -47,6 +47,9 @@ provider:
             - Fn::GetAtt:
               - pageTable
               - Arn
+            - Fn::GetAtt:
+              - websocketTable
+              - Arn
 
 plugins:
   - serverless-go-plugin
@@ -82,6 +85,15 @@ custom:
     securityPolicy: tls_1_2
 
 functions:
+  websocket_connect:
+    handler: functions/websocket/connect_handler/main.go
+    events:
+      - websocket: $connect
+  websocket_disconnect:
+    handler: functions/websocket/disconnect_handler/main.go
+    events:
+      - websocket: $disconnect
+
   business_api:
     handler: functions/business_apis/main.go
     events:
@@ -196,6 +208,20 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
+    
+    websocketTable:
+      Type: AWS::DynamoDB::Table
+      Properties: 
+        TableName: websocketTable
+        AttributeDefinitions: 
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
 
     # Step Functions state machine that delays, then publishes to SNS topic.
     StepFunctionsStateMachine:
