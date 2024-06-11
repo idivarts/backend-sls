@@ -22,7 +22,7 @@ func MessageHandler(ctx context.Context, event events.APIGatewayWebsocketProxyRe
 		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "Invalid message format."}, nil
 	}
 
-	err = wshandler.Broadcast(msg.Data, tableName)
+	err = wshandler.Broadcast(msg.Data)
 	if err != nil {
 		log.Printf("Failed to unmarshal message: %v", err)
 		return events.APIGatewayProxyResponse{StatusCode: 400, Body: "Invalid message format."}, nil

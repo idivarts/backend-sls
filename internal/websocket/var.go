@@ -1,8 +1,12 @@
 package websocket
 
-import dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
+import (
+	"os"
+
+	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
+)
 
 var (
 	dynamoClient = dynamodbhandler.Client
-	tableName    = "websocketTable"
+	tableName    = os.Getenv("WS_CONNECTION_TABLE")
 )

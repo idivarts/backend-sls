@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-func SendToConnection(connectionID *string, data string, tableName string) {
+func SendToConnection(connectionID *string, data string) {
 	_, err := apiClient.PostToConnection(&apigatewaymanagementapi.PostToConnectionInput{
 		ConnectionId: connectionID,
 		Data:         []byte(data),

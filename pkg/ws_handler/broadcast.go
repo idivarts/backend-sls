@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-func Broadcast(data string, tableName string) error {
+func Broadcast(data string) error {
 	connections, err := dynamoClient.Scan(&dynamodb.ScanInput{
 		TableName: aws.String(tableName),
 	})
@@ -18,7 +18,7 @@ func Broadcast(data string, tableName string) error {
 
 	for _, item := range connections.Items {
 		connectionID := item["connectionId"].S
-		SendToConnection(connectionID, data, tableName)
+		SendToConnection(connectionID, data)
 	}
 	return nil
 }
