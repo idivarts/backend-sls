@@ -15,7 +15,7 @@ provider:
       Fn::GetAtt:
         - StepFunctionsStateMachine
         - Arn
-    WS_GATEWAY_ENDPOINT: wss://jnjqasyrl6.execute-api.us-east-1.amazonaws.com/dev
+    WS_GATEWAY_ENDPOINT: https://jnjqasyrl6.execute-api.us-east-1.amazonaws.com/dev
     WS_CONNECTION_TABLE: websocketTable
 
   iam:
