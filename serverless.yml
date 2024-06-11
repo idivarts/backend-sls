@@ -93,6 +93,10 @@ functions:
     handler: functions/websocket/disconnect_handler/main.go
     events:
       - websocket: $disconnect
+  websocket_default:
+    handler: functions/websocket/message_handler/main.go
+    events:
+      - websocket: $default
 
   business_api:
     handler: functions/business_apis/main.go
