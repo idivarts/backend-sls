@@ -15,8 +15,7 @@ provider:
       Fn::GetAtt:
         - StepFunctionsStateMachine
         - Arn
-    WS_GATEWAY_ENDPOINT:
-      Fn::ImportValue: WebSocketApiEndpoint
+    WS_GATEWAY_ENDPOINT: wss://jnjqasyrl6.execute-api.us-east-1.amazonaws.com/dev
     WS_CONNECTION_TABLE: websocketTable
 
   iam:
@@ -285,13 +284,13 @@ resources:
                     Action:
                       - "sqs:sendmessage"
                     Resource: "arn:aws:sqs:*"
-  Outputs:
-    WebSocketApiEndpoint:
-      Description: "WebSocket API Endpoint"
-      Value:
-        Fn::Sub: wss://${WebSocketApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}
-      Export:
-        Name: WebSocketApiEndpoint
+  # Outputs:
+  #   WebSocketApiEndpoint:
+  #     Description: "WebSocket API Endpoint"
+  #     Value:
+  #       Fn::Sub: wss://${WebSocketApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}
+  #     Export:
+  #       Name: WebSocketApiEndpoint
   # Outputs:
   #   StepFunctionsStateMachine:
   #     Description: Step Functions State Machine ARN
