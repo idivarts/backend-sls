@@ -104,6 +104,11 @@ functions:
     handler: functions/business_apis/main.go
     events:
       - http: ANY /business/{proxy+}
+  cc_session_api:
+    handler: functions/business_apis/main.go
+    events:
+      - http: ANY /organizations/{proxy+}
+      - http: ANY /profile/{proxy+}
   
   message_wh:
     handler: functions/message_webhook/main.go
