@@ -7,13 +7,14 @@ import (
 )
 
 func main() {
-	sessionRoutes := apihandler.GinEngine.Group("", middlewares.ValidateSessionMiddleware())
+	// sessionRoutes := apihandler.GinEngine.Group("", middlewares.ValidateSessionMiddleware())
+	apihandler.GinEngine.Use(middlewares.ValidateSessionMiddleware())
 
-	sessionRoutes.GET("/organizations", crowdychat.GetOrganizations)
-	sessionRoutes.GET("/organizations/:orgId", crowdychat.GetOrganizationByID)
-	sessionRoutes.POST("/organizations", crowdychat.CreateOrganization)
+	apihandler.GinEngine.GET("/organizations", crowdychat.GetOrganizations)
+	apihandler.GinEngine.GET("/organizations/:orgId", crowdychat.GetOrganizationByID)
+	apihandler.GinEngine.POST("/organizations", crowdychat.CreateOrganization)
 
-	sessionRoutes.PUT("/profile", crowdychat.UpdateProfile)
+	apihandler.GinEngine.PUT("/profile", crowdychat.UpdateProfile)
 
 	apihandler.StartLambda()
 }
