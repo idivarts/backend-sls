@@ -2,20 +2,25 @@ package main
 
 import (
 	crowdychat "github.com/TrendsHub/th-backend/internal/crowdy_chat"
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
 )
 
 func main() {
-	apihandler.GinEngine.GET("/organizations", crowdychat.GetOrganizations)
-	apihandler.GinEngine.GET("/organizations/:orgId", crowdychat.GetOrganizationByID)
-	apihandler.GinEngine.POST("/organizations", crowdychat.CreateOrganization)
+	sessionRoutes := apihandler.GinEngine.Group("", middlewares.ValidateSessionMiddleware())
 
-	apihandler.GinEngine.GET("/campaigns", crowdychat.GetCampaigns)
-	apihandler.GinEngine.GET("/campaigns/:id", crowdychat.GetCampaignByID)
-	apihandler.GinEngine.POST("/campaigns", crowdychat.CreateCampaign)
-	apihandler.GinEngine.PUT("/campaigns/:id", crowdychat.UpdateCampaign)
+	sessionRoutes.GET("/organizations", crowdychat.GetOrganizations)
+	sessionRoutes.GET("/organizations/:orgId", crowdychat.GetOrganizationByID)
+	sessionRoutes.POST("/organizations", crowdychat.CreateOrganization)
 
-	apihandler.GinEngine.PUT("/profile", crowdychat.UpdateProfile)
+	sessionRoutes.PUT("/profile", crowdychat.UpdateProfile)
+
+	organizationRoutes := sessionRoutes.Group("", middlewares.ValidateOrganizationMiddleware())
+
+	organizationRoutes.GET("/campaigns", crowdychat.GetCampaigns)
+	organizationRoutes.GET("/campaigns/:id", crowdychat.GetCampaignByID)
+	organizationRoutes.POST("/campaigns", crowdychat.CreateCampaign)
+	organizationRoutes.PUT("/campaigns/:id", crowdychat.UpdateCampaign)
 
 	apihandler.StartLambda()
 }
