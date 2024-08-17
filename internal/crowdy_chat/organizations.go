@@ -93,12 +93,21 @@ func GetOrganizationByID(c *gin.Context) {
 	})
 }
 
+type _OrganizationRequest struct {
+	Name        string `form:"name" binding:"required"`
+	Image       string `form:"image" binding:"required"`
+	Description string `form:"description" binding:"required"`
+	Industry    string `form:"industry" binding:"required"`
+	Website     string `form:"website" binding:"required,url"`
+}
+
 func CreateOrganization(c *gin.Context) {
-	// Parse the form data
-	name := c.PostForm("name")
-	description := c.PostForm("description")
-	industry := c.PostForm("industry")
-	website := c.PostForm("website")
+	// Parse and validate the form data
+	var req _OrganizationRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Handle the file upload
 	file, err := c.FormFile("image")
@@ -118,11 +127,11 @@ func CreateOrganization(c *gin.Context) {
 	organization := _Organization{
 		OrganizationToken: "est-est-assumenda",
 		ID:                "850",
-		Name:              name,
+		Name:              req.Name,
 		Image:             "https://xyz.com/image", // You can replace this with the actual file path or a URL
-		Description:       description,
-		Industry:          industry,
-		Website:           website,
+		Description:       req.Description,
+		Industry:          req.Industry,
+		Website:           req.Website,
 	}
 
 	// Send the response
@@ -133,11 +142,12 @@ func CreateOrganization(c *gin.Context) {
 }
 
 func UpdateOrganization(c *gin.Context) {
-	// Parse the form data
-	name := c.PostForm("name")
-	description := c.PostForm("description")
-	industry := c.PostForm("industry")
-	website := c.PostForm("website")
+	// Parse and validate the form data
+	var req _OrganizationRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Handle the file upload
 	file, err := c.FormFile("image")
@@ -157,11 +167,11 @@ func UpdateOrganization(c *gin.Context) {
 	// Mocked data for demonstration purposes
 	organization := _Organization{
 		ID:          "850",
-		Name:        name,
+		Name:        req.Name,
 		Image:       "https://xyz.com/image", // You can replace this with the actual file path or a URL
-		Description: description,
-		Industry:    industry,
-		Website:     website,
+		Description: req.Description,
+		Industry:    req.Industry,
+		Website:     req.Website,
 	}
 
 	// Send the response

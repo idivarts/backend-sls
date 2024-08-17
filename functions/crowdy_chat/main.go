@@ -15,5 +15,7 @@ func main() {
 	apihandler.GinEngine.POST("/campaigns", crowdychat.CreateCampaign)
 	apihandler.GinEngine.PUT("/campaigns/:id", crowdychat.UpdateCampaign)
 
+	apihandler.GinEngine.PUT("/profile", crowdychat.UpdateProfile)
+
 	apihandler.StartLambda()
 }
