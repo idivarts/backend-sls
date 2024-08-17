@@ -105,10 +105,14 @@ functions:
     events:
       - http: ANY /business/{proxy+}
   cc_session_api:
-    handler: functions/business_apis/main.go
+    handler: functions/crowdy_chat/session/main.go
     events:
       - http: ANY /organizations/{proxy+}
       - http: ANY /profile/{proxy+}
+  cc_campaigns_api:
+    handler: functions/crowdy_chat/campaigns/main.go
+    events:
+      - http: ANY /campaigns/{proxy+}
   
   message_wh:
     handler: functions/message_webhook/main.go
