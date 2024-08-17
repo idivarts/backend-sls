@@ -1,8 +1,9 @@
-package crowdychat
+package cc_campaigns
 
 import (
 	"net/http"
 
+	crowdychat "github.com/TrendsHub/th-backend/internal/crowdy_chat"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
@@ -94,7 +95,7 @@ func GetCampaigns(c *gin.Context) {
 		Content:  filteredCampaigns,
 	}
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusOK, crowdychat.Response{
 		Data:    response,
 		Message: "Success",
 	})
@@ -180,7 +181,7 @@ func GetCampaignByID(c *gin.Context) {
 		},
 	}
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusOK, crowdychat.Response{
 		Data:    campaign,
 		Message: "Success",
 	})
@@ -208,7 +209,7 @@ func CreateCampaign(c *gin.Context) {
 		TotalSources:     195,
 	}
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusOK, crowdychat.Response{
 		Data:    response,
 		Message: "Success Data",
 	})
@@ -238,7 +239,7 @@ func UpdateCampaign(c *gin.Context) {
 		TotalSources:     195,
 	}
 
-	c.JSON(http.StatusOK, Response{
+	c.JSON(http.StatusOK, crowdychat.Response{
 		Data:    response,
 		Message: "Success Data",
 	})

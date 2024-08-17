@@ -1,4 +1,4 @@
-package crowdychat
+package cc_campaigns
 
 // Structs for response structure
 

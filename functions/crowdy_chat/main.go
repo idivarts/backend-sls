@@ -2,6 +2,7 @@ package main
 
 import (
 	crowdychat "github.com/TrendsHub/th-backend/internal/crowdy_chat"
+	cc_campaigns "github.com/TrendsHub/th-backend/internal/crowdy_chat/campaigns"
 	"github.com/TrendsHub/th-backend/internal/middlewares"
 	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
 )
@@ -15,12 +16,12 @@ func main() {
 
 	sessionRoutes.PUT("/profile", crowdychat.UpdateProfile)
 
-	organizationRoutes := sessionRoutes.Group("", middlewares.ValidateOrganizationMiddleware())
+	organizationRoutes := sessionRoutes.Group("/main", middlewares.ValidateOrganizationMiddleware())
 
-	organizationRoutes.GET("/campaigns", crowdychat.GetCampaigns)
-	organizationRoutes.GET("/campaigns/:id", crowdychat.GetCampaignByID)
-	organizationRoutes.POST("/campaigns", crowdychat.CreateCampaign)
-	organizationRoutes.PUT("/campaigns/:id", crowdychat.UpdateCampaign)
+	organizationRoutes.GET("/campaigns", cc_campaigns.GetCampaigns)
+	organizationRoutes.GET("/campaigns/:id", cc_campaigns.GetCampaignByID)
+	organizationRoutes.POST("/campaigns", cc_campaigns.CreateCampaign)
+	organizationRoutes.PUT("/campaigns/:id", cc_campaigns.UpdateCampaign)
 
 	apihandler.StartLambda()
 }
