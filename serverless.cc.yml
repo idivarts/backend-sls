@@ -1,4 +1,4 @@
-service: crowdy-chatß
+service: crowdy-chat
 frameworkVersion: '3'
 
 provider:
