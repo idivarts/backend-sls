@@ -1,0 +1,168 @@
+service: crowdy-chatß
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  architecture: arm64
+  runtime: provided.al2
+  environment:
+    SEND_MESSAGE_QUEUE_ARN:
+      Fn::GetAtt:
+        - SendMessageQueue
+        - QueueName
+    OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
+    DELAY_STATE_FUNCTION:
+      Fn::GetAtt:
+        - StepFunctionsStateMachine
+        - Arn
+    # Need to figure out a way to make this dynamic
+    WS_GATEWAY_ENDPOINT: https://jnjqasyrl6.execute-api.us-east-1.amazonaws.com/dev
+    WS_CONNECTION_TABLE: websocketTable
+
+  iam:
+    role:
+      statements:
+        - Effect: "Allow"
+          Action:
+            - "states:StartExecution"
+          Resource: { "Fn::GetAtt" : ["StepFunctionsStateMachine","Arn"]  }
+        - Effect: "Allow"
+          Action:
+            - "states:StopExecution"
+          Resource: { "Fn::Join" : ["", ["arn:aws:states:*:*:execution:", { "Fn::GetAtt" : ["StepFunctionsStateMachine","Name"]  }, ":*" ] ]  }
+        - Effect: "Allow"
+          Action:
+            - "sqs:sendmessage"
+          Resource: { "Fn::GetAtt" : ["SendMessageQueue","Arn"]  }
+
+plugins:
+  - serverless-go-plugin
+  - serverless-domain-manager
+  - serverless-certificate-creator
+
+custom:
+  go:
+    baseDir: . # folder where go.mod file lives, if set `handler` property should be set relatively to that folder
+    binDir: .bin # target folder for binary files
+    cgo: 0 # CGO_ENABLED flag
+    cmd: GOARCH=arm64 GOOS=linux go build -tags lambda.norpc # compile command
+    monorepo: false # if enabled, builds function every directory (useful for monorepo where go.mod is managed by each function
+    supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level) 
+    buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
+  customCertificate:
+    certificateName: 'be.crowdy.chat'
+    hostedZoneIds: Z080267715NZAAP58PC3U
+    enabled: true
+    rewriteRecords: false
+  customDomain:
+    domainName: be.crowdy.chat
+    basePath: ''
+    stage: dev
+    certificateName: 'be.crowdy.chat'
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: 'regional'
+    securityPolicy: tls_1_2
+
+functions:
+  websocket_connect:
+    handler: functions/websocket/connect_handler/main.go
+    events:
+      - websocket: $connect
+  websocket_disconnect:
+    handler: functions/websocket/disconnect_handler/main.go
+    events:
+      - websocket: $disconnect
+  websocket_default:
+    handler: functions/websocket/message_handler/main.go
+    events:
+      - websocket: $default
+
+  business_api:
+    handler: functions/business_apis/main.go
+    events:
+      - http: ANY /business/{proxy+}
+  
+  message_wh:
+    handler: functions/message_webhook/main.go
+    events:
+      - http: GET /instagram/webhook
+      - http: POST /instagram/webhook
+      - http: GET /test/sqs
+
+  message_sqs:
+    handler: functions/message_sqs/main.go
+    timeout: 60
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - SendMessageQueue
+              - Arn
+package:
+  patterns:
+    - '!./**'
+  individually: true
+
+resources:
+  Resources:
+    SendMessageQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SendMessageQueue
+    
+    # Step Functions state machine that delays, then publishes to SNS topic.
+    StepFunctionsStateMachine:
+      Type: "AWS::StepFunctions::StateMachine"
+      Properties:
+        StateMachineName: DelayedSQS
+        RoleArn: !GetAtt StepFunctionsServiceRole.Arn
+        # Replace "SecondsPath" with "TimestampPath" for scheduling
+        DefinitionString: |
+          {
+            "StartAt": "Delay",
+            "Comment": "Publish to SNS with delay",
+            "States": {
+              "Delay": {
+                "Type": "Wait",
+                "SecondsPath": "$.delay_seconds",
+                "Next": "Send message to SQS"
+              },
+              "Send message to SQS": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::sqs:sendMessage",
+                "Parameters": {  
+                    "QueueUrl.$": "$.topic",
+                    "MessageBody.$": "$.message"
+                },
+                "End":true
+              }
+            }
+          }
+
+    # Allow Step Functions state machine to publish to SNS topic
+    StepFunctionsServiceRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
+        ManagedPolicyArns:
+          - "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: "AllowStepFunctionsServiceToAssumeRole"
+              Effect: "Allow"
+              Action: 
+                - "sts:AssumeRole"
+              Principal:
+                Service:
+                  - !Sub "states.${AWS::Region}.amazonaws.com"
+        Policies:
+          -   PolicyName: "PublishToSNSTopic"
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: "Allow"
+                    Action:
+                      - "sqs:sendmessage"
+                    Resource: "arn:aws:sqs:*"
