@@ -38,7 +38,7 @@ jobs:
       - run: go version
       # - name: Install dependencies
       - run: go mod download
-      - run: echo ${{ secrets.FIREBASE_SERVICE_ACCOUNT }} >> service-account.json
+      - run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" >> service-account.json
       - run: npx sls deploy --config serverless.cc.yml
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
