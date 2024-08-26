@@ -1,5 +1,5 @@
 service: th-backend
-frameworkVersion: '3'
+frameworkVersion: "3"
 
 provider:
   name: aws
@@ -24,16 +24,27 @@ provider:
         - Effect: "Allow"
           Action:
             - "states:StartExecution"
-          Resource: { "Fn::GetAtt" : ["StepFunctionsStateMachine","Arn"]  }
+          Resource: { "Fn::GetAtt": ["StepFunctionsStateMachine", "Arn"] }
         - Effect: "Allow"
           Action:
             - "states:StopExecution"
-          Resource: { "Fn::Join" : ["", ["arn:aws:states:*:*:execution:", { "Fn::GetAtt" : ["StepFunctionsStateMachine","Name"]  }, ":*" ] ]  }
+          Resource:
+            {
+              "Fn::Join":
+                [
+                  "",
+                  [
+                    "arn:aws:states:*:*:execution:",
+                    { "Fn::GetAtt": ["StepFunctionsStateMachine", "Name"] },
+                    ":*",
+                  ],
+                ],
+            }
           # "arn:aws:states:::execution::*"
         - Effect: "Allow"
           Action:
             - "sqs:sendmessage"
-          Resource: { "Fn::GetAtt" : ["SendMessageQueue","Arn"]  }
+          Resource: { "Fn::GetAtt": ["SendMessageQueue", "Arn"] }
         - Effect: Allow
           Action:
             - dynamodb:GetItem
@@ -44,14 +55,14 @@ provider:
             - dynamodb:Scan
           Resource:
             - Fn::GetAtt:
-              - conversationTable
-              - Arn
+                - conversationTable
+                - Arn
             - Fn::GetAtt:
-              - pageTable
-              - Arn
+                - pageTable
+                - Arn
             - Fn::GetAtt:
-              - websocketTable
-              - Arn
+                - websocketTable
+                - Arn
 
 plugins:
   - serverless-go-plugin
@@ -66,10 +77,10 @@ custom:
     cgo: 0 # CGO_ENABLED flag
     cmd: GOARCH=arm64 GOOS=linux go build -tags lambda.norpc # compile command
     monorepo: false # if enabled, builds function every directory (useful for monorepo where go.mod is managed by each function
-    supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level) 
+    supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level)
     buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
   customCertificate:
-    certificateName: '*.trendshub.co.in'
+    certificateName: "*.trendshub.co.in"
     # idempotencyToken: 'abcsomedomainio' //optional
     # hostedZoneNames: 'trendshub.co.in'
     hostedZoneIds: Z080267715NZAAP58PC3U
@@ -78,12 +89,12 @@ custom:
     rewriteRecords: false
   customDomain:
     domainName: backend.trendshub.co.in
-    basePath: ''
+    basePath: ""
     stage: dev
-    certificateName: '*.trendshub.co.in'
+    certificateName: "*.trendshub.co.in"
     createRoute53Record: true
     createRoute53IPv6Record: true
-    endpointType: 'regional'
+    endpointType: "regional"
     securityPolicy: tls_1_2
 
 functions:
@@ -113,7 +124,7 @@ functions:
     handler: functions/crowdy_chat/campaigns/main.go
     events:
       - http: ANY /campaigns/{proxy+}
-  
+
   message_wh:
     handler: functions/message_webhook/main.go
     events:
@@ -132,7 +143,7 @@ functions:
               - Arn
 package:
   patterns:
-    - '!./**'
+    - "!./**"
   individually: true
 
 resources:
@@ -171,12 +182,12 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
-    
+
     pageTable:
       Type: AWS::DynamoDB::Table
-      Properties: 
+      Properties:
         TableName: pageTable
-        AttributeDefinitions: 
+        AttributeDefinitions:
           - AttributeName: pageId
             AttributeType: S
           - AttributeName: userId
@@ -197,12 +208,12 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
-    
+
     websocketTable:
       Type: AWS::DynamoDB::Table
-      Properties: 
+      Properties:
         TableName: websocketTable
-        AttributeDefinitions: 
+        AttributeDefinitions:
           - AttributeName: connectionId
             AttributeType: S
         KeySchema:
@@ -253,20 +264,20 @@ resources:
           Statement:
             - Sid: "AllowStepFunctionsServiceToAssumeRole"
               Effect: "Allow"
-              Action: 
+              Action:
                 - "sts:AssumeRole"
               Principal:
                 Service:
                   - !Sub "states.${AWS::Region}.amazonaws.com"
         Policies:
-          -   PolicyName: "PublishToSNSTopic"
-              PolicyDocument:
-                Version: '2012-10-17'
-                Statement:
-                  - Effect: "Allow"
-                    Action:
-                      - "sqs:sendmessage"
-                    Resource: "arn:aws:sqs:*"
+          - PolicyName: "PublishToSNSTopic"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "sqs:sendmessage"
+                  Resource: "arn:aws:sqs:*"
   # Outputs:
   #   WebSocketApiEndpoint:
   #     Description: "WebSocket API Endpoint"
