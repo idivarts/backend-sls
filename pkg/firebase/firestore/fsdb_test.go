@@ -23,3 +23,12 @@ func TestFireStoreConnection(t *testing.T) {
 		fmt.Println(doc.Data())
 	}
 }
+
+func TestAddAgainstRule(t *testing.T) {
+	_, _, err := firestoredb.Client.Collection("userstest").Add(context.Background(), map[string]interface{}{
+		"test": "Hello there",
+	})
+	if err != nil {
+		log.Fatalf("Failed adding alovelace: %v", err)
+	}
+}
