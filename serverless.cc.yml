@@ -86,7 +86,9 @@ functions:
   cc_backend:
     handler: functions/cc_apis/main.go
     events:
-      - http: ANY /business/{proxy+}
+      - http: ANY /sources/{proxy+}
+      - http: ANY /conversations/{proxy+}
+      - http: ANY /messages/{proxy+}
 
   cc_message_wh:
     handler: functions/message_webhook/main.go

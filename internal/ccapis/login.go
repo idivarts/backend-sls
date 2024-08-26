@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Login(c *gin.Context) {
+func FacebookLogin(c *gin.Context) {
 	var person messenger.FacebookLoginRequest
 
 	if err := c.ShouldBindJSON(&person); err != nil {
