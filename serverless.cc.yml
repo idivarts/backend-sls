@@ -94,15 +94,15 @@ functions:
       - http: ANY /instagram/webhook
       - http: GET /test/sqs
 
-  # cc_message_sqs:
-  #   handler: functions/message_sqs/main.go
-  #   timeout: 60
-  #   events:
-  #     - sqs:
-  #         arn:
-  #           Fn::GetAtt:
-  #             - CCMessageQueue
-  #             - Arn
+  cc_message_sqs:
+    handler: functions/message_sqs/main.go
+    timeout: 60
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - CCMessageQueue
+              - Arn
 
 package:
   patterns:
@@ -115,6 +115,7 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: CCMessageQueue
+        VisibilityTimeout: 60
 
     # Step Functions state machine that delays, then publishes to SNS topic.
     CCStepFunctions:
