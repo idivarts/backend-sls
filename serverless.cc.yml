@@ -84,7 +84,7 @@ functions:
       - websocket: $default
 
   cc_backend:
-    handler: functions/business_apis/main.go
+    handler: functions/cc_apis/main.go
     events:
       - http: ANY /business/{proxy+}
 
