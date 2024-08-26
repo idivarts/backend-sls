@@ -109,6 +109,8 @@ functions:
 package:
   patterns:
     - "!./**"
+  includes:
+    - service-account.json
   individually: true
 
 resources:

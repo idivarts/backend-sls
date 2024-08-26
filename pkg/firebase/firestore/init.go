@@ -13,9 +13,12 @@ var Client *firestore.Client
 func init() {
 	ctx := context.Background()
 	var err error
+	log.Println("Creating Firestore")
+
 	Client, err = firebaseapp.FirebaseApp.Firestore(ctx)
 	if err != nil {
 		log.Fatalln(err)
 		panic(err.Error())
 	}
+	log.Println("Created Firestore Connection")
 }
