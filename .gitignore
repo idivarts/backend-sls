@@ -21,4 +21,4 @@ vendor
 *.out
 node_modules
 .bin
-service-account.json
+**/service-account.json

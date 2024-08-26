@@ -14,7 +14,7 @@ var FirebaseApp *firebase.App
 func init() {
 	// Use a service account
 	ctx := context.Background()
-	sa := option.WithCredentialsFile("../../../service-account.json")
+	sa := option.WithCredentialsFile("service-account.json")
 	log.Println("Coming here", sa)
 	var err error
 	FirebaseApp, err = firebase.NewApp(ctx, nil, sa)
