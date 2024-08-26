@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	lambda.Start(websocket.MessageHandler)
+	lambda.Start(websocket.Handler)
 }
