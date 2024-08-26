@@ -1,5 +1,5 @@
-service: crowdy-chat
-frameworkVersion: '3'
+service: crowdy-chat-be
+frameworkVersion: "3"
 
 provider:
   name: aws
@@ -8,15 +8,15 @@ provider:
   environment:
     SEND_MESSAGE_QUEUE_ARN:
       Fn::GetAtt:
-        - SendMessageQueue
+        - CCMessageQueue
         - QueueName
     OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
     DELAY_STATE_FUNCTION:
       Fn::GetAtt:
-        - StepFunctionsStateMachine
+        - CCStepFunctions
         - Arn
     # Need to figure out a way to make this dynamic
-    WS_GATEWAY_ENDPOINT: https://jnjqasyrl6.execute-api.us-east-1.amazonaws.com/dev
+    WS_GATEWAY_ENDPOINT: https://w754u2apn0.execute-api.us-east-1.amazonaws.com/dev
     WS_CONNECTION_TABLE: websocketTable
 
   iam:
@@ -25,15 +25,26 @@ provider:
         - Effect: "Allow"
           Action:
             - "states:StartExecution"
-          Resource: { "Fn::GetAtt" : ["StepFunctionsStateMachine","Arn"]  }
+          Resource: { "Fn::GetAtt": ["CCStepFunctions", "Arn"] }
         - Effect: "Allow"
           Action:
             - "states:StopExecution"
-          Resource: { "Fn::Join" : ["", ["arn:aws:states:*:*:execution:", { "Fn::GetAtt" : ["StepFunctionsStateMachine","Name"]  }, ":*" ] ]  }
+          Resource:
+            {
+              "Fn::Join":
+                [
+                  "",
+                  [
+                    "arn:aws:states:*:*:execution:",
+                    { "Fn::GetAtt": ["CCStepFunctions", "Name"] },
+                    ":*",
+                  ],
+                ],
+            }
         - Effect: "Allow"
           Action:
             - "sqs:sendmessage"
-          Resource: { "Fn::GetAtt" : ["SendMessageQueue","Arn"]  }
+          Resource: { "Fn::GetAtt": ["CCMessageQueue", "Arn"] }
 
 plugins:
   - serverless-go-plugin
@@ -47,75 +58,70 @@ custom:
     cgo: 0 # CGO_ENABLED flag
     cmd: GOARCH=arm64 GOOS=linux go build -tags lambda.norpc # compile command
     monorepo: false # if enabled, builds function every directory (useful for monorepo where go.mod is managed by each function
-    supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level) 
+    supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level)
     buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
   customCertificate:
-    certificateName: 'be.crowdy.chat'
+    certificateName: "be.crowdy.chat"
     hostedZoneIds: Z080267715NZAAP58PC3U
     enabled: true
     rewriteRecords: false
   customDomain:
     domainName: be.crowdy.chat
-    basePath: ''
+    basePath: ""
     stage: dev
-    certificateName: 'be.crowdy.chat'
+    certificateName: "be.crowdy.chat"
     createRoute53Record: true
     createRoute53IPv6Record: true
-    endpointType: 'regional'
+    endpointType: "regional"
     securityPolicy: tls_1_2
 
 functions:
-  websocket_connect:
-    handler: functions/websocket/connect_handler/main.go
+  cc_websocket:
+    handler: functions/websocket/main.go
     events:
       - websocket: $connect
-  websocket_disconnect:
-    handler: functions/websocket/disconnect_handler/main.go
-    events:
       - websocket: $disconnect
-  websocket_default:
-    handler: functions/websocket/message_handler/main.go
-    events:
       - websocket: $default
 
-  business_api:
+  cc_backend:
     handler: functions/business_apis/main.go
     events:
       - http: ANY /business/{proxy+}
-  
-  message_wh:
+
+  cc_message_wh:
     handler: functions/message_webhook/main.go
     events:
       - http: ANY /instagram/webhook
       - http: GET /test/sqs
 
-  message_sqs:
-    handler: functions/message_sqs/main.go
-    timeout: 60
-    events:
-      - sqs:
-          arn:
-            Fn::GetAtt:
-              - SendMessageQueue
-              - Arn
+  # cc_message_sqs:
+  #   handler: functions/message_sqs/main.go
+  #   timeout: 60
+  #   events:
+  #     - sqs:
+  #         arn:
+  #           Fn::GetAtt:
+  #             - CCMessageQueue
+  #             - Arn
+
 package:
   patterns:
-    - '!./**'
+    - "!./**"
   individually: true
 
 resources:
   Resources:
-    SendMessageQueue:
+    CCMessageQueue:
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: SendMessageQueue
-    
+        QueueName: CCMessageQueue
+
     # Step Functions state machine that delays, then publishes to SNS topic.
-    StepFunctionsStateMachine:
+    CCStepFunctions:
       Type: "AWS::StepFunctions::StateMachine"
       Properties:
-        StateMachineName: DelayedSQS
-        RoleArn: !GetAtt StepFunctionsServiceRole.Arn
+        StateMachineName: CCDelayedSQS
+        RoleArn: !GetAtt CCStepFunctionsRole.Arn
         # Replace "SecondsPath" with "TimestampPath" for scheduling
         DefinitionString: |
           {
@@ -140,7 +146,7 @@ resources:
           }
 
     # Allow Step Functions state machine to publish to SNS topic
-    StepFunctionsServiceRole:
+    CCStepFunctionsRole:
       Type: "AWS::IAM::Role"
       Properties:
         Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
@@ -151,17 +157,17 @@ resources:
           Statement:
             - Sid: "AllowStepFunctionsServiceToAssumeRole"
               Effect: "Allow"
-              Action: 
+              Action:
                 - "sts:AssumeRole"
               Principal:
                 Service:
                   - !Sub "states.${AWS::Region}.amazonaws.com"
         Policies:
-          -   PolicyName: "PublishToSNSTopic"
-              PolicyDocument:
-                Version: '2012-10-17'
-                Statement:
-                  - Effect: "Allow"
-                    Action:
-                      - "sqs:sendmessage"
-                    Resource: "arn:aws:sqs:*"
+          - PolicyName: "PublishToSNSTopic"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "sqs:sendmessage"
+                  Resource: "arn:aws:sqs:*"
