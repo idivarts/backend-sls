@@ -3,16 +3,16 @@ package wshandler
 import (
 	"os"
 
-	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
+	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apigatewaymanagementapi"
 )
 
 var (
-	dynamoClient = dynamodbhandler.Client
-	apiClient    *apigatewaymanagementapi.ApiGatewayManagementApi
-	tableName    = os.Getenv("WS_CONNECTION_TABLE")
+	firestoreClient = firestoredb.Client
+	apiClient       *apigatewaymanagementapi.ApiGatewayManagementApi
+	tableName       = os.Getenv("WS_CONNECTION_TABLE")
 )
 
 func init() {

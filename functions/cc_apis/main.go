@@ -6,21 +6,21 @@ import (
 )
 
 func main() {
-	apihandler.GinEngine.POST("/business/login", ccapis.Login)
-	apihandler.GinEngine.GET("/business/pages", ccapis.GetPages)
+	apihandler.GinEngine.GET("/sources", ccapis.GetPages)
+	apihandler.GinEngine.POST("/sources/facebook", ccapis.FacebookLogin)
 
 	// All newly changed apis below
-	apihandler.GinEngine.POST("/business/pages/:pageId/webhook", ccapis.PageWebhook)
-	apihandler.GinEngine.POST("/business/pages/:pageId/assistant", ccapis.PageAssistant)
-	apihandler.GinEngine.POST("/business/pages/:pageId/sync", ccapis.PageSync)
+	apihandler.GinEngine.POST("/sources/:pageId/webhook", ccapis.PageWebhook)
+	apihandler.GinEngine.POST("/sources/:pageId/assistant", ccapis.PageAssistant)
+	apihandler.GinEngine.POST("/sources/:pageId/sync", ccapis.PageSync)
 
-	apihandler.GinEngine.GET("/business/conversations", ccapis.GetConversations)
+	apihandler.GinEngine.GET("/conversations", ccapis.GetConversations)
 
-	apihandler.GinEngine.GET("/business/conversations/:igsid", ccapis.GetConversationById)
-	apihandler.GinEngine.PUT("/business/conversations/:igsid", ccapis.UpdateConversation)
+	apihandler.GinEngine.GET("/conversations/:igsid", ccapis.GetConversationById)
+	apihandler.GinEngine.PUT("/conversations/:igsid", ccapis.UpdateConversation)
 
-	apihandler.GinEngine.GET("/business/messages/:igsid", ccapis.GetMessages)
-	apihandler.GinEngine.POST("/business/messages/:igsid", ccapis.SendMessage)
+	apihandler.GinEngine.GET("/messages/:igsid", ccapis.GetMessages)
+	apihandler.GinEngine.POST("/messages/:igsid", ccapis.SendMessage)
 
 	apihandler.StartLambda()
 }

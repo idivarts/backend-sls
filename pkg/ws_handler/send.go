@@ -1,12 +1,11 @@
 package wshandler
 
 import (
+	"context"
 	"log"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 func SendToConnection(connectionID *string, data string) {
@@ -16,14 +15,15 @@ func SendToConnection(connectionID *string, data string) {
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == apigatewaymanagementapi.ErrCodeGoneException {
-			_, err := dynamoClient.DeleteItem(&dynamodb.DeleteItemInput{
-				TableName: aws.String(tableName),
-				Key: map[string]*dynamodb.AttributeValue{
-					"connectionId": {
-						S: connectionID,
-					},
-				},
-			})
+			_, err := firestoreClient.Collection("websockets").Doc(*connectionID).Delete(context.Background())
+			// .DeleteItem(&dynamodb.DeleteItemInput{
+			// 	TableName: aws.String(tableName),
+			// 	Key: map[string]*dynamodb.AttributeValue{
+			// 		"connectionId": {
+			// 			S: connectionID,
+			// 		},
+			// 	},
+			// })
 			if err != nil {
 				log.Printf("Failed to delete stale connection: %v", err)
 			}
