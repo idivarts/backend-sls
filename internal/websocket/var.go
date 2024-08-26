@@ -3,10 +3,10 @@ package websocket
 import (
 	"os"
 
-	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
+	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 )
 
 var (
-	dynamoClient = dynamodbhandler.Client
-	tableName    = os.Getenv("WS_CONNECTION_TABLE")
+	firestoreClient = firestoredb.Client
+	tableName       = os.Getenv("WS_CONNECTION_TABLE")
 )
