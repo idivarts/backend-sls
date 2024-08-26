@@ -14,15 +14,11 @@ var FirebaseApp *firebase.App
 func init() {
 	// Use a service account
 	ctx := context.Background()
-	sa := option.WithCredentialsFile("path/to/serviceAccount.json")
-	FirebaseApp, err := firebase.NewApp(ctx, nil, sa)
+	sa := option.WithCredentialsFile("service-account.json")
+	var err error
+	FirebaseApp, err = firebase.NewApp(ctx, nil, sa)
 	if err != nil {
 		log.Fatalln(err)
+		panic(err.Error())
 	}
-
-	client, err := FirebaseApp.Firestore(ctx)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer client.Close()
 }
