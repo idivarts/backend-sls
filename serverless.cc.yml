@@ -17,7 +17,7 @@ provider:
         - Arn
     # Need to figure out a way to make this dynamic
     WS_GATEWAY_ENDPOINT: https://w754u2apn0.execute-api.us-east-1.amazonaws.com/dev
-    WS_CONNECTION_TABLE: websocketTable
+    # WS_CONNECTION_TABLE: websocketTable
 
   iam:
     role:
@@ -109,6 +109,7 @@ functions:
 package:
   patterns:
     - "!./**"
+  includes:
     - service-account.json
   individually: true
 
