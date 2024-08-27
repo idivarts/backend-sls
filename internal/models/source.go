@@ -1,12 +1,12 @@
 package models
 
 import (
+	"context"
 	"fmt"
 
-	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"cloud.google.com/go/firestore"
+	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type SourceType string
@@ -48,107 +48,89 @@ type Source struct {
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
 
-func (c *Source) Insert() (*dynamodb.PutItemOutput, error) {
-	data, err := dynamodbattribute.MarshalMap(*c)
+func (c *Source) GetPath() (*string, error) {
+	if c.OrganizationID == "" {
+		return nil, fmt.Errorf("Organzation(%s) cant be null", c.OrganizationID)
+	}
+
+	path := fmt.Sprintf("/organizations/%s/sources", c.OrganizationID)
+	return &path, nil
+}
+
+func (c *Source) Insert() (*firestore.WriteResult, error) {
+	path, err := c.GetPath()
 	if err != nil {
 		return nil, err
 	}
-	res, err := dynamodbhandler.Client.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String(pageTable),
-		Item:      data,
-	})
+
+	res, err := firestoredb.Client.Collection(*path).Doc(c.PageID).Set(context.Background(), c)
 	return res, err
 }
 
 func (c *Source) Get(pageId string) error {
-	result, err := dynamodbhandler.Client.GetItem(&dynamodb.GetItemInput{
-		TableName: aws.String(pageTable),
-		Key: map[string]*dynamodb.AttributeValue{
-			"pageId": {
-				S: aws.String(pageId),
-			},
-		},
-	})
+	path, err := c.GetPath()
 	if err != nil {
-		fmt.Println("Error getting item from DynamoDB:", err)
 		return err
 	}
 
-	err = dynamodbattribute.UnmarshalMap(result.Item, c)
+	result, err := firestoredb.Client.Collection(*path).Doc(pageId).Get(context.Background())
 	if err != nil {
-		fmt.Println("Error unmarshalling item:", err)
+		fmt.Println("Error getting item from Firestore:", err)
 		return err
 	}
-	if c.Status != 1 {
-		return fmt.Errorf("page %s is deactivated", c.PageID)
+
+	err = result.DataTo(c)
+	if err != nil {
+		fmt.Println("Error getting item from Firestore:", err)
+		return err
 	}
-	if c.PageID == "" {
-		return fmt.Errorf("error finding page %s", pageId)
-	}
+
 	return nil
 }
 
 func GetPagesByUserId(userId string) ([]Source, error) {
-	// Create the input for the query operation
-	input := &dynamodb.ScanInput{
-		TableName:        aws.String(pageTable),
-		FilterExpression: aws.String("#userId = :v_userId"),
-		ExpressionAttributeNames: map[string]*string{
-			"#userId": aws.String("userId"),
-		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":v_userId": {
-				S: aws.String(userId),
-			},
-		},
-	}
 
-	// Perform the query operation
-	result, err := dynamodbhandler.Client.Scan(input)
-	if err != nil {
-		fmt.Println("Error scanning DynamoDB table:", err)
-		return nil, err
-	}
+	sources := []Source{}
+	iter := firestoredb.Client.CollectionGroup("sources").Where("userId", "==", userId).Documents(context.Background())
 
-	pages := []Source{}
-	err = dynamodbattribute.UnmarshalListOfMaps(result.Items, &pages)
-	if err != nil {
-		fmt.Println("Error unmarshalling item:", err)
-		return nil, err
-	}
-
-	// // Print the results
-	// fmt.Println("Query results:")
-	// for _, item := range result.Items {
-	// 	fmt.Println(item)
-	// }
-
-	return pages, nil
-}
-
-func FetchAllPages() ([]Source, error) {
-
-	// Input parameters for Scan operation
-	input := &dynamodb.ScanInput{
-		TableName: aws.String(pageTable),
-	}
-
-	// Perform a Scan operation to fetch all items
-	result, err := dynamodbhandler.Client.Scan(input)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal the DynamoDB items into a slice of Page structs
-	pages := make([]Source, 0)
-	for _, item := range result.Items {
-		page := Source{}
-		err = dynamodbattribute.UnmarshalMap(item, &page)
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
 		if err != nil {
 			return nil, err
 		}
-		pages = append(pages, page)
+		source := Source{}
+		err = doc.DataTo(&source)
+		if err != nil {
+			continue
+		}
+		sources = append(sources, source)
 	}
 
-	return pages, nil
+	return sources, nil
+}
+
+func FetchAllPages() ([]Source, error) {
+	sources := []Source{}
+	iter := firestoredb.Client.CollectionGroup("sources").Documents(context.Background())
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		source := Source{}
+		err = doc.DataTo(&source)
+		if err != nil {
+			continue
+		}
+		sources = append(sources, source)
+	}
+
+	return sources, nil
 }
