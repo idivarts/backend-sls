@@ -48,7 +48,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(conversation.IGSID, pData.AccessToken)
+	convIds, err := messenger.GetConversationsByUserId(conversation.IGSID, *pData.AccessToken)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	lastMid := ""
 	conv := convIds.Data[0]
 
-	messages := messenger.FetchAllMessages(conv.ID, nil, pData.AccessToken)
+	messages := messenger.FetchAllMessages(conv.ID, nil, *pData.AccessToken)
 
 	lastindex := 1
 	if includeLastMessage {

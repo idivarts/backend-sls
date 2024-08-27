@@ -24,7 +24,7 @@ func GetConversationById(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pData.AccessToken = ""
+	pData.AccessToken = nil
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched successfully", "conversation": *cData, "page": *pData})
 }
 

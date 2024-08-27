@@ -74,7 +74,7 @@ func GetConversations(c *gin.Context) {
 				p.Page = IPage{
 					ID:          pData.PageID,
 					Name:        pData.Name,
-					UserName:    pData.UserName,
+					UserName:    *pData.UserName,
 					IsInstagram: pData.IsInstagram,
 				}
 			}

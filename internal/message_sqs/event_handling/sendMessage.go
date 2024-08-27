@@ -103,7 +103,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
 				pInp := processInput(aMsg.Value)
 				secondsElapsed := 0
-				_, err = messenger.SendAction(cData.IGSID, messenger.TYPING_ON, pData.AccessToken)
+				_, err = messenger.SendAction(cData.IGSID, messenger.TYPING_ON, *pData.AccessToken)
 				if err != nil {
 					log.Println("Error while send Action", err.Error())
 				}
@@ -112,7 +112,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 					st := sqsevents.ConversationEvent{
 						IGSID:       conv.IGSID,
 						Message:     v.StringVal,
-						PageToken:   pData.AccessToken,
+						PageToken:   *pData.AccessToken,
 						Action:      sqsevents.INSTA_SEND,
 						LastMessage: &isLast,
 					}

@@ -39,7 +39,7 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 		if err != nil {
 			return err
 		}
-		user, err := messenger.GetUser(igsid, pData.AccessToken)
+		user, err := messenger.GetUser(igsid, *pData.AccessToken)
 		if err != nil {
 			return err
 		}

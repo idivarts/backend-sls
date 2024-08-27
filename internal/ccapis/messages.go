@@ -38,7 +38,7 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	igConvs, err := messenger.GetConversationsByUserId(igsid, pData.AccessToken)
+	igConvs, err := messenger.GetConversationsByUserId(igsid, *pData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -48,7 +48,7 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 	convId := igConvs.Data[0].ID
-	messages, err := messenger.GetMessagesWithPagination(convId, req.After, req.Limit, pData.AccessToken)
+	messages, err := messenger.GetMessagesWithPagination(convId, req.After, req.Limit, *pData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -121,7 +121,7 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 	} else if req.SendType == Page && req.Message != "" {
-		msg, err := messenger.SendTextMessage(cData.IGSID, req.Message, pData.AccessToken)
+		msg, err := messenger.SendTextMessage(cData.IGSID, req.Message, *pData.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

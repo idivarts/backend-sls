@@ -9,6 +9,15 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
+type SourceType string
+
+const (
+	Facebook  SourceType = "facebook"
+	Instagram SourceType = "instagram"
+	YouTube   SourceType = "youtube"
+	Email     SourceType = "email"
+)
+
 //	type InstagramObject struct {
 //		ID       string `json:"id" dynamodbav:"id"`
 //		Name     string `json:"name" dynamodbav:"name"`
@@ -16,22 +25,25 @@ import (
 //		Bio      string `json:"bio" dynamodbav:"bio"`
 //	}
 type Source struct {
-	PageID             string `json:"pageId" dynamodbav:"pageId"`
-	ConnectedID        string `json:"connectedId" dynamodbav:"connectedId"`
-	UserID             string `json:"userId" dynamodbav:"userId"`
-	OwnerName          string `json:"ownerName" dynamodbav:"ownerName"`
-	Name               string `json:"name" dynamodbav:"name"`
-	UserName           string `json:"userName" dynamodbav:"userName"`
-	Bio                string `json:"bio" dynamodbav:"bio"`
-	IsInstagram        bool   `json:"isInstagram" dynamodbav:"isInstagram"`
-	AccessToken        string `json:"accessToken" dynamodbav:"accessToken"`
-	AssistantID        string `json:"assistantId" dynamodbav:"assistantId"`
-	IsWebhookConnected bool   `json:"isWebhookConnected" dynamodbav:"isWebhookConnected"`
-	Status             int    `json:"status" dynamodbav:"status"`
+	OrganizationId     string     `json:"organizationId"`
+	PageID             string     `json:"pageId"`
+	Name               string     `json:"name"`
+	UserID             string     `json:"userId"`
+	OwnerName          string     `json:"ownerName"`
+	IsWebhookConnected bool       `json:"isWebhookConnected"`
+	Status             int        `json:"status"`
+	UserName           *string    `json:"userName,omitempty"`
+	Bio                *string    `json:"bio,omitempty"`
+	SourceType         SourceType `json:"sourceType"`
+	ConnectedID        *string    `json:"connectedId,omitempty"`
+	AccessToken        *string    `json:"accessToken,omitempty"`
 
-	ReminderTimeMultiplier int `json:"reminderTimeMultiplier" dynamodbav:"reminderTimeMultiplier"`
-	ReplyTimeMin           int `json:"replyTimeMin" dynamodbav:"replyTimeMin"`
-	ReplyTimeMax           int `json:"replyTimeMax" dynamodbav:"replyTimeMax"`
+	// OLD FIELDS that we would need to shift in a different model
+	IsInstagram            bool   `json:"isInstagram" dynamodbav:"isInstagram"`
+	AssistantID            string `json:"assistantId" dynamodbav:"assistantId"`
+	ReminderTimeMultiplier int    `json:"reminderTimeMultiplier" dynamodbav:"reminderTimeMultiplier"`
+	ReplyTimeMin           int    `json:"replyTimeMin" dynamodbav:"replyTimeMin"`
+	ReplyTimeMax           int    `json:"replyTimeMax" dynamodbav:"replyTimeMax"`
 
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
