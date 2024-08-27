@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 )
 
-func connectHandler(ctx context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
+func connectHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 	connectionID := event.RequestContext.ConnectionID
 
 	// item := map[string]*dynamodb.AttributeValue{

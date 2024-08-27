@@ -14,7 +14,7 @@ type Message struct {
 	Data   string `json:"data"`
 }
 
-func messageHandler(ctx context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
+func messageHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 	var msg Message
 	err := json.Unmarshal([]byte(event.Body), &msg)
 	if err != nil {
