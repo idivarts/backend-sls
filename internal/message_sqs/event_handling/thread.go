@@ -16,8 +16,8 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 	run := true
 	if err != nil {
 		conv = &models.Conversation{
-			PageID: pageId,
-			IGSID:  igsid,
+			SourceID: pageId,
+			IGSID:    igsid,
 		}
 	} else {
 		if ev.Action != sqsevents.CREATE_OR_UPDATE_THREAD {
@@ -34,12 +34,12 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 		}
 	}
 	if ev.Action == sqsevents.CREATE_THREAD || ev.Action == sqsevents.CREATE_OR_UPDATE_THREAD {
-		pData := &models.Page{}
+		pData := &models.Source{}
 		err := pData.Get(pageId)
 		if err != nil {
 			return err
 		}
-		user, err := messenger.GetUser(igsid, pData.AccessToken)
+		user, err := messenger.GetUser(igsid, *pData.AccessToken)
 		if err != nil {
 			return err
 		}

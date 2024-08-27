@@ -17,8 +17,8 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 	if err != nil {
 		return err
 	}
-	pData := &models.Page{}
-	err = pData.Get(cData.PageID)
+	pData := &models.Source{}
+	err = pData.Get(cData.SourceID)
 	if err != nil || pData.PageID == "" {
 		return err
 	}

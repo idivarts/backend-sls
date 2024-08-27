@@ -19,8 +19,8 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		return err
 	}
 
-	pData := &models.Page{}
-	err = pData.Get(cData.PageID)
+	pData := &models.Source{}
+	err = pData.Get(cData.SourceID)
 	if err != nil || pData.PageID == "" {
 		return err
 	}
@@ -29,13 +29,13 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		log.Println("This message is old.. Waiting for new message", cData.LastMID, conv.MID)
 		return nil
 	}
-	_, err = messenger.SendAction(cData.IGSID, messenger.MARK_SEEN, pData.AccessToken)
+	_, err = messenger.SendAction(cData.IGSID, messenger.MARK_SEEN, *pData.AccessToken)
 	if err != nil {
 		log.Println("Error while send Action", err.Error())
 	}
 
 	if !cData.IsProfileFetched {
-		uProfile, err := messenger.GetUser(cData.IGSID, pData.AccessToken)
+		uProfile, err := messenger.GetUser(cData.IGSID, *pData.AccessToken)
 		if err != nil {
 			return err
 		}

@@ -67,14 +67,14 @@ func GetConversations(c *gin.Context) {
 		if v.UserProfile != nil {
 			p.User = IUser{ProfilePic: v.UserProfile.ProfilePic, Name: v.UserProfile.Name, UserName: v.UserProfile.Username}
 		}
-		if v.PageID != "" {
-			pData := models.Page{}
-			err := pData.Get(v.PageID)
+		if v.SourceID != "" {
+			pData := models.Source{}
+			err := pData.Get(v.SourceID)
 			if err == nil {
 				p.Page = IPage{
 					ID:          pData.PageID,
 					Name:        pData.Name,
-					UserName:    pData.UserName,
+					UserName:    *pData.UserName,
 					IsInstagram: pData.IsInstagram,
 				}
 			}

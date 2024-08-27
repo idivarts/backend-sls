@@ -24,7 +24,7 @@ func PageWebhook(c *gin.Context) {
 	}
 	pageId := c.Param("pageId")
 
-	cPage := &models.Page{}
+	cPage := &models.Source{}
 	err := cPage.Get(pageId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -34,7 +34,7 @@ func PageWebhook(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page cant be found"})
 		return
 	}
-	err = messenger.SubscribeApp(*req.Enable, cPage.AccessToken)
+	err = messenger.SubscribeApp(*req.Enable, *cPage.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -65,7 +65,7 @@ func PageAssistant(c *gin.Context) {
 	}
 	pageId := c.Param("pageId")
 
-	cPage := &models.Page{}
+	cPage := &models.Source{}
 	err := cPage.Get(pageId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -102,7 +102,7 @@ func PageSync(c *gin.Context) {
 		return
 	}
 	pageId := c.Param("pageId")
-	pData := &models.Page{}
+	pData := &models.Source{}
 	err := pData.Get(pageId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -110,14 +110,14 @@ func PageSync(c *gin.Context) {
 	}
 	var conversations []messenger.ConversationMessagesData
 	if req.IGSID != nil {
-		data, err := messenger.GetConversationsByUserId(*req.IGSID, pData.AccessToken)
+		data, err := messenger.GetConversationsByUserId(*req.IGSID, *pData.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		conversations = data.Data
 	} else {
-		conversations = messenger.FetchAllConversations(nil, pData.AccessToken)
+		conversations = messenger.FetchAllConversations(nil, *pData.AccessToken)
 	}
 	if len(conversations) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No Conversation found"})
@@ -125,7 +125,7 @@ func PageSync(c *gin.Context) {
 	}
 
 	for _, v := range conversations {
-		igsid := messenger.GetRecepientIDFromParticipants(v.Participants, pData.UserName)
+		igsid := messenger.GetRecepientIDFromParticipants(v.Participants, *pData.UserName)
 		log.Println("IGSID", igsid)
 		event := sqsevents.CREATE_THREAD
 		if req.All {

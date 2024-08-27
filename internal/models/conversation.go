@@ -1,42 +1,47 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"log"
-	"strconv"
 
+	"cloud.google.com/go/firestore"
 	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
-	dynamodbhandler "github.com/TrendsHub/th-backend/pkg/dynamodb_handler"
+	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"google.golang.org/api/iterator"
 )
 
 type Conversation struct {
-	IGSID              string                 `json:"igsid" dynamodbav:"igsid"`
-	PageID             string                 `json:"pageId" dynamodbav:"pageId"`
-	ThreadID           string                 `json:"threadId" dynamodbav:"threadId"`
-	LastMID            string                 `json:"lastMid" dynamodbav:"lastMid"`
-	LastBotMessageTime int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
-	BotMessageCount    int                    `json:"botMessageCount" dynamodbav:"botMessageCount"`
-	IsProfileFetched   bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
-	UserProfile        *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
-	Phases             []int                  `json:"phases" dynamodbav:"phases"`
-	CurrentPhase       int                    `json:"currentPhase" dynamodbav:"currentPhase"`
-	Information        openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
-	MessageQueue       *string                `json:"messageQueue" dynamodbav:"messageQueue"`
-	NextMessageTime    *int64                 `json:"nextMessageTime" dynamodbav:"nextMessageTime"`
-	NextReminderTime   *int64                 `json:"nextReminderTime" dynamodbav:"nextReminderTime"`
-	ReminderQueue      *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
-	ReminderCount      int                    `json:"reminderCount" dynamodbav:"reminderCount"`
-	Status             int                    `json:"status" dynamodbav:"status"`
+	OrganizationID     string            `json:"organizationId"`
+	CampaignID         string            `json:"campaignId"`
+	SourceID           string            `json:"sourceId"`
+	ThreadID           string            `json:"threadId"`
+	LeadID             string            `json:"leadId"`
+	LastMID            string            `json:"lastMid"`
+	LastBotMessageTime int64             `json:"lastBotMessageTime"`
+	BotMessageCount    int               `json:"botMessageCount"`
+	IsProfileFetched   bool              `json:"isProfileFetched"`
+	Phases             []int             `json:"phases"`
+	CurrentPhase       int               `json:"currentPhase"`
+	Collectibles       map[string]string `json:"collectibles"`
+	MessageQueue       *string           `json:"messageQueue,omitempty"`
+	NextMessageTime    *int64            `json:"nextMessageTime,omitempty"`
+	NextReminderTime   *int64            `json:"nextReminderTime,omitempty"`
+	ReminderQueue      *string           `json:"reminderQueue,omitempty"`
+	ReminderCount      int               `json:"reminderCount"`
+	Status             int               `json:"status"`
+
+	// Old fields that needs to be replaced or removed
+	IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
+	UserProfile *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
+	Information openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
 }
 
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
-	pData := Page{}
-	err := pData.Get(conversation.PageID)
+	pData := Source{}
+	err := pData.Get(conversation.SourceID)
 	if err != nil || pData.PageID == "" {
 		return err
 	}
@@ -48,7 +53,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(conversation.IGSID, pData.AccessToken)
+	convIds, err := messenger.GetConversationsByUserId(conversation.IGSID, *pData.AccessToken)
 	if err != nil {
 		return err
 	}
@@ -60,7 +65,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	lastMid := ""
 	conv := convIds.Data[0]
 
-	messages := messenger.FetchAllMessages(conv.ID, nil, pData.AccessToken)
+	messages := messenger.FetchAllMessages(conv.ID, nil, *pData.AccessToken)
 
 	lastindex := 1
 	if includeLastMessage {
@@ -102,8 +107,8 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 			log.Println("Both Message and Rich Content is empty")
 			message = "[Attached Video/Link/Shares that cant be read by Chat Assistant]"
 		}
-		log.Println("Sending Message", threadId, message, conversation.PageID == entry.From.ID)
-		_, err = openai.SendMessage(threadId, message, richContent, conversation.PageID == entry.From.ID)
+		log.Println("Sending Message", threadId, message, conversation.SourceID == entry.From.ID)
+		_, err = openai.SendMessage(threadId, message, richContent, conversation.SourceID == entry.From.ID)
 		if err != nil {
 			log.Println("Something went wrong while inseting the message", err.Error())
 			// return nil, err
@@ -130,72 +135,53 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	return nil
 }
 
-func (c *Conversation) Insert() (*dynamodb.PutItemOutput, error) {
-	data, err := dynamodbattribute.MarshalMap(*c)
+func (c *Conversation) GetPath() (*string, error) {
+	if c.OrganizationID == "" || c.CampaignID == "" {
+		return nil, fmt.Errorf("Organzation(%s) of Campaign(%s) id cant be null", c.OrganizationID, c.CampaignID)
+	}
+
+	path := fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", c.OrganizationID, c.CampaignID)
+	return &path, nil
+}
+func (c *Conversation) Insert() (*firestore.WriteResult, error) {
+	path, err := c.GetPath()
 	if err != nil {
 		return nil, err
 	}
-	res, err := dynamodbhandler.Client.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String(conversationTable),
-		Item:      data,
-	})
+
+	docRef := firestoredb.Client.Collection(*path).Doc(c.LeadID)
+	res, err := docRef.Set(context.Background(), c)
 	return res, err
 }
 
-func (c *Conversation) Get(igsid string) error {
-	result, err := dynamodbhandler.Client.GetItem(&dynamodb.GetItemInput{
-		TableName: aws.String(conversationTable),
-		Key: map[string]*dynamodb.AttributeValue{
-			"igsid": {
-				S: aws.String(igsid),
-			},
-		},
-	})
+func (c *Conversation) Get(leadId string) error {
+	iter := firestoredb.Client.CollectionGroup("conversations").Query.Where("leadId", "==", leadId).Documents(context.Background())
+	data, err := iter.Next()
 	if err != nil {
-		fmt.Println("Error getting item from DynamoDB:", err)
+		fmt.Println("Error getting item from Firestore:", err.Error())
 		return err
 	}
-
-	err = dynamodbattribute.UnmarshalMap(result.Item, c)
+	err = data.DataTo(c)
 	if err != nil {
-		fmt.Println("Error unmarshalling item:", err)
+		fmt.Println("Error getting item from Firestore:", err.Error())
 		return err
-	}
-
-	if c.IGSID == "" {
-		return fmt.Errorf("error finding conversation %s", igsid)
 	}
 
 	return nil
 }
 
-func (c *Conversation) UpdateLastMID(mid string) (*dynamodb.UpdateItemOutput, error) {
+func (c *Conversation) UpdateLastMID(mid string) (*firestore.WriteResult, error) {
 	c.LastMID = mid
-	// Specify the update expression and expression attribute values
-	updateExpression := "SET #lastMid = :lastMid"
-	expressionAttributeNames := map[string]*string{
-		"#lastMid": aws.String("lastMid"),
-	}
-	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
-		":lastMid": {S: aws.String(c.LastMID)},
-	}
 
-	// Construct the update input
-	input := &dynamodb.UpdateItemInput{
-		TableName: aws.String(conversationTable),
-		Key: map[string]*dynamodb.AttributeValue{
-			"igsid": {
-				S: aws.String(c.IGSID),
-			},
-		}, // Use the marshalled item as the key
-		UpdateExpression:          aws.String(updateExpression),
-		ExpressionAttributeNames:  expressionAttributeNames,
-		ExpressionAttributeValues: expressionAttributeValues,
-		ReturnValues:              aws.String("UPDATED_NEW"), // Specify the attributes to return after the update
+	path, err := c.GetPath()
+	if err != nil {
+		return nil, err
 	}
 
 	// Perform the update operation
-	result, err := dynamodbhandler.Client.UpdateItem(input)
+	result, err := firestoredb.Client.Collection(*path).Doc(c.LeadID).Set(context.Background(), map[string]interface{}{
+		"lastMid": mid,
+	}, firestore.MergeAll)
 	if err != nil {
 		fmt.Println("Error updating item:", err)
 		return nil, err
@@ -203,157 +189,49 @@ func (c *Conversation) UpdateLastMID(mid string) (*dynamodb.UpdateItemOutput, er
 	return result, nil
 }
 
-func (c *Conversation) UpdateProfileFetched() (*dynamodb.UpdateItemOutput, error) {
+func (c *Conversation) UpdateProfileFetched() (*firestore.WriteResult, error) {
 	c.IsProfileFetched = true
-	// Specify the update expression and expression attribute values
-	updateExpression := "SET #isProfileFetched = :isProfileFetched"
-	expressionAttributeNames := map[string]*string{
-		"#isProfileFetched": aws.String("isProfileFetched"),
-	}
-	expressionAttributeValues := map[string]*dynamodb.AttributeValue{
-		":isProfileFetched": {BOOL: &c.IsProfileFetched},
-	}
 
-	// Construct the update input
-	input := &dynamodb.UpdateItemInput{
-		TableName: aws.String(conversationTable),
-		Key: map[string]*dynamodb.AttributeValue{
-			"igsid": {
-				S: aws.String(c.IGSID),
-			},
-		}, // Use the marshalled item as the key
-		UpdateExpression:          aws.String(updateExpression),
-		ExpressionAttributeNames:  expressionAttributeNames,
-		ExpressionAttributeValues: expressionAttributeValues,
-		ReturnValues:              aws.String("UPDATED_NEW"), // Specify the attributes to return after the update
+	path, err := c.GetPath()
+	if err != nil {
+		return nil, err
 	}
 
 	// Perform the update operation
-	result, err := dynamodbhandler.Client.UpdateItem(input)
+	result, err := firestoredb.Client.Collection(*path).Doc(c.LeadID).Set(context.Background(), map[string]interface{}{
+		"isProfileFetched": true,
+	}, firestore.MergeAll)
 	if err != nil {
 		fmt.Println("Error updating item:", err)
 		return nil, err
 	}
 	return result, nil
 }
-
-// // Function to update the MessageQueue field in DynamoDB
-// func (conversation Conversation) UpdateMessageQueue() error {
-// 	// Update the MessageQueue field in the DynamoDB item
-// 	input := &dynamodb.UpdateItemInput{
-// 		TableName: aws.String(tableName),
-// 		Key: map[string]*dynamodb.AttributeValue{
-// 			"igsid": {
-// 				S: aws.String(conversation.IGSID),
-// 			},
-// 		},
-// 		ExpressionAttributeNames: map[string]*string{
-// 			"#MQ": aws.String("messageQueue"),
-// 		},
-// 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-// 			":mq": {
-// 				SS: aws.StringSlice(conversation.MessageQueue),
-// 			},
-// 		},
-// 		UpdateExpression: aws.String("SET #MQ = :mq"),
-// 	}
-
-// 	_, err := dynamodbhandler.Client.UpdateItem(input)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
-// // Function to update the MessageQueue field in DynamoDB
-// func (conversation Conversation) UpdateReminderQueue() error {
-// 	// Update the MessageQueue field in the DynamoDB item
-// 	input := &dynamodb.UpdateItemInput{
-// 		TableName: aws.String(tableName),
-// 		Key: map[string]*dynamodb.AttributeValue{
-// 			"igsid": {
-// 				S: aws.String(conversation.IGSID),
-// 			},
-// 		},
-// 		ExpressionAttributeNames: map[string]*string{
-// 			"#MQ": aws.String("reminderQueue"),
-// 		},
-// 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-// 			":mq": {
-// 				SS: aws.StringSlice(conversation.ReminderQueue),
-// 			},
-// 		},
-// 		UpdateExpression: aws.String("SET #MQ = :mq"),
-// 	}
-
-// 	_, err := dynamodbhandler.Client.UpdateItem(input)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
 
 func GetConversations(pageId *string, phase *int) ([]Conversation, error) {
-	// Initialize AWS SDK and DynamoDB client
-
-	// Initialize variables
 	var conversations []Conversation
 
-	// Create the input for the Scan operation
-	input := &dynamodb.ScanInput{
-		TableName: aws.String(conversationTable),
-	}
+	query := firestoredb.Client.CollectionGroup("conversations").Query
 	if pageId != nil {
-		input = &dynamodb.ScanInput{
-			TableName:        aws.String(conversationTable),
-			FilterExpression: aws.String("pageId = :pageId"),
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":pageId": {
-					S: pageId,
-				},
-			},
-		}
+		query = query.Where("pageId", "==", *pageId)
 	}
 	if phase != nil {
-		input = &dynamodb.ScanInput{
-			TableName:        aws.String(conversationTable),
-			FilterExpression: aws.String("currentPhase = :phase"),
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":phase": {
-					N: aws.String(strconv.Itoa(*phase)),
-				},
-			},
-		}
-	}
-	if pageId != nil && phase != nil {
-		input = &dynamodb.ScanInput{
-			TableName:        aws.String(conversationTable),
-			FilterExpression: aws.String("pageId = :pageId AND currentPhase = :phase"),
-			ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-				":pageId": {
-					S: pageId,
-				},
-				":phase": {
-					N: aws.String(strconv.Itoa(*phase)),
-				},
-			},
-		}
+		query = query.Where("phase", "==", *phase)
 	}
 
-	// Perform the Scan operation
-	result, err := dynamodbhandler.Client.Scan(input)
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse the response into Conversation structs
-	for _, item := range result.Items {
-		conv := Conversation{}
-		err = dynamodbattribute.UnmarshalMap(item, &conv)
+	iter := query.Documents(context.Background())
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
 		if err != nil {
 			return nil, err
+		}
+		conv := Conversation{}
+		err = doc.DataTo(&conv)
+		if err != nil {
+			continue
 		}
 		conversations = append(conversations, conv)
 	}

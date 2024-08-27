@@ -47,17 +47,17 @@ func FacebookLogin(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			instaPage := models.Page{
+			instaPage := models.Source{
 				PageID:      inst.ID,
-				ConnectedID: v.ID,
+				ConnectedID: &v.ID,
 				IsInstagram: true,
 				Name:        inst.Name,
-				UserName:    inst.Username,
-				Bio:         inst.Biography,
+				UserName:    &inst.Username,
+				Bio:         &inst.Biography,
 				UserID:      person.ID,
 				OwnerName:   person.Name,
 				// Instagram:   nil,
-				AccessToken:            lRes.AccessToken,
+				AccessToken:            &lRes.AccessToken,
 				AssistantID:            string(openai.ArjunAssistant),
 				Status:                 1,
 				IsWebhookConnected:     false,
@@ -72,17 +72,17 @@ func FacebookLogin(c *gin.Context) {
 			}
 		}
 
-		fbPage := models.Page{
+		fbPage := models.Source{
 			PageID:      v.ID,
-			ConnectedID: v.InstagramBusinessAccount.ID,
+			ConnectedID: &v.InstagramBusinessAccount.ID,
 			IsInstagram: false,
 			Name:        v.Name,
-			UserName:    "",
-			Bio:         "",
+			UserName:    nil,
+			Bio:         nil,
 			UserID:      person.ID,
 			OwnerName:   person.Name,
 			// Instagram:   nil,
-			AccessToken:            lRes.AccessToken,
+			AccessToken:            &lRes.AccessToken,
 			AssistantID:            string(openai.ArjunAssistant),
 			Status:                 1,
 			IsWebhookConnected:     false,

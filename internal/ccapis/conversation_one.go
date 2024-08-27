@@ -18,13 +18,13 @@ func GetConversationById(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pData := &models.Page{}
-	err = pData.Get(cData.PageID)
+	pData := &models.Source{}
+	err = pData.Get(cData.SourceID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pData.AccessToken = ""
+	pData.AccessToken = nil
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched successfully", "conversation": *cData, "page": *pData})
 }
 
@@ -52,8 +52,8 @@ func UpdateConversation(c *gin.Context) {
 	if req.Information != nil {
 		cData.Information = *req.Information
 	}
-	if req.PageID != "" {
-		cData.PageID = req.PageID
+	if req.SourceID != "" {
+		cData.SourceID = req.SourceID
 	}
 	if req.CurrentPhase != nil {
 		cData.CurrentPhase = *req.CurrentPhase
