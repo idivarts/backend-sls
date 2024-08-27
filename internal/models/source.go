@@ -25,7 +25,7 @@ const (
 //		Bio      string `json:"bio" dynamodbav:"bio"`
 //	}
 type Source struct {
-	OrganizationId     string     `json:"organizationId"`
+	OrganizationID     string     `json:"organizationId"`
 	PageID             string     `json:"pageId"`
 	Name               string     `json:"name"`
 	UserID             string     `json:"userId"`
