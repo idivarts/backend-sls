@@ -60,7 +60,7 @@ func GetPages(c *gin.Context) {
 			pagesResp.MyPages = append(pagesResp.MyPages, PageUnit{
 				Id:                     v.PageID,
 				Name:                   v.Name,
-				UserName:               v.UserName,
+				UserName:               *v.UserName,
 				OwnerName:              v.OwnerName,
 				IsInstagram:            v.IsInstagram,
 				IsWebhookConnected:     v.IsWebhookConnected,
@@ -73,7 +73,7 @@ func GetPages(c *gin.Context) {
 			pagesResp.OtherPages = append(pagesResp.OtherPages, PageUnit{
 				Id:                     v.PageID,
 				Name:                   v.Name,
-				UserName:               v.UserName,
+				UserName:               *v.UserName,
 				OwnerName:              v.OwnerName,
 				IsInstagram:            v.IsInstagram,
 				IsWebhookConnected:     v.IsWebhookConnected,
