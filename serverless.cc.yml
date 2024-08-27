@@ -92,10 +92,8 @@ functions:
       include:
         - 'service-account.json'
     events:
-      - http: ANY /sources/{proxy+}
-      - http: ANY /conversations/{proxy+}
-      - http: ANY /messages/{proxy+}
-
+      - http: ANY /api/v1/{proxy+}
+      
   cc_message_wh:
     handler: functions/message_webhook/main.go
     package:

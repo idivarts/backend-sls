@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 )
 
-func disconnectHandler(ctx context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
+func disconnectHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 	connectionID := event.RequestContext.ConnectionID
 
 	_, err := firestoreClient.Collection("websockets").Doc(connectionID).Delete(context.Background())
