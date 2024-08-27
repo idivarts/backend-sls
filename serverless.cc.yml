@@ -17,7 +17,7 @@ provider:
         - Arn
     # Need to figure out a way to make this dynamic
     WS_GATEWAY_ENDPOINT: https://w754u2apn0.execute-api.us-east-1.amazonaws.com/dev
-    WS_CONNECTION_TABLE: websocketTable
+    # WS_CONNECTION_TABLE: websocketTable
 
   iam:
     role:
@@ -78,6 +78,9 @@ custom:
 functions:
   cc_websocket:
     handler: functions/websocket/main.go
+    package:
+      include:
+        - 'service-account.json'
     events:
       - websocket: $connect
       - websocket: $disconnect
@@ -85,6 +88,9 @@ functions:
 
   cc_backend:
     handler: functions/cc_apis/main.go
+    package:
+      include:
+        - 'service-account.json'
     events:
       - http: ANY /sources/{proxy+}
       - http: ANY /conversations/{proxy+}
@@ -92,12 +98,18 @@ functions:
 
   cc_message_wh:
     handler: functions/message_webhook/main.go
+    package:
+      include:
+        - 'service-account.json'
     events:
       - http: ANY /instagram/webhook
       - http: GET /test/sqs
 
   cc_message_sqs:
     handler: functions/message_sqs/main.go
+    package:
+      include:
+        - 'service-account.json'
     timeout: 60
     events:
       - sqs:
@@ -109,7 +121,6 @@ functions:
 package:
   patterns:
     - "!./**"
-    - service-account.json
   individually: true
 
 resources:
