@@ -15,7 +15,7 @@ import (
 //		UserName string `json:"userName" dynamodbav:"userName"`
 //		Bio      string `json:"bio" dynamodbav:"bio"`
 //	}
-type Page struct {
+type Source struct {
 	PageID             string `json:"pageId" dynamodbav:"pageId"`
 	ConnectedID        string `json:"connectedId" dynamodbav:"connectedId"`
 	UserID             string `json:"userId" dynamodbav:"userId"`
@@ -36,7 +36,7 @@ type Page struct {
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
 
-func (c *Page) Insert() (*dynamodb.PutItemOutput, error) {
+func (c *Source) Insert() (*dynamodb.PutItemOutput, error) {
 	data, err := dynamodbattribute.MarshalMap(*c)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (c *Page) Insert() (*dynamodb.PutItemOutput, error) {
 	return res, err
 }
 
-func (c *Page) Get(pageId string) error {
+func (c *Source) Get(pageId string) error {
 	result, err := dynamodbhandler.Client.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(pageTable),
 		Key: map[string]*dynamodb.AttributeValue{
@@ -76,7 +76,7 @@ func (c *Page) Get(pageId string) error {
 	return nil
 }
 
-func GetPagesByUserId(userId string) ([]Page, error) {
+func GetPagesByUserId(userId string) ([]Source, error) {
 	// Create the input for the query operation
 	input := &dynamodb.ScanInput{
 		TableName:        aws.String(pageTable),
@@ -98,7 +98,7 @@ func GetPagesByUserId(userId string) ([]Page, error) {
 		return nil, err
 	}
 
-	pages := []Page{}
+	pages := []Source{}
 	err = dynamodbattribute.UnmarshalListOfMaps(result.Items, &pages)
 	if err != nil {
 		fmt.Println("Error unmarshalling item:", err)
@@ -114,7 +114,7 @@ func GetPagesByUserId(userId string) ([]Page, error) {
 	return pages, nil
 }
 
-func FetchAllPages() ([]Page, error) {
+func FetchAllPages() ([]Source, error) {
 
 	// Input parameters for Scan operation
 	input := &dynamodb.ScanInput{
@@ -128,9 +128,9 @@ func FetchAllPages() ([]Page, error) {
 	}
 
 	// Unmarshal the DynamoDB items into a slice of Page structs
-	pages := make([]Page, 0)
+	pages := make([]Source, 0)
 	for _, item := range result.Items {
-		page := Page{}
+		page := Source{}
 		err = dynamodbattribute.UnmarshalMap(item, &page)
 		if err != nil {
 			return nil, err

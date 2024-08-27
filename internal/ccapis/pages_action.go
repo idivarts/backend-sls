@@ -24,7 +24,7 @@ func PageWebhook(c *gin.Context) {
 	}
 	pageId := c.Param("pageId")
 
-	cPage := &models.Page{}
+	cPage := &models.Source{}
 	err := cPage.Get(pageId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -65,7 +65,7 @@ func PageAssistant(c *gin.Context) {
 	}
 	pageId := c.Param("pageId")
 
-	cPage := &models.Page{}
+	cPage := &models.Source{}
 	err := cPage.Get(pageId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -102,7 +102,7 @@ func PageSync(c *gin.Context) {
 		return
 	}
 	pageId := c.Param("pageId")
-	pData := &models.Page{}
+	pData := &models.Source{}
 	err := pData.Get(pageId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

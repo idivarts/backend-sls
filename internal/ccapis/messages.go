@@ -31,7 +31,7 @@ func GetMessages(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pData := &models.Page{}
+	pData := &models.Source{}
 	err = pData.Get(cData.PageID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -87,7 +87,7 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
-	pData := &models.Page{}
+	pData := &models.Source{}
 	err = pData.Get(cData.PageID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

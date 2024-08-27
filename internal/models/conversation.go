@@ -35,7 +35,7 @@ type Conversation struct {
 }
 
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
-	pData := Page{}
+	pData := Source{}
 	err := pData.Get(conversation.PageID)
 	if err != nil || pData.PageID == "" {
 		return err

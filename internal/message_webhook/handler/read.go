@@ -5,7 +5,7 @@ import (
 )
 
 func (msg IGMessagehandler) handleReadOperation() error {
-	pData := models.Page{}
+	pData := models.Source{}
 	err := pData.Get(msg.PageID)
 	if err != nil || pData.PageID == "" {
 		return err

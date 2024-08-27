@@ -47,7 +47,7 @@ func FacebookLogin(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			instaPage := models.Page{
+			instaPage := models.Source{
 				PageID:      inst.ID,
 				ConnectedID: v.ID,
 				IsInstagram: true,
@@ -72,7 +72,7 @@ func FacebookLogin(c *gin.Context) {
 			}
 		}
 
-		fbPage := models.Page{
+		fbPage := models.Source{
 			PageID:      v.ID,
 			ConnectedID: v.InstagramBusinessAccount.ID,
 			IsInstagram: false,
