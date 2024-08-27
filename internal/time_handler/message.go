@@ -28,7 +28,7 @@ func generateRandomNumberInSeconds(min, max int) int {
 func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
 
 	pData := &models.Source{}
-	err := pData.Get(conv.PageID)
+	err := pData.Get(conv.SourceID)
 	if err != nil {
 		return nil, err
 	}

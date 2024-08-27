@@ -67,9 +67,9 @@ func GetConversations(c *gin.Context) {
 		if v.UserProfile != nil {
 			p.User = IUser{ProfilePic: v.UserProfile.ProfilePic, Name: v.UserProfile.Name, UserName: v.UserProfile.Username}
 		}
-		if v.PageID != "" {
+		if v.SourceID != "" {
 			pData := models.Source{}
-			err := pData.Get(v.PageID)
+			err := pData.Get(v.SourceID)
 			if err == nil {
 				p.Page = IPage{
 					ID:          pData.PageID,

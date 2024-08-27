@@ -20,7 +20,7 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 	}
 
 	pData := &models.Source{}
-	err = pData.Get(cData.PageID)
+	err = pData.Get(cData.SourceID)
 	if err != nil || pData.PageID == "" {
 		return err
 	}

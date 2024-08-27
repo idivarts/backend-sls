@@ -41,8 +41,8 @@ func (msg IGMessagehandler) HandleMessage() error {
 		// This is where I would need to create a new instance
 		log.Println("Error Finding IGSID", err.Error())
 		msg.conversationData = &models.Conversation{
-			PageID: msg.PageID,
-			IGSID:  convId,
+			SourceID: msg.PageID,
+			IGSID:    convId,
 		}
 		msg.conversationData, err = msg.createMessageThread(false)
 		if err != nil {

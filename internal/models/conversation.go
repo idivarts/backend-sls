@@ -15,28 +15,34 @@ import (
 )
 
 type Conversation struct {
-	IGSID              string                 `json:"igsid" dynamodbav:"igsid"`
-	PageID             string                 `json:"pageId" dynamodbav:"pageId"`
-	ThreadID           string                 `json:"threadId" dynamodbav:"threadId"`
-	LastMID            string                 `json:"lastMid" dynamodbav:"lastMid"`
-	LastBotMessageTime int64                  `json:"lastBotMessageTime" dynamodbav:"lastBotMessageTime"`
-	BotMessageCount    int                    `json:"botMessageCount" dynamodbav:"botMessageCount"`
-	IsProfileFetched   bool                   `json:"isProfileFetched" dynamodbav:"isProfileFetched"`
-	UserProfile        *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
-	Phases             []int                  `json:"phases" dynamodbav:"phases"`
-	CurrentPhase       int                    `json:"currentPhase" dynamodbav:"currentPhase"`
-	Information        openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
-	MessageQueue       *string                `json:"messageQueue" dynamodbav:"messageQueue"`
-	NextMessageTime    *int64                 `json:"nextMessageTime" dynamodbav:"nextMessageTime"`
-	NextReminderTime   *int64                 `json:"nextReminderTime" dynamodbav:"nextReminderTime"`
-	ReminderQueue      *string                `json:"reminderQueue" dynamodbav:"reminderQueue"`
-	ReminderCount      int                    `json:"reminderCount" dynamodbav:"reminderCount"`
-	Status             int                    `json:"status" dynamodbav:"status"`
+	OrganizationID     string            `json:"organizationId"`
+	CampaignID         string            `json:"campaignId"`
+	SourceID           string            `json:"sourceId"`
+	ThreadID           string            `json:"threadId"`
+	LeadID             string            `json:"leadId"`
+	LastMID            string            `json:"lastMid"`
+	LastBotMessageTime int64             `json:"lastBotMessageTime"`
+	BotMessageCount    int               `json:"botMessageCount"`
+	IsProfileFetched   bool              `json:"isProfileFetched"`
+	Phases             []int             `json:"phases"`
+	CurrentPhase       int               `json:"currentPhase"`
+	Collectibles       map[string]string `json:"collectibles"`
+	MessageQueue       *string           `json:"messageQueue,omitempty"`
+	NextMessageTime    *int64            `json:"nextMessageTime,omitempty"`
+	NextReminderTime   *int64            `json:"nextReminderTime,omitempty"`
+	ReminderQueue      *string           `json:"reminderQueue,omitempty"`
+	ReminderCount      int               `json:"reminderCount"`
+	Status             int               `json:"status"`
+
+	// Old fields that needs to be replaced or removed
+	IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
+	UserProfile *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
+	Information openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
 }
 
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	pData := Source{}
-	err := pData.Get(conversation.PageID)
+	err := pData.Get(conversation.SourceID)
 	if err != nil || pData.PageID == "" {
 		return err
 	}
@@ -102,8 +108,8 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 			log.Println("Both Message and Rich Content is empty")
 			message = "[Attached Video/Link/Shares that cant be read by Chat Assistant]"
 		}
-		log.Println("Sending Message", threadId, message, conversation.PageID == entry.From.ID)
-		_, err = openai.SendMessage(threadId, message, richContent, conversation.PageID == entry.From.ID)
+		log.Println("Sending Message", threadId, message, conversation.SourceID == entry.From.ID)
+		_, err = openai.SendMessage(threadId, message, richContent, conversation.SourceID == entry.From.ID)
 		if err != nil {
 			log.Println("Something went wrong while inseting the message", err.Error())
 			// return nil, err

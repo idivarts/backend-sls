@@ -16,8 +16,8 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 	run := true
 	if err != nil {
 		conv = &models.Conversation{
-			PageID: pageId,
-			IGSID:  igsid,
+			SourceID: pageId,
+			IGSID:    igsid,
 		}
 	} else {
 		if ev.Action != sqsevents.CREATE_OR_UPDATE_THREAD {

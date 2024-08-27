@@ -10,7 +10,7 @@ func CalculateRemiderDelay(conv *models.Conversation) int {
 	calcTime := int(REMINDER_SECONDS)
 
 	pData := &models.Source{}
-	err := pData.Get(conv.PageID)
+	err := pData.Get(conv.SourceID)
 	if err != nil {
 		// Do nothing
 	} else {
