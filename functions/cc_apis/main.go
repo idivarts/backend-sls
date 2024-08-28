@@ -2,11 +2,12 @@ package main
 
 import (
 	"github.com/TrendsHub/th-backend/internal/ccapis"
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
 )
 
 func main() {
-	apiV1 := apihandler.GinEngine.Group("/api/v1")
+	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware())
 
 	apiV1.POST("/sources/facebook", ccapis.FacebookLogin)
 
