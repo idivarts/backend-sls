@@ -75,7 +75,7 @@ func GetConversations(c *gin.Context) {
 					ID:          pData.PageID,
 					Name:        pData.Name,
 					UserName:    *pData.UserName,
-					IsInstagram: pData.IsInstagram,
+					IsInstagram: pData.SourceType == models.Instagram,
 				}
 			}
 		}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
-	"github.com/TrendsHub/th-backend/pkg/openai"
 	"github.com/gin-gonic/gin"
 )
 
@@ -48,22 +47,23 @@ func FacebookLogin(c *gin.Context) {
 				return
 			}
 			instaPage := models.Source{
-				PageID:      inst.ID,
-				ConnectedID: &v.ID,
-				IsInstagram: true,
-				Name:        inst.Name,
-				UserName:    &inst.Username,
-				Bio:         &inst.Biography,
-				UserID:      person.ID,
-				OwnerName:   person.Name,
-				// Instagram:   nil,
-				AccessToken:            &lRes.AccessToken,
-				AssistantID:            string(openai.ArjunAssistant),
-				Status:                 1,
-				IsWebhookConnected:     false,
-				ReminderTimeMultiplier: 60 * 60 * 6,
-				ReplyTimeMin:           15,
-				ReplyTimeMax:           120,
+				OrganizationID:     person.OrganizationID,
+				PageID:             inst.ID,
+				Name:               inst.Name,
+				UserID:             person.ID,
+				OwnerName:          person.Name,
+				IsWebhookConnected: false,
+				Status:             1,
+				UserName:           &inst.Username,
+				Bio:                &inst.Biography,
+				SourceType:         models.Instagram,
+				ConnectedID:        &v.ID,
+				AccessToken:        &lRes.AccessToken,
+				// IsInstagram:            true,
+				// AssistantID:            string(openai.ArjunAssistant),
+				// ReminderTimeMultiplier: 60 * 60 * 6,
+				// ReplyTimeMin:           15,
+				// ReplyTimeMax:           120,
 			}
 			_, err = instaPage.Insert()
 			if err != nil {
@@ -73,22 +73,18 @@ func FacebookLogin(c *gin.Context) {
 		}
 
 		fbPage := models.Source{
-			PageID:      v.ID,
-			ConnectedID: &v.InstagramBusinessAccount.ID,
-			IsInstagram: false,
-			Name:        v.Name,
-			UserName:    nil,
-			Bio:         nil,
-			UserID:      person.ID,
-			OwnerName:   person.Name,
-			// Instagram:   nil,
-			AccessToken:            &lRes.AccessToken,
-			AssistantID:            string(openai.ArjunAssistant),
-			Status:                 1,
-			IsWebhookConnected:     false,
-			ReminderTimeMultiplier: 60 * 60 * 6,
-			ReplyTimeMin:           15,
-			ReplyTimeMax:           120,
+			OrganizationID:     person.OrganizationID,
+			PageID:             v.ID,
+			Name:               v.Name,
+			UserID:             person.ID,
+			OwnerName:          person.Name,
+			IsWebhookConnected: false,
+			Status:             1,
+			UserName:           nil,
+			Bio:                nil,
+			SourceType:         models.Facebook,
+			ConnectedID:        &v.InstagramBusinessAccount.ID,
+			AccessToken:        &lRes.AccessToken,
 		}
 		_, err = fbPage.Insert()
 		if err != nil {

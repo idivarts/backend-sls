@@ -1,6 +1,13 @@
 package models
 
-type ICampaigns struct {
+import (
+	"context"
+	"fmt"
+
+	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
+)
+
+type Campaign struct {
 	OrganizationID string        `json:"organizationId"`
 	Name           string        `json:"name"`
 	Objective      string        `json:"objective"`
@@ -11,6 +18,9 @@ type ICampaigns struct {
 	ReplySpeed     Range         `json:"replySpeed"`
 	ReminderTiming Range         `json:"reminderTiming"`
 	ChatGPT        ChatGPTConfig `json:"chatgpt"`
+
+	// This will be used for storing the assistant data
+	AssistantID string `json:"assistantId"`
 
 	// LeadStages     []LeadStage   `json:"leadStages"`
 }
@@ -54,4 +64,14 @@ type Collectible struct {
 	Type           string `json:"type"`
 	Description    string `json:"description"`
 	Mandatory      bool   `json:"mandatory"`
+}
+
+func (c *Campaign) Get(organizationId, campaignId string) error {
+	iter := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s", organizationId, campaignId)).Documents(context.Background())
+	doc, err := iter.Next()
+	if err != nil {
+		return err
+	}
+	doc.DataTo(c)
+	return nil
 }

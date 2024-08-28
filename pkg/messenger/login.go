@@ -1,6 +1,7 @@
 package messenger
 
 type FacebookLoginRequest struct {
+	OrganizationID           string `json:"organizationId" binding:"required"`
 	Name                     string `json:"name"`
 	ID                       string `json:"id" binding:"required"`
 	UserID                   string `json:"userID"`

@@ -27,11 +27,17 @@ func generateRandomNumberInSeconds(min, max int) int {
 
 func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
 
-	pData := &models.Source{}
-	err := pData.Get(conv.SourceID)
+	campaign := &models.Campaign{}
+	err := campaign.Get(conv.OrganizationID, conv.CampaignID)
 	if err != nil {
 		return nil, err
 	}
+
+	// pData := &models.Source{}
+	// err = pData.Get(conv.SourceID)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	msgs, err := openai.GetMessages(conv.ThreadID, 5, "")
 	if err != nil {
@@ -49,14 +55,14 @@ func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
 		}
 	}
 
-	rt1, rt2 := splitRange(pData.ReplyTimeMin, pData.ReplyTimeMax)
+	rt1, rt2 := splitRange(campaign.ReplySpeed.Min, campaign.ReplySpeed.Max)
 	calcTime := int(difference)
 	if calcTime > 30*60 {
-		calcTime = generateRandomNumberInSeconds(rt2, pData.ReplyTimeMax)
+		calcTime = generateRandomNumberInSeconds(rt2, campaign.ReplySpeed.Max)
 	} else if calcTime > 10*60 {
 		calcTime = generateRandomNumberInSeconds(rt1, rt2)
 	} else {
-		calcTime = generateRandomNumberInSeconds(pData.ReplyTimeMin, rt1)
+		calcTime = generateRandomNumberInSeconds(campaign.ReplySpeed.Min, rt1)
 	}
 
 	// // TODO: Remove this one the testing phase is crossed

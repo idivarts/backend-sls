@@ -19,6 +19,12 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		return err
 	}
 
+	campaign := &models.Campaign{}
+	err = campaign.Get(cData.OrganizationID, cData.CampaignID)
+	if err != nil {
+		return err
+	}
+
 	pData := &models.Source{}
 	err = pData.Get(cData.SourceID)
 	if err != nil || pData.PageID == "" {
@@ -51,7 +57,7 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		// cData.UpdateProfileFetched()
 	}
 	log.Println("Starting Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(pData.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
+	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
 	if err != nil {
 		return err
 	}

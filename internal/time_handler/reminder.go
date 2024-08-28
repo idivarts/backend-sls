@@ -9,12 +9,12 @@ const REMINDER_SECONDS = 60 * 60 * 6
 func CalculateRemiderDelay(conv *models.Conversation) int {
 	calcTime := int(REMINDER_SECONDS)
 
-	pData := &models.Source{}
-	err := pData.Get(conv.SourceID)
+	campaign := &models.Campaign{}
+	err := campaign.Get(conv.OrganizationID, conv.CampaignID)
 	if err != nil {
-		// Do nothing
+		// Do Nothing
 	} else {
-		calcTime = (pData.ReminderTimeMultiplier)
+		calcTime = (campaign.ReminderTiming.Min)
 	}
 
 	calcTime = calcTime + calcTime*conv.ReminderCount
