@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,12 @@ import (
 
 func FacebookLogin(c *gin.Context) {
 	var person messenger.FacebookLoginRequest
+
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
 
 	if err := c.ShouldBindJSON(&person); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -47,7 +54,7 @@ func FacebookLogin(c *gin.Context) {
 				return
 			}
 			instaPage := models.Source{
-				OrganizationID:     person.OrganizationID,
+				OrganizationID:     organizationID,
 				PageID:             inst.ID,
 				Name:               inst.Name,
 				UserID:             person.ID,
@@ -73,7 +80,7 @@ func FacebookLogin(c *gin.Context) {
 		}
 
 		fbPage := models.Source{
-			OrganizationID:     person.OrganizationID,
+			OrganizationID:     organizationID,
 			PageID:             v.ID,
 			Name:               v.Name,
 			UserID:             person.ID,
