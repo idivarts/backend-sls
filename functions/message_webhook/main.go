@@ -7,11 +7,13 @@ import (
 )
 
 func main() {
-	apihandler.GinEngine.POST("/instagram/webhook", messagewebhook.Receive)
-	apihandler.GinEngine.GET("/instagram/webhook", messagewebhook.Validation)
+	webhooksHandler := apihandler.GinEngine.Group("/webhooks")
 
-	apihandler.GinEngine.POST("/facebook/webhook", messagewebhook.Receive)
-	apihandler.GinEngine.GET("/facebook/webhook", messagewebhook.Validation)
+	webhooksHandler.POST("/instagram", messagewebhook.Receive)
+	webhooksHandler.GET("/instagram", messagewebhook.Validation)
+
+	webhooksHandler.POST("/facebook", messagewebhook.Receive)
+	webhooksHandler.GET("/facebook", messagewebhook.Validation)
 
 	apihandler.GinEngine.GET("/test/sqs", sqsapp.SendTestSQSMessage)
 

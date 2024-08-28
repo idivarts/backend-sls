@@ -100,8 +100,7 @@ functions:
       include:
         - 'service-account.json'
     events:
-      - http: ANY /instagram/webhook
-      - http: ANY /facebook/webhook
+      - http: ANY /webhooks/{proxy+}
       - http: GET /test/sqs
 
   cc_message_sqs:
