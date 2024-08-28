@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware())
+	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.ValidateOrganizationMiddleware())
 
 	apiV1.POST("/sources/facebook", ccapis.FacebookLogin)
 
