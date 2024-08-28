@@ -23,10 +23,10 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	igsid := c.Param("igsid")
+	leadId := c.Param("leadId")
 
 	cData := &models.Conversation{}
-	err := cData.Get(igsid)
+	err := cData.Get(leadId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -38,7 +38,7 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	igConvs, err := messenger.GetConversationsByUserId(igsid, *pData.AccessToken)
+	igConvs, err := messenger.GetConversationsByUserId(leadId, *pData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -78,10 +78,10 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
-	igsid := c.Param("igsid")
+	leadId := c.Param("leadId")
 
 	cData := &models.Conversation{}
-	err := cData.Get(igsid)
+	err := cData.Get(leadId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -111,7 +111,7 @@ func SendMessage(c *gin.Context) {
 		// openai.SendMessage()
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    igsid,
+			IGSID:    leadId,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}
@@ -137,7 +137,7 @@ func SendMessage(c *gin.Context) {
 	} else if req.SendType == Bot && req.BotInstruction != "" {
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    igsid,
+			IGSID:    leadId,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}

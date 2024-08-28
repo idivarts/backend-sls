@@ -10,17 +10,13 @@ func main() {
 
 	apiV1.POST("/sources/facebook", ccapis.FacebookLogin)
 
-	// All newly changed apis below
 	apiV1.POST("/sources/:pageId/webhook", ccapis.PageWebhook)
 	apiV1.POST("/sources/:pageId/sync", ccapis.PageSync)
 
-	apiV1.GET("/conversations", ccapis.GetConversations)
+	apiV1.PUT("/conversations/:leadId/stop", ccapis.StopConversation)
 
-	apiV1.GET("/conversations/:igsid", ccapis.GetConversationById)
-	apiV1.PUT("/conversations/:igsid", ccapis.UpdateConversation)
-
-	apiV1.GET("/messages/:igsid", ccapis.GetMessages)
-	apiV1.POST("/messages/:igsid", ccapis.SendMessage)
+	apiV1.GET("/messages/:leadId", ccapis.GetMessages)
+	apiV1.POST("/messages/:leadId", ccapis.SendMessage)
 
 	apihandler.StartLambda()
 }
