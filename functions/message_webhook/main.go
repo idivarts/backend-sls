@@ -9,6 +9,10 @@ import (
 func main() {
 	apihandler.GinEngine.POST("/instagram/webhook", messagewebhook.Receive)
 	apihandler.GinEngine.GET("/instagram/webhook", messagewebhook.Validation)
+
+	apihandler.GinEngine.POST("/facebook/webhook", messagewebhook.Receive)
+	apihandler.GinEngine.GET("/facebook/webhook", messagewebhook.Validation)
+
 	apihandler.GinEngine.GET("/test/sqs", sqsapp.SendTestSQSMessage)
 
 	apihandler.StartLambda()

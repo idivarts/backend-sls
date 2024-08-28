@@ -39,11 +39,11 @@ type Source struct {
 	AccessToken        *string    `json:"accessToken,omitempty"`
 
 	// OLD FIELDS that we would need to shift in a different model
-	IsInstagram            bool   `json:"isInstagram" dynamodbav:"isInstagram"`
-	AssistantID            string `json:"assistantId" dynamodbav:"assistantId"`
-	ReminderTimeMultiplier int    `json:"reminderTimeMultiplier" dynamodbav:"reminderTimeMultiplier"`
-	ReplyTimeMin           int    `json:"replyTimeMin" dynamodbav:"replyTimeMin"`
-	ReplyTimeMax           int    `json:"replyTimeMax" dynamodbav:"replyTimeMax"`
+	// IsInstagram            bool   `json:"isInstagram" dynamodbav:"isInstagram"`
+	// AssistantID            string `json:"assistantId" dynamodbav:"assistantId"`
+	// ReminderTimeMultiplier int    `json:"reminderTimeMultiplier" dynamodbav:"reminderTimeMultiplier"`
+	// ReplyTimeMin           int    `json:"replyTimeMin" dynamodbav:"replyTimeMin"`
+	// ReplyTimeMax           int    `json:"replyTimeMax" dynamodbav:"replyTimeMax"`
 
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
@@ -112,9 +112,9 @@ func GetPagesByUserId(userId string) ([]Source, error) {
 	return sources, nil
 }
 
-func FetchAllPages() ([]Source, error) {
+func FetchAllPages(organizationId string) ([]Source, error) {
 	sources := []Source{}
-	iter := firestoredb.Client.CollectionGroup("sources").Documents(context.Background())
+	iter := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationId)).Documents(context.Background())
 
 	for {
 		doc, err := iter.Next()

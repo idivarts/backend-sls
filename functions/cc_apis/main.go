@@ -2,27 +2,26 @@ package main
 
 import (
 	"github.com/TrendsHub/th-backend/internal/ccapis"
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
 )
 
 func main() {
-	apiV1 := apihandler.GinEngine.Group("/api/v1")
+	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.ValidateOrganizationMiddleware())
 
-	apiV1.GET("/sources", ccapis.GetPages)
 	apiV1.POST("/sources/facebook", ccapis.FacebookLogin)
+	apiV1.POST("/sources/facebook/:sourceId/webhook", ccapis.PageWebhook)
+	apiV1.POST("/sources/facebook/:sourceId/leads", ccapis.PageWebhook) // We would use this api to create all the leads and fetch there profile
 
-	// All newly changed apis below
-	apiV1.POST("/sources/:pageId/webhook", ccapis.PageWebhook)
-	apiV1.POST("/sources/:pageId/assistant", ccapis.PageAssistant)
-	apiV1.POST("/sources/:pageId/sync", ccapis.PageSync)
+	apiV1.POST("/campaigns/:campaignId", ccapis.GetMessages)           //Initiates the campaigns by creating Assistant
+	apiV1.POST("/campaigns/:campaignId/sources", ccapis.GetMessages)   // Create API to attach source
+	apiV1.DELETE("/campaigns/:campaignId/sources", ccapis.GetMessages) // Creatae API to Delete the attached source and its conversations
+	apiV1.POST("/campaigns/:campaignId/sync", ccapis.PageSync)         //API to sync either all the connected sources, or specific sources or specific conversations
 
-	apiV1.GET("/conversations", ccapis.GetConversations)
+	apiV1.PUT("/conversations/:conversationId/stop", ccapis.StopConversation) // Make changes in the api to stop tracking the conversation
 
-	apiV1.GET("/conversations/:igsid", ccapis.GetConversationById)
-	apiV1.PUT("/conversations/:igsid", ccapis.UpdateConversation)
-
-	apiV1.GET("/messages/:igsid", ccapis.GetMessages)
-	apiV1.POST("/messages/:igsid", ccapis.SendMessage)
+	apiV1.GET("/facebook/messages/:leadId", ccapis.GetMessages)
+	apiV1.POST("/facebook/messages/:leadId", ccapis.SendMessage)
 
 	apihandler.StartLambda()
 }
