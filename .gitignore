@@ -22,3 +22,4 @@ vendor
 node_modules
 .bin
 **/service-account.json
+.DS_Store
