@@ -78,17 +78,17 @@ func createToolFunctions(collectibles map[string]models.Collectible) []openai.To
 	}
 
 	mandatorFields := []string{"phase"}
-	for _, data := range collectibles {
-		properties[data.Name] = openai.VariableProperty{
-			Type:        openai.VariableType(data.Type),
-			Enum:        nil,
-			Description: data.Description,
-		}
+	// for _, data := range collectibles {
+	// 	properties[data.Name] = openai.VariableProperty{
+	// 		Type:        openai.VariableType(data.Type),
+	// 		Enum:        nil,
+	// 		Description: data.Description,
+	// 	}
 
-		if data.Mandatory {
-			mandatorFields = append(mandatorFields, data.Name)
-		}
-	}
+	// 	if data.Mandatory {
+	// 		mandatorFields = append(mandatorFields, data.Name)
+	// 	}
+	// }
 
 	changePhaseFn := openai.ToolEntry{
 		Type: openai.TT_FUNCTION,
