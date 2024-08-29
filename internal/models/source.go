@@ -88,10 +88,10 @@ func (c *Source) Get(pageId string) error {
 	return nil
 }
 
-func GetPagesByUserId(userId string) ([]Source, error) {
+func GetPagesByUserId(organizationID, userId string) ([]Source, error) {
 
 	sources := []Source{}
-	iter := firestoredb.Client.CollectionGroup("sources").Where("userId", "==", userId).Documents(context.Background())
+	iter := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationID)).Where("userId", "==", userId).Documents(context.Background())
 
 	for {
 		doc, err := iter.Next()

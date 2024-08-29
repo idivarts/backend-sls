@@ -24,7 +24,7 @@ func FacebookLogin(c *gin.Context) {
 		return
 	}
 
-	pages, err := models.GetPagesByUserId(person.ID)
+	pages, err := models.GetPagesByUserId(organizationID, person.ID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
