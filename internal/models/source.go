@@ -26,7 +26,7 @@ const (
 //	}
 type Source struct {
 	OrganizationID     string     `json:"organizationId"`
-	PageID             string     `json:"pageId"`
+	ID                 string     `json:"id"`
 	Name               string     `json:"name"`
 	UserID             string     `json:"userId"`
 	OwnerName          string     `json:"ownerName"`
@@ -63,7 +63,7 @@ func (c *Source) Insert() (*firestore.WriteResult, error) {
 		return nil, err
 	}
 
-	res, err := firestoredb.Client.Collection(*path).Doc(c.PageID).Set(context.Background(), c)
+	res, err := firestoredb.Client.Collection(*path).Doc(c.ID).Set(context.Background(), c)
 	return res, err
 }
 

@@ -33,7 +33,7 @@ func GetMessages(c *gin.Context) {
 	leadId := c.Param("leadId")
 
 	cData := &models.Conversation{}
-	err := cData.Get(leadId)
+	err := cData.Get(organizationID, leadId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -94,7 +94,7 @@ func SendMessage(c *gin.Context) {
 	leadId := c.Param("leadId")
 
 	cData := &models.Conversation{}
-	err := cData.Get(leadId)
+	err := cData.Get(organizationID, leadId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

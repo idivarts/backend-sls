@@ -55,7 +55,7 @@ func FacebookLogin(c *gin.Context) {
 			}
 			instaPage := models.Source{
 				OrganizationID:     organizationID,
-				PageID:             inst.ID,
+				ID:                 inst.ID,
 				Name:               inst.Name,
 				UserID:             person.ID,
 				OwnerName:          person.Name,
@@ -81,7 +81,7 @@ func FacebookLogin(c *gin.Context) {
 
 		fbPage := models.Source{
 			OrganizationID:     organizationID,
-			PageID:             v.ID,
+			ID:                 v.ID,
 			Name:               v.Name,
 			UserID:             person.ID,
 			OwnerName:          person.Name,

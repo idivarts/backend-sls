@@ -3,6 +3,7 @@ package ccapis
 import (
 	"net/http"
 
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	"github.com/TrendsHub/th-backend/internal/models"
 	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	"github.com/gin-gonic/gin"
@@ -16,8 +17,14 @@ type IUpdateConversation struct {
 func UpdateConversation(c *gin.Context) {
 	leadId := c.Param("leadId")
 
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
+
 	cData := &models.Conversation{}
-	err := cData.Get(leadId)
+	err := cData.Get(organizationID, leadId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

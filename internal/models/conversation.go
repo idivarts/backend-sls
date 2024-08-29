@@ -42,7 +42,7 @@ type Conversation struct {
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	pData := Source{}
 	err := pData.Get(conversation.OrganizationID, conversation.SourceID)
-	if err != nil || pData.PageID == "" {
+	if err != nil || pData.ID == "" {
 		return err
 	}
 
@@ -154,7 +154,22 @@ func (c *Conversation) Insert() (*firestore.WriteResult, error) {
 	return res, err
 }
 
-func (c *Conversation) Get(leadId string) error {
+func (c *Conversation) Get(organizationID, conversationId string) error {
+	doc, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/conversations", organizationID)).Doc(conversationId).Get(context.Background())
+	if err != nil {
+		fmt.Println("Error getting item from Firestore:", err.Error())
+		return err
+	}
+	err = doc.DataTo(c)
+	if err != nil {
+		fmt.Println("Error getting item from Firestore:", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (c *Conversation) GetByLead(leadId string) error {
 	iter := firestoredb.Client.CollectionGroup("conversations").Query.Where("leadId", "==", leadId).Documents(context.Background())
 	data, err := iter.Next()
 	if err != nil {
@@ -208,10 +223,10 @@ func (c *Conversation) UpdateProfileFetched() (*firestore.WriteResult, error) {
 	return result, nil
 }
 
-func GetConversations(pageId *string, phase *int) ([]Conversation, error) {
+func GetConversations(organizationID string, pageId *string, phase *int) ([]Conversation, error) {
 	var conversations []Conversation
 
-	query := firestoredb.Client.CollectionGroup("conversations").Query
+	query := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/conversations", organizationID)).Query
 	if pageId != nil {
 		query = query.Where("pageId", "==", *pageId)
 	}

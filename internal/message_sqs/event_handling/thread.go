@@ -12,7 +12,7 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 	igsid := ev.IGSID
 	pageId := ev.PageID
 	conv := &models.Conversation{}
-	err := conv.Get(igsid)
+	err := conv.GetByLead(igsid)
 	run := true
 	if err != nil {
 		conv = &models.Conversation{

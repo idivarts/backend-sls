@@ -36,7 +36,7 @@ func (msg IGMessagehandler) HandleMessage() error {
 	if msg.PageID == msg.IGSID {
 		convId = msg.Entry.Recipient.ID
 	}
-	err := msg.conversationData.Get(convId)
+	err := msg.conversationData.GetByLead(convId)
 	if err != nil {
 		// This is where I would need to create a new instance
 		log.Println("Error Finding IGSID", err.Error())

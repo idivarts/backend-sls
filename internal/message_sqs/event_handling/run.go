@@ -14,7 +14,7 @@ import (
 
 func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) error {
 	cData := &models.Conversation{}
-	err := cData.Get(conv.IGSID)
+	err := cData.GetByLead(conv.IGSID)
 	if err != nil {
 		return err
 	}
@@ -27,7 +27,7 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 
 	pData := &models.Source{}
 	err = pData.Get(cData.OrganizationID, cData.SourceID)
-	if err != nil || pData.PageID == "" {
+	if err != nil || pData.ID == "" {
 		return err
 	}
 
