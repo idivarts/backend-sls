@@ -43,7 +43,7 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 	}
 	additionalInstruction := fmt.Sprintf("The user has not replied in %s. Remind them gently. This is reminder %d", timeData, (cData.ReminderCount + 1))
 	log.Println("Starting Reminder Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
+	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(*campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
 	if err != nil {
 		return err
 	}

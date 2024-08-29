@@ -62,7 +62,9 @@ type VariableProperty struct {
 	Description string       `json:"description"`
 }
 
-type AssistantReponse map[string]interface{}
+type AssistantReponse struct {
+	AssistantID string `json:"assistantId"`
+}
 
 // Function to make the API call
 func CreateAssistant(assistant CreateAssistantRequest) (*AssistantReponse, error) {
