@@ -13,7 +13,7 @@ type IUpdateConversation struct {
 	Status *int `json:"status,omitempty"`
 }
 
-func StopConversation(c *gin.Context) {
+func UpdateConversation(c *gin.Context) {
 	leadId := c.Param("leadId")
 
 	cData := &models.Conversation{}
