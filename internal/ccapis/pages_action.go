@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
@@ -22,10 +23,17 @@ func PageWebhook(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pageId := c.Param("pageId")
+
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
+
+	sourceId := c.Param("sourceId")
 
 	cPage := &models.Source{}
-	err := cPage.Get(pageId)
+	err := cPage.Get(organizationID, sourceId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -61,13 +69,21 @@ func PageSync(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pageId := c.Param("pageId")
+
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
+
+	sourceId := c.Param("sourceId")
 	pData := &models.Source{}
-	err := pData.Get(pageId)
+	err := pData.Get(organizationID, sourceId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	var conversations []messenger.ConversationMessagesData
 	if req.IGSID != nil {
 		data, err := messenger.GetConversationsByUserId(*req.IGSID, *pData.AccessToken)
@@ -93,7 +109,7 @@ func PageSync(c *gin.Context) {
 		}
 		x := sqsevents.ConversationEvent{
 			IGSID:  igsid,
-			PageID: pageId,
+			PageID: sourceId,
 			Action: event,
 		}
 		b, err := json.Marshal(&x)

@@ -5,6 +5,7 @@ import (
 
 	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
@@ -23,6 +24,12 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
+
 	leadId := c.Param("leadId")
 
 	cData := &models.Conversation{}
@@ -32,7 +39,7 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 	pData := &models.Source{}
-	err = pData.Get(cData.SourceID)
+	err = pData.Get(organizationID, cData.SourceID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -78,6 +85,12 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
+
 	leadId := c.Param("leadId")
 
 	cData := &models.Conversation{}
@@ -88,7 +101,7 @@ func SendMessage(c *gin.Context) {
 	}
 
 	pData := &models.Source{}
-	err = pData.Get(cData.SourceID)
+	err = pData.Get(organizationID, cData.SourceID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

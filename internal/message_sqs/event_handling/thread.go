@@ -35,7 +35,7 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 	}
 	if ev.Action == sqsevents.CREATE_THREAD || ev.Action == sqsevents.CREATE_OR_UPDATE_THREAD {
 		pData := &models.Source{}
-		err := pData.Get(pageId)
+		err := pData.Get(conv.OrganizationID, pageId)
 		if err != nil {
 			return err
 		}

@@ -67,13 +67,9 @@ func (c *Source) Insert() (*firestore.WriteResult, error) {
 	return res, err
 }
 
-func (c *Source) Get(pageId string) error {
-	path, err := c.GetPath()
-	if err != nil {
-		return err
-	}
+func (c *Source) Get(organizationID, sourceId string) error {
 
-	result, err := firestoredb.Client.Collection(*path).Doc(pageId).Get(context.Background())
+	result, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationID)).Doc(sourceId).Get(context.Background())
 	if err != nil {
 		fmt.Println("Error getting item from Firestore:", err)
 		return err

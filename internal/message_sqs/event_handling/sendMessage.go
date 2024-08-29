@@ -79,7 +79,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		}
 		log.Println("Fetching Page", cData.SourceID)
 		pData := &models.Source{}
-		err = pData.Get(cData.SourceID)
+		err = pData.Get(cData.OrganizationID, cData.SourceID)
 		if err != nil || pData.PageID == "" {
 			return err
 		}
