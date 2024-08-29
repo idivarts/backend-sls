@@ -1,6 +1,7 @@
 package campaignsapi
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/TrendsHub/th-backend/internal/middlewares"
@@ -11,12 +12,63 @@ import (
 
 func createInstruction(campaign *models.Campaign) string {
 	// Write the logic to create the instruction script for chatGPT
-	return ""
+	markdown := "# Campaign Details\n\n"
+
+	// Add Campaign Name if not empty
+	if campaign.Name != "" {
+		markdown += fmt.Sprintf("### Campaign Name\n%s\n\n", campaign.Name)
+	}
+
+	// Add Objective if not empty
+	if campaign.Objective != "" {
+		markdown += fmt.Sprintf("### Objective\n%s\n\n", campaign.Objective)
+	}
+
+	// Add ChatGPT Configuration if fields are not empty
+	chatGPTConfig := ""
+	if campaign.ChatGPT.Prescript != "" {
+		chatGPTConfig += fmt.Sprintf("### **Prescript:**\n%s\n\n", campaign.ChatGPT.Prescript)
+	}
+	if campaign.ChatGPT.Purpose != "" {
+		chatGPTConfig += fmt.Sprintf("### **Purpose:**\n%s\n\n", campaign.ChatGPT.Purpose)
+	}
+	if campaign.ChatGPT.Actor != "" {
+		chatGPTConfig += fmt.Sprintf("### **Actor:**\n%s\n\n", campaign.ChatGPT.Actor)
+	}
+	if campaign.ChatGPT.Examples != "" {
+		chatGPTConfig += fmt.Sprintf("### **Examples:**\n%s\n", campaign.ChatGPT.Examples)
+	}
+
+	if chatGPTConfig != "" {
+		markdown += "## ChatGPT Configuration\n" + chatGPTConfig
+	}
+
+	return markdown
 }
 
 func createToolFunctions(campaign *models.Campaign) []openai.ToolEntry {
 	// Write the logic to create the function for chatGPT
-	return []openai.ToolEntry{}
+
+	changePhaseFn := openai.ToolEntry{
+		Type: openai.TT_FUNCTION,
+		Function: openai.Function{
+			Name:        "changePhaseFunction",
+			Description: "This function will be used whenever we want to change phase",
+			Parameters: openai.Parameters{
+				Type: openai.PT_OBJECT,
+				Properties: map[string]openai.VariableProperty{
+					"test": {
+						Type:        openai.VT_STRING,
+						Enum:        nil,
+						Description: "",
+					},
+				},
+				Required: []string{},
+			},
+		},
+	}
+
+	return []openai.ToolEntry{changePhaseFn}
 }
 
 func CreateOrUpdateCampaign(c *gin.Context) {
