@@ -11,11 +11,18 @@ import (
 
 type IUpdateConversation struct {
 	models.Conversation
-	Status *int `json:"status,omitempty"`
+	// Information  *openaifc.ChangePhase `json:"information,omitempty"`
+	CurrentPhase *int `json:"currentPhase,omitempty"`
+	Status       *int `json:"status,omitempty"`
 }
 
 func UpdateConversation(c *gin.Context) {
-	leadId := c.Param("leadId")
+	var req IUpdateConversation
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	conversationID := c.Param("conversationId")
 
 	organizationID, b := middlewares.GetOrganizationId(c)
 	if !b {
@@ -24,21 +31,43 @@ func UpdateConversation(c *gin.Context) {
 	}
 
 	cData := &models.Conversation{}
-	err := cData.Get(organizationID, leadId)
+	err := cData.Get(organizationID, conversationID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	cData.Status = 0
-
-	delayedsqs.StopExecutions(cData.ReminderQueue)
-	cData.ReminderQueue = nil
-	cData.NextReminderTime = nil
-
-	delayedsqs.StopExecutions(cData.MessageQueue)
-	cData.MessageQueue = nil
-	cData.NextMessageTime = nil
-
+	// if req.Information != nil {
+	// 	cData.Information = *req.Information
+	// }
+	// if req.SourceID != "" {
+	// 	cData.SourceID = req.SourceID
+	// }
+	if req.CurrentPhase != nil {
+		cData.CurrentPhase = *req.CurrentPhase
+	}
+	if req.Status != nil {
+		cData.Status = *req.Status
+	}
+	if req.ReminderQueue != nil {
+		delayedsqs.StopExecutions(req.ReminderQueue)
+		if *req.ReminderQueue == *cData.ReminderQueue {
+			cData.ReminderQueue = nil
+			cData.NextReminderTime = nil
+		}
+	}
+	if req.MessageQueue != nil {
+		delayedsqs.StopExecutions(req.MessageQueue)
+		if *req.MessageQueue == *cData.MessageQueue {
+			cData.MessageQueue = nil
+			cData.NextMessageTime = nil
+		}
+	}
+	// if req.UserProfile != nil {
+	// 	cData.UserProfile = req.UserProfile
+	// }
+	// if req. != nil {
+	// 	cData.CurrentPhase = *req.CurrentPhase
+	// }
 	_, err = cData.Insert()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
