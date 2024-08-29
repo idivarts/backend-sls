@@ -42,7 +42,7 @@ func (msg IGMessagehandler) HandleMessage() error {
 		log.Println("Error Finding IGSID", err.Error())
 		msg.conversationData = &models.Conversation{
 			SourceID: msg.PageID,
-			IGSID:    convId,
+			LeadID:   convId,
 		}
 		msg.conversationData, err = msg.createMessageThread(false)
 		if err != nil {
@@ -84,7 +84,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	if msg.PageID != msg.IGSID ||
 		//Checking last time bot processed the message was more than 2 minutes before the recorded time
 		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-120000) {
-		log.Println("Handling Message Send Logic", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
+		log.Println("Handling Message Send Logic", msg.conversationData.LeadID, msg.conversationData.ThreadID, msg.Message.Text)
 
 		var richContent []openai.ContentRequest = nil
 
@@ -137,7 +137,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		}
 
 		event := sqsevents.ConversationEvent{
-			IGSID:    msg.conversationData.IGSID,
+			IGSID:    msg.conversationData.LeadID,
 			ThreadID: msg.conversationData.ThreadID,
 			MID:      msg.conversationData.LastMID,
 			Action:   sqsevents.RUN_OPENAI,
@@ -157,7 +157,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 	}
 
 	if msg.PageID == msg.IGSID {
-		log.Println("Handling Reminder Logics", msg.conversationData.IGSID, msg.conversationData.ThreadID, msg.Message.Text)
+		log.Println("Handling Reminder Logics", msg.conversationData.LeadID, msg.conversationData.ThreadID, msg.Message.Text)
 		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
 		if msg.conversationData.ReminderQueue == nil {
 			msg.conversationData.ReminderCount = msg.conversationData.ReminderCount + 1
@@ -166,7 +166,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		}
 		if msg.conversationData.CurrentPhase < 5 {
 			event := sqsevents.ConversationEvent{
-				IGSID:    msg.conversationData.IGSID,
+				IGSID:    msg.conversationData.LeadID,
 				ThreadID: msg.conversationData.ThreadID,
 				MID:      msg.conversationData.LastMID,
 				Action:   sqsevents.REMINDER,

@@ -5,7 +5,6 @@ import (
 
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/TrendsHub/th-backend/internal/models"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
 )
 
 func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
@@ -17,7 +16,7 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 	if err != nil {
 		conv = &models.Conversation{
 			SourceID: pageId,
-			IGSID:    igsid,
+			LeadID:   igsid,
 		}
 	} else {
 		if ev.Action != sqsevents.CREATE_OR_UPDATE_THREAD {
@@ -39,15 +38,16 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 		if err != nil {
 			return err
 		}
-		user, err := messenger.GetUser(igsid, *pData.AccessToken)
-		if err != nil {
-			return err
-		}
-		conv.UserProfile = user
-		_, err = conv.Insert()
-		if err != nil {
-			return err
-		}
+		// TODO: Write code to update the lead table
+		// user, err := messenger.GetUser(igsid, *pData.AccessToken)
+		// if err != nil {
+		// 	return err
+		// }
+		// conv.UserProfile = user
+		// _, err = conv.Insert()
+		// if err != nil {
+		// 	return err
+		// }
 	}
 
 	return nil

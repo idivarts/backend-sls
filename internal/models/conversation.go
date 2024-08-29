@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"cloud.google.com/go/firestore"
-	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
 	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
@@ -34,9 +33,9 @@ type Conversation struct {
 	Status             int               `json:"status"`
 
 	// Old fields that needs to be replaced or removed
-	IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
-	UserProfile *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
-	Information openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
+	// IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
+	// UserProfile *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
+	// Information openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
 }
 
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
@@ -53,7 +52,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(conversation.IGSID, *pData.AccessToken)
+	convIds, err := messenger.GetConversationsByUserId(conversation.LeadID, *pData.AccessToken)
 	if err != nil {
 		return err
 	}
@@ -116,7 +115,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 		lastMid = entry.ID
 	}
 
-	log.Println("Inserting the Conversation Model", conversation.IGSID, threadId)
+	log.Println("Inserting the Conversation Model", conversation.LeadID, threadId)
 	// conversation.IGSID = igsid
 	// conversation.PageID = pageId
 	conversation.ThreadID = threadId
