@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/TrendsHub/th-backend/internal/ccapis"
 	campaignsapi "github.com/TrendsHub/th-backend/internal/ccapis/campaigns"
 	conversationsapi "github.com/TrendsHub/th-backend/internal/ccapis/campaigns/conversations"
+	sourcesapi "github.com/TrendsHub/th-backend/internal/ccapis/sources"
 	"github.com/TrendsHub/th-backend/internal/middlewares"
 	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
 )
@@ -11,9 +11,9 @@ import (
 func main() {
 	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.ValidateOrganizationMiddleware())
 
-	apiV1.POST("/sources/facebook", ccapis.FacebookLogin)
-	apiV1.POST("/sources/facebook/:sourceId/webhook", ccapis.PageWebhook)
-	apiV1.POST("/sources/facebook/:sourceId/leads", ccapis.SourceSyncLeads) // We would use this api to create all the leads and fetch there profile
+	apiV1.POST("/sources/facebook", sourcesapi.FacebookLogin)
+	apiV1.POST("/sources/facebook/:sourceId/webhook", sourcesapi.PageWebhook)
+	apiV1.POST("/sources/facebook/:sourceId/leads", sourcesapi.SourceSyncLeads) // We would use this api to create all the leads and fetch there profile
 
 	apiV1.POST("/campaigns/:campaignId", campaignsapi.CreateOrUpdateCampaign) //Initiates the campaigns by creating Assistant
 
