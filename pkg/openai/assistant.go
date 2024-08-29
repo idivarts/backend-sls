@@ -51,8 +51,9 @@ type Parameters struct {
 type VariableType string
 
 const (
-	VT_STRING VariableType = "string"
-	VT_NUMBER VariableType = "number"
+	VT_STRING  VariableType = "string"
+	VT_NUMBER  VariableType = "number"
+	VT_BOOLEAN VariableType = "boolean"
 )
 
 // Define struct for Unit Property
