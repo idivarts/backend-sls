@@ -57,9 +57,15 @@ func SyncConversations(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	ppData := &models.SourcePrivate{}
+	err = pData.Get(organizationID, cData.SourceID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var conversations []messenger.ConversationMessagesData
-	data, err := messenger.GetConversationsByUserId(cData.LeadID, *pData.AccessToken)
+	data, err := messenger.GetConversationsByUserId(cData.LeadID, *ppData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

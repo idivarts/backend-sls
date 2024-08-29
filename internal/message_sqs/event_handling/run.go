@@ -25,9 +25,9 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		return err
 	}
 
-	pData := &models.Source{}
+	pData := &models.SourcePrivate{}
 	err = pData.Get(cData.OrganizationID, cData.SourceID)
-	if err != nil || pData.ID == "" {
+	if err != nil {
 		return err
 	}
 

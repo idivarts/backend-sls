@@ -39,9 +39,9 @@ type Conversation struct {
 }
 
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
-	pData := Source{}
+	pData := SourcePrivate{}
 	err := pData.Get(conversation.OrganizationID, conversation.SourceID)
-	if err != nil || pData.ID == "" {
+	if err != nil {
 		return err
 	}
 

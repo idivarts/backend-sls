@@ -36,11 +36,17 @@ func PageWebhook(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	sP := &models.SourcePrivate{}
+	err = sP.Get(organizationID, sourceId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	if cPage.ID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page cant be found"})
 		return
 	}
-	err = messenger.SubscribeApp(*req.Enable, *cPage.AccessToken)
+	err = messenger.SubscribeApp(*req.Enable, *sP.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -81,8 +87,14 @@ func SourceSyncLeads(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	sP := &models.SourcePrivate{}
+	err = sP.Get(organizationID, sourceId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	var conversations []messenger.ConversationMessagesData = messenger.FetchAllConversations(nil, *sData.AccessToken)
+	var conversations []messenger.ConversationMessagesData = messenger.FetchAllConversations(nil, *sP.AccessToken)
 
 	if len(conversations) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No Conversation found"})
@@ -93,7 +105,7 @@ func SourceSyncLeads(c *gin.Context) {
 		igsid := messenger.GetRecepientIDFromParticipants(v.Participants, *sData.UserName)
 		log.Println("IGSID", igsid)
 
-		uProfile, err := messenger.GetUser(igsid, *sData.AccessToken)
+		uProfile, err := messenger.GetUser(igsid, *sP.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
