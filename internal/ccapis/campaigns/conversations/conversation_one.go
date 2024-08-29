@@ -1,4 +1,4 @@
-package ccapis
+package conversationsapi
 
 import (
 	"net/http"
@@ -22,6 +22,7 @@ func UpdateConversation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	campaignID := c.Param("campaignId")
 	conversationID := c.Param("conversationId")
 
 	organizationID, b := middlewares.GetOrganizationId(c)
@@ -31,7 +32,7 @@ func UpdateConversation(c *gin.Context) {
 	}
 
 	cData := &models.Conversation{}
-	err := cData.Get(organizationID, conversationID)
+	err := cData.Get(organizationID, campaignID, conversationID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

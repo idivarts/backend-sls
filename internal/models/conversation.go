@@ -153,8 +153,8 @@ func (c *Conversation) Insert() (*firestore.WriteResult, error) {
 	return res, err
 }
 
-func (c *Conversation) Get(organizationID, conversationId string) error {
-	doc, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/conversations", organizationID)).Doc(conversationId).Get(context.Background())
+func (c *Conversation) Get(organizationID, campaignID, conversationId string) error {
+	doc, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Doc(conversationId).Get(context.Background())
 	if err != nil {
 		fmt.Println("Error getting item from Firestore:", err.Error())
 		return err
@@ -222,10 +222,10 @@ func (c *Conversation) UpdateProfileFetched() (*firestore.WriteResult, error) {
 	return result, nil
 }
 
-func GetConversations(organizationID string, pageId *string, phase *int) ([]Conversation, error) {
+func GetConversations(organizationID string, campaignID string, pageId *string, phase *int) ([]Conversation, error) {
 	var conversations []Conversation
 
-	query := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/conversations", organizationID)).Query
+	query := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Query
 	if pageId != nil {
 		query = query.Where("pageId", "==", *pageId)
 	}

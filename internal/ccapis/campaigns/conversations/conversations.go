@@ -1,4 +1,4 @@
-package campaignsapi
+package conversationsapi
 
 import (
 	"encoding/json"
@@ -13,16 +13,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ISyncConversations struct {
-	ConversationID string `json:"conversationId"`
-}
+// type ISyncConversations struct {
+// 	ConversationID string `json:"conversationId"`
+// }
 
 func SyncConversations(c *gin.Context) {
-	var req ISyncConversations
-	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	// var req ISyncConversations
+	// if err := c.ShouldBind(&req); err != nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// 	return
+	// }
 
 	organizationID, b := middlewares.GetOrganizationId(c)
 	if !b {
@@ -30,10 +30,11 @@ func SyncConversations(c *gin.Context) {
 		return
 	}
 
-	// campaignID := c.Param("campaignId")
+	campaignID := c.Param("campaignId")
+	conversationID := c.Param("conversationId")
 
 	cData := &models.Conversation{}
-	err := cData.Get(organizationID, req.ConversationID)
+	err := cData.Get(organizationID, campaignID, conversationID)
 	// cDatas, err := models.GetConversations(organizationID, nil, nil)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
