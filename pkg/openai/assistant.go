@@ -133,6 +133,49 @@ func UpdateAssistant(assistantID string, assistant CreateAssistantRequest) (*Ass
 
 	// Set appropriate headers
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("OpenAI-Beta", "assistants=v2")
+
+	// Make the HTTP request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
+	}
+
+	fmt.Println("Response:", string(body))
+	data := AssistantReponse{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &data, nil
+}
+
+// Function to make the API call
+func DeleteAssistant(assistantID string) (*AssistantReponse, error) {
+
+	url := fmt.Sprintf("%s/assistants/%s", baseURL, assistantID)
+
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("OpenAI-Beta", "assistants=v2")
 
 	// Make the HTTP request
 	client := &http.Client{}

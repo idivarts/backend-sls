@@ -184,31 +184,31 @@ func CreateOrUpdateCampaign(c *gin.Context) {
 
 	log.Println("CreateOrUpdateCampaign5")
 
+	rC, err := openai.CreateAssistant(assistant)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Write logic in openai to either update or create new assistant
 	if campaign.AssistantID != nil {
 		log.Println("CreateOrUpdateCampaign6.1")
-		_, err = openai.UpdateAssistant(*campaign.AssistantID, assistant)
+		_, err = openai.DeleteAssistant(*campaign.AssistantID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		log.Println("CreateOrUpdateCampaign7")
-	} else {
-		log.Println("CreateOrUpdateCampaign6.2")
-		rC, err := openai.CreateAssistant(assistant)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		campaign.AssistantID = &rC.ID
-		log.Println("CreateOrUpdateCampaign7")
-		_, err = campaign.Update(campaignId)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		log.Println("CreateOrUpdateCampaign8")
 	}
+
+	campaign.AssistantID = &rC.ID
+	log.Println("CreateOrUpdateCampaign8")
+	_, err = campaign.Update(campaignId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	log.Println("CreateOrUpdateCampaign9")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Create Done"})
 }
