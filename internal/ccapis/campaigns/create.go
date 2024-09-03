@@ -3,6 +3,7 @@ package campaignsapi
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/TrendsHub/th-backend/internal/middlewares"
@@ -112,6 +113,7 @@ func CreateOrUpdateCampaign(c *gin.Context) {
 	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	// 	return
 	// }
+	log.Println("CreateOrUpdateCampaign")
 
 	organizationID, b := middlewares.GetOrganizationId(c)
 	if !b {
@@ -121,12 +123,16 @@ func CreateOrUpdateCampaign(c *gin.Context) {
 
 	campaignId := c.Param("campaignId")
 
+	log.Println("CreateOrUpdateCampaign2")
+
 	campaign := &models.Campaign{}
 	err := campaign.Get(organizationID, campaignId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	log.Println("CreateOrUpdateCampaign3")
 
 	leadStages := map[string]models.LeadStage{}
 	iter := firestoredb.Client.CollectionGroup("leadStages").Where("campaignId", "==", campaignId).Documents(context.Background())
@@ -168,32 +174,41 @@ func CreateOrUpdateCampaign(c *gin.Context) {
 		collectibles[doc.Ref.ID] = lS
 	}
 
+	log.Println("CreateOrUpdateCampaign4")
 	assistant := openai.CreateAssistantRequest{
 		Model:        "gpt-4o",
+		Name:         campaign.Name,
 		Instructions: createInstruction(campaign, leadStages, collectibles),
 		Tools:        createToolFunctions(collectibles),
 	}
 
+	log.Println("CreateOrUpdateCampaign5")
+
+	rC, err := openai.CreateAssistant(assistant)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Write logic in openai to either update or create new assistant
 	if campaign.AssistantID != nil {
-		_, err = openai.UpdateAssistant(*campaign.AssistantID, assistant)
+		log.Println("CreateOrUpdateCampaign6.1")
+		_, err = openai.DeleteAssistant(*campaign.AssistantID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-	} else {
-		rC, err := openai.CreateAssistant(assistant)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		campaign.AssistantID = &rC.AssistantID
-		_, err = campaign.Update(campaignId)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+		log.Println("CreateOrUpdateCampaign7")
 	}
+
+	campaign.AssistantID = &rC.ID
+	log.Println("CreateOrUpdateCampaign8")
+	_, err = campaign.Update(campaignId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	log.Println("CreateOrUpdateCampaign9")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Create Done"})
 }

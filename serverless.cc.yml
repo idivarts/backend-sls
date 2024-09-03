@@ -10,7 +10,7 @@ provider:
       Fn::GetAtt:
         - CCMessageQueue
         - QueueName
-    OPENAI_API_KEY: sk-proj-jx7xhhAMe27SKaDGMKr8T3BlbkFJazp4XlPOqap2HHSU3ttH
+    OPENAI_API_KEY: ${env:OPENAI_API_KEY}
     DELAY_STATE_FUNCTION:
       Fn::GetAtt:
         - CCStepFunctions
