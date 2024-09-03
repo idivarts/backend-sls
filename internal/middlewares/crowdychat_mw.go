@@ -90,7 +90,7 @@ func ValidateOrganizationMiddleware() gin.HandlerFunc {
 		}
 
 		if !validateUserOrganization(firebaseUID, orgID) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "User does not belong to the specified organization"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "User does not belong to the specified organization", "user": firebaseUID, "org": orgID})
 			c.Abort()
 			return
 		}
