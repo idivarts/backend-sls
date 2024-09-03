@@ -114,7 +114,7 @@ func (c *SourcePrivate) Get(organizationID, sourceId string) error {
 	return nil
 }
 
-func GetPagesByUserId(organizationID, userId string) ([]Source, error) {
+func GetSourcesByUserId(organizationID, userId string) ([]Source, error) {
 
 	sources := []Source{}
 	iter := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/sources", organizationID)).Where("userId", "==", userId).Documents(context.Background())

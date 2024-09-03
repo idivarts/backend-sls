@@ -24,14 +24,14 @@ func FacebookLogin(c *gin.Context) {
 		return
 	}
 
-	pages, err := models.GetPagesByUserId(organizationID, person.ID)
+	sources, err := models.GetSourcesByUserId(organizationID, person.ID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	for i := 0; i < len(pages); i++ {
-		pages[i].Status = 0
-		_, err = pages[i].Insert()
+	for i := 0; i < len(sources); i++ {
+		sources[i].Status = 0
+		_, err = sources[i].Insert()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -85,6 +85,7 @@ func FacebookLogin(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
+			log.Println("Instagram Saved Accesstoken", instaPPage)
 		}
 
 		fbPage := models.Source{
@@ -114,6 +115,7 @@ func FacebookLogin(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		log.Println("FB Saved Accesstoken", fbPPage)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": person})
