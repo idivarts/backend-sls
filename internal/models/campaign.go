@@ -39,8 +39,7 @@ type ChatGPTConfig struct {
 }
 
 func (c *Campaign) Get(organizationId, campaignId string) error {
-	iter := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/campaigns/%s", organizationId, campaignId)).Documents(context.Background())
-	doc, err := iter.Next()
+	doc, err := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/campaigns", organizationId)).Doc(campaignId).Get(context.Background())
 	if err != nil {
 		return err
 	}

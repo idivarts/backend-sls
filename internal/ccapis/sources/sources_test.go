@@ -1,4 +1,4 @@
-package sourcesapi
+package sourcesapi_test
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	sourcesapi "github.com/TrendsHub/th-backend/internal/ccapis/sources"
 	"github.com/gin-gonic/gin"
 )
 
@@ -72,7 +73,7 @@ func TestFacebookLogin(t *testing.T) {
 	cont.Set("organizationID", "jJLOC1LfG8WLgmAs5Ka7")
 
 	// Call the function you want to test
-	FacebookLogin(cont)
+	sourcesapi.FacebookLogin(cont)
 
 	if w.Result().StatusCode != http.StatusOK {
 		log.Printf("Expected status code 200, but got: %v\n\n\n%s\n\n", w.Result().StatusCode, w.Body.String())

@@ -11,6 +11,7 @@ import (
 
 // Define a struct for the request body
 type CreateAssistantRequest struct {
+	Name         string      `json:"name"`
 	Model        string      `json:"model"`
 	Instructions string      `json:"instructions"`
 	Tools        []ToolEntry `json:"tools"`
@@ -64,7 +65,7 @@ type VariableProperty struct {
 }
 
 type AssistantReponse struct {
-	AssistantID string `json:"assistantId"`
+	ID string `json:"id"`
 }
 
 // Function to make the API call
@@ -84,6 +85,8 @@ func CreateAssistant(assistant CreateAssistantRequest) (*AssistantReponse, error
 
 	// Set appropriate headers
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("OpenAI-Beta", "assistants=v2")
 
 	// Make the HTTP request
 	client := &http.Client{}
