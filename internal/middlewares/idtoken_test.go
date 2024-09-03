@@ -28,3 +28,10 @@ func TestVerifyIdToken(t *testing.T) {
 	}
 	log.Println(token)
 }
+
+// func TestValidateFunction(t *testing.T) {
+// 	val := middlewares.ValidateUserOrganization("0rdPB7B5q3cUvbu1Ewarp4Xg2AD3", "jJLOC1LfG8WLgmAs5Ka7")
+// 	if !val {
+// 		t.Fail()
+// 	}
+// }

@@ -58,7 +58,7 @@ func (c *Source) GetPath() (*string, error) {
 		return nil, fmt.Errorf("Organzation(%s) cant be null", c.OrganizationID)
 	}
 
-	path := fmt.Sprintf("/organizations/%s/sources", c.OrganizationID)
+	path := fmt.Sprintf("organizations/%s/sources", c.OrganizationID)
 	return &path, nil
 }
 
@@ -74,7 +74,7 @@ func (c *Source) Insert() (*firestore.WriteResult, error) {
 
 func (c *Source) Get(organizationID, sourceId string) error {
 
-	result, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationID)).Doc(sourceId).Get(context.Background())
+	result, err := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/sources", organizationID)).Doc(sourceId).Get(context.Background())
 	if err != nil {
 		fmt.Println("Error getting item from Firestore:", err)
 		return err
@@ -90,7 +90,7 @@ func (c *Source) Get(organizationID, sourceId string) error {
 }
 
 func (c *SourcePrivate) Set(organizationID, sourceId string) (*firestore.WriteResult, error) {
-	res, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sourcesPrivate", organizationID)).Doc(sourceId).Set(context.Background(), c)
+	res, err := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/sourcesPrivate", organizationID)).Doc(sourceId).Set(context.Background(), c)
 
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (c *SourcePrivate) Set(organizationID, sourceId string) (*firestore.WriteRe
 }
 
 func (c *SourcePrivate) Get(organizationID, sourceId string) error {
-	result, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sourcesPrivate", organizationID)).Doc(sourceId).Get(context.Background())
+	result, err := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/sourcesPrivate", organizationID)).Doc(sourceId).Get(context.Background())
 	if err != nil {
 		fmt.Println("Error getting item from Firestore:", err)
 		return err
@@ -117,7 +117,7 @@ func (c *SourcePrivate) Get(organizationID, sourceId string) error {
 func GetPagesByUserId(organizationID, userId string) ([]Source, error) {
 
 	sources := []Source{}
-	iter := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationID)).Where("userId", "==", userId).Documents(context.Background())
+	iter := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/sources", organizationID)).Where("userId", "==", userId).Documents(context.Background())
 
 	for {
 		doc, err := iter.Next()
@@ -140,7 +140,7 @@ func GetPagesByUserId(organizationID, userId string) ([]Source, error) {
 
 func FetchAllPages(organizationId string) ([]Source, error) {
 	sources := []Source{}
-	iter := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationId)).Documents(context.Background())
+	iter := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/sources", organizationId)).Documents(context.Background())
 
 	for {
 		doc, err := iter.Next()

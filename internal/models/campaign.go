@@ -39,7 +39,7 @@ type ChatGPTConfig struct {
 }
 
 func (c *Campaign) Get(organizationId, campaignId string) error {
-	iter := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s", organizationId, campaignId)).Documents(context.Background())
+	iter := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/campaigns/%s", organizationId, campaignId)).Documents(context.Background())
 	doc, err := iter.Next()
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func (c *Campaign) Get(organizationId, campaignId string) error {
 }
 
 func (c *Campaign) Update(campaignId string) (*firestore.WriteResult, error) {
-	docRef := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns", c.OrganizationID)).Doc(campaignId)
+	docRef := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/campaigns", c.OrganizationID)).Doc(campaignId)
 	res, err := docRef.Set(context.Background(), c)
 	return res, err
 }

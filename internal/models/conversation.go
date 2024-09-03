@@ -139,7 +139,7 @@ func (c *Conversation) GetPath() (*string, error) {
 		return nil, fmt.Errorf("Organzation(%s) of Campaign(%s) id cant be null", c.OrganizationID, c.CampaignID)
 	}
 
-	path := fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", c.OrganizationID, c.CampaignID)
+	path := fmt.Sprintf("organizations/%s/campaigns/%s/conversations", c.OrganizationID, c.CampaignID)
 	return &path, nil
 }
 func (c *Conversation) Insert() (*firestore.WriteResult, error) {
@@ -154,7 +154,7 @@ func (c *Conversation) Insert() (*firestore.WriteResult, error) {
 }
 
 func (c *Conversation) Get(organizationID, campaignID, conversationId string) error {
-	doc, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Doc(conversationId).Get(context.Background())
+	doc, err := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Doc(conversationId).Get(context.Background())
 	if err != nil {
 		fmt.Println("Error getting item from Firestore:", err.Error())
 		return err
@@ -225,7 +225,7 @@ func (c *Conversation) UpdateProfileFetched() (*firestore.WriteResult, error) {
 func GetConversations(organizationID string, campaignID string, pageId *string, phase *int) ([]Conversation, error) {
 	var conversations []Conversation
 
-	query := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Query
+	query := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Query
 	if pageId != nil {
 		query = query.Where("pageId", "==", *pageId)
 	}
