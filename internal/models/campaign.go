@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"cloud.google.com/go/firestore"
 	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 )
 
@@ -20,7 +21,7 @@ type Campaign struct {
 	ChatGPT        ChatGPTConfig `json:"chatgpt"`
 
 	// This will be used for storing the assistant data
-	AssistantID string `json:"assistantId"`
+	AssistantID *string `json:"assistantId,omitempty"`
 
 	// LeadStages     []LeadStage   `json:"leadStages"`
 }
@@ -45,4 +46,10 @@ func (c *Campaign) Get(organizationId, campaignId string) error {
 	}
 	doc.DataTo(c)
 	return nil
+}
+
+func (c *Campaign) Update(campaignId string) (*firestore.WriteResult, error) {
+	docRef := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns", c.OrganizationID)).Doc(campaignId)
+	res, err := docRef.Set(context.Background(), c)
+	return res, err
 }

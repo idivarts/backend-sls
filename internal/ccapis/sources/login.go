@@ -1,4 +1,4 @@
-package ccapis
+package sourcesapi
 
 import (
 	"log"
@@ -24,7 +24,7 @@ func FacebookLogin(c *gin.Context) {
 		return
 	}
 
-	pages, err := models.GetPagesByUserId(person.ID)
+	pages, err := models.GetPagesByUserId(organizationID, person.ID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -55,7 +55,7 @@ func FacebookLogin(c *gin.Context) {
 			}
 			instaPage := models.Source{
 				OrganizationID:     organizationID,
-				PageID:             inst.ID,
+				ID:                 inst.ID,
 				Name:               inst.Name,
 				UserID:             person.ID,
 				OwnerName:          person.Name,
@@ -65,7 +65,7 @@ func FacebookLogin(c *gin.Context) {
 				Bio:                &inst.Biography,
 				SourceType:         models.Instagram,
 				ConnectedID:        &v.ID,
-				AccessToken:        &lRes.AccessToken,
+				// AccessToken:        &lRes.AccessToken,
 				// IsInstagram:            true,
 				// AssistantID:            string(openai.ArjunAssistant),
 				// ReminderTimeMultiplier: 60 * 60 * 6,
@@ -77,11 +77,19 @@ func FacebookLogin(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
+			instaPPage := models.SourcePrivate{
+				AccessToken: &lRes.AccessToken,
+			}
+			_, err = instaPPage.Set(organizationID, inst.ID)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 		}
 
 		fbPage := models.Source{
 			OrganizationID:     organizationID,
-			PageID:             v.ID,
+			ID:                 v.ID,
 			Name:               v.Name,
 			UserID:             person.ID,
 			OwnerName:          person.Name,
@@ -91,9 +99,17 @@ func FacebookLogin(c *gin.Context) {
 			Bio:                nil,
 			SourceType:         models.Facebook,
 			ConnectedID:        &v.InstagramBusinessAccount.ID,
-			AccessToken:        &lRes.AccessToken,
+			// AccessToken:        &lRes.AccessToken,
 		}
 		_, err = fbPage.Insert()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		fbPPage := models.SourcePrivate{
+			AccessToken: &lRes.AccessToken,
+		}
+		_, err = fbPPage.Set(organizationID, v.ID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

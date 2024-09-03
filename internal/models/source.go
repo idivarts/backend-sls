@@ -26,7 +26,7 @@ const (
 //	}
 type Source struct {
 	OrganizationID     string     `json:"organizationId"`
-	PageID             string     `json:"pageId"`
+	ID                 string     `json:"id"`
 	Name               string     `json:"name"`
 	UserID             string     `json:"userId"`
 	OwnerName          string     `json:"ownerName"`
@@ -36,7 +36,8 @@ type Source struct {
 	Bio                *string    `json:"bio,omitempty"`
 	SourceType         SourceType `json:"sourceType"`
 	ConnectedID        *string    `json:"connectedId,omitempty"`
-	AccessToken        *string    `json:"accessToken,omitempty"`
+	CampaignID         *string    `json:"campaignId,omitempty"`
+	// AccessToken        *string    `json:"accessToken,omitempty"`
 
 	// OLD FIELDS that we would need to shift in a different model
 	// IsInstagram            bool   `json:"isInstagram" dynamodbav:"isInstagram"`
@@ -46,6 +47,10 @@ type Source struct {
 	// ReplyTimeMax           int    `json:"replyTimeMax" dynamodbav:"replyTimeMax"`
 
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
+}
+
+type SourcePrivate struct {
+	AccessToken *string `json:"accessToken,omitempty"`
 }
 
 func (c *Source) GetPath() (*string, error) {
@@ -63,17 +68,13 @@ func (c *Source) Insert() (*firestore.WriteResult, error) {
 		return nil, err
 	}
 
-	res, err := firestoredb.Client.Collection(*path).Doc(c.PageID).Set(context.Background(), c)
+	res, err := firestoredb.Client.Collection(*path).Doc(c.ID).Set(context.Background(), c)
 	return res, err
 }
 
-func (c *Source) Get(pageId string) error {
-	path, err := c.GetPath()
-	if err != nil {
-		return err
-	}
+func (c *Source) Get(organizationID, sourceId string) error {
 
-	result, err := firestoredb.Client.Collection(*path).Doc(pageId).Get(context.Background())
+	result, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationID)).Doc(sourceId).Get(context.Background())
 	if err != nil {
 		fmt.Println("Error getting item from Firestore:", err)
 		return err
@@ -88,10 +89,35 @@ func (c *Source) Get(pageId string) error {
 	return nil
 }
 
-func GetPagesByUserId(userId string) ([]Source, error) {
+func (c *SourcePrivate) Set(organizationID, sourceId string) (*firestore.WriteResult, error) {
+	res, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sourcesPrivate", organizationID)).Doc(sourceId).Set(context.Background(), c)
+
+	if err != nil {
+		return nil, err
+	}
+	return res, err
+}
+
+func (c *SourcePrivate) Get(organizationID, sourceId string) error {
+	result, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sourcesPrivate", organizationID)).Doc(sourceId).Get(context.Background())
+	if err != nil {
+		fmt.Println("Error getting item from Firestore:", err)
+		return err
+	}
+
+	err = result.DataTo(c)
+	if err != nil {
+		fmt.Println("Error getting item from Firestore:", err)
+		return err
+	}
+
+	return nil
+}
+
+func GetPagesByUserId(organizationID, userId string) ([]Source, error) {
 
 	sources := []Source{}
-	iter := firestoredb.Client.CollectionGroup("sources").Where("userId", "==", userId).Documents(context.Background())
+	iter := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/sources", organizationID)).Where("userId", "==", userId).Documents(context.Background())
 
 	for {
 		doc, err := iter.Next()

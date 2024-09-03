@@ -14,7 +14,7 @@ import (
 
 func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) error {
 	cData := &models.Conversation{}
-	err := cData.Get(conv.IGSID)
+	err := cData.GetByLead(conv.IGSID)
 	if err != nil {
 		return err
 	}
@@ -25,9 +25,9 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		return err
 	}
 
-	pData := &models.Source{}
-	err = pData.Get(cData.SourceID)
-	if err != nil || pData.PageID == "" {
+	pData := &models.SourcePrivate{}
+	err = pData.Get(cData.OrganizationID, cData.SourceID)
+	if err != nil {
 		return err
 	}
 
@@ -35,13 +35,13 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		log.Println("This message is old.. Waiting for new message", cData.LastMID, conv.MID)
 		return nil
 	}
-	_, err = messenger.SendAction(cData.IGSID, messenger.MARK_SEEN, *pData.AccessToken)
+	_, err = messenger.SendAction(cData.LeadID, messenger.MARK_SEEN, *pData.AccessToken)
 	if err != nil {
 		log.Println("Error while send Action", err.Error())
 	}
 
 	if !cData.IsProfileFetched {
-		uProfile, err := messenger.GetUser(cData.IGSID, *pData.AccessToken)
+		uProfile, err := messenger.GetUser(cData.LeadID, *pData.AccessToken)
 		if err != nil {
 			return err
 		}
@@ -52,12 +52,13 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		}
 
 		cData.IsProfileFetched = true
-		cData.UserProfile = uProfile
+		// TODO: Probably write code to update the lead table
+		// cData.UserProfile = uProfile
 		cData.Insert()
 		// cData.UpdateProfileFetched()
 	}
 	log.Println("Starting Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
+	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(*campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
 	if err != nil {
 		return err
 	}

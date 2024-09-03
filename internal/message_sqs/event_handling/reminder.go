@@ -13,7 +13,7 @@ import (
 
 func SendReminder(conv *sqsevents.ConversationEvent) error {
 	cData := &models.Conversation{}
-	err := cData.Get(conv.IGSID)
+	err := cData.GetByLead(conv.IGSID)
 	if err != nil {
 		return err
 	}
@@ -25,8 +25,8 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 	}
 
 	pData := &models.Source{}
-	err = pData.Get(cData.SourceID)
-	if err != nil || pData.PageID == "" {
+	err = pData.Get(cData.OrganizationID, cData.SourceID)
+	if err != nil || pData.ID == "" {
 		return err
 	}
 
@@ -43,7 +43,7 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 	}
 	additionalInstruction := fmt.Sprintf("The user has not replied in %s. Remind them gently. This is reminder %d", timeData, (cData.ReminderCount + 1))
 	log.Println("Starting Reminder Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
+	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(*campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
 	if err != nil {
 		return err
 	}

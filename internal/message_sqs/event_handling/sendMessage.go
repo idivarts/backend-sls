@@ -73,14 +73,14 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		}
 		log.Println("Fetching Conversation", conv.IGSID)
 		cData := &models.Conversation{}
-		err = cData.Get(conv.IGSID)
+		err = cData.GetByLead(conv.IGSID)
 		if err != nil {
 			return err
 		}
 		log.Println("Fetching Page", cData.SourceID)
-		pData := &models.Source{}
-		err = pData.Get(cData.SourceID)
-		if err != nil || pData.PageID == "" {
+		pData := &models.SourcePrivate{}
+		err = pData.Get(cData.OrganizationID, cData.SourceID)
+		if err != nil {
 			return err
 		}
 
@@ -103,7 +103,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
 				pInp := processInput(aMsg.Value)
 				secondsElapsed := 0
-				_, err = messenger.SendAction(cData.IGSID, messenger.TYPING_ON, *pData.AccessToken)
+				_, err = messenger.SendAction(cData.LeadID, messenger.TYPING_ON, *pData.AccessToken)
 				if err != nil {
 					log.Println("Error while send Action", err.Error())
 				}

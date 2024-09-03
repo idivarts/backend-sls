@@ -1,15 +1,11 @@
 package mwh_handler
 
-import (
-	"github.com/TrendsHub/th-backend/internal/models"
-)
-
 func (msg IGMessagehandler) handleReadOperation() error {
-	pData := models.Source{}
-	err := pData.Get(msg.PageID)
-	if err != nil || pData.PageID == "" {
-		return err
-	}
+	// pData := models.Source{}
+	// err := pData.Get(msg.PageID)
+	// if err != nil || pData.PageID == "" {
+	// 	return err
+	// }
 
 	// Wrong implementation of using Conversation ID. Hence commented
 

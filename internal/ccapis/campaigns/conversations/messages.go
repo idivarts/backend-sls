@@ -1,10 +1,11 @@
-package ccapis
+package conversationsapi
 
 import (
 	"net/http"
 
 	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
 	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
+	"github.com/TrendsHub/th-backend/internal/middlewares"
 	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
@@ -23,22 +24,29 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	leadId := c.Param("leadId")
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
+
+	campaignID := c.Param("campaignId")
+	conversationID := c.Param("conversationId")
 
 	cData := &models.Conversation{}
-	err := cData.Get(leadId)
+	err := cData.Get(organizationID, campaignID, conversationID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	pData := &models.Source{}
-	err = pData.Get(cData.SourceID)
+	pData := &models.SourcePrivate{}
+	err = pData.Get(organizationID, cData.SourceID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	igConvs, err := messenger.GetConversationsByUserId(leadId, *pData.AccessToken)
+	igConvs, err := messenger.GetConversationsByUserId(cData.LeadID, *pData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -78,17 +86,24 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
-	leadId := c.Param("leadId")
+	organizationID, b := middlewares.GetOrganizationId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No organization in the header"})
+		return
+	}
+
+	campaignID := c.Param("campaignId")
+	conversationID := c.Param("conversationId")
 
 	cData := &models.Conversation{}
-	err := cData.Get(leadId)
+	err := cData.Get(organizationID, campaignID, conversationID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	pData := &models.Source{}
-	err = pData.Get(cData.SourceID)
+	pData := &models.SourcePrivate{}
+	err = pData.Get(organizationID, cData.SourceID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -111,7 +126,7 @@ func SendMessage(c *gin.Context) {
 		// openai.SendMessage()
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    leadId,
+			IGSID:    cData.LeadID,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}
@@ -121,7 +136,7 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 	} else if req.SendType == Page && req.Message != "" {
-		msg, err := messenger.SendTextMessage(cData.IGSID, req.Message, *pData.AccessToken)
+		msg, err := messenger.SendTextMessage(cData.LeadID, req.Message, *pData.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -137,7 +152,7 @@ func SendMessage(c *gin.Context) {
 	} else if req.SendType == Bot && req.BotInstruction != "" {
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    leadId,
+			IGSID:    cData.LeadID,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}

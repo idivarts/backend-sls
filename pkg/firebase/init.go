@@ -3,6 +3,7 @@ package firebaseapp
 import (
 	"context"
 	"log"
+	"os"
 
 	// firebase "firebase.google.com/go"
 	firebase "firebase.google.com/go"
@@ -14,7 +15,12 @@ var FirebaseApp *firebase.App
 func init() {
 	// Use a service account
 	ctx := context.Background()
-	sa := option.WithCredentialsFile("service-account.json")
+	configFile := os.Getenv("FIREBASE_CONFIG_PATH")
+	log.Println("Config File Path", configFile)
+	if configFile == "" {
+		configFile = "service-account.json"
+	}
+	sa := option.WithCredentialsFile(configFile)
 	log.Println("Coming here", sa)
 	var err error
 	FirebaseApp, err = firebase.NewApp(ctx, nil, sa)

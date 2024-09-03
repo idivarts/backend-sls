@@ -29,7 +29,7 @@ func main() {
 	}
 	log.Println("Custom IGSID - ", conv.IGSID)
 	cData := models.Conversation{
-		IGSID:    conv.IGSID,
+		LeadID:   conv.IGSID,
 		ThreadID: conv.ThreadID,
 	}
 	cData.Insert()

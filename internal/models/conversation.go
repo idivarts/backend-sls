@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"cloud.google.com/go/firestore"
-	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
 	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
@@ -34,15 +33,15 @@ type Conversation struct {
 	Status             int               `json:"status"`
 
 	// Old fields that needs to be replaced or removed
-	IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
-	UserProfile *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
-	Information openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
+	// IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
+	// UserProfile *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
+	// Information openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
 }
 
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
-	pData := Source{}
-	err := pData.Get(conversation.SourceID)
-	if err != nil || pData.PageID == "" {
+	pData := SourcePrivate{}
+	err := pData.Get(conversation.OrganizationID, conversation.SourceID)
+	if err != nil {
 		return err
 	}
 
@@ -53,7 +52,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(conversation.IGSID, *pData.AccessToken)
+	convIds, err := messenger.GetConversationsByUserId(conversation.LeadID, *pData.AccessToken)
 	if err != nil {
 		return err
 	}
@@ -116,7 +115,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 		lastMid = entry.ID
 	}
 
-	log.Println("Inserting the Conversation Model", conversation.IGSID, threadId)
+	log.Println("Inserting the Conversation Model", conversation.LeadID, threadId)
 	// conversation.IGSID = igsid
 	// conversation.PageID = pageId
 	conversation.ThreadID = threadId
@@ -154,7 +153,22 @@ func (c *Conversation) Insert() (*firestore.WriteResult, error) {
 	return res, err
 }
 
-func (c *Conversation) Get(leadId string) error {
+func (c *Conversation) Get(organizationID, campaignID, conversationId string) error {
+	doc, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Doc(conversationId).Get(context.Background())
+	if err != nil {
+		fmt.Println("Error getting item from Firestore:", err.Error())
+		return err
+	}
+	err = doc.DataTo(c)
+	if err != nil {
+		fmt.Println("Error getting item from Firestore:", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (c *Conversation) GetByLead(leadId string) error {
 	iter := firestoredb.Client.CollectionGroup("conversations").Query.Where("leadId", "==", leadId).Documents(context.Background())
 	data, err := iter.Next()
 	if err != nil {
@@ -208,10 +222,10 @@ func (c *Conversation) UpdateProfileFetched() (*firestore.WriteResult, error) {
 	return result, nil
 }
 
-func GetConversations(pageId *string, phase *int) ([]Conversation, error) {
+func GetConversations(organizationID string, campaignID string, pageId *string, phase *int) ([]Conversation, error) {
 	var conversations []Conversation
 
-	query := firestoredb.Client.CollectionGroup("conversations").Query
+	query := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Query
 	if pageId != nil {
 		query = query.Where("pageId", "==", *pageId)
 	}
