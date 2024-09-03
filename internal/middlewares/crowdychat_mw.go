@@ -67,7 +67,7 @@ func GetOrganizationId(c *gin.Context) (string, bool) {
 
 // validateUserOrganization checks if the user belongs to the specified organization.
 func validateUserOrganization(userUID, orgID string) bool {
-	_, err := firestoredb.Client.Collection(fmt.Sprintf("/organizations/%s/members", orgID)).Doc(userUID).Get(context.Background())
+	_, err := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/members", orgID)).Doc(userUID).Get(context.Background())
 	return err == nil
 }
 

@@ -24,7 +24,7 @@ type Leads struct {
 }
 
 func (c *Leads) GetPath(organizationID string) (*string, error) {
-	path := fmt.Sprintf("/organizations/%s/leads", organizationID)
+	path := fmt.Sprintf("organizations/%s/leads", organizationID)
 	return &path, nil
 }
 
