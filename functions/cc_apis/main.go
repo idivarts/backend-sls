@@ -17,6 +17,12 @@ func main() {
 
 	apiV1.POST("/campaigns/:campaignId", campaignsapi.CreateOrUpdateCampaign) //Initiates the campaigns by creating Assistant
 
+	apiV1.POST("/campaigns/:campaignId/sources", campaignsapi.ConnectSourcesWithCampaign)      //This api will be used ot connect sources
+	apiV1.DELETE("/campaigns/:campaignId/sources", campaignsapi.DisconnectSourcesFromCampaign) //This api will disconnect a source from the campaign
+
+	// apiV1.POST("/campaigns/:campaignId/tags", campaignsapi.CreateOrUpdateCampaign)   //This api will be used ot connect tags with the campaign
+	// apiV1.DELETE("/campaigns/:campaignId/tags", campaignsapi.CreateOrUpdateCampaign) //This api will disconnect a tags from the campaign
+
 	apiV1.PUT("/campaigns/:campaignId/conversations/:conversationId", conversationsapi.UpdateConversation)      // Make changes in the api to stop tracking the conversation
 	apiV1.POST("/campaigns/:campaignId/conversations/:conversationId/sync", conversationsapi.SyncConversations) //API to sync a specific conversation
 	apiV1.GET("/campaigns/:campaignId/conversations/:conversationId/messages", conversationsapi.GetMessages)
