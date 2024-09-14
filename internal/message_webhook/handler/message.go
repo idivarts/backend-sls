@@ -12,6 +12,7 @@ import (
 	timehandler "github.com/TrendsHub/th-backend/internal/time_handler"
 	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
+	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/TrendsHub/th-backend/pkg/openai"
 )
 
@@ -57,7 +58,29 @@ func (msg IGMessagehandler) HandleMessage() error {
 	lead := models.Lead{}
 	err = lead.Get(organizationID, msg.LeadID)
 	if err != nil {
-		return err
+		log.Println("Lead not found. Creating a new lead", err.Error())
+		sP := &models.SourcePrivate{}
+		err = sP.Get(organizationID, source.ID)
+		if err != nil {
+			return err
+		}
+		uProfile, err := messenger.GetUser(msg.LeadID, *sP.AccessToken)
+		if err != nil {
+			return err
+		}
+		lead = models.Lead{
+			ID:          msg.LeadID,
+			SourceType:  source.SourceType,
+			SourceID:    source.ID,
+			UserProfile: uProfile,
+			Status:      1,
+			CreatedAt:   time.Now().Unix(),
+			UpdatedAt:   time.Now().Unix(),
+		}
+		_, err = lead.Insert(organizationID)
+		if err != nil {
+			return err
+		}
 	}
 
 	if lead.Status != 1 || source.Status != 1 {
