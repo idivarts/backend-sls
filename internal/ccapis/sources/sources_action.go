@@ -15,7 +15,7 @@ type IPageWebhook struct {
 	Enable *bool `json:"enable" form:"enable" binding:"required"`
 }
 
-func PageWebhook(c *gin.Context) {
+func SourceWebhookAction(c *gin.Context) {
 	var req IPageWebhook
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

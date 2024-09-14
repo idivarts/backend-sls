@@ -37,3 +37,22 @@ func (c *Leads) Insert(organizationID string) (*firestore.WriteResult, error) {
 	res, err := firestoredb.Client.Collection(*path).Doc(c.ID).Set(context.Background(), c)
 	return res, err
 }
+
+// This function will get all leads for a given source from firestore
+func GetLeads(organizationID, sourceID string) ([]Leads, error) {
+	var leads []Leads
+
+	iter := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/leads", organizationID)).Where("sourceId", "==", sourceID).Documents(context.Background())
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			break
+		}
+
+		var lead Leads
+		doc.DataTo(&lead)
+		leads = append(leads, lead)
+	}
+
+	return leads, nil
+}
