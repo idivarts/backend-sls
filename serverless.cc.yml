@@ -117,16 +117,19 @@ functions:
             Fn::GetAtt:
               - CCMessageQueue
               - Arn
-  # run_handler:
-  #   handler: src/runHandler.runHandler
-  #   runtime: nodejs20.x
-  #   timeout: 60
-  #   events:
-  #     - sqs:
-  #         arn:
-  #           Fn::GetAtt:
-  #             - CCMessageQueue
-  #             - Arn
+  run_handler:
+    handler: dist/src/runHandler.runHandler
+    runtime: nodejs20.x
+    package:
+      patterns:
+        - "dist/**"
+    timeout: 60
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - CCMessageQueue
+              - Arn
 
 package:
   patterns:

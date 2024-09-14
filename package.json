@@ -8,8 +8,10 @@
     "serverless-go-plugin": "^2.4.0",
     "serverless-lift": "^1.28.1",
     "serverless-offline": "^13.8.0",
-    "serverless-plugin-typescript": "^2.1.5",
     "typescript": "^5.6.2"
+  },
+  "scripts": {
+    "build": "tsc"
   },
   "dependencies": {
     "glob": "^10.3.12"

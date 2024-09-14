@@ -21,6 +21,6 @@ vendor
 *.out
 node_modules
 .bin
-.build
+dist
 **/service-account.json
 .DS_Store
