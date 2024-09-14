@@ -9,7 +9,7 @@ import (
 	"github.com/TrendsHub/th-backend/pkg/messenger"
 )
 
-type Leads struct {
+type Lead struct {
 	ID          string                 `json:"id,omitempty"`
 	Email       *string                `json:"email,omitempty"`
 	Name        *string                `json:"name,omitempty"`
@@ -23,12 +23,12 @@ type Leads struct {
 	UpdatedAt   int64                  `json:"updatedAt"`
 }
 
-func (c *Leads) GetPath(organizationID string) (*string, error) {
+func (c *Lead) GetPath(organizationID string) (*string, error) {
 	path := fmt.Sprintf("organizations/%s/leads", organizationID)
 	return &path, nil
 }
 
-func (c *Leads) Insert(organizationID string) (*firestore.WriteResult, error) {
+func (c *Lead) Insert(organizationID string) (*firestore.WriteResult, error) {
 	path, err := c.GetPath(organizationID)
 	if err != nil {
 		return nil, err
@@ -38,9 +38,26 @@ func (c *Leads) Insert(organizationID string) (*firestore.WriteResult, error) {
 	return res, err
 }
 
+func (c *Lead) Get(organizationID string, leadID string) error {
+	path, err := c.GetPath(organizationID)
+	if err != nil {
+		return err
+	}
+
+	res, err := firestoredb.Client.Collection(*path).Doc(c.ID).Get(context.Background())
+	if err != nil {
+		return err
+	}
+	err = res.DataTo(c)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // This function will get all leads for a given source from firestore
-func GetLeads(organizationID, sourceID string) ([]Leads, error) {
-	var leads []Leads
+func GetLeads(organizationID, sourceID string) ([]Lead, error) {
+	var leads []Lead
 
 	iter := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/leads", organizationID)).Where("sourceId", "==", sourceID).Documents(context.Background())
 	for {
@@ -49,7 +66,7 @@ func GetLeads(organizationID, sourceID string) ([]Leads, error) {
 			break
 		}
 
-		var lead Leads
+		var lead Lead
 		doc.DataTo(&lead)
 		leads = append(leads, lead)
 	}

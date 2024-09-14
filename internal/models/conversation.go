@@ -170,7 +170,7 @@ func (c *Conversation) Get(organizationID, campaignID, conversationId string) er
 }
 
 func (c *Conversation) GetByLead(leadId string) error {
-	iter := firestoredb.Client.CollectionGroup("conversations").Query.Where("leadId", "==", leadId).Documents(context.Background())
+	iter := firestoredb.Client.CollectionGroup("conversations").Query.Where("leadId", "==", leadId).Where("status", "==", 1).Documents(context.Background())
 	data, err := iter.Next()
 	if err != nil {
 		fmt.Println("Error getting item from Firestore:", err.Error())

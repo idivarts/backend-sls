@@ -111,7 +111,7 @@ func SourceSyncLeads(c *gin.Context) {
 			return
 		}
 
-		lead := &models.Leads{
+		lead := &models.Lead{
 			ID:          igsid,
 			Email:       nil,
 			Name:        &uProfile.Name,

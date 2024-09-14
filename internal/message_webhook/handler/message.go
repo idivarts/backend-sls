@@ -16,7 +16,7 @@ import (
 )
 
 type IGMessagehandler struct {
-	ConversationID   string
+	// ConversationID   string
 	LeadID           string
 	SourceID         string
 	Entry            *instainterfaces.Messaging
@@ -27,7 +27,7 @@ type IGMessagehandler struct {
 
 func (msg IGMessagehandler) HandleMessage() error {
 	if msg.Message == nil && msg.Read == nil {
-		return errors.New("Message and Read Body is empty")
+		return errors.New("message or read body is empty")
 	}
 
 	log.Println("Getting the conversation from dynamoDB")
@@ -39,28 +39,39 @@ func (msg IGMessagehandler) HandleMessage() error {
 		leadId = msg.Entry.Recipient.ID
 	}
 
-	// Get the source from the source Id and make sure that the source is active and linked with a campaign
-
 	// Get conversation from only the specified campaign convesation. Please note, a conversation can exists with same id on mulitple campaigns
 	err := msg.conversationData.GetByLead(leadId)
 	if err != nil {
-		// This is where I would need to create a new instance
-		log.Println("Error Finding LeadId", err.Error())
-		msg.conversationData = &models.Conversation{
-			SourceID: msg.SourceID,
-			LeadID:   leadId,
-		}
-		msg.conversationData, err = msg.createMessageThread(false)
+		return err
+	}
+
+	organizationID := msg.conversationData.OrganizationID
+
+	// Get the source from the source Id and make sure that the source is active and linked with a campaign
+	source := models.Source{}
+	err = source.Get(organizationID, msg.SourceID)
+	if err != nil {
+		return err
+	}
+
+	lead := models.Lead{}
+	err = lead.Get(organizationID, msg.LeadID)
+	if err != nil {
+		return err
+	}
+
+	if lead.Status != 1 || source.Status != 1 {
+		return fmt.Errorf("lead or source is not active %d %d", lead.Status, source.Status)
+	}
+
+	if msg.conversationData.ThreadID == "" || msg.Message.IsDeleted {
+		msg.conversationData, err = msg.createMessageThread(msg.Message.IsDeleted)
 		if err != nil {
 			return err
 		}
-	} else if msg.Message.IsDeleted {
-		log.Println("Deleting and creating a brand new thread")
-		msg.conversationData, err = msg.createMessageThread(true)
-		if err != nil {
-			return err
+		if msg.Message.IsDeleted {
+			return nil
 		}
-		return nil
 	}
 
 	err = msg.handleMessageThreadOperation()
