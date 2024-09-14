@@ -123,6 +123,7 @@ functions:
     package:
       patterns:
         - "dist/**"
+        - "node_modules/**"
     timeout: 60
     events:
       - sqs:
