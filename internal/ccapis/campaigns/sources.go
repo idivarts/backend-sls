@@ -8,11 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Struct to take input for ConnectSourcesWithCampaign apis. Params is just one sourceId
-type IConnectSourcesWithCampaign struct {
-	SourceID string `json:"sourceId" binding:"required"`
-}
-
 func removeAllConversationFromCampaign(organizationID, campaignID, sourceID string) error {
 	// Get all the conversations of the source
 	conversations, err := models.GetConversations(organizationID, campaignID, &sourceID, nil)
@@ -70,6 +65,11 @@ func addAllConversationToCampaign(organizationID, campaignID, sourceID string) e
 	return nil
 }
 
+// Struct to take input for ConnectSourcesWithCampaign apis. Params is just one sourceId
+type IConnectSourcesWithCampaign struct {
+	SourceID string `json:"sourceId" form:"sourceId" binding:"required"`
+}
+
 // Create an api to connect sources with the campaign
 func ConnectSourcesWithCampaign(c *gin.Context) {
 	// Get the campaign id from the url
@@ -77,7 +77,7 @@ func ConnectSourcesWithCampaign(c *gin.Context) {
 
 	// Get the sources from the request body
 	var req IConnectSourcesWithCampaign
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -129,7 +129,7 @@ func ConnectSourcesWithCampaign(c *gin.Context) {
 
 // Struct to take input for DisconnectSourcesWithCampaign apis. Params is just one sourceId
 type IDisconnectSourcesFromCampaign struct {
-	SourceID string `form:"sourceId" binding:"required"`
+	SourceID string `json:"sourceId" form:"sourceId" binding:"required"`
 }
 
 // Create an api to disconnect sources with the campaign
