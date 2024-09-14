@@ -140,7 +140,6 @@ func DisconnectSourcesFromCampaign(c *gin.Context) {
 	// Get the sources from the request body
 	var req IDisconnectSourcesFromCampaign
 	if err := c.ShouldBind(&req); err != nil {
-
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
