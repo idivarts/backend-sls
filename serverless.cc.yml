@@ -50,6 +50,7 @@ plugins:
   - serverless-go-plugin
   - serverless-domain-manager
   - serverless-certificate-creator
+  # - serverless-plugin-typescript
 
 custom:
   go:
@@ -116,6 +117,16 @@ functions:
             Fn::GetAtt:
               - CCMessageQueue
               - Arn
+  # run_handler:
+  #   handler: src/runHandler.runHandler
+  #   runtime: nodejs20.x
+  #   timeout: 60
+  #   events:
+  #     - sqs:
+  #         arn:
+  #           Fn::GetAtt:
+  #             - CCMessageQueue
+  #             - Arn
 
 package:
   patterns:

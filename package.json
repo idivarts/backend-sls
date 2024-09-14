@@ -1,10 +1,15 @@
 {
   "devDependencies": {
-    "serverless": "3.38.0",
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.5.5",
+    "serverless": "^3.38.0",
     "serverless-certificate-creator": "^1.6.0",
     "serverless-domain-manager": "^7.3.8",
     "serverless-go-plugin": "^2.4.0",
-    "serverless-lift": "^1.28.1"
+    "serverless-lift": "^1.28.1",
+    "serverless-offline": "^13.8.0",
+    "serverless-plugin-typescript": "^2.1.5",
+    "typescript": "^5.6.2"
   },
   "dependencies": {
     "glob": "^10.3.12"
