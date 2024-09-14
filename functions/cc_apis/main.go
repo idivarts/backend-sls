@@ -21,9 +21,9 @@ func main() {
 	apiV1.POST("/campaigns/:campaignId/sources", campaignsapi.ConnectSourcesWithCampaign)      //This api will be used ot connect sources
 	apiV1.DELETE("/campaigns/:campaignId/sources", campaignsapi.DisconnectSourcesFromCampaign) //This api will disconnect a source from the campaign
 
-	apiV1.POST("/campaigns/:campaignId/fine-tune", finetune.Create)                 //This api will help in creating a test thread
-	apiV1.GET("/campaigns/:campaignId/fine-tune/:threadId", finetune.GetThread)     //This api will get all messages from the thread
-	apiV1.POST("/campaigns/:campaignId/fine-tune/:threadId", finetune.PostToThread) //This api will post a new message to the thread
+	apiV1.POST("/campaigns/:campaignId/dryrun", finetune.Create)                 //This api will help in creating a test thread
+	apiV1.GET("/campaigns/:campaignId/dryrun/:threadId", finetune.GetThread)     //This api will get all messages from the thread
+	apiV1.POST("/campaigns/:campaignId/dryrun/:threadId", finetune.PostToThread) //This api will post a new message to the thread
 
 	// apiV1.POST("/campaigns/:campaignId/tags", campaignsapi.CreateOrUpdateCampaign)   //This api will be used ot connect tags with the campaign
 	// apiV1.DELETE("/campaigns/:campaignId/tags", campaignsapi.CreateOrUpdateCampaign) //This api will disconnect a tags from the campaign
