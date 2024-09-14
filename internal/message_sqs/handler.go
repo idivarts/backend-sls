@@ -29,7 +29,7 @@ func sendMessage(message string) error {
 		return err
 	}
 
-	if conv.IGSID == "" || conv.Action == "" {
+	if conv.LeadID == "" || conv.Action == "" {
 		return fmt.Errorf("error - empty field - %s", "IGSID or Action")
 	}
 

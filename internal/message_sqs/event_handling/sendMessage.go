@@ -44,12 +44,12 @@ func processInput(input string) []IProcessedInput {
 }
 func InstaSend(conv *sqsevents.ConversationEvent) error {
 	log.Println("Sending Message to instagram", conv.Message)
-	_, err := messenger.SendTextMessage(conv.IGSID, conv.Message, conv.PageToken)
+	_, err := messenger.SendTextMessage(conv.LeadID, conv.Message, conv.PageToken)
 	if err != nil {
 		return err
 	}
 	if conv.LastMessage != nil && !*conv.LastMessage {
-		_, err = messenger.SendAction(conv.IGSID, messenger.TYPING_ON, conv.PageToken)
+		_, err = messenger.SendAction(conv.LeadID, messenger.TYPING_ON, conv.PageToken)
 		if err != nil {
 			log.Println("Error while send Action", err.Error())
 		}
@@ -71,9 +71,9 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		if err != nil {
 			return err
 		}
-		log.Println("Fetching Conversation", conv.IGSID)
+		log.Println("Fetching Conversation", conv.LeadID)
 		cData := &models.Conversation{}
-		err = cData.GetByLead(conv.IGSID)
+		err = cData.GetByLead(conv.LeadID)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		for _, v := range msgs.Data {
 			if v.RunID == conv.RunID {
 				aMsg := v.Content[0].Text
-				log.Println("Sending Message", conv.IGSID, aMsg.Value, v.ID)
+				log.Println("Sending Message", conv.LeadID, aMsg.Value, v.ID)
 				pInp := processInput(aMsg.Value)
 				secondsElapsed := 0
 				_, err = messenger.SendAction(cData.LeadID, messenger.TYPING_ON, *pData.AccessToken)
@@ -110,7 +110,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 				for i, v := range pInp {
 					isLast := (i == len(pInp))
 					st := sqsevents.ConversationEvent{
-						IGSID:       conv.IGSID,
+						LeadID:      conv.LeadID,
 						Message:     v.StringVal,
 						PageToken:   *pData.AccessToken,
 						Action:      sqsevents.INSTA_SEND,
