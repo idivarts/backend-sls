@@ -124,6 +124,7 @@ functions:
       patterns:
         - "dist/**"
         - "node_modules/**"
+        - "package.json"
     timeout: 60
     events:
       - sqs:
