@@ -64,9 +64,12 @@ func (msg IGMessagehandler) HandleMessage() error {
 		if err != nil {
 			return err
 		}
-		uProfile, err := messenger.GetUser(msg.LeadID, *sP.AccessToken)
-		if err != nil {
-			return err
+		var uProfile *messenger.UserProfile
+		if source.SourceType == models.Instagram {
+			uProfile, err = messenger.GetUser(msg.LeadID, *sP.AccessToken)
+			if err != nil {
+				return err
+			}
 		}
 		lead = models.Lead{
 			ID:          msg.LeadID,
