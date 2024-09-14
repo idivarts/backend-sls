@@ -129,7 +129,7 @@ func ConnectSourcesWithCampaign(c *gin.Context) {
 
 // Struct to take input for DisconnectSourcesWithCampaign apis. Params is just one sourceId
 type IDisconnectSourcesFromCampaign struct {
-	SourceID string `json:"sourceId" form:"sourceId" binding:"required"`
+	SourceID string `form:"sourceId" binding:"required"`
 }
 
 // Create an api to disconnect sources with the campaign
@@ -140,6 +140,7 @@ func DisconnectSourcesFromCampaign(c *gin.Context) {
 	// Get the sources from the request body
 	var req IDisconnectSourcesFromCampaign
 	if err := c.ShouldBind(&req); err != nil {
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
