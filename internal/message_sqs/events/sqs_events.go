@@ -2,13 +2,13 @@ package sqsevents
 
 type ConversationEvent struct {
 	Action   SQSEvents `json:"action"`
-	IGSID    string    `json:"igsid"`
+	LeadID   string    `json:"leadId"`
 	ThreadID string    `json:"threadId,omitempty"`
 	MID      string    `json:"mid,omitempty"`
 
 	RunID string `json:"runId,omitempty"`
 
-	PageID string `json:"pageId,omitempty"`
+	SourceID string `json:"sourceId,omitempty"`
 
 	PageToken   string `json:"pageToken,omitempty"`
 	Message     string `json:"message,omitempty"`

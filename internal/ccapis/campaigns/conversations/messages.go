@@ -126,7 +126,7 @@ func SendMessage(c *gin.Context) {
 		// openai.SendMessage()
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    cData.LeadID,
+			LeadID:   cData.LeadID,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}
@@ -152,7 +152,7 @@ func SendMessage(c *gin.Context) {
 	} else if req.SendType == Bot && req.BotInstruction != "" {
 		conv := &sqsevents.ConversationEvent{
 			Action:   sqsevents.RUN_OPENAI,
-			IGSID:    cData.LeadID,
+			LeadID:   cData.LeadID,
 			ThreadID: cData.ThreadID,
 			MID:      cData.LastMID,
 		}

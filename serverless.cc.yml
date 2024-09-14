@@ -50,6 +50,7 @@ plugins:
   - serverless-go-plugin
   - serverless-domain-manager
   - serverless-certificate-creator
+  # - serverless-plugin-typescript
 
 custom:
   go:
@@ -109,6 +110,20 @@ functions:
     package:
       include:
         - 'service-account.json'
+    timeout: 60
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - CCMessageQueue
+              - Arn
+  run_handler:
+    handler: dist/src/runHandler.runHandler
+    runtime: nodejs20.x
+    package:
+      patterns:
+        - "dist/**"
+        - "node_modules/**"
     timeout: 60
     events:
       - sqs:

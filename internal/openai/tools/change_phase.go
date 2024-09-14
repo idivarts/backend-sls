@@ -27,7 +27,7 @@ func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall
 	if onlySimulate != nil {
 		cData = *onlySimulate
 	} else {
-		err = cData.GetByLead(conv.IGSID)
+		err = cData.GetByLead(conv.LeadID)
 		if err != nil {
 			return nil, err
 		}

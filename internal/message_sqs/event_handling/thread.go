@@ -8,8 +8,8 @@ import (
 )
 
 func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
-	igsid := ev.IGSID
-	pageId := ev.PageID
+	igsid := ev.LeadID
+	pageId := ev.SourceID
 	conv := &models.Conversation{}
 	err := conv.GetByLead(igsid)
 	run := true

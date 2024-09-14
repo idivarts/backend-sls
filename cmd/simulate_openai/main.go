@@ -24,12 +24,12 @@ func main() {
 	}
 
 	conv := &sqsevents.ConversationEvent{
-		IGSID:    "test-user-" + strconv.Itoa(rand.Intn(1000)),
+		LeadID:   "test-user-" + strconv.Itoa(rand.Intn(1000)),
 		ThreadID: thread.ID,
 	}
-	log.Println("Custom IGSID - ", conv.IGSID)
+	log.Println("Custom IGSID - ", conv.LeadID)
 	cData := models.Conversation{
-		LeadID:   conv.IGSID,
+		LeadID:   conv.LeadID,
 		ThreadID: conv.ThreadID,
 	}
 	cData.Insert()

@@ -17,8 +17,8 @@ import (
 
 type IGMessagehandler struct {
 	ConversationID   string
-	IGSID            string
-	PageID           string
+	LeadID           string
+	SourceID         string
 	Entry            *instainterfaces.Messaging
 	Message          *instainterfaces.Message
 	Read             *instainterfaces.Read
@@ -32,17 +32,23 @@ func (msg IGMessagehandler) HandleMessage() error {
 
 	log.Println("Getting the conversation from dynamoDB")
 	msg.conversationData = &models.Conversation{}
-	convId := msg.IGSID
-	if msg.PageID == msg.IGSID {
-		convId = msg.Entry.Recipient.ID
+	leadId := msg.LeadID
+
+	// If the message is echo from the page itself, then the leadId should be the recipient
+	if msg.SourceID == msg.LeadID {
+		leadId = msg.Entry.Recipient.ID
 	}
-	err := msg.conversationData.GetByLead(convId)
+
+	// Get the source from the source Id and make sure that the source is active and linked with a campaign
+
+	// Get conversation from only the specified campaign convesation. Please note, a conversation can exists with same id on mulitple campaigns
+	err := msg.conversationData.GetByLead(leadId)
 	if err != nil {
 		// This is where I would need to create a new instance
-		log.Println("Error Finding IGSID", err.Error())
+		log.Println("Error Finding LeadId", err.Error())
 		msg.conversationData = &models.Conversation{
-			SourceID: msg.PageID,
-			LeadID:   convId,
+			SourceID: msg.SourceID,
+			LeadID:   leadId,
 		}
 		msg.conversationData, err = msg.createMessageThread(false)
 		if err != nil {
@@ -56,7 +62,7 @@ func (msg IGMessagehandler) HandleMessage() error {
 		}
 		return nil
 	}
-	// if msg.Message != nil {
+
 	err = msg.handleMessageThreadOperation()
 	if err != nil {
 		delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
@@ -81,7 +87,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		return nil
 	}
 
-	if msg.PageID != msg.IGSID ||
+	if msg.SourceID != msg.LeadID ||
 		//Checking last time bot processed the message was more than 2 minutes before the recorded time
 		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-120000) {
 		log.Println("Handling Message Send Logic", msg.conversationData.LeadID, msg.conversationData.ThreadID, msg.Message.Text)
@@ -118,13 +124,13 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			return fmt.Errorf("error with webhook data : %s", "Both Message and Rich content is empty")
 		}
 
-		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, richContent, msg.PageID == msg.IGSID)
+		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, richContent, msg.SourceID == msg.LeadID)
 		if err != nil {
 			return err
 		}
 	}
 
-	if msg.PageID != msg.IGSID {
+	if msg.SourceID != msg.LeadID {
 		delayedsqs.StopExecutions(msg.conversationData.MessageQueue)
 		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
 
@@ -137,7 +143,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		}
 
 		event := sqsevents.ConversationEvent{
-			IGSID:    msg.conversationData.LeadID,
+			LeadID:   msg.conversationData.LeadID,
 			ThreadID: msg.conversationData.ThreadID,
 			MID:      msg.conversationData.LastMID,
 			Action:   sqsevents.RUN_OPENAI,
@@ -156,7 +162,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		log.Println("Message sent to the queue after", *sendTimeDuration)
 	}
 
-	if msg.PageID == msg.IGSID {
+	if msg.SourceID == msg.LeadID {
 		log.Println("Handling Reminder Logics", msg.conversationData.LeadID, msg.conversationData.ThreadID, msg.Message.Text)
 		delayedsqs.StopExecutions(msg.conversationData.ReminderQueue)
 		if msg.conversationData.ReminderQueue == nil {
@@ -166,7 +172,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		}
 		if msg.conversationData.CurrentPhase < 5 {
 			event := sqsevents.ConversationEvent{
-				IGSID:    msg.conversationData.LeadID,
+				LeadID:   msg.conversationData.LeadID,
 				ThreadID: msg.conversationData.ThreadID,
 				MID:      msg.conversationData.LastMID,
 				Action:   sqsevents.REMINDER,
@@ -183,9 +189,9 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			nextReminderTime := time.Now().Unix() + int64(sendTimeDuration)
 			msg.conversationData.NextReminderTime = &nextReminderTime
 			msg.conversationData.ReminderQueue = execArn.ExecutionArn
-			log.Println("Reminder Set after", REMINDER_SECONDS, msg.IGSID)
+			log.Println("Reminder Set after", REMINDER_SECONDS, msg.LeadID)
 		} else {
-			log.Println("Ignoring reminder", msg.IGSID)
+			log.Println("Ignoring reminder", msg.LeadID)
 		}
 	}
 	_, err := msg.conversationData.Insert()

@@ -13,7 +13,7 @@ import (
 
 func SendReminder(conv *sqsevents.ConversationEvent) error {
 	cData := &models.Conversation{}
-	err := cData.GetByLead(conv.IGSID)
+	err := cData.GetByLead(conv.LeadID)
 	if err != nil {
 		return err
 	}

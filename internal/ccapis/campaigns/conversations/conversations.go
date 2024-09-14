@@ -90,9 +90,9 @@ func SyncConversations(c *gin.Context) {
 		// 	event = sqsevents.CREATE_OR_UPDATE_THREAD
 		// }
 		x := sqsevents.ConversationEvent{
-			IGSID:  igsid,
-			PageID: cData.SourceID,
-			Action: event,
+			LeadID:   igsid,
+			SourceID: cData.SourceID,
+			Action:   event,
 		}
 		b, err := json.Marshal(&x)
 		if err != nil {
