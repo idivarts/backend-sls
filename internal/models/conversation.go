@@ -13,11 +13,12 @@ import (
 )
 
 type Conversation struct {
+	LeadID string `json:"leadId"`
+
 	OrganizationID     string            `json:"organizationId"`
 	CampaignID         string            `json:"campaignId"`
 	SourceID           string            `json:"sourceId"`
 	ThreadID           string            `json:"threadId"`
-	LeadID             string            `json:"leadId"`
 	LastMID            string            `json:"lastMid"`
 	LastBotMessageTime int64             `json:"lastBotMessageTime"`
 	BotMessageCount    int               `json:"botMessageCount"`
@@ -222,12 +223,12 @@ func (c *Conversation) UpdateProfileFetched() (*firestore.WriteResult, error) {
 	return result, nil
 }
 
-func GetConversations(organizationID string, campaignID string, pageId *string, phase *int) ([]Conversation, error) {
+func GetConversations(organizationID string, campaignID string, sourceID *string, phase *int) ([]Conversation, error) {
 	var conversations []Conversation
 
 	query := firestoredb.Client.Collection(fmt.Sprintf("organizations/%s/campaigns/%s/conversations", organizationID, campaignID)).Query
-	if pageId != nil {
-		query = query.Where("pageId", "==", *pageId)
+	if sourceID != nil {
+		query = query.Where("sourceId", "==", *sourceID)
 	}
 	if phase != nil {
 		query = query.Where("phase", "==", *phase)
