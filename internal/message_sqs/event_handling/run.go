@@ -25,8 +25,8 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		return err
 	}
 
-	pData := &models.SourcePrivate{}
-	err = pData.Get(cData.OrganizationID, cData.SourceID)
+	srcP := &models.SourcePrivate{}
+	err = srcP.Get(cData.OrganizationID, cData.SourceID)
 	if err != nil {
 		return err
 	}
@@ -35,13 +35,13 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		log.Println("This message is old.. Waiting for new message", cData.LastMID, conv.MID)
 		return nil
 	}
-	_, err = messenger.SendAction(cData.LeadID, messenger.MARK_SEEN, *pData.AccessToken)
+	_, err = messenger.SendAction(cData.LeadID, messenger.MARK_SEEN, *srcP.AccessToken)
 	if err != nil {
 		log.Println("Error while send Action", err.Error())
 	}
 
 	if !cData.IsProfileFetched {
-		uProfile, err := messenger.GetUser(cData.LeadID, *pData.AccessToken)
+		uProfile, err := messenger.GetUser(cData.LeadID, *srcP.AccessToken)
 		if err != nil {
 			return err
 		}
