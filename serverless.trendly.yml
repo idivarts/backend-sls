@@ -78,7 +78,10 @@ functions:
           bucket: ${self:service}-video-uploads
           event: s3:ObjectCreated:*
           existing: true
-
+          rules:
+            - prefix: ""  # Only triggers when an object is uploaded directly in the root
+            - suffix: ".mp4"  # Only triggers when the object has a .mp4 extension
+            
 package:
   patterns:
     - "!./**"
