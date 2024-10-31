@@ -32,5 +32,5 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
-          run build:trendly
+          npm run build:trendly
           npx sls deploy --config serverless.trendly.yml
