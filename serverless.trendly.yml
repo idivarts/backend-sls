@@ -7,7 +7,6 @@ provider:
   runtime: provided.al2
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
-    MEDIACONVERT_ROLE_ARN: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
 
 plugins:
   - serverless-go-plugin
@@ -47,6 +46,10 @@ functions:
 
   processVideoUpload:
     handler: functions/process_video/main.go
+    environment:
+      MEDIACONVERT_ROLE_ARN: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
+      MEDIACONVERT_JOBTEMPLATE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:jobTemplates/System-Generic_Mp4_Progressive
+      MEDIACONVERT_JOBQUEUE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:queues/Default
     events:
       - s3:
           bucket: ${self:service}-video-uploads
