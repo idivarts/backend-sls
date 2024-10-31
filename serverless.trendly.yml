@@ -13,6 +13,7 @@ provider:
         - Effect: "Allow"
           Action:
             - "iam:PassRole"
+            - "mediaconvert:CreateJob"
           Resource: "*"
         # - Effect: "Allow"
         #   Action:
