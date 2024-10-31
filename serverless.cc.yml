@@ -118,7 +118,7 @@ functions:
               - CCMessageQueue
               - Arn
   run_handler:
-    handler: dist/src/runHandler.runHandler
+    handler: dist/src/cc/runHandler.runHandler
     runtime: nodejs20.x
     package:
       patterns:
