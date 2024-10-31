@@ -1,0 +1,89 @@
+service: trendly-be
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  architecture: arm64
+  runtime: provided.al2
+  environment:
+    VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
+    MEDIACONVERT_ROLE_ARN: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
+
+plugins:
+  - serverless-go-plugin
+  - serverless-domain-manager
+  - serverless-certificate-creator
+  # - serverless-plugin-typescript
+
+custom:
+  go:
+    baseDir: . # folder where go.mod file lives, if set `handler` property should be set relatively to that folder
+    binDir: .bin # target folder for binary files
+    cgo: 0 # CGO_ENABLED flag
+    cmd: GOARCH=arm64 GOOS=linux go build -tags lambda.norpc # compile command
+    monorepo: false # if enabled, builds function every directory (useful for monorepo where go.mod is managed by each function
+    supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level)
+    buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
+  customCertificate:
+    certificateName: "be.trendly.pro"
+    hostedZoneIds: Z080267715NZAAP58PC3U
+    enabled: true
+    rewriteRecords: false
+  customDomain:
+    domainName: be.trendly.pro
+    basePath: ""
+    stage: dev
+    certificateName: "be.crowdy.chat"
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: "regional"
+    securityPolicy: tls_1_2
+
+functions:
+  generatePreSignedUrl:
+    handler: functions/s3/main.go
+    events:
+      - http: POST /s3-upload
+
+  processVideoUpload:
+    handler: functions/process_video/main.go
+    events:
+      - s3:
+          bucket: ${self:service}-video-uploads
+          event: s3:ObjectCreated:*
+          existing: true
+
+package:
+  patterns:
+    - "!./**"
+  individually: true
+
+resources:
+  Resources:
+    VideoUploadBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-video-uploads
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ["*"]
+              AllowedMethods: ["GET", "PUT", "POST", "DELETE"]
+              AllowedOrigins: ["*"]
+
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          Origins:
+            - DomainName: {"Fn::GetAtt": ["VideoUploadBucket", "DomainName"]}
+              Id: S3Origin
+              S3OriginConfig: {}
+          DefaultCacheBehavior:
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: "redirect-to-https"
+            AllowedMethods: ["GET", "HEAD"]
+            ForwardedValues:
+              QueryString: false
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: true
