@@ -9,8 +9,6 @@ jobs:
   setup:
     name: Setup Environment
     runs-on: ubuntu-latest
-    outputs:
-      # Outputs can store specific paths if needed for the deploy job
     steps:
       - uses: actions/checkout@v3
 
