@@ -7,6 +7,17 @@ provider:
   runtime: provided.al2
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
+  iam:
+    role:
+      statements:
+        - Effect: "Allow"
+          Action:
+            - "iam:PassRole"
+          Resource: "*"
+        # - Effect: "Allow"
+        #   Action:
+        #     - "sqs:sendmessage"
+        #   Resource: { "Fn::GetAtt": ["CCMessageQueue", "Arn"] }
 
 plugins:
   - serverless-go-plugin
