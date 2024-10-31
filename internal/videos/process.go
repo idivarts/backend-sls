@@ -35,8 +35,8 @@ func VideoProcessHandler(ctx context.Context, s3Event events.S3Event) {
 func createMediaConvertJobInput(s3ObjectKey string) *mediaconvert.CreateJobInput {
 	bucketName := os.Getenv("VIDEO_S3_BUCKET_NAME")
 	jobRoleArn := os.Getenv("MEDIACONVERT_ROLE_ARN")
-	jobTemplateArn := os.Getenv("MEDIACONVERT_ROLE_ARN")
-	jobQueueArn := os.Getenv("MEDIACONVERT_ROLE_ARN")
+	jobTemplateArn := os.Getenv("MEDIACONVERT_JOBTEMPLATE_ARN")
+	jobQueueArn := os.Getenv("MEDIACONVERT_JOBQUEUE_ARN")
 
 	return &mediaconvert.CreateJobInput{
 		JobTemplate: aws.String(jobTemplateArn),
