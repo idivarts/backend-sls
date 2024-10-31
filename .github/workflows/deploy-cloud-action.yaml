@@ -28,15 +28,35 @@ jobs:
 
       - run: npm run build
 
+      # Archive the build output
+      - name: Create Archive of Build Output
+        run: tar -czf build-output.tar.gz . # Adjust path as needed
+
+      # Upload the compressed archive as an artifact
+      - name: Upload Build Archive
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-output
+          path: build-output.tar.gz
+
   deploy:
     name: Deploy to Cloud Function
-    needs: setup  # Makes deploy dependent on setup
+    needs: setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
         app: [crowdy-chat, trendly]
     steps:
       - uses: actions/checkout@v3
+
+      # Download and extract the archived artifact
+      - name: Download Build Archive
+        uses: actions/download-artifact@v3
+        with:
+          name: build-output
+
+      - name: Extract Archive
+        run: tar -xzf build-output.tar.gz
 
       - name: Add Service JSON and Deploy
         env:
