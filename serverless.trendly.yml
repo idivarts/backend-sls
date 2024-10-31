@@ -12,13 +12,24 @@ provider:
       statements:
         - Effect: "Allow"
           Action:
-            - "iam:PassRole"
             - "mediaconvert:CreateJob"
+            - "mediaconvert:GetJob"
+            - "mediaconvert:ListJobs"
+            - "mediaconvert:CancelJob"
+            - "mediaconvert:DescribeEndpoints"
           Resource: "*"
-        # - Effect: "Allow"
-        #   Action:
-        #     - "sqs:sendmessage"
-        #   Resource: { "Fn::GetAtt": ["CCMessageQueue", "Arn"] }
+        - Effect: "Allow"
+          Action:
+            - "s3:GetObject"
+            - "s3:PutObject"
+            - "s3:ListBucket"
+          Resource: 
+            - arn:aws:s3:::${self:service}-video-uploads
+            - arn:aws:s3:::${self:service}-video-uploads/*
+        - Effect: "Allow"
+          Action:
+            - "iam:PassRole"
+          Resource: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
 
 plugins:
   - serverless-go-plugin
