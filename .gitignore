@@ -22,5 +22,5 @@ vendor
 node_modules
 .bin
 dist
-**/service-account.json
+**/service-account**.json
 .DS_Store
