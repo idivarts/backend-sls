@@ -11,7 +11,8 @@
     "typescript": "^5.6.2"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "build:trendly": "tsc --project tsconfig.trendly.json"
   },
   "dependencies": {
     "glob": "^10.3.12",
