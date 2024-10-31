@@ -1,0 +1,60 @@
+name: Deploy to Cloud Function
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Crowdy Chat Deploy
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+    steps:
+      - uses: actions/checkout@v3
+        # with:
+        #   submodules: true
+        #   ssh-key: ${{ secrets.GIT_SSH_KEY }}
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.2 # Set this to the Go version you're using
+      # - name: Cache Go modules
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/go/pkg/mod
+      #       ~/.cache/go-build
+      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-go-
+      - run: npm i
+      - run: go version
+      # - name: Install dependencies
+      - run: go mod download
+      - run: npm run build
+      - name: Add Service JSON and Deploy
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # This uses the secret stored in GitHub
+          FIREBASE_SERVICE_ACCOUNT_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
+          npx sls deploy --config serverless.cc.yml
+        
+    # - name: serverless deploy
+    #   uses: serverless/github-action@v3.2
+    #   with:
+    #     args: deploy
+    #   env:
+    #     # SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+    #     # or if using AWS credentials directly
+    #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
