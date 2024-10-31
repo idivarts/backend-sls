@@ -1,4 +1,4 @@
-name: Deploy to Cloud Function
+name: Deploy Crowdy Chat Function
 
 on:
   push:
@@ -38,7 +38,6 @@ jobs:
       - run: go version
       # - name: Install dependencies
       - run: go mod download
-      - run: npm run build
       - name: Add Service JSON and Deploy
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # This uses the secret stored in GitHub
@@ -47,6 +46,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
+          npm run build:cc
           npx sls deploy --config serverless.cc.yml
         
     # - name: serverless deploy
