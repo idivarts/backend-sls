@@ -108,7 +108,8 @@ resources:
             - DomainName: {"Fn::GetAtt": ["VideoUploadBucket", "DomainName"]}
               Id: S3Origin
               S3OriginConfig:
-                OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+                OriginAccessControlId: !Ref CloudFrontOriginAccessControl
+                # OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
           DefaultCacheBehavior:
             TargetOriginId: S3Origin
             ViewerProtocolPolicy: "redirect-to-https"
@@ -127,8 +128,18 @@ resources:
             CloudFrontDefaultCertificate: true
           # PriceClass: "PriceClass_100"
 
-    # S3 Bucket Policy for CloudFront
-    TrendlyS3BucketPolicy:
+    # CloudFront Origin Access Control (OAC)
+    CloudFrontOriginAccessControl:
+      Type: AWS::CloudFront::OriginAccessControl
+      Properties:
+        OriginAccessControlConfig:
+          Name: "TrendlyS3OAC"
+          OriginType: "s3"
+          SigningBehavior: "always"
+          SigningProtocol: "sigv4"
+
+    # S3 Bucket Policy for CloudFront with OAC
+    VideoS3BucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-video-uploads
@@ -137,17 +148,31 @@ resources:
           Statement:
             - Effect: Allow
               Principal:
-                Service: cloudfront.amazonaws.com
+                AWS: !GetAtt CloudFrontOriginAccessControl.AccessControlId
               Action: "s3:GetObject"
-              Resource: arn:aws:s3:::${self:service}-video-uploads/*
-              Condition:
-                StringEquals:
-                  "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2SI5E1LON8KJ0
-                  # {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
+              Resource: "arn:aws:s3:::${self:service}-video-uploads/*"
 
-    # CloudFront Origin Access Identity
-    CloudFrontOriginAccessIdentity:
-      Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-      Properties:
-        CloudFrontOriginAccessIdentityConfig:
-          Comment: "Access identity for CloudFront to securely fetch content from trendly-be-video-uploads S3 bucket"
+    # # S3 Bucket Policy for CloudFront
+    # TrendlyS3BucketPolicy:
+    #   Type: AWS::S3::BucketPolicy
+    #   Properties:
+    #     Bucket: ${self:service}-video-uploads
+    #     PolicyDocument:
+    #       Version: "2012-10-17"
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #             Service: cloudfront.amazonaws.com
+    #           Action: "s3:GetObject"
+    #           Resource: arn:aws:s3:::${self:service}-video-uploads/*
+    #           Condition:
+    #             StringEquals:
+    #               "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2SI5E1LON8KJ0
+    #               # {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
+
+    # # CloudFront Origin Access Identity
+    # CloudFrontOriginAccessIdentity:
+    #   Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    #   Properties:
+    #     CloudFrontOriginAccessIdentityConfig:
+    #       Comment: "Access identity for CloudFront to securely fetch content from trendly-be-video-uploads S3 bucket"
