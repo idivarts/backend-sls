@@ -36,7 +36,8 @@ func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest)
 	// Remove the extension from the filename
 	fileWithoutExtension := strings.TrimSuffix(filename, ext)
 
-	fetchUrl := fmt.Sprintf("%s/outputs/%s.m3u8", domainUrl, fileWithoutExtension)
+	appleUrl := fmt.Sprintf("%s/outputs/%s.m3u8", domainUrl, fileWithoutExtension)
+	playUrl := fmt.Sprintf("%s/outputs/%s.mpd", domainUrl, fileWithoutExtension)
 
 	req, _ := svc.PutObjectRequest(&s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
@@ -50,6 +51,6 @@ func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest)
 
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
-		Body:       fmt.Sprintf(`{"uploadUrl": "%s", "fetchUrl": "%s"}`, url, fetchUrl),
+		Body:       fmt.Sprintf(`{"uploadUrl": "%s", "appleUrl": "%s", "playUrl":"%s"}`, url, appleUrl, playUrl),
 	}, nil
 }
