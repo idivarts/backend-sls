@@ -142,8 +142,9 @@ resources:
               Resource: arn:aws:s3:::${self:service}-video-uploads/*
               Condition:
                 StringEquals:
-                  "AWS:SourceArn": {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
-                  
+                  "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2SI5E1LON8KJ0
+                  # {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
+
     # CloudFront Origin Access Identity
     CloudFrontOriginAccessIdentity:
       Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
