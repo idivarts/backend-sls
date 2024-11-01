@@ -132,6 +132,7 @@ resources:
     CloudFrontOriginAccessControl:
       Type: AWS::CloudFront::OriginAccessControl
       Properties:
+        OriginAccessControlOriginType: "s3"
         OriginAccessControlConfig:
           Name: "TrendlyS3OAC"
           SigningBehavior: "always"
