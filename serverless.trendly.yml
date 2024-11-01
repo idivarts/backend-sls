@@ -81,7 +81,6 @@ functions:
           existing: true
           rules:
             - prefix: "uploads/"  # Only triggers when an object is uploaded directly in the root
-            - suffix: ".mp4"
             
 package:
   patterns:
