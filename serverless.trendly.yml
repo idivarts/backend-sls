@@ -148,7 +148,8 @@ resources:
           Statement:
             - Effect: Allow
               Principal:
-                AWS: !GetAtt CloudFrontOriginAccessControl.AccessControlId
+                AWS: !GetAtt CloudFrontOriginAccessControl.Arn
+                # AccessControlId
               Action: "s3:GetObject"
               Resource: "arn:aws:s3:::${self:service}-video-uploads/*"
 
