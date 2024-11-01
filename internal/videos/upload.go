@@ -50,6 +50,6 @@ func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest)
 
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
-		Body:       fmt.Sprintf(`{"url": "%s", "fetchUrl": "%s"}`, url, fetchUrl),
+		Body:       fmt.Sprintf(`{"uploadUrl": "%s", "fetchUrl": "%s"}`, url, fetchUrl),
 	}, nil
 }
