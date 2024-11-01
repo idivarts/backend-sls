@@ -7,6 +7,7 @@ provider:
   runtime: provided.al2
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
+    CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
   iam:
     role:
       statements:
