@@ -99,6 +99,23 @@ resources:
               AllowedMethods: ["GET", "PUT", "POST", "DELETE"]
               AllowedOrigins: ["*"]
 
+    # S3 Bucket Policy for CloudFront
+    TrendlyS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: ${self:service}-video-uploads
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: cloudfront.amazonaws.com
+              Action: "s3:GetObject"
+              Resource: arn:aws:s3:::${self:service}-video-uploads/*
+              Condition:
+                StringEquals:
+                  "AWS:SourceArn": !GetAtt CloudFrontDistribution.Arn
+
     CloudFrontDistribution:
       Type: AWS::CloudFront::Distribution
       Properties:
@@ -107,12 +124,29 @@ resources:
           Origins:
             - DomainName: {"Fn::GetAtt": ["VideoUploadBucket", "DomainName"]}
               Id: S3Origin
-              S3OriginConfig: {}
+              S3OriginConfig:
+                OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
           DefaultCacheBehavior:
             TargetOriginId: S3Origin
             ViewerProtocolPolicy: "redirect-to-https"
             AllowedMethods: ["GET", "HEAD"]
+            CachedMethods:
+              - GET
+              - HEAD
             ForwardedValues:
               QueryString: false
+              Cookies:
+                Forward: "none"
+            MinTTL: 0
+            DefaultTTL: 86400  # 1 day
+            MaxTTL: 31536000  # 1 year
           ViewerCertificate:
             CloudFrontDefaultCertificate: true
+          # PriceClass: "PriceClass_100"
+
+    # CloudFront Origin Access Identity
+    CloudFrontOriginAccessIdentity:
+      Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+      Properties:
+        CloudFrontOriginAccessIdentityConfig:
+          Comment: "Access identity for CloudFront to securely fetch content from trendly-be-video-uploads S3 bucket"
