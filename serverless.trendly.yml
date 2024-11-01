@@ -134,7 +134,6 @@ resources:
       Properties:
         OriginAccessControlConfig:
           Name: "TrendlyS3OAC"
-          OriginType: "s3"
           SigningBehavior: "always"
           SigningProtocol: "sigv4"
 
