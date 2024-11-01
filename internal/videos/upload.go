@@ -30,7 +30,7 @@ func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest)
 
 	req, _ := svc.PutObjectRequest(&s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
-		Key:    aws.String(filename),
+		Key:    aws.String(fmt.Sprintf("uploads/%s", filename)),
 	})
 	url, err := req.Presign(15 * time.Minute)
 	if err != nil {
