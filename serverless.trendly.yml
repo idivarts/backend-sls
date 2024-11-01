@@ -107,7 +107,7 @@ resources:
           Origins:
             - DomainName: {"Fn::GetAtt": ["VideoUploadBucket", "DomainName"]}
               Id: S3Origin
-              OriginAccessControlId: !Ref CloudFrontOriginAccessControl
+              OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
               # S3OriginConfig:
                 # OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
           DefaultCacheBehavior:
