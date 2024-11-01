@@ -139,7 +139,7 @@ resources:
           SigningProtocol: "sigv4"
 
     # S3 Bucket Policy for CloudFront with OAC
-    VideoS3BucketPolicy:
+    TrendlyS3BucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-video-uploads
