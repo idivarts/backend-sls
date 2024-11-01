@@ -99,23 +99,6 @@ resources:
               AllowedMethods: ["GET", "PUT", "POST", "DELETE"]
               AllowedOrigins: ["*"]
 
-    # S3 Bucket Policy for CloudFront
-    TrendlyS3BucketPolicy:
-      Type: AWS::S3::BucketPolicy
-      Properties:
-        Bucket: ${self:service}-video-uploads
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service: cloudfront.amazonaws.com
-              Action: "s3:GetObject"
-              Resource: arn:aws:s3:::${self:service}-video-uploads/*
-              Condition:
-                StringEquals:
-                  "AWS:SourceArn": !GetAtt CloudFrontDistribution.Arn
-
     CloudFrontDistribution:
       Type: AWS::CloudFront::Distribution
       Properties:
@@ -144,6 +127,23 @@ resources:
             CloudFrontDefaultCertificate: true
           # PriceClass: "PriceClass_100"
 
+    # S3 Bucket Policy for CloudFront
+    TrendlyS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: ${self:service}-video-uploads
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: cloudfront.amazonaws.com
+              Action: "s3:GetObject"
+              Resource: arn:aws:s3:::${self:service}-video-uploads/*
+              Condition:
+                StringEquals:
+                  "AWS:SourceArn": {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
+                  
     # CloudFront Origin Access Identity
     CloudFrontOriginAccessIdentity:
       Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
