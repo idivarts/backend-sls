@@ -139,19 +139,19 @@ resources:
           SigningProtocol: "sigv4"
 
     # S3 Bucket Policy for CloudFront with OAC
-    TrendlyS3BucketPolicy:
-      Type: AWS::S3::BucketPolicy
-      Properties:
-        Bucket: ${self:service}-video-uploads
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Principal:
-                AWS: !GetAtt CloudFrontOriginAccessControl.Id
-                # AccessControlId
-              Action: "s3:GetObject"
-              Resource: "arn:aws:s3:::${self:service}-video-uploads/*"
+    # TrendlyS3BucketPolicy:
+    #   Type: AWS::S3::BucketPolicy
+    #   Properties:
+    #     Bucket: ${self:service}-video-uploads
+    #     PolicyDocument:
+    #       Version: "2012-10-17"
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #             AWS: !GetAtt CloudFrontOriginAccessControl.Id
+    #             # AccessControlId
+    #           Action: "s3:GetObject"
+    #           Resource: "arn:aws:s3:::${self:service}-video-uploads/*"
 
     # # S3 Bucket Policy for CloudFront
     # TrendlyS3BucketPolicy:
