@@ -39,49 +39,74 @@ func createMediaConvertJobInput(s3ObjectKey string) *mediaconvert.CreateJobInput
 	jobQueueArn := os.Getenv("MEDIACONVERT_JOBQUEUE_ARN")
 
 	return &mediaconvert.CreateJobInput{
-		JobTemplate: aws.String(jobTemplateArn),
-		Queue:       aws.String(jobQueueArn),
-		Role:        aws.String(jobRoleArn),
 		Settings: &mediaconvert.JobSettings{
 			OutputGroups: []*mediaconvert.OutputGroup{
 				{
-					Name: aws.String("File Group"),
+					Name: aws.String("CMAF"),
 					Outputs: []*mediaconvert.Output{
 						{
-							Preset:       aws.String("System-Generic_Uhd_Mp4_Hevc_Aac_16x9_3840x2160p_24Hz_8Mbps"),
-							Extension:    aws.String("mp4"),
-							NameModifier: aws.String("_Generic_Uhd_Mp4_Hevc_Aac_16x9_3840x2160p_24Hz_8Mbps"),
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1920x1080p_30Hz_10Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1920x1080p_30Hz_10000Kbps_Cbr"),
 						},
 						{
-							Preset:       aws.String("System-Generic_Hd_Mp4_Hevc_Aac_16x9_1920x1080p_24Hz_4.5Mbps"),
-							Extension:    aws.String("mp4"),
-							NameModifier: aws.String("_Generic_Hd_Mp4_Hevc_Aac_16x9_1920x1080p_24Hz_4.5Mbps"),
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1920x1080p_30Hz_8Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1920x1080p_30Hz_8000Kbps_Cbr"),
 						},
 						{
-							Preset:       aws.String("System-Generic_Hd_Mp4_Hevc_Aac_16x9_1280x720p_24Hz_3.0Mbps"),
-							Extension:    aws.String("mp4"),
-							NameModifier: aws.String("_Generic_Hd_Mp4_Hevc_Aac_16x9_1280x720p_24Hz_3.0Mbps"),
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1440x810p_30Hz_6Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1440x810p_30Hz_6000Kbps_Cbr"),
 						},
 						{
-							Preset:       aws.String("System-Generic_Hd_Mp4_Avc_Aac_16x9_1920x1080p_24Hz_6Mbps"),
-							Extension:    aws.String("mp4"),
-							NameModifier: aws.String("_Generic_Hd_Mp4_Avc_Aac_16x9_1920x1080p_24Hz_6Mbps"),
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1440x810p_30Hz_5Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1440x810p_30Hz_5000Kbps_Cbr"),
 						},
 						{
-							Preset:       aws.String("System-Generic_Hd_Mp4_Avc_Aac_16x9_1280x720p_24Hz_4.5Mbps"),
-							Extension:    aws.String("mp4"),
-							NameModifier: aws.String("_Generic_Hd_Mp4_Avc_Aac_16x9_1280x720p_24Hz_4.5Mbps"),
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1280x720p_30Hz_5Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1280x720p_30Hz_5000Kbps_Cbr"),
 						},
 						{
-							Preset:       aws.String("System-Generic_Sd_Mp4_Avc_Aac_4x3_640x480p_24Hz_1.5Mbps"),
-							Extension:    aws.String("mp4"),
-							NameModifier: aws.String("_Generic_Sd_Mp4_Avc_Aac_4x3_640x480p_24Hz_1.5Mbps"),
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1280x720p_30Hz_4Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_1280x720p_30Hz_4000Kbps_Cbr"),
+						},
+						{
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_960x540p_30Hz_2.5Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_960x540p_30Hz_2500Kbps_Cbr"),
+						},
+						{
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_768x432p_30Hz_1.2Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_768x432p_30Hz_1200Kbps_Cbr"),
+						},
+						{
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_640x360p_30Hz_0.8Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_640x360p_30Hz_800Kbps_Cbr"),
+						},
+						{
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Avc_16x9_Sdr_416x234p_30Hz_0.36Mbps_Cbr"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Avc_16x9_Sdr_416x234p_30Hz_360Kbps_Cbr"),
+						},
+						{
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Aac_He_96Kbps"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Aac_He_96Kbps"),
+						},
+						{
+							Preset:       aws.String("System-Ott_Cmaf_Cmfc_Aac_He_64Kbps"),
+							NameModifier: aws.String("_Ott_Cmaf_Cmfc_Aac_He_64Kbps"),
 						},
 					},
 					OutputGroupSettings: &mediaconvert.OutputGroupSettings{
-						Type: aws.String("FILE_GROUP_SETTINGS"),
-						FileGroupSettings: &mediaconvert.FileGroupSettings{
-							Destination: aws.String(fmt.Sprintf("s3://%s/outputs/%s", bucketName, s3ObjectKey)),
+						Type: aws.String("CMAF_GROUP_SETTINGS"),
+						CmafGroupSettings: &mediaconvert.CmafGroupSettings{
+							WriteHlsManifest:       aws.String("ENABLED"),
+							WriteDashManifest:      aws.String("ENABLED"),
+							SegmentLength:          aws.Int64(30),
+							FragmentLength:         aws.Int64(3),
+							SegmentControl:         aws.String("SEGMENTED_FILES"),
+							ManifestDurationFormat: aws.String("INTEGER"),
+							StreamInfResolution:    aws.String("INCLUDE"),
+							ClientCache:            aws.String("ENABLED"),
+							ManifestCompression:    aws.String("NONE"),
+							CodecSpecification:     aws.String("RFC_4281"),
+							Destination:            aws.String(fmt.Sprintf("s3://%s/outputs/", bucketName)),
 						},
 					},
 				},
@@ -89,22 +114,24 @@ func createMediaConvertJobInput(s3ObjectKey string) *mediaconvert.CreateJobInput
 			AdAvailOffset: aws.Int64(0),
 			Inputs: []*mediaconvert.Input{
 				{
+					TimecodeSource: aws.String("ZEROBASED"),
+					VideoSelector:  &mediaconvert.VideoSelector{},
 					AudioSelectors: map[string]*mediaconvert.AudioSelector{
 						"Audio Selector 1": {
 							DefaultSelection: aws.String("DEFAULT"),
 						},
 					},
-					VideoSelector:  &mediaconvert.VideoSelector{},
-					TimecodeSource: aws.String("ZEROBASED"),
-					FileInput:      aws.String(fmt.Sprintf("s3://%s/%s", bucketName, s3ObjectKey)),
+					FileInput: aws.String(fmt.Sprintf("s3://%s/%s", bucketName, s3ObjectKey)),
 				},
 			},
+			FollowSource: aws.Int64(1),
 		},
-		BillingTagsSource:    aws.String("JOB"),
-		AccelerationSettings: &mediaconvert.AccelerationSettings{Mode: aws.String("DISABLED")},
-		StatusUpdateInterval: aws.String("SECONDS_60"),
-		Priority:             aws.Int64(0),
-		HopDestinations:      []*mediaconvert.HopDestination{},
-		UserMetadata:         map[string]*string{},
+		AccelerationSettings: &mediaconvert.AccelerationSettings{
+			Mode: aws.String("DISABLED"),
+		},
+		HopDestinations: []*mediaconvert.HopDestination{},
+		JobTemplate:     aws.String(jobTemplateArn),
+		Queue:           aws.String(jobQueueArn),
+		Role:            aws.String(jobRoleArn),
 	}
 }

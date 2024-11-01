@@ -71,7 +71,7 @@ functions:
     handler: functions/process_video/main.go
     environment:
       MEDIACONVERT_ROLE_ARN: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
-      MEDIACONVERT_JOBTEMPLATE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:jobTemplates/System-Generic_Mp4_Progressive
+      MEDIACONVERT_JOBTEMPLATE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:jobTemplates/System-Ott_Cmaf_Cmfc_Avc_Aac_Sdr_Cbr
       MEDIACONVERT_JOBQUEUE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:queues/Default
     events:
       - s3:
@@ -139,19 +139,19 @@ resources:
           SigningProtocol: "sigv4"
 
     # S3 Bucket Policy for CloudFront with OAC
-    VideoS3BucketPolicy:
-      Type: AWS::S3::BucketPolicy
-      Properties:
-        Bucket: ${self:service}-video-uploads
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Principal:
-                AWS: !GetAtt CloudFrontOriginAccessControl.Id
-                # AccessControlId
-              Action: "s3:GetObject"
-              Resource: "arn:aws:s3:::${self:service}-video-uploads/*"
+    # VideoS3BucketPolicy:
+    #   Type: AWS::S3::BucketPolicy
+    #   Properties:
+    #     Bucket: ${self:service}-video-uploads
+    #     PolicyDocument:
+    #       Version: "2012-10-17"
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #             AWS: !GetAtt CloudFrontOriginAccessControl.Id
+    #             # AccessControlId
+    #           Action: "s3:GetObject"
+    #           Resource: "arn:aws:s3:::${self:service}-video-uploads/*"
 
     # # S3 Bucket Policy for CloudFront
     # TrendlyS3BucketPolicy:
