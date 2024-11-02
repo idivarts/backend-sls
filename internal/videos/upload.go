@@ -16,10 +16,29 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+// Check if the filename has a video extension
+func isVideoFile(filename string) bool {
+	videoExtensions := []string{".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".webm", ".mpeg"}
+
+	// Get the file extension and convert it to lowercase
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	// Check if the extension is in the list of video extensions
+	for _, videoExt := range videoExtensions {
+		if ext == videoExt {
+			return true
+		}
+	}
+	return false
+}
+
 func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	filename := request.QueryStringParameters["filename"]
 	if filename == "" {
 		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest, Body: "Filename is required"}, nil
+	}
+	if !isVideoFile(filename) {
+		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest, Body: "File needs to be a video"}, nil
 	}
 
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -31,6 +50,7 @@ func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest)
 	bucketName := os.Getenv("VIDEO_S3_BUCKET_NAME")
 	domainUrl := os.Getenv("CLOUDFRONT_DISTRIBUTION_URL")
 
+	filename = fmt.Sprintf("file_%d_%s", time.Now().Unix(), filename)
 	// Get the file extension
 	ext := filepath.Ext(filename)
 	// Remove the extension from the filename
