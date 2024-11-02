@@ -10,8 +10,8 @@ provider:
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-image-uploads
     CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
-    IMAGE_CF_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
-    ATTACHMENT_CF_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
+    IMAGE_CF_DISTRIBUTION_URL: https://d1tfun8qrz04mk.cloudfront.net
+    ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
     WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
   iam:
     role:
@@ -227,6 +227,23 @@ resources:
           SigningBehavior: "always"
           SigningProtocol: "sigv4"
     
+    # S3 Bucket Policy for CloudFront
+    ImageS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: ${self:service}-image-uploads
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: cloudfront.amazonaws.com
+              Action: "s3:GetObject"
+              Resource: arn:aws:s3:::${self:service}-image-uploads/*
+              Condition:
+                StringEquals:
+                  "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2IB9GHFJLTLW8
+    
     # --------------------------------------------------------------------------------------
     # ------------- S3 for Attachemnts -----------------------------------------------------
     # --------------------------------------------------------------------------------------
@@ -279,20 +296,19 @@ resources:
           SigningBehavior: "always"
           SigningProtocol: "sigv4"
 
-    # # # S3 Bucket Policy for CloudFront
-    # ImageS3BucketPolicy:
-    #   Type: AWS::S3::BucketPolicy
-    #   Properties:
-    #     Bucket: ${self:service}-image-uploads
-    #     PolicyDocument:
-    #       Version: "2012-10-17"
-    #       Statement:
-    #         - Effect: Allow
-    #           Principal:
-    #             Service: cloudfront.amazonaws.com
-    #           Action: "s3:GetObject"
-    #           Resource: arn:aws:s3:::${self:service}-image-uploads/*
-    #           Condition:
-    #             StringEquals:
-    #               "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2SI5E1LON8KJ0
-    #               # {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
+    # S3 Bucket Policy for CloudFront
+    AttachmentS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: ${self:service}-attachment-uploads
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: cloudfront.amazonaws.com
+              Action: "s3:GetObject"
+              Resource: arn:aws:s3:::${self:service}-attachment-uploads/*
+              Condition:
+                StringEquals:
+                  "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/EKFBJTEBWZH55
