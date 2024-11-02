@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	"github.com/TrendsHub/th-backend/internal/s3/attachments"
-	"github.com/TrendsHub/th-backend/internal/s3/images"
-	"github.com/TrendsHub/th-backend/internal/s3/videos"
-	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/s3/attachments"
+	"github.com/idivarts/backend-sls/internal/s3/images"
+	"github.com/idivarts/backend-sls/internal/s3/videos"
+	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
 
 func main() {

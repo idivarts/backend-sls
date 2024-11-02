@@ -3,8 +3,8 @@ package timehandler_test
 import (
 	"testing"
 
-	"github.com/TrendsHub/th-backend/internal/models"
-	timehandler "github.com/TrendsHub/th-backend/internal/time_handler"
+	"github.com/idivarts/backend-sls/internal/models"
+	timehandler "github.com/idivarts/backend-sls/internal/time_handler"
 )
 
 func TestCalculateMessageDelay(t *testing.T) {

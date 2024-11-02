@@ -1,7 +1,7 @@
 package websocket
 
 import (
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 var (

@@ -5,7 +5,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/TrendsHub/th-backend/pkg/firebase/fauth"
+	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 )
 
 func TestCreateIDToken(m *testing.T) {

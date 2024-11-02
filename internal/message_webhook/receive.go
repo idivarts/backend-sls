@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	mwh_handler "github.com/TrendsHub/th-backend/internal/message_webhook/handler"
-	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
 	"github.com/gin-gonic/gin"
+	mwh_handler "github.com/idivarts/backend-sls/internal/message_webhook/handler"
+	instainterfaces "github.com/idivarts/backend-sls/pkg/interfaces/instaInterfaces"
 )
 
 func Receive(c *gin.Context) {

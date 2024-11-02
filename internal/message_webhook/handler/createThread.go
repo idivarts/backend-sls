@@ -3,7 +3,7 @@ package mwh_handler
 import (
 	"log"
 
-	"github.com/TrendsHub/th-backend/internal/models"
+	"github.com/idivarts/backend-sls/internal/models"
 )
 
 func (msg *IGMessagehandler) createMessageThread(includeLastMessage bool) (*models.Conversation, error) {

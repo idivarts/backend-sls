@@ -5,12 +5,12 @@ import (
 	"log"
 	"net/http"
 
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	"github.com/TrendsHub/th-backend/internal/models"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
-	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
 	"github.com/gin-gonic/gin"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models"
+	"github.com/idivarts/backend-sls/pkg/messenger"
+	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
 // type ISyncConversations struct {

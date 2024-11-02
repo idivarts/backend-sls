@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	"github.com/TrendsHub/th-backend/internal/models"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models"
+	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
 type IPageWebhook struct {

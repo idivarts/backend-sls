@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/models"
-	openaitools "github.com/TrendsHub/th-backend/internal/openai/tools"
-	"github.com/TrendsHub/th-backend/pkg/openai"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/models"
+	openaitools "github.com/idivarts/backend-sls/internal/openai/tools"
+	"github.com/idivarts/backend-sls/pkg/openai"
 )
 
 func main() {

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/models"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
-	"github.com/TrendsHub/th-backend/pkg/openai"
-	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/models"
+	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/openai"
+	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
 func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) error {

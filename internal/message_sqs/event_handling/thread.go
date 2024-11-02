@@ -3,8 +3,8 @@ package eventhandling
 import (
 	"log"
 
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/models"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/models"
 )
 
 func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {

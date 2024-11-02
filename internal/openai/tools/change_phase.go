@@ -3,10 +3,10 @@ package openaitools
 import (
 	"log"
 
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/models"
-	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
-	"github.com/TrendsHub/th-backend/pkg/openai"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/models"
+	openaifc "github.com/idivarts/backend-sls/internal/openai/fc"
+	"github.com/idivarts/backend-sls/pkg/openai"
 )
 
 type ChangePhaseOuput struct {

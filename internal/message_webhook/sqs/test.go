@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/gin-gonic/gin"
+	delayedsqs "github.com/idivarts/backend-sls/pkg/delayed_sqs"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 type testSQSMessage struct {

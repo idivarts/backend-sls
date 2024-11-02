@@ -1,7 +1,7 @@
 package timehandler
 
 import (
-	"github.com/TrendsHub/th-backend/internal/models"
+	"github.com/idivarts/backend-sls/internal/models"
 )
 
 const REMINDER_SECONDS = 60 * 60 * 6

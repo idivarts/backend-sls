@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/models"
-	openaitools "github.com/TrendsHub/th-backend/internal/openai/tools"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
-	"github.com/TrendsHub/th-backend/pkg/openai"
-	sqshandler "github.com/TrendsHub/th-backend/pkg/sqs_handler"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/models"
+	openaitools "github.com/idivarts/backend-sls/internal/openai/tools"
+	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/openai"
+	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
 type IProcessedInput struct {

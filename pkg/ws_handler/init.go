@@ -3,10 +3,10 @@ package wshandler
 import (
 	"os"
 
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apigatewaymanagementapi"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 var (

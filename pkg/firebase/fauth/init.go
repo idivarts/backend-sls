@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"firebase.google.com/go/auth"
-	firebaseapp "github.com/TrendsHub/th-backend/pkg/firebase"
+	firebaseapp "github.com/idivarts/backend-sls/pkg/firebase"
 )
 
 var Client *auth.Client

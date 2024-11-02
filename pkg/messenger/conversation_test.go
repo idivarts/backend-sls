@@ -3,7 +3,7 @@ package messenger_test
 import (
 	"testing"
 
-	"github.com/TrendsHub/th-backend/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
 var conversationID = ""

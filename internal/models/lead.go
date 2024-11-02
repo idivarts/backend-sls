@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
 type Leads struct {

@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	campaignsapi "github.com/TrendsHub/th-backend/internal/ccapis/campaigns"
 	"github.com/gin-gonic/gin"
+	campaignsapi "github.com/idivarts/backend-sls/internal/ccapis/campaigns"
 )
 
 func TestCreateCampaign(t *testing.T) {

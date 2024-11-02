@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	sourcesapi "github.com/TrendsHub/th-backend/internal/ccapis/sources"
 	"github.com/gin-gonic/gin"
+	sourcesapi "github.com/idivarts/backend-sls/internal/ccapis/sources"
 )
 
 func TestFacebookLogin(t *testing.T) {

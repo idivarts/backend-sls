@@ -6,11 +6,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	"github.com/TrendsHub/th-backend/internal/models"
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
-	"github.com/TrendsHub/th-backend/pkg/openai"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/openai"
 	"google.golang.org/api/iterator"
 )
 

@@ -1,12 +1,12 @@
 package main
 
 import (
-	campaignsapi "github.com/TrendsHub/th-backend/internal/ccapis/campaigns"
-	conversationsapi "github.com/TrendsHub/th-backend/internal/ccapis/campaigns/conversations"
-	finetune "github.com/TrendsHub/th-backend/internal/ccapis/campaigns/fineTune"
-	sourcesapi "github.com/TrendsHub/th-backend/internal/ccapis/sources"
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
+	campaignsapi "github.com/idivarts/backend-sls/internal/ccapis/campaigns"
+	conversationsapi "github.com/idivarts/backend-sls/internal/ccapis/campaigns/conversations"
+	finetune "github.com/idivarts/backend-sls/internal/ccapis/campaigns/fineTune"
+	sourcesapi "github.com/idivarts/backend-sls/internal/ccapis/sources"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
 
 func main() {

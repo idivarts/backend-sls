@@ -6,9 +6,9 @@ import (
 	"log"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
-	"github.com/TrendsHub/th-backend/pkg/openai"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/openai"
 	"google.golang.org/api/iterator"
 )
 

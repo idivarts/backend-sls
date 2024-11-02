@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 
-	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
 	"github.com/aws/aws-lambda-go/events"
+	eventhandling "github.com/idivarts/backend-sls/internal/message_sqs/event_handling"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 )
 
 func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {

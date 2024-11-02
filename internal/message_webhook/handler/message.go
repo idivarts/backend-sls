@@ -7,12 +7,12 @@ import (
 	"log"
 	"time"
 
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/models"
-	timehandler "github.com/TrendsHub/th-backend/internal/time_handler"
-	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
-	instainterfaces "github.com/TrendsHub/th-backend/pkg/interfaces/instaInterfaces"
-	"github.com/TrendsHub/th-backend/pkg/openai"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/models"
+	timehandler "github.com/idivarts/backend-sls/internal/time_handler"
+	delayedsqs "github.com/idivarts/backend-sls/pkg/delayed_sqs"
+	instainterfaces "github.com/idivarts/backend-sls/pkg/interfaces/instaInterfaces"
+	"github.com/idivarts/backend-sls/pkg/openai"
 )
 
 type IGMessagehandler struct {

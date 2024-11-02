@@ -3,8 +3,8 @@ package openaitools
 import (
 	"log"
 
-	openaifc "github.com/TrendsHub/th-backend/internal/openai/fc"
-	"github.com/TrendsHub/th-backend/pkg/openai"
+	openaifc "github.com/idivarts/backend-sls/internal/openai/fc"
+	"github.com/idivarts/backend-sls/pkg/openai"
 )
 
 func CanConversationEnd(toolOption openai.ToolCall) (*openai.ToolOutput, error) {

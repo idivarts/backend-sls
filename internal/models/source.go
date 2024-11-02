@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"google.golang.org/api/iterator"
 )
 

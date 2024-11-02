@@ -3,9 +3,9 @@ package campaignsapi
 import (
 	"net/http"
 
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	"github.com/TrendsHub/th-backend/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models"
 )
 
 func removeAllConversationFromCampaign(organizationID, campaignID, sourceID string) error {

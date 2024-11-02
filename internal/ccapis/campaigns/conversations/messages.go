@@ -3,13 +3,13 @@ package conversationsapi
 import (
 	"net/http"
 
-	eventhandling "github.com/TrendsHub/th-backend/internal/message_sqs/event_handling"
-	sqsevents "github.com/TrendsHub/th-backend/internal/message_sqs/events"
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	"github.com/TrendsHub/th-backend/internal/models"
-	"github.com/TrendsHub/th-backend/pkg/messenger"
-	"github.com/TrendsHub/th-backend/pkg/openai"
 	"github.com/gin-gonic/gin"
+	eventhandling "github.com/idivarts/backend-sls/internal/message_sqs/event_handling"
+	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models"
+	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/openai"
 )
 
 type IMessagesByID struct {

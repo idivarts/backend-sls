@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"firebase.google.com/go/auth"
-	"github.com/TrendsHub/th-backend/pkg/firebase/fauth"
-	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 // Make the debug mode true to bypass the firebase token verification through id token method

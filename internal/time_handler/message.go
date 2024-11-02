@@ -3,8 +3,8 @@ package timehandler
 import (
 	"math/rand"
 
-	"github.com/TrendsHub/th-backend/internal/models"
-	"github.com/TrendsHub/th-backend/pkg/openai"
+	"github.com/idivarts/backend-sls/internal/models"
+	"github.com/idivarts/backend-sls/pkg/openai"
 )
 
 func splitRange(min, max int) (int, int) {

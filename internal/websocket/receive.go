@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"log"
 
-	wshandler "github.com/TrendsHub/th-backend/pkg/ws_handler"
 	"github.com/aws/aws-lambda-go/events"
+	wshandler "github.com/idivarts/backend-sls/pkg/ws_handler"
 )
 
 type Message struct {

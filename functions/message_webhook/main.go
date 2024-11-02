@@ -1,9 +1,9 @@
 package main
 
 import (
-	messagewebhook "github.com/TrendsHub/th-backend/internal/message_webhook"
-	sqsapp "github.com/TrendsHub/th-backend/internal/message_webhook/sqs"
-	apihandler "github.com/TrendsHub/th-backend/pkg/api_handler"
+	messagewebhook "github.com/idivarts/backend-sls/internal/message_webhook"
+	sqsapp "github.com/idivarts/backend-sls/internal/message_webhook/sqs"
+	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
 
 func main() {

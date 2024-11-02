@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"cloud.google.com/go/firestore"
-	firebaseapp "github.com/TrendsHub/th-backend/pkg/firebase"
+	firebaseapp "github.com/idivarts/backend-sls/pkg/firebase"
 )
 
 var Client *firestore.Client

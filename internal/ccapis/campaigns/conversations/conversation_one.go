@@ -3,10 +3,10 @@ package conversationsapi
 import (
 	"net/http"
 
-	"github.com/TrendsHub/th-backend/internal/middlewares"
-	"github.com/TrendsHub/th-backend/internal/models"
-	delayedsqs "github.com/TrendsHub/th-backend/pkg/delayed_sqs"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models"
+	delayedsqs "github.com/idivarts/backend-sls/pkg/delayed_sqs"
 )
 
 type IUpdateConversation struct {

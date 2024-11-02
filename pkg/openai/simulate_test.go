@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TrendsHub/th-backend/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/openai"
 )
 
 func TestXxx(t *testing.T) {

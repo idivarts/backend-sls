@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/TrendsHub/th-backend/internal/s3/videos"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/idivarts/backend-sls/internal/s3/videos"
 )
 
 func main() {
