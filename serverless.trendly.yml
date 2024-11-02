@@ -7,7 +7,9 @@ provider:
   runtime: provided.al2
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
+    IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
+    IMAGE_CF_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
     WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
   iam:
     role:
