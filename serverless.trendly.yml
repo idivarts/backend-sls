@@ -32,6 +32,10 @@ provider:
           Resource: 
             - arn:aws:s3:::${self:service}-video-uploads
             - arn:aws:s3:::${self:service}-video-uploads/*
+            - arn:aws:s3:::${self:service}-image-uploads
+            - arn:aws:s3:::${self:service}-image-uploads/*
+            - arn:aws:s3:::${self:service}-attachment-uploads
+            - arn:aws:s3:::${self:service}-attachment-uploads/*
         - Effect: "Allow"
           Action:
             - "iam:PassRole"
