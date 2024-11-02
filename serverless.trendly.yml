@@ -8,6 +8,7 @@ provider:
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
+    WS_GATEWAY_ENDPOINT: https://w754u2apn0.execute-api.us-east-1.amazonaws.com/dev
   iam:
     role:
       statements:
@@ -63,6 +64,16 @@ custom:
     securityPolicy: tls_1_2
 
 functions:
+  t_websocket:
+    handler: functions/websocket/main.go
+    package:
+      include:
+        - 'service-account.json'
+    events:
+      - websocket: $connect
+      - websocket: $disconnect
+      - websocket: $default
+
   generatePreSignedUrl:
     handler: functions/s3/main.go
     events:
