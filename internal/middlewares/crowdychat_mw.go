@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"firebase.google.com/go/auth"
+	"github.com/TrendsHub/th-backend/pkg/firebase/fauth"
 	firestoredb "github.com/TrendsHub/th-backend/pkg/firebase/firestore"
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +19,20 @@ func GetUserId(c *gin.Context) (string, bool) {
 	}
 	return "", exists
 	// return
+}
+
+// Validate UID
+func isValidUID(client *auth.Client, uid string) bool {
+	// Try to get user by UID
+	_, err := client.GetUser(context.Background(), uid)
+	if err != nil {
+		if auth.IsUserNotFound(err) {
+			return false // UID does not exist
+		}
+		return false // Some other error
+	}
+
+	return true // UID is valid
 }
 
 // ValidateSessionMiddleware checks for required headers and validates them
@@ -38,15 +53,21 @@ func ValidateSessionMiddleware() gin.HandlerFunc {
 		}
 
 		// Verify the token with Firebase Admin SDK
-		// token, err := auth.Client.VerifyIDToken(context.Background(), idToken)
-		// if err != nil {
-		// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid ID token"})
-		// 	c.Abort()
-		// 	return
-		// }
-		token := auth.Token{
-			UID: idToken,
+		token, err := fauth.Client.VerifyIDToken(context.Background(), idToken)
+		if err != nil {
+			if isValidUID(fauth.Client, idToken) {
+				token = &auth.Token{
+					UID: idToken,
+				}
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid ID token"})
+				c.Abort()
+				return
+			}
 		}
+		// token := auth.Token{
+		// 	UID: idToken,
+		// }
 
 		// Token is valid; set user info in Gin context for use in handlers
 		c.Set("firebaseUID", token.UID)
