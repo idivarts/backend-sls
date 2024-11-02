@@ -107,7 +107,7 @@ resources:
         CorsConfiguration:
           CorsRules:
             - AllowedHeaders: ["*"]
-              AllowedMethods: ["GET", "PUT", "POST", "DELETE"]
+              AllowedMethods: ["GET", "PUT", "POST", "DELETE", "HEAD"]
               AllowedOrigins: ["*"]
 
     CloudFrontDistribution:
@@ -149,22 +149,7 @@ resources:
           SigningBehavior: "always"
           SigningProtocol: "sigv4"
 
-    # S3 Bucket Policy for CloudFront with OAC
-    # VideoS3BucketPolicy:
-    #   Type: AWS::S3::BucketPolicy
-    #   Properties:
-    #     Bucket: ${self:service}-video-uploads
-    #     PolicyDocument:
-    #       Version: "2012-10-17"
-    #       Statement:
-    #         - Effect: Allow
-    #           Principal:
-    #             AWS: !GetAtt CloudFrontOriginAccessControl.Id
-    #             # AccessControlId
-    #           Action: "s3:GetObject"
-    #           Resource: "arn:aws:s3:::${self:service}-video-uploads/*"
-
-    # # S3 Bucket Policy for CloudFront
+    # S3 Bucket Policy for CloudFront
     TrendlyS3BucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
@@ -182,9 +167,69 @@ resources:
                   "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2SI5E1LON8KJ0
                   # {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
 
-    # # CloudFront Origin Access Identity
-    # CloudFrontOriginAccessIdentity:
-    #   Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    ImageUploadBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-image-uploads
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ["*"]
+              AllowedMethods: ["GET", "PUT", "POST", "DELETE", "HEAD"]
+              AllowedOrigins: ["*"]
+
+    ImageCFDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          Origins:
+            - DomainName: {"Fn::GetAtt": ["ImageUploadBucket", "DomainName"]}
+              Id: S3ImageOrigin
+              OriginAccessControlId: !GetAtt ImageCFOriginAccessControl.Id
+              S3OriginConfig: {}
+                # OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+          DefaultCacheBehavior:
+            TargetOriginId: S3ImageOrigin
+            ViewerProtocolPolicy: "redirect-to-https"
+            AllowedMethods: ["GET", "HEAD"]
+            CachedMethods:
+              - GET
+              - HEAD
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: "none"
+            MinTTL: 0
+            DefaultTTL: 86400  # 1 day
+            MaxTTL: 31536000  # 1 year
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: true
+          # PriceClass: "PriceClass_100"
+
+    # CloudFront Origin Access Control (OAC)
+    ImageCFOriginAccessControl:
+      Type: AWS::CloudFront::OriginAccessControl
+      Properties:        
+        OriginAccessControlConfig:
+          Name: "TrendlyS3ImageOAC"
+          OriginAccessControlOriginType: "s3"
+          SigningBehavior: "always"
+          SigningProtocol: "sigv4"
+
+    # # # S3 Bucket Policy for CloudFront
+    # ImageS3BucketPolicy:
+    #   Type: AWS::S3::BucketPolicy
     #   Properties:
-    #     CloudFrontOriginAccessIdentityConfig:
-    #       Comment: "Access identity for CloudFront to securely fetch content from trendly-be-video-uploads S3 bucket"
+    #     Bucket: ${self:service}-image-uploads
+    #     PolicyDocument:
+    #       Version: "2012-10-17"
+    #       Statement:
+    #         - Effect: Allow
+    #           Principal:
+    #             Service: cloudfront.amazonaws.com
+    #           Action: "s3:GetObject"
+    #           Resource: arn:aws:s3:::${self:service}-image-uploads/*
+    #           Condition:
+    #             StringEquals:
+    #               "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2SI5E1LON8KJ0
+    #               # {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
