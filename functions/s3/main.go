@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware())
+	apiV1 := apihandler.GinEngine.Group("/s3/v1", middlewares.ValidateSessionMiddleware())
 
 	apiV1.POST("/videos", videos.S3UploadHandler)
 	apiV1.POST("/images", videos.S3UploadHandler)

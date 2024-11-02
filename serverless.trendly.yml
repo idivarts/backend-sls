@@ -78,10 +78,10 @@ functions:
       - websocket: $disconnect
       - websocket: $default
 
-  generatePreSignedUrl:
+  s3:
     handler: functions/s3/main.go
     events:
-      - http: POST /s3-upload
+      - http: ANY /s3/v1/{proxy+}
 
   processVideoUpload:
     handler: functions/process_video/main.go
