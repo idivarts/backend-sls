@@ -1,7 +1,6 @@
 package videos
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/gin-gonic/gin"
 )
 
 // Check if the filename has a video extension
@@ -32,13 +31,15 @@ func isVideoFile(filename string) bool {
 	return false
 }
 
-func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	filename := request.QueryStringParameters["filename"]
+func S3UploadHandler(ctx *gin.Context) {
+	filename := ctx.Query("filename")
 	if filename == "" {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest, Body: "Filename is required"}, nil
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Filename is required"})
+		return
 	}
 	if !isVideoFile(filename) {
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusBadRequest, Body: "File needs to be a video"}, nil
+		ctx.JSON(http.StatusBadRequest, gin.H{"message": "Invalid file extension"})
+		return
 	}
 
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -66,11 +67,9 @@ func S3UploadHandler(ctx context.Context, request events.APIGatewayProxyRequest)
 	url, err := req.Presign(15 * time.Minute)
 	if err != nil {
 		log.Println("Failed to sign request", err)
-		return events.APIGatewayProxyResponse{StatusCode: http.StatusInternalServerError}, nil
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
 	}
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Body:       fmt.Sprintf(`{"uploadUrl": "%s", "appleUrl": "%s", "playUrl":"%s"}`, url, appleUrl, playUrl),
-	}, nil
+	ctx.JSON(http.StatusOK, gin.H{"uploadUrl": url, "appleUrl": appleUrl, "playUrl": playUrl})
 }
