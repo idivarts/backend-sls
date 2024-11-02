@@ -8,8 +8,10 @@ provider:
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
+    ATTACHMENT_S3_BUCKET_NAME: ${self:service}-image-uploads
     CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
     IMAGE_CF_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
+    ATTACHMENT_CF_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
     WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
   iam:
     role:
@@ -102,6 +104,10 @@ package:
 
 resources:
   Resources:
+
+    # --------------------------------------------------------------------------------------
+    # ------------- S3 for Videos -----------------------------------------------------
+    # --------------------------------------------------------------------------------------
     VideoUploadBucket:
       Type: AWS::S3::Bucket
       Properties:
@@ -152,7 +158,7 @@ resources:
           SigningProtocol: "sigv4"
 
     # S3 Bucket Policy for CloudFront
-    TrendlyS3BucketPolicy:
+    VideoS3BucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-video-uploads
@@ -168,6 +174,10 @@ resources:
                 StringEquals:
                   "AWS:SourceArn": arn:aws:cloudfront::730335628944:distribution/E2SI5E1LON8KJ0
                   # {"Fn::GetAtt": ["CloudFrontDistribution", "Arn"]}
+
+    # --------------------------------------------------------------------------------------
+    # ------------- S3 for Images -----------------------------------------------------
+    # --------------------------------------------------------------------------------------
 
     ImageUploadBucket:
       Type: AWS::S3::Bucket
@@ -189,7 +199,6 @@ resources:
               Id: S3ImageOrigin
               OriginAccessControlId: !GetAtt ImageCFOriginAccessControl.Id
               S3OriginConfig: {}
-                # OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
           DefaultCacheBehavior:
             TargetOriginId: S3ImageOrigin
             ViewerProtocolPolicy: "redirect-to-https"
@@ -214,6 +223,58 @@ resources:
       Properties:        
         OriginAccessControlConfig:
           Name: "TrendlyS3ImageOAC"
+          OriginAccessControlOriginType: "s3"
+          SigningBehavior: "always"
+          SigningProtocol: "sigv4"
+    
+    # --------------------------------------------------------------------------------------
+    # ------------- S3 for Attachemnts -----------------------------------------------------
+    # --------------------------------------------------------------------------------------
+
+    AttachmentUploadBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-attachment-uploads
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ["*"]
+              AllowedMethods: ["GET", "PUT", "POST", "DELETE"]
+              AllowedOrigins: ["*"]
+
+    AttachmentCFDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          Origins:
+            - DomainName: {"Fn::GetAtt": ["AttachmentUploadBucket", "DomainName"]}
+              Id: S3AttachmentOrigin
+              OriginAccessControlId: !GetAtt AttachmentCFOriginAccessControl.Id
+              S3OriginConfig: {}
+          DefaultCacheBehavior:
+            TargetOriginId: S3AttachmentOrigin
+            ViewerProtocolPolicy: "redirect-to-https"
+            AllowedMethods: ["GET", "HEAD"]
+            CachedMethods:
+              - GET
+              - HEAD
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: "none"
+            MinTTL: 0
+            DefaultTTL: 86400  # 1 day
+            MaxTTL: 31536000  # 1 year
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: true
+          # PriceClass: "PriceClass_100"
+
+    # CloudFront Origin Access Control (OAC)
+    AttachmentCFOriginAccessControl:
+      Type: AWS::CloudFront::OriginAccessControl
+      Properties:        
+        OriginAccessControlConfig:
+          Name: "TrendlyS3AttachmentOAC"
           OriginAccessControlOriginType: "s3"
           SigningBehavior: "always"
           SigningProtocol: "sigv4"
