@@ -8,7 +8,7 @@ provider:
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
-    ATTACHMENT_S3_BUCKET_NAME: ${self:service}-image-uploads
+    ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
     CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
     IMAGE_CF_DISTRIBUTION_URL: https://d1tfun8qrz04mk.cloudfront.net
     ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
@@ -80,6 +80,9 @@ functions:
 
   s3:
     handler: functions/s3/main.go
+    package:
+      include:
+        - 'service-account.json'
     events:
       - http: ANY /s3/v1/{proxy+}
 
