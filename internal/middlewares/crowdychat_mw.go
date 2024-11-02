@@ -12,6 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Make the debug mode true to bypass the firebase token verification through id token method
+// In Production, it should be false
+const DEBUG_MODE = true
+
 func GetUserId(c *gin.Context) (string, bool) {
 	uId, exists := c.Get("firebaseUID")
 	if exists {
@@ -55,7 +59,7 @@ func ValidateSessionMiddleware() gin.HandlerFunc {
 		// Verify the token with Firebase Admin SDK
 		token, err := fauth.Client.VerifyIDToken(context.Background(), idToken)
 		if err != nil {
-			if isValidUID(fauth.Client, idToken) {
+			if DEBUG_MODE && isValidUID(fauth.Client, idToken) {
 				token = &auth.Token{
 					UID: idToken,
 				}
