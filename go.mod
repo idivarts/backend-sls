@@ -72,6 +72,7 @@ require (
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/aws/aws-sdk-go v1.52.1
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
+	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-resty/resty/v2 v2.12.0
 	google.golang.org/api v0.194.0
