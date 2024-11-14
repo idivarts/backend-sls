@@ -10,17 +10,17 @@ import (
 )
 
 type Leads struct {
-	ID          string                 `json:"id,omitempty"`
-	Email       *string                `json:"email,omitempty"`
-	Name        *string                `json:"name,omitempty"`
-	SourceType  SourceType             `json:"sourceType"`
-	SourceID    string                 `json:"sourceId"`
-	UserProfile *messenger.UserProfile `json:"userProfile,omitempty"`
-	TagID       *string                `json:"tagId,omitempty"`
-	CampaignID  *string                `json:"campaignId,omitempty"`
-	Status      int                    `json:"status"`
-	CreatedAt   int64                  `json:"createdAt"`
-	UpdatedAt   int64                  `json:"updatedAt"`
+	ID          string                 `json:"id,omitempty" firestore:"id"`
+	Email       *string                `json:"email,omitempty" firestore:"email"`
+	Name        *string                `json:"name,omitempty" firestore:"name"`
+	SourceType  SourceType             `json:"sourceType" firestore:"sourceType"`
+	SourceID    string                 `json:"sourceId" firestore:"sourceId"`
+	UserProfile *messenger.UserProfile `json:"userProfile,omitempty" firestore:"userProfile"`
+	TagID       *string                `json:"tagId,omitempty" firestore:"tagId"`
+	CampaignID  *string                `json:"campaignId,omitempty" firestore:"campaignId"`
+	Status      int                    `json:"status" firestore:"status"`
+	CreatedAt   int64                  `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt   int64                  `json:"updatedAt" firestore:"updatedAt"`
 }
 
 func (c *Leads) GetPath(organizationID string) (*string, error) {

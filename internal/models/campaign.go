@@ -9,33 +9,33 @@ import (
 )
 
 type Campaign struct {
-	OrganizationID string        `json:"organizationId"`
-	Name           string        `json:"name"`
-	Objective      string        `json:"objective"`
-	CreatedBy      string        `json:"createdBy"`
-	CreatedAt      int64         `json:"createdAt"`
-	UpdatedAt      int64         `json:"updatedAt"`
-	Status         int           `json:"status"`
-	ReplySpeed     Range         `json:"replySpeed"`
-	ReminderTiming Range         `json:"reminderTiming"`
-	ChatGPT        ChatGPTConfig `json:"chatgpt"`
+	OrganizationID string        `json:"organizationId" firestore:"organizationId"`
+	Name           string        `json:"name" firestore:"name"`
+	Objective      string        `json:"objective" firestore:"objective"`
+	CreatedBy      string        `json:"createdBy" firestore:"createdBy"`
+	CreatedAt      int64         `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt      int64         `json:"updatedAt" firestore:"updatedAt"`
+	Status         int           `json:"status" firestore:"status"`
+	ReplySpeed     Range         `json:"replySpeed" firestore:"replySpeed"`
+	ReminderTiming Range         `json:"reminderTiming" firestore:"reminderTiming"`
+	ChatGPT        ChatGPTConfig `json:"chatgpt" firestore:"chatgpt"`
 
 	// This will be used for storing the assistant data
-	AssistantID *string `json:"assistantId,omitempty"`
+	AssistantID *string `json:"assistantId,omitempty" firestore:"assistantId"`
 
 	// LeadStages     []LeadStage   `json:"leadStages"`
 }
 
 type Range struct {
-	Min int `json:"min"`
-	Max int `json:"max"`
+	Min int `json:"min" firestore:"min"`
+	Max int `json:"max" firestore:"max"`
 }
 
 type ChatGPTConfig struct {
-	Prescript string `json:"prescript"`
-	Purpose   string `json:"purpose"`
-	Actor     string `json:"actor"`
-	Examples  string `json:"examples"`
+	Prescript string `json:"prescript" firestore:"prescript"`
+	Purpose   string `json:"purpose" firestore:"purpose"`
+	Actor     string `json:"actor" firestore:"actor"`
+	Examples  string `json:"examples" firestore:"examples"`
 }
 
 func (c *Campaign) Get(organizationId, campaignId string) error {

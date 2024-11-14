@@ -1,11 +1,11 @@
 package models
 
 type Collectible struct {
-	OrganizationID string `json:"organizationId"`
-	CampaignID     string `json:"campaignId"`
-	LeadStageID    string `json:"leadStageId"`
-	Name           string `json:"name"`
-	Type           string `json:"type"`
-	Description    string `json:"description"`
-	Mandatory      bool   `json:"mandatory"`
+	OrganizationID string `json:"organizationId" firestore:"organizationId"`
+	CampaignID     string `json:"campaignId" firestore:"campaignId"`
+	LeadStageID    string `json:"leadStageId" firestore:"leadStageId"`
+	Name           string `json:"name" firestore:"name"`
+	Type           string `json:"type" firestore:"type"`
+	Description    string `json:"description" firestore:"description"`
+	Mandatory      bool   `json:"mandatory" firestore:"mandatory"`
 }

@@ -25,18 +25,18 @@ const (
 //		Bio      string `json:"bio" dynamodbav:"bio"`
 //	}
 type Source struct {
-	OrganizationID     string     `json:"organizationId"`
-	ID                 string     `json:"id"`
-	Name               string     `json:"name"`
-	UserID             string     `json:"userId"`
-	OwnerName          string     `json:"ownerName"`
-	IsWebhookConnected bool       `json:"isWebhookConnected"`
-	Status             int        `json:"status"`
-	UserName           *string    `json:"userName,omitempty"`
-	Bio                *string    `json:"bio,omitempty"`
-	SourceType         SourceType `json:"sourceType"`
-	ConnectedID        *string    `json:"connectedId,omitempty"`
-	CampaignID         *string    `json:"campaignId,omitempty"`
+	OrganizationID     string     `json:"organizationId" firestore:"organizationId"`
+	ID                 string     `json:"id" firestore:"id"`
+	Name               string     `json:"name" firestore:"name"`
+	UserID             string     `json:"userId" firestore:"userId"`
+	OwnerName          string     `json:"ownerName" firestore:"ownerName"`
+	IsWebhookConnected bool       `json:"isWebhookConnected" firestore:"isWebhookConnected"`
+	Status             int        `json:"status" firestore:"status"`
+	UserName           *string    `json:"userName,omitempty" firestore:"userName"`
+	Bio                *string    `json:"bio,omitempty" firestore:"bio"`
+	SourceType         SourceType `json:"sourceType" firestore:"sourceType"`
+	ConnectedID        *string    `json:"connectedId,omitempty" firestore:"connectedId"`
+	CampaignID         *string    `json:"campaignId,omitempty" firestore:"campaignId"`
 	// AccessToken        *string    `json:"accessToken,omitempty"`
 
 	// OLD FIELDS that we would need to shift in a different model

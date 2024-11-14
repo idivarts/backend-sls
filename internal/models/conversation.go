@@ -15,23 +15,23 @@ import (
 type Conversation struct {
 	LeadID string `json:"leadId"`
 
-	OrganizationID     string            `json:"organizationId"`
-	CampaignID         string            `json:"campaignId"`
-	SourceID           string            `json:"sourceId"`
-	ThreadID           string            `json:"threadId"`
-	LastMID            string            `json:"lastMid"`
-	LastBotMessageTime int64             `json:"lastBotMessageTime"`
-	BotMessageCount    int               `json:"botMessageCount"`
-	IsProfileFetched   bool              `json:"isProfileFetched"`
-	Phases             []int             `json:"phases"`
-	CurrentPhase       int               `json:"currentPhase"`
-	Collectibles       map[string]string `json:"collectibles"`
-	MessageQueue       *string           `json:"messageQueue,omitempty"`
-	NextMessageTime    *int64            `json:"nextMessageTime,omitempty"`
-	NextReminderTime   *int64            `json:"nextReminderTime,omitempty"`
-	ReminderQueue      *string           `json:"reminderQueue,omitempty"`
-	ReminderCount      int               `json:"reminderCount"`
-	Status             int               `json:"status"`
+	OrganizationID     string            `json:"organizationId" firestore:"organizationId"`
+	CampaignID         string            `json:"campaignId" firestore:"campaignId"`
+	SourceID           string            `json:"sourceId" firestore:"sourceId"`
+	ThreadID           string            `json:"threadId" firestore:"threadId"`
+	LastMID            string            `json:"lastMid" firestore:"lastMid"`
+	LastBotMessageTime int64             `json:"lastBotMessageTime" firestore:"lastBotMessageTime"`
+	BotMessageCount    int               `json:"botMessageCount" firestore:"botMessageCount"`
+	IsProfileFetched   bool              `json:"isProfileFetched" firestore:"isProfileFetched"`
+	Phases             []int             `json:"phases" firestore:"phases"`
+	CurrentPhase       int               `json:"currentPhase" firestore:"currentPhase"`
+	Collectibles       map[string]string `json:"collectibles" firestore:"collectibles"`
+	MessageQueue       *string           `json:"messageQueue,omitempty" firestore:"messageQueue"`
+	NextMessageTime    *int64            `json:"nextMessageTime,omitempty" firestore:"nextMessageTime"`
+	NextReminderTime   *int64            `json:"nextReminderTime,omitempty" firestore:"nextReminderTime"`
+	ReminderQueue      *string           `json:"reminderQueue,omitempty" firestore:"reminderQueue"`
+	ReminderCount      int               `json:"reminderCount" firestore:"reminderCount"`
+	Status             int               `json:"status" firestore:"status"`
 
 	// Old fields that needs to be replaced or removed
 	// IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
