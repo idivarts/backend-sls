@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/gin-contrib/cors"
 	campaignsapi "github.com/idivarts/backend-sls/internal/ccapis/campaigns"
 	conversationsapi "github.com/idivarts/backend-sls/internal/ccapis/campaigns/conversations"
 	finetune "github.com/idivarts/backend-sls/internal/ccapis/campaigns/fineTune"
@@ -11,13 +10,6 @@ import (
 )
 
 func main() {
-	apihandler.GinEngine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},                                       // replace with allowed origin(s)
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, // replace with allowed HTTP methods
-		AllowHeaders:     []string{"X-ORGANIZATION-ID", "Content-Type", "Authorization"},
-		AllowCredentials: true,
-	}))
-
 	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.ValidateOrganizationMiddleware())
 
 	apiV1.POST("/sources/facebook", sourcesapi.FacebookLogin)
