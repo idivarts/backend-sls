@@ -85,7 +85,7 @@ func SyncConversations(c *gin.Context) {
 	for _, v := range conversations {
 		igsid := messenger.GetRecepientIDFromParticipants(v.Participants, *pData.UserName)
 		log.Println("IGSID", igsid)
-		event := sqsevents.CREATE_THREAD
+		event := sqsevents.CREATE_OR_UPDATE_THREAD
 		// if req.All {
 		// 	event = sqsevents.CREATE_OR_UPDATE_THREAD
 		// }
