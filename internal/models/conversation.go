@@ -13,7 +13,7 @@ import (
 )
 
 type Conversation struct {
-	LeadID string `json:"leadId"`
+	LeadID string `json:"leadId" firestore:"leadId"`
 
 	OrganizationID     string            `json:"organizationId" firestore:"organizationId"`
 	CampaignID         string            `json:"campaignId" firestore:"campaignId"`
