@@ -59,7 +59,7 @@ func SyncConversations(c *gin.Context) {
 		return
 	}
 	ppData := &models.SourcePrivate{}
-	err = pData.Get(organizationID, cData.SourceID)
+	err = ppData.Get(organizationID, cData.SourceID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
