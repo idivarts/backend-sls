@@ -9,6 +9,7 @@ type LeadStage struct {
 	ExampleConversations string         `json:"exampleConversations" firestore:"exampleConversations"`
 	StopConversation     bool           `json:"stopConversation" firestore:"stopConversation"`
 	LeadConversion       bool           `json:"leadConversion" firestore:"leadConversion"`
+	Index                int            `json:"index" firestore:"index"`
 
 	// Collectibles         []Collectible  `json:"collectibles"`
 }
