@@ -34,9 +34,9 @@ type Conversation struct {
 	Status             int               `json:"status" firestore:"status"`
 
 	// Old fields that needs to be replaced or removed
-	// IGSID       string                 `json:"igsid" dynamodbav:"igsid"`
-	// UserProfile *messenger.UserProfile `json:"userProfile,omitempty" dynamodbav:"userProfile"`
-	// Information openaifc.ChangePhase   `json:"information" dynamodbav:"information"`
+	// IGSID       string                 `json:"igsid" firestore:"igsid"`
+	// UserProfile *messenger.UserProfile `json:"userProfile,omitempty" firestore:"userProfile"`
+	// Information openaifc.ChangePhase   `json:"information" firestore:"information"`
 }
 
 func (conversation *Conversation) CreateThread(includeLastMessage bool) error {

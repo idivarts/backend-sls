@@ -19,10 +19,10 @@ const (
 )
 
 //	type InstagramObject struct {
-//		ID       string `json:"id" dynamodbav:"id"`
-//		Name     string `json:"name" dynamodbav:"name"`
-//		UserName string `json:"userName" dynamodbav:"userName"`
-//		Bio      string `json:"bio" dynamodbav:"bio"`
+//		ID       string `json:"id" firestore:"id"`
+//		Name     string `json:"name" firestore:"name"`
+//		UserName string `json:"userName" firestore:"userName"`
+//		Bio      string `json:"bio" firestore:"bio"`
 //	}
 type Source struct {
 	OrganizationID     string     `json:"organizationId" firestore:"organizationId"`
@@ -40,11 +40,11 @@ type Source struct {
 	// AccessToken        *string    `json:"accessToken,omitempty"`
 
 	// OLD FIELDS that we would need to shift in a different model
-	// IsInstagram            bool   `json:"isInstagram" dynamodbav:"isInstagram"`
-	// AssistantID            string `json:"assistantId" dynamodbav:"assistantId"`
-	// ReminderTimeMultiplier int    `json:"reminderTimeMultiplier" dynamodbav:"reminderTimeMultiplier"`
-	// ReplyTimeMin           int    `json:"replyTimeMin" dynamodbav:"replyTimeMin"`
-	// ReplyTimeMax           int    `json:"replyTimeMax" dynamodbav:"replyTimeMax"`
+	// IsInstagram            bool   `json:"isInstagram" firestore:"isInstagram"`
+	// AssistantID            string `json:"assistantId" firestore:"assistantId"`
+	// ReminderTimeMultiplier int    `json:"reminderTimeMultiplier" firestore:"reminderTimeMultiplier"`
+	// ReplyTimeMin           int    `json:"replyTimeMin" firestore:"replyTimeMin"`
+	// ReplyTimeMax           int    `json:"replyTimeMax" firestore:"replyTimeMax"`
 
 	// Instagram   *InstagramObject `json:"instagram,omitempty"`
 }
