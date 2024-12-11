@@ -74,6 +74,12 @@ func FacebookLogin(c *gin.Context) {
 			// log.Println("Instagram Saved Accesstoken", instaPPage)
 		}
 
+		// fb, err := messenger.GetFacebook(lRes.AccessToken)
+		// if err != nil {
+		// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// 	return
+		// }
+
 		// fbPage := models.Source{
 		// 	OrganizationID:     organizationID,
 		// 	ID:                 v.ID,
