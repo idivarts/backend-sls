@@ -1,14 +1,8 @@
 package messenger
 
 type FacebookLoginRequest struct {
-	Name                     string `json:"name"`
-	ID                       string `json:"id" binding:"required"`
-	UserID                   string `json:"userID"`
-	ExpiresIn                int    `json:"expiresIn"`
-	AccessToken              string `json:"accessToken" binding:"required"`
-	SignedRequest            string `json:"signedRequest"`
-	GraphDomain              string `json:"graphDomain"`
-	DataAccessExpirationTime int    `json:"data_access_expiration_time"`
+	Name string `json:"name"`
+	ID   string `json:"id" binding:"required"`
 
 	Accounts struct {
 		Data []struct {
