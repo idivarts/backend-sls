@@ -74,7 +74,7 @@ custom:
     securityPolicy: tls_1_2
 
 functions:
-  t_websocket:
+  trendly_apis:
     handler: functions/trendly_apis/main.go
     package:
       include:
