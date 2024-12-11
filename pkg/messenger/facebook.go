@@ -9,6 +9,29 @@ import (
 )
 
 type FacebookProfile struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	About        string `json:"about"`
+	Category     string `json:"category"`
+	CategoryList []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"category_list"`
+	Phone          string      `json:"phone"`
+	Location       interface{} `json:"location"` // Think how to fix this
+	Website        string      `json:"website"`
+	Emails         interface{} `json:"emails"` // Think how to fix this
+	FanCount       int         `json:"fan_count"`
+	FollowersCount int         `json:"followers_count"`
+	Picture        struct {
+		Data struct {
+			URL string `json:"url"`
+		} `json:"data"`
+	} `json:"picture"`
+	Cover struct {
+		Source string `json:"source"`
+		ID     string `json:"id"`
+	} `json:"cover"`
 }
 
 func GetFacebook(pageAccessToken string) (*FacebookProfile, error) {

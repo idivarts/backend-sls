@@ -17,6 +17,11 @@ type InstagramBriefProfile struct {
 
 type InstagramProfile struct {
 	InstagramBriefProfile
+	ProfilePictureURL string `json:"profile_picture_url"`
+	FollowersCount    int    `json:"followers_count"`
+	FollowsCount      int    `json:"follows_count"`
+	MediaCount        int    `json:"media_count"`
+	Website           string `json:"website"`
 }
 
 func GetInstagramInBrief(instagramId string, pageAccessToken string) (*InstagramBriefProfile, error) {
