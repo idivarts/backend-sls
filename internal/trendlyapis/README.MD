@@ -1,3 +1,7 @@
+# API to be called from Frontend
+
+`<graph-api-url>`/me?fields=name,id,accounts{access_token,name,id,instagram_business_account}
+
 # For Facebook
 
 fields=id,name,about,category,category_list,location,phone,website,emails,fan_count,followers_count,picture{url},cover{source}
