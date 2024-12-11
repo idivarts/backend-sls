@@ -13,6 +13,8 @@ provider:
     IMAGE_CF_DISTRIBUTION_URL: https://d1tfun8qrz04mk.cloudfront.net
     ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
     WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
+    FB_CLIENT_ID: 567254166026958
+    FB_CLIENT_SECRET: 98f69a92bda993fb01b11f58eaceeb07
   iam:
     role:
       statements:
