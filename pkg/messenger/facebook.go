@@ -9,29 +9,29 @@ import (
 )
 
 type FacebookProfile struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	About        string `json:"about"`
-	Category     string `json:"category"`
+	ID           string `json:"id" firestore:"id"`
+	Name         string `json:"name" firestore:"name"`
+	About        string `json:"about" firestore:"about"`
+	Category     string `json:"category" firestore:"category"`
 	CategoryList []struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	} `json:"category_list"`
-	Phone          string      `json:"phone"`
-	Location       interface{} `json:"location"` // Think how to fix this
-	Website        string      `json:"website"`
-	Emails         interface{} `json:"emails"` // Think how to fix this
-	FanCount       int         `json:"fan_count"`
-	FollowersCount int         `json:"followers_count"`
+		ID   string `json:"id" firestore:"id"`
+		Name string `json:"name" firestore:"name"`
+	} `json:"category_list" firestore:"category_list"`
+	Phone          string      `json:"phone" firestore:"phone"`
+	Location       interface{} `json:"location" firestore:"location"` // You might want to define a struct for this
+	Website        string      `json:"website" firestore:"website"`
+	Emails         interface{} `json:"emails" firestore:"emails"` // You might want to define a struct for this
+	FanCount       int         `json:"fan_count" firestore:"fan_count"`
+	FollowersCount int         `json:"followers_count" firestore:"followers_count"`
 	Picture        struct {
 		Data struct {
-			URL string `json:"url"`
-		} `json:"data"`
-	} `json:"picture"`
+			URL string `json:"url" firestore:"url"`
+		} `json:"data" firestore:"data"`
+	} `json:"picture" firestore:"picture"`
 	Cover struct {
-		Source string `json:"source"`
-		ID     string `json:"id"`
-	} `json:"cover"`
+		Source string `json:"source" firestore:"source"`
+		ID     string `json:"id" firestore:"id"`
+	} `json:"cover" firestore:"cover"`
 }
 
 func GetFacebook(pageAccessToken string) (*FacebookProfile, error) {

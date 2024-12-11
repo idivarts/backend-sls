@@ -9,19 +9,19 @@ import (
 )
 
 type InstagramBriefProfile struct {
-	Name      string `json:"name"`
-	Username  string `json:"username"`
-	Biography string `json:"biography"`
-	ID        string `json:"id"`
+	Name      string `json:"name" firestore:"name"`
+	Username  string `json:"username" firestore:"username"`
+	Biography string `json:"biography" firestore:"biography"`
+	ID        string `json:"id" firestore:"id"`
 }
 
 type InstagramProfile struct {
 	InstagramBriefProfile
-	ProfilePictureURL string `json:"profile_picture_url"`
-	FollowersCount    int    `json:"followers_count"`
-	FollowsCount      int    `json:"follows_count"`
-	MediaCount        int    `json:"media_count"`
-	Website           string `json:"website"`
+	ProfilePictureURL string `json:"profile_picture_url" firestore:"profile_picture_url"`
+	FollowersCount    int    `json:"followers_count" firestore:"followers_count"`
+	FollowsCount      int    `json:"follows_count" firestore:"follows_count"`
+	MediaCount        int    `json:"media_count" firestore:"media_count"`
+	Website           string `json:"website" firestore:"website"`
 }
 
 func GetInstagramInBrief(instagramId string, pageAccessToken string) (*InstagramBriefProfile, error) {
