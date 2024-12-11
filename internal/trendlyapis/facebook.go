@@ -18,7 +18,11 @@ func FacebookLogin(c *gin.Context) {
 		return
 	}
 
-	userId, _ := middlewares.GetUserId(c)
+	userId, b := middlewares.GetUserId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
 
 	for _, v := range person.Accounts.Data {
 		lRes, err := messenger.GetLongLivedAccessToken(v.AccessToken)
