@@ -79,6 +79,7 @@ functions:
     package:
       include:
         - 'service-account.json'
+    timeout: 30
     events:
       - http: ANY /api/v1/{proxy+}
   t_websocket:
@@ -90,7 +91,6 @@ functions:
       - websocket: $connect
       - websocket: $disconnect
       - websocket: $default
-
   s3:
     handler: functions/s3/main.go
     package:
