@@ -22,7 +22,7 @@ type Socials struct {
 }
 
 type SocialsPrivate struct {
-	AccessToken *string `json:"accessToken,omitempty"`
+	AccessToken *string `json:"accessToken,omitempty" firestore:"accessToken"`
 }
 
 func (s *SocialsPrivate) Set(userId, id string) (*firestore.WriteResult, error) {
