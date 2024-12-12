@@ -8,7 +8,7 @@ import (
 )
 
 func InstagramRedirect(ctx *gin.Context) {
-	clientId := os.Getenv("INSTAGRAM_CLIENT_ID")
+	clientId := os.Getenv("INSTA_CLIENT_ID")
 	if clientId == "" {
 		ctx.JSON(400, gin.H{"error": "Instagram client id not found"})
 	}
