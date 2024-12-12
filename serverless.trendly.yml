@@ -15,6 +15,8 @@ provider:
     WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
     FB_CLIENT_ID: 567254166026958
     FB_CLIENT_SECRET: 98f69a92bda993fb01b11f58eaceeb07
+    INSTA_CLIENT_ID: 1166596944824933
+    INSTA_CLIENT_SECRET: e1003872fc1e9167220ea31d65e58d97
   iam:
     role:
       statements:
@@ -82,6 +84,15 @@ functions:
     timeout: 30
     events:
       - http: ANY /api/v1/{proxy+}
+  insta_apis:
+    handler: functions/insta_apis/main.go
+    package:
+      include:
+        - 'service-account.json'
+    timeout: 30
+    events:
+      - http: ANY /instagram
+      - http: ANY /instagram/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
     package:
@@ -98,7 +109,6 @@ functions:
         - 'service-account.json'
     events:
       - http: ANY /s3/v1/{proxy+}
-
   processVideoUpload:
     handler: functions/process_video/main.go
     environment:
