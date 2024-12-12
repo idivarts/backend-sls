@@ -1,42 +1,65 @@
 package instagram
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 )
 
-type CodeResponseData struct {
-	Data []CodeResponse `json:"data"`
-}
 type CodeResponse struct {
 	AccessToken string   `json:"access_token"`
-	UserID      string   `json:"user_id"`
+	UserID      int64    `json:"user_id"`
 	Permissions []string `json:"permissions"`
 }
 
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
-	ExpiresIn   string `json:"expires_in"`
+	ExpiresIn   int64  `json:"expires_in"`
 }
 
 func GetAccessTokenFromCode(code string) (*CodeResponse, error) {
-	url := fmt.Sprintf("%s/oauth/access_token?grant_type=authorization_code&client_id=%s&client_secret=%s&code=%s", apiURL, ClientID, ClientSecret, code)
+	log.Println("Code is", code)
 
-	resp, err := http.Get(url)
+	apiURL := "https://api.instagram.com/oauth/access_token"
+	data := url.Values{
+		"client_id":     {ClientID},
+		"client_secret": {ClientSecret},
+		"grant_type":    {"authorization_code"},
+		"redirect_uri":  {"https://be.trendly.pro/instagram/auth"},
+		"code":          {code},
+	}
+
+	// Create the HTTP request
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBufferString(data.Encode()))
 	if err != nil {
-		fmt.Println("Error making GET request:", err)
+		fmt.Println("Error creating request:", err)
 		return nil, err
 	}
 
+	// Set headers
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	log.Println("Coming till here")
+	// Make the HTTP request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error making request:", err)
+		return nil, err
+	}
 	defer resp.Body.Close()
 
+	log.Println("Request is done")
+	// Read the response
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
+		fmt.Println("Error reading response:", err)
 		return nil, err
 	}
 
@@ -45,15 +68,12 @@ func GetAccessTokenFromCode(code string) (*CodeResponse, error) {
 	}
 
 	log.Println("Token Url output", string(b))
-	token := &CodeResponseData{}
+	token := &CodeResponse{}
 	err = json.Unmarshal(b, token)
 	if err != nil {
 		return nil, err
 	}
-	if token.Data == nil || len(token.Data) == 0 {
-		return nil, errors.New("invalid code")
-	}
-	return &token.Data[0], nil
+	return token, nil
 }
 
 func GetLongLivedAccessToken(accessToken string) (*TokenResponse, error) {
