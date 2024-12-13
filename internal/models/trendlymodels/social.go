@@ -21,8 +21,16 @@ type Socials struct {
 	FBProfile    *messenger.FacebookProfile  `json:"fbProfile,omitempty" firestore:"fbProfile"`
 }
 
+type GraphType int
+
+const (
+	FacebookGraphType  GraphType = 0
+	InstagramGraphType GraphType = 1
+)
+
 type SocialsPrivate struct {
-	AccessToken *string `json:"accessToken,omitempty" firestore:"accessToken"`
+	AccessToken *string   `json:"accessToken,omitempty" firestore:"accessToken"`
+	GraphType   GraphType `json:"graphType" firestore:"graphType"`
 }
 
 func (s *SocialsPrivate) Set(userId, id string) (*firestore.WriteResult, error) {

@@ -58,12 +58,17 @@ func InstagramAuth(ctx *gin.Context) {
 	}
 	log.Println("Long Lived Access Token:", llToken.AccessToken)
 
-	// Save the access token in the firestore database
+	userId := strconv.FormatInt(accessToken.UserID, 10)
+
+	// Create User Model if new user
+	// firestoredb.Client.Collection("users").Doc(userId).Set(context.Background(), map[string]interface{}{
 
 	// Add the socials for that user
 
+	// Save the access token in the firestore database
+
 	// Create custom firebase token and send it back to the client
-	token, err := fauth.Client.CustomToken(context.Background(), strconv.FormatInt(accessToken.UserID, 10))
+	token, err := fauth.Client.CustomToken(context.Background(), userId)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
