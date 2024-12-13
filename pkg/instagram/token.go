@@ -23,7 +23,7 @@ type TokenResponse struct {
 	ExpiresIn   int64  `json:"expires_in"`
 }
 
-func GetAccessTokenFromCode(code string) (*CodeResponse, error) {
+func GetAccessTokenFromCode(code, redirectUri string) (*CodeResponse, error) {
 	log.Println("Code is", code)
 
 	apiURL := "https://api.instagram.com/oauth/access_token"
@@ -31,7 +31,7 @@ func GetAccessTokenFromCode(code string) (*CodeResponse, error) {
 		"client_id":     {ClientID},
 		"client_secret": {ClientSecret},
 		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {"https://be.trendly.pro/instagram/auth"},
+		"redirect_uri":  {redirectUri},
 		"code":          {code},
 	}
 
