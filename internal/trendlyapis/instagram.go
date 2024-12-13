@@ -39,7 +39,7 @@ type ITokenResponse struct {
 
 func InstagramAuth(ctx *gin.Context) {
 	var req IInstaAuth
-	if err := ctx.BindJSON(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
