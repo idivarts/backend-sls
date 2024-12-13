@@ -7,10 +7,10 @@ import (
 	"github.com/idivarts/backend-sls/pkg/instagram"
 )
 
-const code = `AQBC7U30Jlct4s9m5uroY_0Yr5pYBYe1nthVK6NwivmAXdNG1iksmr78GnlfzcXoeSqPlGfnweOq1nRdruH4p6oCE20bLbzCNsvdY-Mpz5dVdjB8Y6-deam7oKt5wqNIGbFmy-Q1hij2Ug9tB2tiQ2X6Gc40taNvzXJYgXNhw9sYN6e0ltAJmg-TZtGnaIk66WXSv3qgmK4OdLFjQzA4AEJO2Hbr4Pi-dismd43ph9Q9Xg#_`
+const code = `AQAB6OfvQEP1tq_wXSHZXrnLnKNQL8tUmkYIPswgB9BSXO0bTkdyMIKs3eY5D4MBk3mlCAaTRHUlIkmfD7TlNN_q-P8YNm2lbLdKxD6zJLNYIZDloptz5wWIe6ghu0DIov6yuC9Fu84ELYSGszwtFYgWZK1ooUQ744EqoeZ0Umcij4Uese8LBjQGtBT8Y-EldfRTt-L4yC8qump9b9vbINairnuqrlpSeqnSRXQljC-n-w#_`
 const accessToken = `IGAAQlA4RZBCmVBZAFBNX1VoN3lJeHBkRjAxNm1Qa2hkRmlrTjBQNGdxUlNWclZATTTM5cWxURGNHZA1lJZAEJWc3VGLWFmdlZAaMW9uTzhtZAmQ4VGk5NE9USHFrZA2VDeFRQdk84cUJYVS1WUnVDWFNvSTh1MEhSUEVlTXhERUxhZAXlnVGgxWThOXzgycVJR`
 
-// const longLivedAccessToken = `IGQWRQZAnBGM3NKcDRTRk03MHJzTWJPMDR5NGFwemlDTWNZALTBxZA0Vsel9iclZAMV01reFM0Q3pnTXozMlAxR0ZA4c3ZAidG9JWi1hbXVnMUhxY2ZAKRF9qekxnTnlZAVW96aDRMX3VyX09jRWtPQQZDZD`
+const longLivedAccessToken = `IGQWRNd2JEcFdHU2QzZAnpieE94cFhOdnU5YW1RalFoSE9GQTltdnB5cFU5UlU1OVlGTmlHMThhMkh2V2tWajJOU2JTV19HN3l4REFOMGs1ZA29ualRzLXhLaWpNQ1g4SlFwRmx5TUI4ZAkhUdwZDZD`
 
 func TestToken(t *testing.T) {
 	accessToken, err := instagram.GetAccessTokenFromCode(code, "https://be.trendly.pro/instagram/auth")
@@ -34,4 +34,13 @@ func TestAccessToken(t *testing.T) {
 		return
 	}
 	log.Println("Long Lived Access Token:", llToken.AccessToken)
+}
+
+func TestGetUser(t *testing.T) {
+	iData, err := instagram.GetInstagram("me", longLivedAccessToken)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	log.Println("Instagram Data:", iData)
 }
