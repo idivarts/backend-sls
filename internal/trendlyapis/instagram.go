@@ -152,3 +152,11 @@ func InstagramAuth(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "Successfully Logged in", "data": res})
 
 }
+
+func InstagramDeAuth(ctx *gin.Context) {
+
+}
+
+func InstagramDelete(ctx *gin.Context) {
+
+}
