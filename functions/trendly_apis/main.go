@@ -10,6 +10,7 @@ func main() {
 	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware())
 
 	apiV1.POST("/socials/facebook", trendlyapis.FacebookLogin)
+	apiV1.POST("/socials/instagram", trendlyapis.InstagramAuth)
 
 	apihandler.StartLambda()
 }

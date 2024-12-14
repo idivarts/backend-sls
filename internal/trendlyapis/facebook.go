@@ -3,10 +3,12 @@ package trendlyapis
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
@@ -98,4 +100,79 @@ func FacebookLogin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": person})
+}
+
+func ConnectInstagram(ctx *gin.Context) {
+	var req IInstaAuth
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	userId, b := middlewares.GetUserId(ctx)
+	if !b {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+
+	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, req.RedirectUri)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	log.Println("Access Token:", accessToken.AccessToken)
+
+	llToken, err := instagram.GetLongLivedAccessToken(accessToken.AccessToken)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	log.Println("Long Lived Access Token:", llToken.AccessToken)
+
+	socialId := strconv.FormatInt(accessToken.UserID, 10)
+
+	insta, err := instagram.GetInstagram("me", llToken.AccessToken)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	user := trendlymodels.User{}
+	err = user.Get(userId)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Add the socials for that user
+	social := trendlymodels.Socials{
+		ID:           socialId,
+		Name:         insta.Name,
+		Image:        insta.ProfilePictureURL,
+		IsInstagram:  true,
+		ConnectedID:  nil,
+		UserID:       userId,
+		OwnerName:    insta.Name,
+		InstaProfile: insta,
+		FBProfile:    nil,
+	}
+	_, err = social.Insert(userId)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Save the access token in the firestore database
+	socialPrivate := trendlymodels.SocialsPrivate{
+		AccessToken: &llToken.AccessToken,
+		GraphType:   trendlymodels.InstagramGraphType,
+	}
+	_, err = socialPrivate.Set(userId, socialId)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Successfully social added", "social": social})
+
 }
