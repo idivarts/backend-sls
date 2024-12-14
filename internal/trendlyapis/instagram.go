@@ -80,6 +80,7 @@ func InstagramAuth(ctx *gin.Context) {
 			user = trendlymodels.User{
 				Name:          insta.Name,
 				ProfileImage:  &insta.ProfilePictureURL,
+				PrimarySocial: &userId,
 				Email:         nil,
 				PhoneNumber:   nil,
 				Location:      nil,
@@ -107,6 +108,13 @@ func InstagramAuth(ctx *gin.Context) {
 			}
 			existingUser = false
 		} else {
+			ctx.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		user.PrimarySocial = &userId
+		_, err = user.Insert(userId)
+		if err != nil {
 			ctx.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
