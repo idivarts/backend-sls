@@ -39,6 +39,7 @@ type IInstaAuth struct {
 }
 type ITokenResponse struct {
 	FirebaseCustomToken string `json:"firebaseCustomToken"`
+	IsExistingUser      bool   `json:"isExistingUser"`
 }
 
 func InstagramAuth(ctx *gin.Context) {
@@ -72,12 +73,14 @@ func InstagramAuth(ctx *gin.Context) {
 
 	user := trendlymodels.User{}
 	err = user.Get(userId)
+	existingUser := true
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			// Create User Model if new user
 			user = trendlymodels.User{
 				Name:          insta.Name,
 				ProfileImage:  &insta.ProfilePictureURL,
+				PrimarySocial: &userId,
 				Email:         nil,
 				PhoneNumber:   nil,
 				Location:      nil,
@@ -103,8 +106,15 @@ func InstagramAuth(ctx *gin.Context) {
 				ctx.JSON(400, gin.H{"error": err.Error()})
 				return
 			}
-
+			existingUser = false
 		} else {
+			ctx.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		user.PrimarySocial = &userId
+		_, err = user.Insert(userId)
+		if err != nil {
 			ctx.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
@@ -148,7 +158,16 @@ func InstagramAuth(ctx *gin.Context) {
 
 	res := ITokenResponse{
 		FirebaseCustomToken: token,
+		IsExistingUser:      existingUser,
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Successfully Logged in", "data": res})
+
+}
+
+func InstagramDeAuth(ctx *gin.Context) {
+
+}
+
+func InstagramDelete(ctx *gin.Context) {
 
 }

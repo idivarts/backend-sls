@@ -10,8 +10,8 @@ func main() {
 
 	apiV1.GET("/", trendlyapis.InstagramRedirect)
 	apiV1.POST("/auth", trendlyapis.InstagramAuth)
-	apiV1.GET("/deauth", trendlyapis.InstagramAuth)
-	apiV1.GET("/delete", trendlyapis.InstagramAuth)
+	apiV1.GET("/deauth", trendlyapis.InstagramDeAuth)
+	apiV1.GET("/delete", trendlyapis.InstagramDelete)
 
 	apihandler.StartLambda()
 }
