@@ -1,5 +1,12 @@
 package trendlymodels
 
+import (
+	"context"
+
+	"cloud.google.com/go/firestore"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+)
+
 type User struct {
 	Name                  string                 `json:"name" firestore:"name"`
 	ProfileImage          *string                `json:"profileImage,omitempty" firestore:"profileImage,omitempty"`
@@ -77,4 +84,25 @@ type PushNotificationToken struct {
 	IOS     []string `json:"ios,omitempty" firestore:"ios,omitempty"`
 	Android []string `json:"android,omitempty" firestore:"android,omitempty"`
 	Web     []string `json:"web,omitempty" firestore:"web,omitempty"`
+}
+
+func (u *User) Insert(uid string) (*firestore.WriteResult, error) {
+	res, err := firestoredb.Client.Collection("users").Doc(uid).Set(context.Background(), u)
+
+	if err != nil {
+		return nil, err
+	}
+	return res, err
+}
+
+func (u *User) Get(uid string) error {
+	res, err := firestoredb.Client.Collection("users").Doc(uid).Get((context.Background()))
+	if err != nil {
+		return err
+	}
+	err = res.DataTo(u)
+	if err != nil {
+		return err
+	}
+	return err
 }

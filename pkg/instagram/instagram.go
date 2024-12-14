@@ -6,25 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
-type InstagramBriefProfile struct {
-	Name      string `json:"name" firestore:"name"`
-	Username  string `json:"username" firestore:"username"`
-	Biography string `json:"biography" firestore:"biography"`
-	ID        string `json:"id" firestore:"id"`
-}
-
-type InstagramProfile struct {
-	InstagramBriefProfile
-	ProfilePictureURL string `json:"profile_picture_url" firestore:"profile_picture_url"`
-	FollowersCount    int    `json:"followers_count" firestore:"followers_count"`
-	FollowsCount      int    `json:"follows_count" firestore:"follows_count"`
-	MediaCount        int    `json:"media_count" firestore:"media_count"`
-	Website           string `json:"website" firestore:"website"`
-}
-
-func GetInstagramInBrief(instagramId string, pageAccessToken string) (*InstagramBriefProfile, error) {
+func GetInstagramInBrief(instagramId string, pageAccessToken string) (*messenger.InstagramBriefProfile, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
@@ -50,7 +36,7 @@ func GetInstagramInBrief(instagramId string, pageAccessToken string) (*Instagram
 
 	// Print the response body
 	fmt.Println(string(body))
-	data := InstagramBriefProfile{}
+	data := messenger.InstagramBriefProfile{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return nil, err
@@ -58,7 +44,7 @@ func GetInstagramInBrief(instagramId string, pageAccessToken string) (*Instagram
 	return &data, nil
 }
 
-func GetInstagram(instagramId string, pageAccessToken string) (*InstagramProfile, error) {
+func GetInstagram(instagramId string, pageAccessToken string) (*messenger.InstagramProfile, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
@@ -84,7 +70,7 @@ func GetInstagram(instagramId string, pageAccessToken string) (*InstagramProfile
 
 	// Print the response body
 	fmt.Println(string(body))
-	data := InstagramProfile{}
+	data := messenger.InstagramProfile{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return nil, err

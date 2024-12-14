@@ -9,9 +9,13 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/instagram"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func InstagramRedirect(ctx *gin.Context) {
@@ -34,7 +38,7 @@ type IInstaAuth struct {
 	RedirectUri string `json:"redirect_uri"`
 }
 type ITokenResponse struct {
-	Token string `json:"token"`
+	FirebaseCustomToken string `json:"firebaseCustomToken"`
 }
 
 func InstagramAuth(ctx *gin.Context) {
@@ -60,12 +64,80 @@ func InstagramAuth(ctx *gin.Context) {
 
 	userId := strconv.FormatInt(accessToken.UserID, 10)
 
-	// Create User Model if new user
-	// firestoredb.Client.Collection("users").Doc(userId).Set(context.Background(), map[string]interface{}{
+	insta, err := instagram.GetInstagram("me", llToken.AccessToken)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	user := trendlymodels.User{}
+	err = user.Get(userId)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			// Create User Model if new user
+			user = trendlymodels.User{
+				Name:          insta.Name,
+				ProfileImage:  &insta.ProfilePictureURL,
+				Email:         nil,
+				PhoneNumber:   nil,
+				Location:      nil,
+				EmailVerified: nil,
+				PhoneVerified: nil,
+				Profile: &trendlymodels.UserProfile{
+					CompletionPercentage: aws.Int(10),
+					Content:              &trendlymodels.UserProfileContent{},
+					IntroVideo:           nil,
+					Category:             []string{},
+					Attachments:          []trendlymodels.UserAttachment{},
+					TimeCommitment:       nil,
+				},
+				Preferences: &trendlymodels.UserPreferences{},
+				Settings:    &trendlymodels.UserSettings{},
+				Backend: &trendlymodels.BackendData{
+					Followers: &insta.FollowersCount,
+				},
+				PushNotificationToken: &trendlymodels.PushNotificationToken{},
+			}
+			_, err = user.Insert(userId)
+			if err != nil {
+				ctx.JSON(400, gin.H{"error": err.Error()})
+				return
+			}
+
+		} else {
+			ctx.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+	}
 
 	// Add the socials for that user
+	social := trendlymodels.Socials{
+		ID:           userId,
+		Name:         insta.Name,
+		Image:        insta.ProfilePictureURL,
+		IsInstagram:  true,
+		ConnectedID:  nil,
+		UserID:       userId,
+		OwnerName:    insta.Name,
+		InstaProfile: insta,
+		FBProfile:    nil,
+	}
+	_, err = social.Insert(userId)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Save the access token in the firestore database
+	socialPrivate := trendlymodels.SocialsPrivate{
+		AccessToken: &llToken.AccessToken,
+		GraphType:   trendlymodels.InstagramGraphType,
+	}
+	_, err = socialPrivate.Set(userId, userId)
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Create custom firebase token and send it back to the client
 	token, err := fauth.Client.CustomToken(context.Background(), userId)
@@ -75,8 +147,8 @@ func InstagramAuth(ctx *gin.Context) {
 	}
 
 	res := ITokenResponse{
-		Token: token,
+		FirebaseCustomToken: token,
 	}
-	ctx.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "data": res})
+	ctx.JSON(http.StatusOK, gin.H{"message": "Successfully Logged in", "data": res})
 
 }
