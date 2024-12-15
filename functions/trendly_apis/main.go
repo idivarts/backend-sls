@@ -12,5 +12,9 @@ func main() {
 	apiV1.POST("/socials/facebook", trendlyapis.FacebookLogin)
 	apiV1.POST("/socials/instagram", trendlyapis.InstagramAuth)
 
+	apiV1.POST("/chat/auth", trendlyapis.FacebookLogin)
+	apiV1.POST("/chat/connect", trendlyapis.FacebookLogin)
+	apiV1.POST("/chat/channel", trendlyapis.FacebookLogin)
+
 	apihandler.StartLambda()
 }
