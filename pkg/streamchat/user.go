@@ -13,15 +13,16 @@ type User struct {
 	IsManager bool   `json:"is_manager"`
 }
 
-func CreateOrUpdateUser(user User) {
+func CreateOrUpdateUser(user User) (*stream_chat.UpsertUserResponse, error) {
 	role := "user"
 	if user.IsManager {
 		role = "admin"
 	}
-	Client.UpsertUser(context.Background(), &stream_chat.User{
+	res, err := Client.UpsertUser(context.Background(), &stream_chat.User{
 		ID:    user.ID,
 		Name:  user.Name,
 		Image: user.Image,
 		Role:  role,
 	})
+	return res, err
 }
