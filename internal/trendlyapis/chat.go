@@ -127,7 +127,7 @@ func ChatChannel(c *gin.Context) {
 			user.DataTo(&uObj)
 		}
 
-		if uObj["isChatConnected"] == false {
+		if uObj["isChatConnected"] != true {
 			_, err := streamchat.CreateOrUpdateUser(streamchat.User{
 				ID:        id,
 				Name:      uObj["name"].(string),
