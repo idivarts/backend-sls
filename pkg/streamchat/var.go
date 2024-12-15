@@ -16,7 +16,7 @@ var (
 func init() {
 	// instantiate your stream client using the API key and secret
 	// the secret is only used server side and gives you full access to the API
-	if os.Getenv("STREAM_CLIENT") == "" && os.Getenv("STREAM_SECRET") == "" {
+	if os.Getenv("STREAM_CLIENT") != "" && os.Getenv("STREAM_SECRET") != "" {
 		streamClient = os.Getenv("STREAM_CLIENT")
 		streamSecret = os.Getenv("STREAM_SECRET")
 	}
