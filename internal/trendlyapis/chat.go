@@ -58,7 +58,7 @@ func ChatConnect(c *gin.Context) {
 
 	userObject := middlewares.GetUserObject(c)
 
-	if userObject["isChatConnected"] == false {
+	if userObject["isChatConnected"] != true {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not connected"})
 		return
 	}
@@ -127,7 +127,7 @@ func ChatChannel(c *gin.Context) {
 			user.DataTo(&uObj)
 		}
 
-		if uObj["isChatConnected"] == false {
+		if uObj["isChatConnected"] != true {
 			_, err := streamchat.CreateOrUpdateUser(streamchat.User{
 				ID:        id,
 				Name:      uObj["name"].(string),
