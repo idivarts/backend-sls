@@ -109,6 +109,7 @@ func ChatChannel(c *gin.Context) {
 
 	req.UserIDs = append(req.UserIDs, userId)
 
+	token := ""
 	// Before creating channel make sure all users has isChatConnected true
 	for _, id := range req.UserIDs {
 
@@ -152,6 +153,15 @@ func ChatChannel(c *gin.Context) {
 					return
 				}
 			}
+
+			if userId == id {
+				t, err := streamchat.CreateToken(userId)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating token", "error": err.Error()})
+					return
+				}
+				token = t
+			}
 		}
 	}
 
@@ -167,5 +177,5 @@ func ChatChannel(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Channel Created", "channel": res.Channel})
+	c.JSON(http.StatusOK, gin.H{"message": "Channel Created", "channel": res.Channel, "token": token})
 }
