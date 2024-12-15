@@ -17,6 +17,8 @@ provider:
     FB_CLIENT_SECRET: 98f69a92bda993fb01b11f58eaceeb07
     INSTA_CLIENT_ID: 1166596944824933
     INSTA_CLIENT_SECRET: e1003872fc1e9167220ea31d65e58d97
+    STREAM_CLIENT: xv7c4yzcux6y
+    STREAM_SECRET: x5p7xg5gerzmdj7e4uagcz4rdnm8abj7ktuj9hhtx2kqzdzmm8gr7a38xrcpywvt
   iam:
     role:
       statements:
