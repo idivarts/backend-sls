@@ -122,10 +122,10 @@ func ChatChannel(c *gin.Context) {
 				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user and/or manager", "error1": err.Error(), "error2": err2.Error()})
 				return
 			}
-			manager.DataTo(&uObj)
+			uObj = manager.Data()
 			isManager = true
 		} else {
-			user.DataTo(&uObj)
+			uObj = user.Data()
 		}
 
 		if uObj["isChatConnected"] != true {
