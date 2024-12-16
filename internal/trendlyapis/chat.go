@@ -25,11 +25,13 @@ func ChatAuth(c *gin.Context) {
 
 	userObject := middlewares.GetUserObject(c)
 
+	name, _ := userObject["name"].(string)
+	profileImage, _ := userObject["profileImage"].(string)
 	// Upsert user to the stream chat
 	_, err := streamchat.CreateOrUpdateUser(streamchat.User{
 		ID:        userId,
-		Name:      userObject["name"].(string),
-		Image:     userObject["profileImage"].(string),
+		Name:      name,
+		Image:     profileImage,
 		IsManager: isManager,
 	})
 	if err != nil {
@@ -128,11 +130,14 @@ func ChatChannel(c *gin.Context) {
 			uObj = user.Data()
 		}
 
+		name, _ := uObj["name"].(string)
+		profileImage, _ := uObj["profileImage"].(string)
+
 		if uObj["isChatConnected"] != true {
 			_, err := streamchat.CreateOrUpdateUser(streamchat.User{
 				ID:        id,
-				Name:      uObj["name"].(string),
-				Image:     uObj["profileImage"].(string),
+				Name:      name,
+				Image:     profileImage,
 				IsManager: isManager,
 			})
 			if err != nil {
