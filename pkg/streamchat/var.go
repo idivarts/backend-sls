@@ -2,6 +2,7 @@ package streamchat
 
 import (
 	"context"
+	"log"
 	"os"
 
 	stream "github.com/GetStream/stream-chat-go/v5"
@@ -25,11 +26,12 @@ func init() {
 		panic(err.Error())
 	}
 
-	settings := &stream.AppSettings{EnforceUniqueUsernames: "app"}
+	settings := &stream.AppSettings{EnforceUniqueUsernames: "no"}
 	_, err = client.UpdateAppSettings(context.Background(), settings)
 	if err != nil {
 		panic(err.Error())
 	}
+	log.Println("Stream Chat client initialized")
 
 	Client = client
 }
