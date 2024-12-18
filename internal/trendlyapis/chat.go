@@ -2,7 +2,11 @@ package trendlyapis
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"net/http"
+	"strings"
+	"unicode"
 
 	stream_chat "github.com/GetStream/stream-chat-go/v5"
 	"github.com/gin-gonic/gin"
@@ -77,6 +81,30 @@ func ChatConnect(c *gin.Context) {
 type ICreateChannel struct {
 	Name    *string  `json:"name,omitempty"`
 	UserIDs []string `json:"userIds" binding:"required"`
+}
+
+// GenerateKey converts a string to a valid key and appends a random 5-digit number
+func GenerateKey(namePtr *string) string {
+	if namePtr == nil {
+		return ""
+	}
+	// Replace spaces with dashes and convert to lowercase
+	name := strings.ToLower(strings.ReplaceAll(*namePtr, " ", "-"))
+
+	// Remove invalid characters (keep only lowercase letters and dashes)
+	validKey := strings.Builder{}
+	for _, char := range name {
+		if unicode.IsLower(char) || char == '-' {
+			validKey.WriteRune(char)
+		}
+	}
+
+	// Generate a random 5-digit number
+	// rand.Seed(time.Now().UnixNano())
+	randomNumber := rand.Intn(90000) + 10000 // Ensures a 5-digit number
+
+	// Append the random number to the key
+	return validKey.String() + "-" + fmt.Sprint(randomNumber)
 }
 
 func ChatChannel(c *gin.Context) {
@@ -170,7 +198,7 @@ func ChatChannel(c *gin.Context) {
 		}
 	}
 
-	res, err := streamchat.Client.CreateChannel(context.Background(), "messaging", "", userId, &stream_chat.ChannelRequest{
+	res, err := streamchat.Client.CreateChannel(context.Background(), "messaging", GenerateKey(req.Name), userId, &stream_chat.ChannelRequest{
 		Members: req.UserIDs,
 		ExtraData: map[string]interface{}{
 			"name": req.Name,
