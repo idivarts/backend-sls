@@ -36,7 +36,7 @@ func InstagramRedirect(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Instagram client id not found"})
 		return
 	}
-	redirect_uri := fmt.Sprintf("%s?redirect_type=%s", INSTAGRAM_REDIRECT, redirect_type)
+	redirect_uri := fmt.Sprintf("%s/%s", INSTAGRAM_REDIRECT, redirect_type)
 	ctx.Redirect(302, fmt.Sprintf("https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0&client_id=%s&redirect_uri=%s&response_type=code&scope=instagram_business_basic", clientId, url.QueryEscape(redirect_uri)))
 }
 
@@ -46,7 +46,7 @@ func InstagramAuthRedirect(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Code not found"})
 		return
 	}
-	redirect_type := ctx.Query("redirect_type")
+	redirect_type := ctx.Param("redirect_type")
 	if redirect_type == "" {
 		ctx.JSON(400, gin.H{"error": "Redirect Type not found"})
 		return
@@ -82,7 +82,7 @@ func InstagramAuth(ctx *gin.Context) {
 		return
 	}
 
-	redirect_uri := fmt.Sprintf("%s?redirect_type=%s", INSTAGRAM_REDIRECT, req.RedirectType)
+	redirect_uri := fmt.Sprintf("%s/%s", INSTAGRAM_REDIRECT, req.RedirectType)
 	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, redirect_uri)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
