@@ -18,10 +18,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const INSTAGRAM_REDIRECT = "https://be.trendly.pro/instagram/auth"
+
 func InstagramRedirect(ctx *gin.Context) {
-	redirect_uri := ctx.Query("redirect_uri")
-	if redirect_uri == "" {
-		ctx.JSON(400, gin.H{"error": "Redirect URI not found"})
+	redirect_type := ctx.Query("redirect_type")
+	if redirect_type == "" {
+		ctx.JSON(400, gin.H{"error": "Redirect Type is not found"})
+		return
+	}
+	if redirect_type != "1" || redirect_type != "2" || redirect_type != "3" || redirect_type != "4" {
+		ctx.JSON(400, gin.H{"error": "Invalid redirect type. Supported values are 1, 2, 3, 4"})
 		return
 	}
 
@@ -30,12 +36,39 @@ func InstagramRedirect(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Instagram client id not found"})
 		return
 	}
+	redirect_uri := fmt.Sprintf("%s?redirect_type=%s", INSTAGRAM_REDIRECT, redirect_type)
 	ctx.Redirect(302, fmt.Sprintf("https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0&client_id=%s&redirect_uri=%s&response_type=code&scope=instagram_business_basic", clientId, url.QueryEscape(redirect_uri)))
 }
 
+func InstagramAuthRedirect(ctx *gin.Context) {
+	code := ctx.Query("code")
+	if code == "" {
+		ctx.JSON(400, gin.H{"error": "Code not found"})
+		return
+	}
+	redirect_type := ctx.Query("redirect_type")
+	if redirect_type == "" {
+		ctx.JSON(400, gin.H{"error": "Redirect Type not found"})
+		return
+	}
+
+	redirectUri := ""
+	if redirect_type == "1" {
+		redirectUri = "http://localhost:8081"
+	} else if redirect_type == "2" {
+		redirectUri = "https://creators.trendly.pro/"
+	} else if redirect_type == "3" || redirect_type == "4" {
+		redirectUri = "fb567254166026958://authorize"
+	} else {
+		ctx.JSON(400, gin.H{"error": "Invalid Redirect Type"})
+		return
+	}
+	ctx.Redirect(302, fmt.Sprintf("%s?code=%s", redirectUri, code))
+}
+
 type IInstaAuth struct {
-	Code        string `json:"code"`
-	RedirectUri string `json:"redirect_uri"`
+	Code string `json:"code"`
+	// RedirectUri string `json:"redirect_uri"`
 }
 type ITokenResponse struct {
 	FirebaseCustomToken string `json:"firebaseCustomToken"`
@@ -49,7 +82,7 @@ func InstagramAuth(ctx *gin.Context) {
 		return
 	}
 
-	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, req.RedirectUri)
+	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, INSTAGRAM_REDIRECT)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
