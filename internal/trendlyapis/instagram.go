@@ -26,7 +26,7 @@ func InstagramRedirect(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Redirect Type is not found"})
 		return
 	}
-	if redirect_type != "1" || redirect_type != "2" || redirect_type != "3" || redirect_type != "4" {
+	if redirect_type != "1" && redirect_type != "2" && redirect_type != "3" && redirect_type != "4" {
 		ctx.JSON(400, gin.H{"error": "Invalid redirect type. Supported values are 1, 2, 3, 4"})
 		return
 	}
