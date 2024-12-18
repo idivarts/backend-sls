@@ -67,8 +67,8 @@ func InstagramAuthRedirect(ctx *gin.Context) {
 }
 
 type IInstaAuth struct {
-	Code string `json:"code"`
-	// RedirectUri string `json:"redirect_uri"`
+	Code         string `json:"code"`
+	RedirectType string `json:"redirect_type"`
 }
 type ITokenResponse struct {
 	FirebaseCustomToken string `json:"firebaseCustomToken"`
@@ -82,7 +82,8 @@ func InstagramAuth(ctx *gin.Context) {
 		return
 	}
 
-	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, INSTAGRAM_REDIRECT)
+	redirect_uri := fmt.Sprintf("%s?redirect_type=%s", INSTAGRAM_REDIRECT, req.RedirectType)
+	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, redirect_uri)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return

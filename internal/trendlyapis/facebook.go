@@ -1,6 +1,7 @@
 package trendlyapis
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -115,7 +116,8 @@ func ConnectInstagram(ctx *gin.Context) {
 		return
 	}
 
-	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, req.RedirectUri)
+	redirect_uri := fmt.Sprintf("%s?redirect_type=%s", INSTAGRAM_REDIRECT, req.RedirectType)
+	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, redirect_uri)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
