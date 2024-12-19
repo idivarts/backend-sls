@@ -31,7 +31,8 @@ func isValidUID(client *auth.Client, uid string) bool {
 	_, err := client.GetUser(context.Background(), uid)
 	if err != nil {
 		if auth.IsUserNotFound(err) {
-			return false // UID does not exist
+			_, err := firestoredb.Client.Collection("users").Doc(uid).Get(context.Background())
+			return err == nil
 		}
 		return false // Some other error
 	}
