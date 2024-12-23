@@ -123,6 +123,10 @@ func ChatChannel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "User not found"})
 		return
 	}
+	if middlewares.GetUserType(c) != "manager" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Only Managers can create new channels"})
+		return
+	}
 
 	// Check if req.UserIDs contains userId
 	contains := false
