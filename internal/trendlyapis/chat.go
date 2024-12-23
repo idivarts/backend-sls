@@ -42,17 +42,8 @@ func ChatAuth(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating/updating user in chat", "error": err.Error()})
 		return
 	}
-	token := ""
-	if userObject["isChatConnected"] == true {
-		t, err := streamchat.CreateToken(userId)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating token", "error": err.Error()})
-			return
-		}
-		token = t
-	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Chat Authentication successful", "token": token})
+	c.JSON(http.StatusOK, gin.H{"message": "Chat Authentication successful"})
 }
 
 func ChatConnect(c *gin.Context) {
@@ -66,6 +57,24 @@ func ChatConnect(c *gin.Context) {
 
 	if userObject["isChatConnected"] != true {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not connected"})
+		return
+	}
+
+	isManager := false
+	if middlewares.GetUserType(c) == "manager" {
+		isManager = true
+	}
+	name, _ := userObject["name"].(string)
+	profileImage, _ := userObject["profileImage"].(string)
+	// Upsert user to the stream chat
+	_, err := streamchat.CreateOrUpdateUser(streamchat.User{
+		ID:        userId,
+		Name:      name,
+		Image:     profileImage,
+		IsManager: isManager,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating/updating user in chat", "error": err.Error()})
 		return
 	}
 
@@ -143,7 +152,7 @@ func ChatChannel(c *gin.Context) {
 
 	req.UserIDs = append(req.UserIDs, userId)
 
-	token := ""
+	// token := ""
 	// Before creating channel make sure all users has isChatConnected true
 	for _, id := range req.UserIDs {
 
@@ -191,14 +200,14 @@ func ChatChannel(c *gin.Context) {
 				}
 			}
 
-			if userId == id {
-				t, err := streamchat.CreateToken(userId)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating token", "error": err.Error()})
-					return
-				}
-				token = t
-			}
+			// if userId == id {
+			// 	t, err := streamchat.CreateToken(userId)
+			// 	if err != nil {
+			// 		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating token", "error": err.Error()})
+			// 		return
+			// 	}
+			// 	token = t
+			// }
 		}
 	}
 
@@ -214,5 +223,5 @@ func ChatChannel(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Channel Created", "channel": res.Channel, "token": token})
+	c.JSON(http.StatusOK, gin.H{"message": "Channel Created", "channel": res.Channel})
 }
