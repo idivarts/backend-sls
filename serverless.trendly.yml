@@ -111,19 +111,19 @@ functions:
         - 'service-account.json'
     events:
       - http: ANY /s3/v1/{proxy+}
-  processVideoUpload:
-    handler: functions/process_video/main.go
-    environment:
-      MEDIACONVERT_ROLE_ARN: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
-      MEDIACONVERT_JOBTEMPLATE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:jobTemplates/System-Ott_Cmaf_Cmfc_Avc_Aac_Sdr_Cbr
-      MEDIACONVERT_JOBQUEUE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:queues/Default
-    events:
-      - s3:
-          bucket: ${self:service}-video-uploads
-          event: s3:ObjectCreated:*
-          existing: true
-          rules:
-            - prefix: "uploads/"  # Only triggers when an object is uploaded directly in the root
+  # processVideoUpload:
+  #   handler: functions/process_video/main.go
+  #   environment:
+  #     MEDIACONVERT_ROLE_ARN: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
+  #     MEDIACONVERT_JOBTEMPLATE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:jobTemplates/System-Ott_Cmaf_Cmfc_Avc_Aac_Sdr_Cbr
+  #     MEDIACONVERT_JOBQUEUE_ARN: arn:aws:mediaconvert:us-east-1:730335628944:queues/Default
+  #   events:
+  #     - s3:
+  #         bucket: ${self:service}-video-uploads
+  #         event: s3:ObjectCreated:*
+  #         existing: true
+  #         rules:
+  #           - prefix: "uploads/"  # Only triggers when an object is uploaded directly in the root
             
 package:
   patterns:

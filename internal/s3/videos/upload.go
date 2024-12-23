@@ -52,17 +52,21 @@ func S3UploadHandler(ctx *gin.Context) {
 	domainUrl := os.Getenv("CLOUDFRONT_DISTRIBUTION_URL")
 
 	filename = fmt.Sprintf("file_%d_%s", time.Now().Unix(), filename)
-	// Get the file extension
-	ext := filepath.Ext(filename)
-	// Remove the extension from the filename
-	fileWithoutExtension := strings.TrimSuffix(filename, ext)
 
-	appleUrl := fmt.Sprintf("%s/outputs/%s.m3u8", domainUrl, fileWithoutExtension)
-	playUrl := fmt.Sprintf("%s/outputs/%s.mpd", domainUrl, fileWithoutExtension)
+	bucketKey := fmt.Sprintf("raw_videos/%s", filename)
+	videoUrl := fmt.Sprintf("%s/%s", domainUrl, bucketKey)
+
+	// // Get the file extension
+	// ext := filepath.Ext(filename)
+	// // Remove the extension from the filename
+	// fileWithoutExtension := strings.TrimSuffix(filename, ext)
+
+	// appleUrl := fmt.Sprintf("%s/outputs/%s.m3u8", domainUrl, fileWithoutExtension)
+	// playUrl := fmt.Sprintf("%s/outputs/%s.mpd", domainUrl, fileWithoutExtension)
 
 	req, _ := svc.PutObjectRequest(&s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
-		Key:    aws.String(fmt.Sprintf("uploads/%s", filename)),
+		Key:    &bucketKey,
 	})
 	url, err := req.Presign(15 * time.Minute)
 	if err != nil {
@@ -71,5 +75,5 @@ func S3UploadHandler(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"uploadUrl": url, "appleUrl": appleUrl, "playUrl": playUrl})
+	ctx.JSON(http.StatusOK, gin.H{"uploadUrl": url, "appleUrl": videoUrl, "playUrl": videoUrl})
 }
