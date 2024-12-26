@@ -151,6 +151,23 @@ func ChatChannel(c *gin.Context) {
 		return
 	}
 
+	_, err := firestoredb.Client.Collection("collaborations").Doc(req.CollaborationID).Get(context.Background())
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Collaboration not found", "error": err.Error()})
+		return
+	}
+
+	_, err = firestoredb.Client.Collection("contracts").Where("collaborationId", "==", req.CollaborationID).Where("userId", "==", req.UserID).Documents(context.Background()).Next()
+	if err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Contract already exists"})
+		return
+	}
+
+	// if err == nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "Contract already exists", "error": err.Error()})
+	// 	return
+	// }
+
 	userIDs := []string{userId, req.UserID}
 
 	// token := ""
@@ -201,12 +218,6 @@ func ChatChannel(c *gin.Context) {
 				}
 			}
 		}
-	}
-
-	_, err := firestoredb.Client.Collection("collaborations").Doc(req.CollaborationID).Get(context.Background())
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Collaboration not found", "error": err.Error()})
-		return
 	}
 
 	contractId := GenerateKey(req.Name)
