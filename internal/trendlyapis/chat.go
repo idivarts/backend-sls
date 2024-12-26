@@ -231,10 +231,12 @@ func ChatChannel(c *gin.Context) {
 		StreamChannelID: res.Channel.ID,
 		Status:          0,
 	}
-	_, err = firestoredb.Client.Collection("contracts").Doc(contractId).Set(context.Background(), contract)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating contract", "error": err.Error()})
-		return
+	if contractId != "" {
+		_, err = firestoredb.Client.Collection("contracts").Doc(contractId).Set(context.Background(), contract)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating contract", "error": err.Error()})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Channel Created", "channel": res.Channel, "contractId": contractId, "contract": contract})
