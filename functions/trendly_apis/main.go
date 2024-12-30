@@ -16,5 +16,7 @@ func main() {
 	apiV1.POST("/chat/connect", trendlyapis.ChatConnect)
 	apiV1.POST("/chat/channel", trendlyapis.ChatChannel)
 
+	apiV1.POST("/brands/members", trendlyapis.CreateBrandMember)
+
 	apihandler.StartLambda()
 }
