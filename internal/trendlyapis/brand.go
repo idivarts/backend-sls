@@ -50,9 +50,13 @@ func CreateBrandMember(c *gin.Context) {
 	}
 
 	// fauth.Client.EmailSignInLink()
-	GenerateInvitationLink(userRecord.Email, userRecord.EmailVerified, req.BrandID, userRecord.UID)
+	link, err := GenerateInvitationLink(userRecord.Email, userRecord.EmailVerified, req.BrandID, userRecord.UID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": userRecord})
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": userRecord, "link": link})
 }
 
 // GenerateInvitationLink creates a password reset link
