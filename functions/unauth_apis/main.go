@@ -6,13 +6,17 @@ import (
 )
 
 func main() {
-	apiV1 := apihandler.GinEngine.Group("/instagram")
+	instaApi := apihandler.GinEngine.Group("/instagram")
 
-	apiV1.GET("/", trendlyapis.InstagramRedirect)
-	apiV1.GET("/auth/:redirect_type", trendlyapis.InstagramAuthRedirect)
-	apiV1.POST("/auth", trendlyapis.InstagramAuth)
-	apiV1.GET("/deauth", trendlyapis.InstagramDeAuth)
-	apiV1.GET("/delete", trendlyapis.InstagramDelete)
+	instaApi.GET("/", trendlyapis.InstagramRedirect)
+	instaApi.GET("/auth/:redirect_type", trendlyapis.InstagramAuthRedirect)
+	instaApi.POST("/auth", trendlyapis.InstagramAuth)
+	instaApi.GET("/deauth", trendlyapis.InstagramDeAuth)
+	instaApi.GET("/delete", trendlyapis.InstagramDelete)
+
+	firebaseApi := apihandler.GinEngine.Group("/firebase")
+
+	firebaseApi.GET("/brands/members/add", trendlyapis.ValidateFirebaseCallback)
 
 	apihandler.StartLambda()
 }
