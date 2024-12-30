@@ -97,6 +97,8 @@ functions:
     events:
       - http: ANY /instagram
       - http: ANY /instagram/{proxy+}
+      - http: ANY /firebase
+      - http: ANY /firebase/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
     package:
