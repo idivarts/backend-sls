@@ -76,6 +76,7 @@ require (
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-resty/resty/v2 v2.12.0
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	google.golang.org/api v0.194.0
 	google.golang.org/grpc v1.65.0
 )

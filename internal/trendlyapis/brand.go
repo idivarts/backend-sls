@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 
 	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 )
 
@@ -28,7 +31,7 @@ func CreateBrandMember(c *gin.Context) {
 	if err != nil {
 		userToCreate := (&auth.UserToCreate{}).Email(req.Email).EmailVerified(false)
 
-		userRecord, err = fauth.Client.CreateUser(c, userToCreate)
+		userRecord, err = fauth.Client.CreateUser(context.Background(), userToCreate)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -47,15 +50,16 @@ func CreateBrandMember(c *gin.Context) {
 	}
 
 	// fauth.Client.EmailSignInLink()
-	GenerateInvitationLink(userRecord.Email, userRecord.EmailVerified, req.BrandID)
+	GenerateInvitationLink(userRecord.Email, userRecord.EmailVerified, req.BrandID, userRecord.UID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": userRecord})
 }
 
 // GenerateInvitationLink creates a password reset link
-func GenerateInvitationLink(email string, userVerified bool, brandId string) (string, error) {
+func GenerateInvitationLink(email string, userVerified bool, brandId string, uid string) (string, error) {
 	actionCodeSettings := &auth.ActionCodeSettings{
-		URL: getRedirectLink(brandId),
+		URL:             getRedirectLink(brandId, uid),
+		HandleCodeInApp: true,
 	}
 	if userVerified {
 		link, err := fauth.Client.EmailVerificationLinkWithSettings(context.Background(), email, actionCodeSettings)
@@ -67,18 +71,19 @@ func GenerateInvitationLink(email string, userVerified bool, brandId string) (st
 }
 
 // This will be used to get the link to redirect
-func getRedirectLink(brandId string) string {
-	link := fmt.Sprintf("https://be.trendly.pro/firebase/brands/members/add?brandId=%s", brandId)
+func getRedirectLink(brandId, uid string) string {
+	token, err := myjwt.EncodeUID(uid)
+	if err != nil {
+		panic("Error Creating custom token")
+	}
+	link := fmt.Sprintf("%s/firebase/brands/members/add?brandId=%s&token=%s", os.Getenv("SELF_BASE_URL"), url.QueryEscape(brandId), url.QueryEscape(token))
+
 	return link
 }
 
 type FirebaseActionRequest struct {
-	OobCode     string `form:"oobCode" binding:"required"`      // Out-of-band code for the action
-	Mode        string `form:"mode" binding:"required"`         // Operation mode (e.g., resetPassword, verifyEmail)
-	ApiKey      string `form:"apiKey" binding:"required"`       // Firebase project API key
-	Lang        string `form:"lang" binding:"omitempty"`        // Language code (optional)
-	ContinueUrl string `form:"continueUrl" binding:"omitempty"` // The original redirect URL
-	TenantId    string `form:"tenantId" binding:"omitempty"`    // Tenant ID (optional for multi-tenancy)
+	Token   string `form:"token" binding:"required"`   // Out-of-band code for the action
+	BrandID string `form:"brandId" binding:"required"` // Operation mode (e.g., resetPassword, verifyEmail)
 }
 
 func ValidateFirebaseCallback(c *gin.Context) {
@@ -88,16 +93,27 @@ func ValidateFirebaseCallback(c *gin.Context) {
 		return
 	}
 
-	if req.Mode == "resetPassword" {
-		// user, err := fauth.Client.VerifyPasswordResetCode(context.Background(), oobCode)
-		// if err != nil {
-		// 	// Handle invalid or expired code
-		// }
-	} else if req.Mode == "verifyEmail" {
-
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request Mode", "data": req})
+	uid, err := myjwt.DecodeUID(req.Token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Success", "data": req})
+
+	uRecord, err := fauth.Client.GetUser(context.Background(), uid)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	bmember := trendlymodels.BrandMember{
+		ManagerID: uid,
+		Role:      "user",
+		Status:    1,
+	}
+	_, err = bmember.Set(req.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s?email=%s", os.Getenv("SELF_BASE_URL"), uRecord.Email))
 }

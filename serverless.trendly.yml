@@ -21,6 +21,9 @@ provider:
     STREAM_SECRET: mac9dexrdgpdf559mjgnmz4284yfaqcx5v8evmash4y9ajbqr63ye5u83u9ufajr
     # STREAM_CLIENT: xv7c4yzcux6y
     # STREAM_SECRET: x5p7xg5gerzmdj7e4uagcz4rdnm8abj7ktuj9hhtx2kqzdzmm8gr7a38xrcpywvt
+    JWT_ENCODE_KEY: anbs8372gi)(034UTHIHABCdsgsdN)
+    LOGIN_URL: "https://trendly.pro"
+    SELF_BASE_URL: "https://be.trendly.pro"
   iam:
     role:
       statements:
