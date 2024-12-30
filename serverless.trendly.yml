@@ -89,7 +89,7 @@ functions:
     events:
       - http: ANY /api/v1/{proxy+}
   insta_apis:
-    handler: functions/insta_apis/main.go
+    handler: functions/unauth_apis/main.go
     package:
       include:
         - 'service-account.json'
