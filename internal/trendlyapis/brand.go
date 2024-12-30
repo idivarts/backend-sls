@@ -9,6 +9,7 @@ import (
 
 	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
@@ -24,6 +25,19 @@ func CreateBrandMember(c *gin.Context) {
 	var req IBrandMember
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userId, b := middlewares.GetUserId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+
+	cUser := &trendlymodels.BrandMember{}
+	err := cUser.Get(req.BrandID, userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not a part of brand", "data": err.Error()})
 		return
 	}
 

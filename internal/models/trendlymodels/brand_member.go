@@ -17,3 +17,16 @@ func (b *BrandMember) Set(brandID string) (*firestore.WriteResult, error) {
 	res, err := firestoredb.Client.Collection("brands").Doc(brandID).Collection("members").Doc(b.ManagerID).Set(context.Background(), b)
 	return res, err
 }
+
+func (b *BrandMember) Get(brandID, userID string) error {
+	res, err := firestoredb.Client.Collection("brands").Doc(brandID).Collection("members").Doc(userID).Get(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = res.DataTo(b)
+	if err != nil {
+		return err
+	}
+	return err
+}
