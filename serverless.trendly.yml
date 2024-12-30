@@ -24,6 +24,9 @@ provider:
     JWT_ENCODE_KEY: anbs8372gi)(034UTHIHABCdsgsdN)
     LOGIN_URL: "https://trendly.pro"
     SELF_BASE_URL: "https://be.trendly.pro"
+    SENDGRID_API_KEY: U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v
+    SENDGRID_NAME: Trendly
+    SENDGRID_EMAIL: no-reply@idiv.in
   iam:
     role:
       statements:

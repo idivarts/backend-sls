@@ -12,6 +12,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
+	"github.com/idivarts/backend-sls/pkg/myemail"
 )
 
 type IBrandMember struct {
@@ -51,6 +52,14 @@ func CreateBrandMember(c *gin.Context) {
 
 	// fauth.Client.EmailSignInLink()
 	link, err := GenerateInvitationLink(userRecord.Email, userRecord.EmailVerified, req.BrandID, userRecord.UID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = myemail.SendEmailUsingTemplate(userRecord.Email, "d-1c924f9017cc45728243bef1ebe4cda3", map[string]interface{}{
+		"invitationUrl": link,
+	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
