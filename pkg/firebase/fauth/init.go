@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"firebase.google.com/go/auth"
+	"firebase.google.com/go/v4/auth"
 	firebaseapp "github.com/idivarts/backend-sls/pkg/firebase"
 )
 

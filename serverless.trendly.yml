@@ -21,6 +21,12 @@ provider:
     STREAM_SECRET: mac9dexrdgpdf559mjgnmz4284yfaqcx5v8evmash4y9ajbqr63ye5u83u9ufajr
     # STREAM_CLIENT: xv7c4yzcux6y
     # STREAM_SECRET: x5p7xg5gerzmdj7e4uagcz4rdnm8abj7ktuj9hhtx2kqzdzmm8gr7a38xrcpywvt
+    JWT_ENCODE_KEY: anbs8372gi)(034UTHIHABCdsgsdN)
+    LOGIN_URL: "https://trendly.pro"
+    SELF_BASE_URL: "https://be.trendly.pro"
+    SENDGRID_API_KEY: U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v
+    SENDGRID_NAME: Trendly
+    SENDGRID_EMAIL: no-reply@idiv.in
   iam:
     role:
       statements:
@@ -89,7 +95,7 @@ functions:
     events:
       - http: ANY /api/v1/{proxy+}
   insta_apis:
-    handler: functions/insta_apis/main.go
+    handler: functions/unauth_apis/main.go
     package:
       include:
         - 'service-account.json'
@@ -97,6 +103,8 @@ functions:
     events:
       - http: ANY /instagram
       - http: ANY /instagram/{proxy+}
+      - http: ANY /firebase
+      - http: ANY /firebase/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
     package:

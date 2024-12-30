@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"firebase.google.com/go/auth"
+	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
