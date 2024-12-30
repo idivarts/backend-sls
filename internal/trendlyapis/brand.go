@@ -128,5 +128,5 @@ func ValidateFirebaseCallback(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s?email=%s", os.Getenv("SELF_BASE_URL"), uRecord.Email))
+	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s?email=%s", os.Getenv("LOGIN_URL"), uRecord.Email))
 }
