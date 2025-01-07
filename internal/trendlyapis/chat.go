@@ -151,11 +151,12 @@ func ChatChannel(c *gin.Context) {
 		return
 	}
 
-	_, err := firestoredb.Client.Collection("collaborations").Doc(req.CollaborationID).Get(context.Background())
+	collabObj, err := firestoredb.Client.Collection("collaborations").Doc(req.CollaborationID).Get(context.Background())
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Collaboration not found", "error": err.Error()})
 		return
 	}
+	collabMap := collabObj.Data()
 
 	_, err = firestoredb.Client.Collection("contracts").Where("collaborationId", "==", req.CollaborationID).Where("userId", "==", req.UserID).Documents(context.Background()).Next()
 	if err == nil {
@@ -240,6 +241,7 @@ func ChatChannel(c *gin.Context) {
 		ManagerID:       userId,
 		CollaborationID: req.CollaborationID,
 		StreamChannelID: res.Channel.ID,
+		BrandID:         collabMap["brandId"].(string),
 		Status:          0,
 	}
 	if contractId != "" {
