@@ -42,6 +42,20 @@ func (s *SocialsPrivate) Set(userId, id string) (*firestore.WriteResult, error) 
 	return res, err
 }
 
+func (s *SocialsPrivate) Get(userId, id string) error {
+	res, err := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socialsPrivate", userId)).Doc(id).Get(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = res.DataTo(s)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *Socials) Insert(userId string) (*firestore.WriteResult, error) {
 	res, err := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socials", userId)).Doc(s.ID).Set(context.Background(), s)
 
