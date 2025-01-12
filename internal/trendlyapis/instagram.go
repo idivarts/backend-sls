@@ -37,7 +37,7 @@ func InstagramRedirect(ctx *gin.Context) {
 		return
 	}
 	redirect_uri := fmt.Sprintf("%s/%s", INSTAGRAM_REDIRECT, redirect_type)
-	ctx.Redirect(302, fmt.Sprintf("https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0&client_id=%s&redirect_uri=%s&response_type=code&scope=instagram_business_basic", clientId, url.QueryEscape(redirect_uri)))
+	ctx.Redirect(302, fmt.Sprintf("https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0&client_id=%s&redirect_uri=%s&response_type=code&scope=instagram_business_basic,instagram_business_manage_insights", clientId, url.QueryEscape(redirect_uri)))
 }
 
 func InstagramAuthRedirect(ctx *gin.Context) {

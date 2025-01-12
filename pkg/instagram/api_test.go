@@ -10,7 +10,7 @@ import (
 const code = `AQAB6OfvQEP1tq_wXSHZXrnLnKNQL8tUmkYIPswgB9BSXO0bTkdyMIKs3eY5D4MBk3mlCAaTRHUlIkmfD7TlNN_q-P8YNm2lbLdKxD6zJLNYIZDloptz5wWIe6ghu0DIov6yuC9Fu84ELYSGszwtFYgWZK1ooUQ744EqoeZ0Umcij4Uese8LBjQGtBT8Y-EldfRTt-L4yC8qump9b9vbINairnuqrlpSeqnSRXQljC-n-w#_`
 const accessToken = `IGAAQlA4RZBCmVBZAFBNX1VoN3lJeHBkRjAxNm1Qa2hkRmlrTjBQNGdxUlNWclZATTTM5cWxURGNHZA1lJZAEJWc3VGLWFmdlZAaMW9uTzhtZAmQ4VGk5NE9USHFrZA2VDeFRQdk84cUJYVS1WUnVDWFNvSTh1MEhSUEVlTXhERUxhZAXlnVGgxWThOXzgycVJR`
 
-const longLivedAccessToken = `IGQWRNd2JEcFdHU2QzZAnpieE94cFhOdnU5YW1RalFoSE9GQTltdnB5cFU5UlU1OVlGTmlHMThhMkh2V2tWajJOU2JTV19HN3l4REFOMGs1ZA29ualRzLXhLaWpNQ1g4SlFwRmx5TUI4ZAkhUdwZDZD`
+const longLivedAccessToken = `IGAAQlA4RZBCmVBZAE9FZA2tfV2ZAUdkNUT0NBUnI4M1BBVzNnemVLeDB6UWx2Mm9qYk5uNTJ1V0tmVk1mdGp6WGxPWkxMckFIQTRaem9tWVBQRG5KNm5GSlVOU0RWcjg3ZAHRYX291SVpUalZAyRmJER1ZAlOUln`
 
 func TestToken(t *testing.T) {
 	accessToken, err := instagram.GetAccessTokenFromCode(code, "https://be.trendly.pro/instagram/auth")
@@ -38,6 +38,15 @@ func TestAccessToken(t *testing.T) {
 
 func TestGetUser(t *testing.T) {
 	iData, err := instagram.GetInstagram("me", longLivedAccessToken)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	log.Println("Instagram Data:", iData)
+}
+
+func TestInstaInsights(t *testing.T) {
+	iData, err := instagram.GetInsights(longLivedAccessToken, []string{"impressions"}, "day", instagram.InsightParams{})
 	if err != nil {
 		t.Error(err)
 		return
