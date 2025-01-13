@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/idivarts/backend-sls/pkg/messenger"
 )
@@ -31,6 +32,7 @@ type instaResponse struct {
 type IGetMediaParams struct {
 	GraphType int
 	PageID    string
+	Count     int
 }
 
 func GetMedia(pageAccessToken string, params IGetMediaParams) ([]InstagramMedia, error) {
@@ -49,6 +51,11 @@ func GetMedia(pageAccessToken string, params IGetMediaParams) ([]InstagramMedia,
 	iParam := url.Values{}
 	iParam.Set("fields", "caption,media_type,media_url,thumbnail_url,cover_url,permalink,timestamp,comments_count,like_count")
 	iParam.Set("access_token", pageAccessToken)
+
+	if params.Count == 0 {
+		params.Count = 10
+	}
+	iParam.Set("limit", strconv.Itoa(params.Count))
 
 	allParams := iParam.Encode()
 	log.Println("All Params:", allParams)
