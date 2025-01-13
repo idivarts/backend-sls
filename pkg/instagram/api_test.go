@@ -57,7 +57,7 @@ func TestInstaInsights(t *testing.T) {
 }
 
 func TestMedia(t *testing.T) {
-	iData, err := instagram.GetMedia(longLivedAccessToken, instagram.IGetMediaParams{})
+	iData, err := instagram.GetMedia(longLivedAccessToken, instagram.IGetMediaParams{GraphType: 1})
 	if err != nil {
 		t.Error(err)
 		return
@@ -67,7 +67,7 @@ func TestMedia(t *testing.T) {
 
 func TestMediaFromFBGraph(t *testing.T) {
 	iData, err := instagram.GetMedia(facebookToken, instagram.IGetMediaParams{
-		GraphType: 1,
+		GraphType: 0,
 		PageID:    pageId,
 	})
 	if err != nil {

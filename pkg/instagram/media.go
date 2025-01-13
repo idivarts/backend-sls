@@ -41,7 +41,7 @@ func GetMedia(pageAccessToken string, params IGetMediaParams) ([]InstagramMedia,
 
 	// Set the API endpoint
 	apiURL := fmt.Sprintf("%s/%s/me/media", BaseURL, ApiVersion)
-	if params.GraphType == 1 {
+	if params.GraphType == 0 {
 		if params.PageID == "" {
 			return nil, fmt.Errorf("pageID is required for instagram - %s", params.PageID)
 		}
