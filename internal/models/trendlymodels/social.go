@@ -64,3 +64,16 @@ func (s *Socials) Insert(userId string) (*firestore.WriteResult, error) {
 	}
 	return res, err
 }
+func (s *Socials) Get(userId, id string) error {
+	res, err := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socials", userId)).Doc(id).Get(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = res.DataTo(s)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

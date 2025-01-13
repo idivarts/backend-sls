@@ -15,7 +15,7 @@ type TokenResponse struct {
 }
 
 func GetLongLivedAccessToken(accessToken string) (*TokenResponse, error) {
-	url := fmt.Sprintf("%s/%s/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s", baseURL, apiVersion, ClientID, ClientSecret, accessToken)
+	url := fmt.Sprintf("%s/%s/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s", BaseURL, ApiVersion, ClientID, ClientSecret, accessToken)
 
 	resp, err := http.Get(url)
 	if err != nil {

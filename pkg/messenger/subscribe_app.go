@@ -12,7 +12,7 @@ const webhook_events = "messages,message_echoes"
 func SubscribeApp(doSubsription bool, pageAccessToken string) error {
 	// Convert the message struct to JSON
 	fields := webhook_events
-	url := baseURL + "/" + apiVersion + "/me/subscribed_apps?subscribed_fields=" + fields + "&access_token=" + pageAccessToken
+	url := BaseURL + "/" + ApiVersion + "/me/subscribed_apps?subscribed_fields=" + fields + "&access_token=" + pageAccessToken
 	fmt.Println(url)
 
 	var resp *http.Response
@@ -66,7 +66,7 @@ type SubscribedAppData struct {
 
 func GetSubscribedApps(pageAccessToken string) (*SubscribedAppData, error) {
 	// Convert the message struct to JSON
-	url := baseURL + "/" + apiVersion + "/me/subscribed_apps?access_token=" + pageAccessToken
+	url := BaseURL + "/" + ApiVersion + "/me/subscribed_apps?access_token=" + pageAccessToken
 	fmt.Println(url)
 	// Make the HTTP request
 	resp, err := http.Get(url)

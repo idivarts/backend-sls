@@ -35,7 +35,7 @@ func GetInsights(
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/insights", baseURL, apiVersion)
+	apiURL := fmt.Sprintf("%s/%s/me/insights", BaseURL, ApiVersion)
 	// Create query parameters
 	iParam := url.Values{}
 	iParam.Set("metric", joinWithComma(metrics))

@@ -41,7 +41,7 @@ func (user UserProfile) GenerateUserDescription() string {
 }
 
 func GetUser(igsid string, pageAccessToken string) (*UserProfile, error) {
-	url := fmt.Sprintf("%s/%s/%s?fields=name,username,profile_pic,follower_count,is_user_follow_business,is_business_follow_user&access_token=%s", baseURL, apiVersion, igsid, pageAccessToken)
+	url := fmt.Sprintf("%s/%s/%s?fields=name,username,profile_pic,follower_count,is_user_follow_business,is_business_follow_user&access_token=%s", BaseURL, ApiVersion, igsid, pageAccessToken)
 
 	// Send GET request
 	resp, err := http.Get(url)

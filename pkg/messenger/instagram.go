@@ -29,7 +29,7 @@ func GetInstagramInBrief(instagramId string, pageAccessToken string) (*Instagram
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,username,biography&access_token=%s", baseURL, apiVersion, instagramId, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,username,biography&access_token=%s", BaseURL, ApiVersion, instagramId, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -63,7 +63,7 @@ func GetInstagram(instagramId string, pageAccessToken string) (*InstagramProfile
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", baseURL, apiVersion, instagramId, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", BaseURL, ApiVersion, instagramId, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
