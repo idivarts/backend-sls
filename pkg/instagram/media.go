@@ -43,7 +43,7 @@ func GetMedia(pageAccessToken string, params IGetMediaParams) ([]InstagramMedia,
 		if params.PageID == "" {
 			return nil, fmt.Errorf("pageID is required for instagram - %s", params.PageID)
 		}
-		apiURL = fmt.Sprintf("%s/%s/%s/media", BaseURL, params.PageID, ApiVersion)
+		apiURL = fmt.Sprintf("%s/%s/%s/media", messenger.BaseURL, messenger.ApiVersion, params.PageID)
 	}
 	// Create query parameters
 	iParam := url.Values{}
