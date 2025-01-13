@@ -27,3 +27,13 @@ func TestFetchMessages(t *testing.T) {
 	log.Println(string(b))
 	log.Println("Total Messages", len(msgs))
 }
+
+func TestFetchPosts(t *testing.T) {
+	pageAccessToken := "EAAID6icQOs4BO7wIl6hDNTBdRWmMhHgnoeF4AgZA5D96CIOBl7WlTeFslrMZC4OtZA44cgeRd4jxJXarkARDwZCjHZArvv1pgC8QA9EBXnARFbrPk1wulK8zaJM4FfMZAnAnwBhPhr4PRbMdEMMWeGQvuLvHKZBjUQGpV54HX5awZCpW2YupSfrfljbgrMFiq0bN"
+	posts, err := GetPosts(pageAccessToken, IFBPostsParams{Count: 10})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	log.Println("Posts:", len(posts))
+}
