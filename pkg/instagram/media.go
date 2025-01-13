@@ -28,12 +28,23 @@ type instaResponse struct {
 	Data []InstagramMedia `json:"data"`
 }
 
-func GetMedia(pageAccessToken string) ([]InstagramMedia, error) {
+type IGetMediaParams struct {
+	GraphType int
+	PageID    string
+}
+
+func GetMedia(pageAccessToken string, params IGetMediaParams) ([]InstagramMedia, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
 	apiURL := fmt.Sprintf("%s/%s/me/media", BaseURL, ApiVersion)
+	if params.GraphType == 1 {
+		if params.PageID == "" {
+			return nil, fmt.Errorf("pageID is required for instagram - %s", params.PageID)
+		}
+		apiURL = fmt.Sprintf("%s/%s/%s/media", BaseURL, params.PageID, ApiVersion)
+	}
 	// Create query parameters
 	iParam := url.Values{}
 	iParam.Set("fields", "caption,media_type,media_url,thumbnail_url,cover_url,permalink,timestamp,comments_count,like_count")

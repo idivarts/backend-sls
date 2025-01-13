@@ -55,7 +55,7 @@ func TestInstaInsights(t *testing.T) {
 }
 
 func TestMedia(t *testing.T) {
-	iData, err := instagram.GetMedia(longLivedAccessToken)
+	iData, err := instagram.GetMedia(longLivedAccessToken, instagram.IGetMediaParams{})
 	if err != nil {
 		t.Error(err)
 		return
