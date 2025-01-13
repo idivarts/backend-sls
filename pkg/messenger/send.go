@@ -109,7 +109,7 @@ func sendMessage(message interface{}, pageAccessToken string) (*IMessageResponse
 	if err != nil {
 		return nil, err
 	}
-	url := baseURL + "/" + apiVersion + "/me/messages?access_token=" + pageAccessToken
+	url := BaseURL + "/" + ApiVersion + "/me/messages?access_token=" + pageAccessToken
 	fmt.Println(url)
 	// Make the HTTP request
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBytes))

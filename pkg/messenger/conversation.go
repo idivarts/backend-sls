@@ -40,7 +40,7 @@ func GetConversationsByUserId(userID string, pageAccessToken string) (*Conversat
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=name,id,participants&user_id=%s&access_token=%s", baseURL, apiVersion, platform, userID, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=name,id,participants&user_id=%s&access_token=%s", BaseURL, ApiVersion, platform, userID, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -72,7 +72,7 @@ func GetConversationById(conversationID string, pageAccessToken string) (*Conver
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,id,participants&access_token=%s", baseURL, apiVersion, conversationID, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,id,participants&access_token=%s", BaseURL, ApiVersion, conversationID, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -104,7 +104,7 @@ func GetConversationsPaginated(after string, limit int, pageAccessToken string) 
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&limit=%d&access_token=%s&after=%s", baseURL, apiVersion, platform, limit, pageAccessToken, after)
+	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&limit=%d&access_token=%s&after=%s", BaseURL, ApiVersion, platform, limit, pageAccessToken, after)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)

@@ -3,8 +3,8 @@ package instagram
 import "os"
 
 const (
-	baseURL    = "https://graph.instagram.com"
-	apiVersion = "v21.0"
+	BaseURL    = "https://graph.instagram.com"
+	ApiVersion = "v21.0"
 )
 
 var (

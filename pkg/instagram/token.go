@@ -77,7 +77,7 @@ func GetAccessTokenFromCode(code, redirectUri string) (*CodeResponse, error) {
 }
 
 func GetLongLivedAccessToken(accessToken string) (*TokenResponse, error) {
-	url := fmt.Sprintf("%s/access_token?grant_type=ig_exchange_token&client_secret=%s&access_token=%s", baseURL, ClientSecret, accessToken)
+	url := fmt.Sprintf("%s/access_token?grant_type=ig_exchange_token&client_secret=%s&access_token=%s", BaseURL, ClientSecret, accessToken)
 
 	resp, err := http.Get(url)
 	if err != nil {

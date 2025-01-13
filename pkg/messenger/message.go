@@ -70,7 +70,7 @@ func GetMessageInfo(messageID string, pageAccessToken string) (*Message, error) 
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=%s&access_token=%s", baseURL, apiVersion, messageID, messageInfoFields, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=%s&access_token=%s", BaseURL, ApiVersion, messageID, messageInfoFields, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -104,7 +104,7 @@ func GetMessagesWithPagination(conversationID string, after string, limit int, p
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s/messages?fields=%s&limit=%d&after=%s&access_token=%s", baseURL, apiVersion, conversationID, messageInfoFields, limit, after, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s/messages?fields=%s&limit=%d&after=%s&access_token=%s", BaseURL, ApiVersion, conversationID, messageInfoFields, limit, after, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)

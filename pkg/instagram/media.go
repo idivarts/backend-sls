@@ -33,7 +33,7 @@ func GetMedia(pageAccessToken string) ([]InstagramMedia, error) {
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/media", baseURL, apiVersion)
+	apiURL := fmt.Sprintf("%s/%s/me/media", BaseURL, ApiVersion)
 	// Create query parameters
 	iParam := url.Values{}
 	iParam.Set("fields", "caption,media_type,media_url,thumbnail_url,cover_url,permalink,timestamp,comments_count,like_count")
