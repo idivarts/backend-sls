@@ -48,11 +48,11 @@ func FetchInsights(c *gin.Context) {
 }
 
 func FetchMedias(c *gin.Context) {
-	userId, b := middlewares.GetUserId(c)
-	if !b {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid User"})
-		return
-	}
+	userId := c.Query("userId")
+	// if !b {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid User"})
+	// 	return
+	// }
 
 	user := &trendlymodels.User{}
 	err := user.Get(userId)
