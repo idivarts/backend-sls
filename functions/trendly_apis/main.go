@@ -11,8 +11,12 @@ func main() {
 
 	apiV1.POST("/socials/facebook", trendlyapis.FacebookLogin)
 	apiV1.POST("/socials/instagram", trendlyapis.ConnectInstagram)
+
+	// Calculate Insights
 	apiV1.POST("/socials/insights", trendlyapis.FetchInsights)
-	apiV1.POST("/socials/medias", trendlyapis.FetchMedias)
+
+	// Get Social Medias
+	apiV1.GET("/socials/medias", trendlyapis.FetchMedias)
 
 	apiV1.POST("/chat/auth", trendlyapis.ChatAuth)
 	apiV1.POST("/chat/connect", trendlyapis.ChatConnect)
