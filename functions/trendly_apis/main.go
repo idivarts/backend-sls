@@ -21,6 +21,7 @@ func main() {
 	apiV1.POST("/chat/auth", trendlyapis.ChatAuth)
 	apiV1.POST("/chat/connect", trendlyapis.ChatConnect)
 	apiV1.POST("/chat/channel", trendlyapis.ChatChannel)
+	apiV1.POST("/chat/notification", trendlyapis.Notify)
 
 	apiV1.POST("/brands/members", trendlyapis.CreateBrandMember)
 
