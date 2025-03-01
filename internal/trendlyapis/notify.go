@@ -13,12 +13,12 @@ type Notification struct {
 	UserID    []string `json:"userId"`
 	ManagerID []string `json:"managerId"`
 	Payload   struct {
-		Data         map[string]string        `json:"data,omitempty"`
-		Notification *messaging.Notification  `json:"notification"`
-		Android      *messaging.AndroidConfig `json:"android,omitempty"`
-		Webpush      *messaging.WebpushConfig `json:"webpush,omitempty"`
-		APNS         *messaging.APNSConfig    `json:"apns,omitempty"`
-		FCMOptions   *messaging.FCMOptions    `json:"fcmOptions,omitempty"`
+		Data         map[string]string       `json:"data,omitempty"`
+		Notification *messaging.Notification `json:"notification"`
+		// Android      *messaging.AndroidConfig `json:"android,omitempty"`
+		// Webpush      *messaging.WebpushConfig `json:"webpush,omitempty"`
+		// APNS         *messaging.APNSConfig    `json:"apns,omitempty"`
+		// FCMOptions   *messaging.FCMOptions    `json:"fcmOptions,omitempty"`
 	} `json:"payload"`
 }
 
@@ -33,10 +33,19 @@ func Notify(c *gin.Context) {
 		Tokens:       []string{},
 		Data:         req.Payload.Data,
 		Notification: req.Payload.Notification,
-		Android:      req.Payload.Android,
-		Webpush:      req.Payload.Webpush,
-		APNS:         req.Payload.APNS,
-		FCMOptions:   req.Payload.FCMOptions,
+		Android: &messaging.AndroidConfig{
+			Priority: "high",
+			Notification: &messaging.AndroidNotification{
+				Sound: "default",
+			},
+		},
+		APNS: &messaging.APNSConfig{
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					Sound: "default",
+				},
+			},
+		},
 	})
 	// Send Notification
 	c.JSON(http.StatusOK, gin.H{"message": "Notification Sent"})
