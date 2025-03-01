@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	stream_chat "github.com/GetStream/stream-chat-go/v5"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
@@ -42,6 +43,66 @@ func ChatAuth(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating/updating user in chat", "error": err.Error()})
 		return
+	}
+	if !isManager {
+		if userObject["primarySocial"] != nil && userObject["primarySocial"] != "" {
+			// Get the user's primary social media account
+			primarySocial := userObject["primarySocial"].(string)
+			social := trendlymodels.Socials{}
+			err := social.Get(userId, primarySocial)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting primary social media account", "error": err.Error()})
+				return
+			}
+
+			user := trendlymodels.User{}
+			err = user.Get(userId)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
+				return
+			}
+
+			if social.FBProfile != nil {
+				user.Backend = &trendlymodels.BackendData{
+					Followers:  &social.FBProfile.FollowersCount,
+					Reach:      aws.Int(0),
+					Engagement: aws.Int(0),
+					Rating:     aws.Int(5),
+				}
+			}
+			if social.InstaProfile != nil {
+				user.Backend = &trendlymodels.BackendData{
+					Followers:  &social.InstaProfile.FollowersCount,
+					Reach:      aws.Int(0),
+					Engagement: aws.Int(0),
+					Rating:     aws.Int(5),
+				}
+			}
+
+			_, err = user.Insert(userId)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
+				return
+			}
+		} else if userObject["backend"] == nil {
+			user := trendlymodels.User{}
+			err = user.Get(userId)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
+				return
+			}
+			user.Backend = &trendlymodels.BackendData{
+				Followers:  aws.Int(0),
+				Reach:      aws.Int(0),
+				Engagement: aws.Int(0),
+				Rating:     aws.Int(5),
+			}
+			_, err = user.Insert(userId)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
+				return
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Chat Authentication successful"})
