@@ -54,9 +54,9 @@ func InstagramAuthRedirect(ctx *gin.Context) {
 
 	redirectUri := ""
 	if redirect_type == "1" {
-		redirectUri = "http://localhost:8081"
+		redirectUri = "http://localhost:8081/insta-redirect"
 	} else if redirect_type == "2" {
-		redirectUri = "https://creators.trendly.pro/"
+		redirectUri = "https://creators.trendly.pro/insta-redirect"
 	} else if redirect_type == "3" || redirect_type == "4" {
 		redirectUri = "fb567254166026958://authorize"
 	} else {
