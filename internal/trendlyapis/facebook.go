@@ -30,7 +30,7 @@ func FacebookLogin(c *gin.Context) {
 	for _, v := range person.Accounts.Data {
 		lRes, err := messenger.GetLongLivedAccessToken(v.AccessToken)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting long lived access token"})
 			return
 		}
 		log.Println("Token", v.AccessToken, lRes.AccessToken)
@@ -39,7 +39,7 @@ func FacebookLogin(c *gin.Context) {
 		if v.InstagramBusinessAccount.ID != "" {
 			insta, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting instagram account"})
 				return
 			}
 			instaPage := trendlymodels.Socials{
@@ -54,7 +54,7 @@ func FacebookLogin(c *gin.Context) {
 			}
 			_, err = instaPage.Insert(userId)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving instagram account"})
 				return
 			}
 			instaPPage := trendlymodels.SocialsPrivate{
@@ -62,7 +62,7 @@ func FacebookLogin(c *gin.Context) {
 			}
 			_, err = instaPPage.Set(userId, insta.ID)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving instagram private details"})
 				return
 			}
 			log.Println("Instagram Saved Accesstoken", instaPPage)
@@ -70,7 +70,7 @@ func FacebookLogin(c *gin.Context) {
 
 		fb, err := messenger.GetFacebook(lRes.AccessToken)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting facebook account"})
 			return
 		}
 
@@ -86,7 +86,7 @@ func FacebookLogin(c *gin.Context) {
 		}
 		_, err = fbPage.Insert(userId)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook account"})
 			return
 		}
 		fbPPage := trendlymodels.SocialsPrivate{
@@ -94,7 +94,7 @@ func FacebookLogin(c *gin.Context) {
 		}
 		_, err = fbPPage.Set(userId, v.ID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook private details"})
 			return
 		}
 		log.Println("FB Saved Accesstoken", fbPPage)
