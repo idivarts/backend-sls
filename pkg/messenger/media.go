@@ -28,17 +28,17 @@ type IPostData struct {
 	CreatedTime  CustomTime `json:"created_time"`
 }
 
-func GetPosts(pageAccessToken string, params IFBPostsParams) ([]IPostData, error) {
+func GetPosts(pageID, accessToken string, params IFBPostsParams) ([]IPostData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/posts", BaseURL, ApiVersion)
+	apiURL := fmt.Sprintf("%s/%s/%s/posts", BaseURL, ApiVersion, pageID)
 
 	// Create query parameters
 	iParam := url.Values{}
 	iParam.Set("fields", "message,full_picture,id,permalink_url,created_time")
-	iParam.Set("access_token", pageAccessToken)
+	iParam.Set("access_token", accessToken)
 
 	if params.Count == 0 {
 		params.Count = 10

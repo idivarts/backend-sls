@@ -35,12 +35,12 @@ type IGetMediaParams struct {
 	Count     int
 }
 
-func GetMedia(pageAccessToken string, params IGetMediaParams) ([]InstagramMedia, error) {
+func GetMedia(pageID, accessToken string, params IGetMediaParams) ([]InstagramMedia, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/media", BaseURL, ApiVersion)
+	apiURL := fmt.Sprintf("%s/%s/%s/media", BaseURL, ApiVersion, pageID)
 	if params.GraphType == 0 {
 		if params.PageID == "" {
 			return nil, fmt.Errorf("pageID is required for instagram - %s", params.PageID)
@@ -50,7 +50,7 @@ func GetMedia(pageAccessToken string, params IGetMediaParams) ([]InstagramMedia,
 	// Create query parameters
 	iParam := url.Values{}
 	iParam.Set("fields", "caption,media_type,media_url,thumbnail_url,cover_url,permalink,timestamp,comments_count,like_count")
-	iParam.Set("access_token", pageAccessToken)
+	iParam.Set("access_token", accessToken)
 
 	if params.Count == 0 {
 		params.Count = 10
