@@ -34,6 +34,35 @@ func FacebookLogin(c *gin.Context) {
 	}
 	log.Println("Token", person.AccessToken, lRes.AccessToken)
 
+	fb, err := messenger.GetMyFacebook(person.ID, lRes.AccessToken)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting facebook account"})
+		return
+	}
+	fbPage := trendlymodels.Socials{
+		ID:          person.ID,
+		Name:        person.Name,
+		UserID:      person.ID,
+		OwnerName:   person.Name,
+		Image:       fb.Picture.Data.URL,
+		ConnectedID: nil,
+		IsInstagram: false,
+		FBProfile:   fb,
+	}
+	_, err = fbPage.Insert(userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook account"})
+		return
+	}
+	fbPPage := trendlymodels.SocialsPrivate{
+		AccessToken: &lRes.AccessToken,
+	}
+	_, err = fbPPage.Set(userId, person.ID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook private details"})
+		return
+	}
+
 	for _, v := range person.Accounts.Data {
 		// var instagram *models.InstagramObject = nil
 		if v.InstagramBusinessAccount.ID != "" {
@@ -68,7 +97,7 @@ func FacebookLogin(c *gin.Context) {
 			log.Println("Instagram Saved Accesstoken", instaPPage)
 		}
 
-		fb, err := messenger.GetFacebook(v.ID, lRes.AccessToken)
+		fb, err := messenger.GetFacebookPage(v.ID, lRes.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting facebook account"})
 			return
