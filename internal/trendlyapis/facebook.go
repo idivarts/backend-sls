@@ -27,14 +27,14 @@ func FacebookLogin(c *gin.Context) {
 		return
 	}
 
-	for _, v := range person.Accounts.Data {
-		lRes, err := messenger.GetLongLivedAccessToken(v.AccessToken)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting long lived access token"})
-			return
-		}
-		log.Println("Token", v.AccessToken, lRes.AccessToken)
+	lRes, err := messenger.GetLongLivedAccessToken(person.AccessToken)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting long lived access token"})
+		return
+	}
+	log.Println("Token", person.AccessToken, lRes.AccessToken)
 
+	for _, v := range person.Accounts.Data {
 		// var instagram *models.InstagramObject = nil
 		if v.InstagramBusinessAccount.ID != "" {
 			insta, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
@@ -68,7 +68,7 @@ func FacebookLogin(c *gin.Context) {
 			log.Println("Instagram Saved Accesstoken", instaPPage)
 		}
 
-		fb, err := messenger.GetFacebook(lRes.AccessToken)
+		fb, err := messenger.GetFacebook(v.ID, lRes.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting facebook account"})
 			return

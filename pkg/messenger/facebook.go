@@ -34,12 +34,12 @@ type FacebookProfile struct {
 	} `json:"cover" firestore:"cover"`
 }
 
-func GetFacebook(pageAccessToken string) (*FacebookProfile, error) {
+func GetFacebook(pageId, accessToken string) (*FacebookProfile, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me?fields=id,name,about,category,category_list,location,phone,website,emails,fan_count,followers_count,picture{url},cover{source}&access_token=%s", BaseURL, ApiVersion, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,about,category,category_list,location,phone,website,emails,fan_count,followers_count,picture{url},cover{source}&access_token=%s", BaseURL, ApiVersion, pageId, accessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)

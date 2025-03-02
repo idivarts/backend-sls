@@ -1,8 +1,9 @@
 package messenger
 
 type FacebookLoginRequest struct {
-	Name string `json:"name"`
-	ID   string `json:"id" binding:"required"`
+	Name        string `json:"name"`
+	ID          string `json:"id" binding:"required"`
+	AccessToken string `json:"accessToken" binding:"required"`
 
 	Accounts struct {
 		Data []struct {
