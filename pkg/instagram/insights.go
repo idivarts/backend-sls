@@ -26,7 +26,8 @@ func joinWithComma(items []string) string {
 }
 
 func GetInsights(
-	pageAccessToken string,
+	pageID,
+	accessToken string,
 	metrics []string,
 	period string,
 	params InsightParams,
@@ -35,7 +36,7 @@ func GetInsights(
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/insights", BaseURL, ApiVersion)
+	apiURL := fmt.Sprintf("%s/%s/%s/insights", BaseURL, ApiVersion, pageID)
 	// Create query parameters
 	iParam := url.Values{}
 	iParam.Set("metric", joinWithComma(metrics))
@@ -55,7 +56,7 @@ func GetInsights(
 	if params.StopTime != "" {
 		iParam.Set("until", params.StopTime)
 	}
-	iParam.Set("access_token", pageAccessToken)
+	iParam.Set("access_token", accessToken)
 
 	allParams := iParam.Encode()
 	log.Println("All Params:", allParams)

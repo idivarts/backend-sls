@@ -9,7 +9,7 @@ import (
 )
 
 func TestFacebookFetch(t *testing.T) {
-	fb, err := messenger.GetFacebook("EAAID6icQOs4BO6GdTXuC4GxBXyKuAmw9nZCnGtwPSOawq2EG4ra385MOL9Wu3esiZCwjqNM5FxiIgDSy55ZBwg9SXLFGoWtgjEcUnG5bIZAkRZCbLNOPTfwhZBwOLONahIlwTw5PZBOKqwpN0ZBoorfWoxaoYz9fJbgAtZC9C2NkKZBr2wVNhuWZBETdl2RBwZBhtmLO")
+	fb, err := messenger.GetFacebook("pageID", "EAAID6icQOs4BO6GdTXuC4GxBXyKuAmw9nZCnGtwPSOawq2EG4ra385MOL9Wu3esiZCwjqNM5FxiIgDSy55ZBwg9SXLFGoWtgjEcUnG5bIZAkRZCbLNOPTfwhZBwOLONahIlwTw5PZBOKqwpN0ZBoorfWoxaoYz9fJbgAtZC9C2NkKZBr2wVNhuWZBETdl2RBwZBhtmLO")
 	if err != nil {
 		t.Error(err)
 	}

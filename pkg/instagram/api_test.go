@@ -48,7 +48,7 @@ func TestGetUser(t *testing.T) {
 }
 
 func TestInstaInsights(t *testing.T) {
-	iData, err := instagram.GetInsights(longLivedAccessToken, []string{"impressions"}, "day", instagram.InsightParams{})
+	iData, err := instagram.GetInsights("", longLivedAccessToken, []string{"impressions"}, "day", instagram.InsightParams{})
 	if err != nil {
 		t.Error(err)
 		return
@@ -57,7 +57,7 @@ func TestInstaInsights(t *testing.T) {
 }
 
 func TestMedia(t *testing.T) {
-	iData, err := instagram.GetMedia(longLivedAccessToken, instagram.IGetMediaParams{GraphType: 1})
+	iData, err := instagram.GetMedia("", longLivedAccessToken, instagram.IGetMediaParams{GraphType: 1})
 	if err != nil {
 		t.Error(err)
 		return
@@ -66,7 +66,7 @@ func TestMedia(t *testing.T) {
 }
 
 func TestMediaFromFBGraph(t *testing.T) {
-	iData, err := instagram.GetMedia(facebookToken, instagram.IGetMediaParams{
+	iData, err := instagram.GetMedia("", facebookToken, instagram.IGetMediaParams{
 		GraphType: 0,
 		PageID:    pageId,
 	})

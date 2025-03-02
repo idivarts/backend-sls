@@ -84,7 +84,7 @@ func FetchMedias(c *gin.Context) {
 	response := map[string]interface{}{}
 	if social.IsInstagram {
 		// instagram
-		medias, err := instagram.GetMedia(*socialPriv.AccessToken, instagram.IGetMediaParams{
+		medias, err := instagram.GetMedia(*pSocial, *socialPriv.AccessToken, instagram.IGetMediaParams{
 			GraphType: int(socialPriv.GraphType),
 			PageID:    *pSocial,
 		})
@@ -97,7 +97,7 @@ func FetchMedias(c *gin.Context) {
 		response["medias"] = medias
 	} else {
 		// facebook
-		posts, err := messenger.GetPosts(*socialPriv.AccessToken, messenger.IFBPostsParams{})
+		posts, err := messenger.GetPosts(*pSocial, *socialPriv.AccessToken, messenger.IFBPostsParams{})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Error Fetching Posts", "error": err.Error()})
 			return

@@ -24,12 +24,12 @@ type InstagramProfile struct {
 	Website           string `json:"website" firestore:"website"`
 }
 
-func GetInstagramInBrief(instagramId string, pageAccessToken string) (*InstagramBriefProfile, error) {
+func GetInstagramInBrief(instagramId string, accessToken string) (*InstagramBriefProfile, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,username,biography&access_token=%s", BaseURL, ApiVersion, instagramId, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=name,username,biography&access_token=%s", BaseURL, ApiVersion, instagramId, accessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -58,12 +58,12 @@ func GetInstagramInBrief(instagramId string, pageAccessToken string) (*Instagram
 	return &data, nil
 }
 
-func GetInstagram(instagramId string, pageAccessToken string) (*InstagramProfile, error) {
+func GetInstagram(instagramId string, accessToken string) (*InstagramProfile, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", BaseURL, ApiVersion, instagramId, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", BaseURL, ApiVersion, instagramId, accessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
