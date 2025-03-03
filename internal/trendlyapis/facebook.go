@@ -64,43 +64,11 @@ func FacebookLogin(c *gin.Context) {
 	}
 
 	for _, v := range person.Accounts.Data {
-		// var instagram *models.InstagramObject = nil
-		if v.InstagramBusinessAccount.ID != "" {
-			insta, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting instagram account"})
-				return
-			}
-			instaPage := trendlymodels.Socials{
-				ID:           insta.ID,
-				Name:         insta.Name,
-				ConnectedID:  &v.ID,
-				UserID:       person.ID,
-				OwnerName:    person.Name,
-				Image:        insta.ProfilePictureURL,
-				IsInstagram:  true,
-				InstaProfile: insta,
-			}
-			_, err = instaPage.Insert(userId)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving instagram account"})
-				return
-			}
-			instaPPage := trendlymodels.SocialsPrivate{
-				AccessToken: &lRes.AccessToken,
-			}
-			_, err = instaPPage.Set(userId, insta.ID)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving instagram private details"})
-				return
-			}
-			log.Println("Instagram Saved Accesstoken", instaPPage)
-		}
-
 		fb, err := messenger.GetFacebookPage(v.ID, lRes.AccessToken)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting facebook account"})
-			return
+			// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting facebook account"})
+			log.Printf("%s - %s\n", err.Error(), "Error in getting facebook account")
+			continue
 		}
 
 		fbPage := trendlymodels.Socials{
@@ -115,18 +83,56 @@ func FacebookLogin(c *gin.Context) {
 		}
 		_, err = fbPage.Insert(userId)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook account"})
-			return
+			// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook account"})
+			log.Printf("%s - %s\n", err.Error(), "Error in saving facebook account")
+			continue
 		}
 		fbPPage := trendlymodels.SocialsPrivate{
 			AccessToken: &lRes.AccessToken,
 		}
 		_, err = fbPPage.Set(userId, v.ID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook private details"})
-			return
+			// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving facebook private details"})
+			log.Printf("%s - %s\n", err.Error(), "Error in saving facebook private details")
+			continue
 		}
 		log.Println("FB Saved Accesstoken", fbPPage)
+
+		if v.InstagramBusinessAccount.ID != "" {
+			insta, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
+			if err != nil {
+				// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting instagram account"})
+				log.Printf("%s - %s\n", err.Error(), "Error in getting instagram account")
+				continue
+			}
+			instaPage := trendlymodels.Socials{
+				ID:           insta.ID,
+				Name:         insta.Name,
+				ConnectedID:  &v.ID,
+				UserID:       person.ID,
+				OwnerName:    person.Name,
+				Image:        insta.ProfilePictureURL,
+				IsInstagram:  true,
+				InstaProfile: insta,
+			}
+			_, err = instaPage.Insert(userId)
+			if err != nil {
+				// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving instagram account"})
+				log.Printf("%s - %s\n", err.Error(), "Error in saving instagram account")
+				continue
+			}
+			instaPPage := trendlymodels.SocialsPrivate{
+				AccessToken: &lRes.AccessToken,
+			}
+			_, err = instaPPage.Set(userId, insta.ID)
+			if err != nil {
+				// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in saving instagram private details"})
+				log.Printf("%s - %s\n", err.Error(), "Error in saving private details")
+				continue
+				// return
+			}
+			log.Println("Instagram Saved Accesstoken", instaPPage)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": person})
