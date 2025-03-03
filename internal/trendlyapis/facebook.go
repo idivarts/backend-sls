@@ -63,13 +63,17 @@ func FacebookLogin(c *gin.Context) {
 	if accounts != nil {
 		for _, v := range accounts.Accounts.Data {
 			fb := &v
+			instaId := ""
+			if v.InstagramBusinessAccount != nil && v.InstagramBusinessAccount.ID != "" {
+				instaId = v.InstagramBusinessAccount.ID
+			}
 			fbPage := trendlymodels.Socials{
 				ID:          v.ID,
 				Name:        v.Name,
 				UserID:      person.ID,
 				OwnerName:   person.Name,
 				Image:       fb.Picture.Data.URL,
-				ConnectedID: &v.InstagramBusinessAccount.ID,
+				ConnectedID: &instaId,
 				IsInstagram: false,
 				FBProfile:   fb,
 			}
@@ -81,8 +85,8 @@ func FacebookLogin(c *gin.Context) {
 			go saveSocialDefered(fbPage, userId, &wg)
 			go saveSocialPrivateDefered(fbPPage, userId, v.ID, &wg)
 
-			if v.InstagramBusinessAccount != nil && v.InstagramBusinessAccount.ID != "" {
-				insta, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
+			if instaId != "" {
+				insta, err := messenger.GetInstagram(instaId, lRes.AccessToken)
 				if err != nil {
 					// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting instagram account"})
 					log.Printf("%s - %s\n", err.Error(), "Error in getting instagram account")
