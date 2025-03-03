@@ -81,7 +81,7 @@ func FacebookLogin(c *gin.Context) {
 			go saveSocialDefered(fbPage, userId, &wg)
 			go saveSocialPrivateDefered(fbPPage, userId, v.ID, &wg)
 
-			if v.InstagramBusinessAccount.ID != "" {
+			if v.InstagramBusinessAccount != nil && v.InstagramBusinessAccount.ID != "" {
 				insta, err := messenger.GetInstagram(v.InstagramBusinessAccount.ID, lRes.AccessToken)
 				if err != nil {
 					// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting instagram account"})
