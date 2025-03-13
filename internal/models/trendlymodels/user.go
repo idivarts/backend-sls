@@ -9,6 +9,7 @@ import (
 
 type User struct {
 	Name                  string                 `json:"name" firestore:"name"`
+	IsChatConnected       bool                   `json:"isChatConnected" firestore:"isChatConnected"`
 	PrimarySocial         *string                `json:"primarySocial,omitempty" firestore:"primarySocial,omitempty"`
 	ProfileImage          *string                `json:"profileImage,omitempty" firestore:"profileImage,omitempty"`
 	Email                 *string                `json:"email,omitempty" firestore:"email,omitempty"`

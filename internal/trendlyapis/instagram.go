@@ -112,14 +112,15 @@ func InstagramAuth(ctx *gin.Context) {
 		if status.Code(err) == codes.NotFound {
 			// Create User Model if new user
 			user = trendlymodels.User{
-				Name:          insta.Name,
-				ProfileImage:  &insta.ProfilePictureURL,
-				PrimarySocial: &userId,
-				Email:         nil,
-				PhoneNumber:   nil,
-				Location:      nil,
-				EmailVerified: nil,
-				PhoneVerified: nil,
+				Name:            insta.Name,
+				IsChatConnected: false,
+				ProfileImage:    &insta.ProfilePictureURL,
+				PrimarySocial:   &userId,
+				Email:           nil,
+				PhoneNumber:     nil,
+				Location:        nil,
+				EmailVerified:   nil,
+				PhoneVerified:   nil,
 				Profile: &trendlymodels.UserProfile{
 					CompletionPercentage: aws.Int(10),
 					Content:              &trendlymodels.UserProfileContent{},
