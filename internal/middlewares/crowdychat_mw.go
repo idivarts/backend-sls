@@ -44,6 +44,7 @@ func isValidUID(client *auth.Client, uid string) bool {
 func ValidateSessionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
+		debugCode := c.GetHeader("X-DEBUG-CODE")
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
 			c.Abort()
@@ -60,7 +61,7 @@ func ValidateSessionMiddleware() gin.HandlerFunc {
 		// Verify the token with Firebase Admin SDK
 		token, err := fauth.Client.VerifyIDToken(context.Background(), idToken)
 		if err != nil {
-			if DEBUG_MODE && isValidUID(fauth.Client, idToken) {
+			if DEBUG_MODE && debugCode == "This-Is-Debug-Enabled-API-Call" && isValidUID(fauth.Client, idToken) {
 				token = &auth.Token{
 					UID: idToken,
 				}
