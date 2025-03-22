@@ -15,7 +15,7 @@ const facebookToken = `EAAID6icQOs4BO7wIl6hDNTBdRWmMhHgnoeF4AgZA5D96CIOBl7WlTeFs
 const pageId = `17841466618151294`
 
 func TestToken(t *testing.T) {
-	accessToken, err := instagram.GetAccessTokenFromCode(code, "https://be.trendly.pro/instagram/auth")
+	accessToken, err := instagram.GetAccessTokenFromCode(code, "https://be.trendly.now/instagram/auth")
 	if err != nil {
 		t.Error(err)
 	}

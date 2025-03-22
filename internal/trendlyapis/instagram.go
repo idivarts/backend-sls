@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const INSTAGRAM_REDIRECT = "https://be.trendly.pro/instagram/auth"
+const INSTAGRAM_REDIRECT = "https://be.trendly.now/instagram/auth"
 
 func InstagramRedirect(ctx *gin.Context) {
 	redirect_type := ctx.Query("redirect_type")
@@ -56,7 +56,7 @@ func InstagramAuthRedirect(ctx *gin.Context) {
 	if redirect_type == "1" {
 		redirectUri = "http://localhost:8081/insta-redirect"
 	} else if redirect_type == "2" {
-		redirectUri = "https://creators.trendly.pro/insta-redirect"
+		redirectUri = "https://creators.trendly.now/insta-redirect"
 	} else if redirect_type == "3" || redirect_type == "4" {
 		redirectUri = "fb567254166026958://authorize"
 	} else {
