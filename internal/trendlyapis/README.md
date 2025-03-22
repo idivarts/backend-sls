@@ -19,7 +19,7 @@ fields=id,name,about,category,category_list,location,phone,website,emails,fan_co
     }
   ],
   "phone": "+919905264774",
-  "website": "http://trendly.pro/",
+  "website": "http://trendly.now/",
   "fan_count": 0,
   "followers_count": 0,
   "picture": {
@@ -42,13 +42,13 @@ fields=id,name,username,profile_picture_url,biography,followers_count,follows_co
 {
   "id": "17841466618151294",
   "name": "Trendly",
-  "username": "trendly.pro",
+  "username": "trendly.now",
   "profile_picture_url": "https://scontent.fccu25-1.fna.fbcdn.net/v/t51.2885-15/452649260_1144764826622816_8824331081732466412_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=7d201b&_nc_ohc=Z2yAqGWBSqMQ7kNvgHXylAy&_nc_zt=23&_nc_ht=scontent.fccu25-1.fna&edm=AL-3X8kEAAAA&oh=00_AYDCg9vKtUGTldtD9BeeJ_cXeILqzZ1hOfutIe7UWVONjg&oe=675F3D44",
   "biography": "Unveiling Trendly!🚀| One-stop solution to connect influencers with brands 🤝 | Elevate your collabs 📈📱 #staytuned",
   "followers_count": 16,
   "follows_count": 120,
   "media_count": 22,
-  "website": "https://trendly.pro"
+  "website": "https://trendly.now"
 }
 ```
 

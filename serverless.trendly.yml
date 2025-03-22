@@ -22,8 +22,8 @@ provider:
     # STREAM_CLIENT: xv7c4yzcux6y
     # STREAM_SECRET: x5p7xg5gerzmdj7e4uagcz4rdnm8abj7ktuj9hhtx2kqzdzmm8gr7a38xrcpywvt
     JWT_ENCODE_KEY: anbs8372gi)(034UTHIHABCdsgsdN)
-    LOGIN_URL: "https://trendly.pro"
-    SELF_BASE_URL: "https://be.trendly.pro"
+    LOGIN_URL: "https://trendly.now"
+    SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v
     SENDGRID_NAME: Trendly
     SENDGRID_EMAIL: no-reply@idiv.in
@@ -71,15 +71,15 @@ custom:
     supportedRuntimes: ["provided.al2"] # the plugin compiles a function only if runtime is declared here (either on function or provider level)
     buildProvidedRuntimeAsBootstrap: true # if enabled, builds and archive function with only single "bootstrap" binary (useful for runtimes like provided.al2)
   customCertificate:
-    certificateName: "be.trendly.pro"
-    hostedZoneIds: Z080267715NZAAP58PC3U
+    certificateName: "be.trendly.now"
+    hostedZoneIds: Z02250033690XMWB8LXL7
     enabled: true
     rewriteRecords: false
   customDomain:
-    domainName: be.trendly.pro
+    domainName: be.trendly.now
     basePath: ""
     stage: dev
-    certificateName: "be.crowdy.chat"
+    certificateName: "be.trendly.now"
     createRoute53Record: true
     createRoute53IPv6Record: true
     endpointType: "regional"
