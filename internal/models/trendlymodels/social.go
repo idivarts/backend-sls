@@ -10,15 +10,16 @@ import (
 )
 
 type Socials struct {
-	ID           string                      `json:"id" firestore:"id"`
-	Name         string                      `json:"name" firestore:"name"`
-	Image        string                      `json:"image" firestore:"image"`
-	IsInstagram  bool                        `json:"isInstagram" firestore:"isInstagram"`
-	ConnectedID  *string                     `json:"connectedId,omitempty" firestore:"connectedId"`
-	UserID       string                      `json:"userId" firestore:"userId"`
-	OwnerName    string                      `json:"ownerName" firestore:"ownerName"`
-	InstaProfile *messenger.InstagramProfile `json:"instaProfile,omitempty" firestore:"instaProfile"`
-	FBProfile    *messenger.FacebookProfile  `json:"fbProfile,omitempty" firestore:"fbProfile"`
+	ID                string                      `json:"id" firestore:"id"`
+	Name              string                      `json:"name" firestore:"name"`
+	Image             string                      `json:"image" firestore:"image"`
+	IsInstagram       bool                        `json:"isInstagram" firestore:"isInstagram"`
+	ConnectedID       *string                     `json:"connectedId,omitempty" firestore:"connectedId"`
+	UserID            string                      `json:"userId" firestore:"userId"`
+	OwnerName         string                      `json:"ownerName" firestore:"ownerName"`
+	InstaProfile      *messenger.InstagramProfile `json:"instaProfile,omitempty" firestore:"instaProfile"`
+	FBProfile         *messenger.FacebookProfile  `json:"fbProfile,omitempty" firestore:"fbProfile"`
+	SocialScreenShots []string                    `json:"socialScreenShots,omitempty" firestore:"socialScreenShots"`
 }
 
 type GraphType int
@@ -26,6 +27,7 @@ type GraphType int
 const (
 	FacebookGraphType  GraphType = 0
 	InstagramGraphType GraphType = 1
+	InstagramManual    GraphType = 3
 )
 
 type SocialsPrivate struct {
