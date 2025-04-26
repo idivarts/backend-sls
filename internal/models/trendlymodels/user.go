@@ -23,6 +23,10 @@ type User struct {
 	Backend               *BackendData           `json:"backend,omitempty" firestore:"backend,omitempty"`
 	PushNotificationToken *PushNotificationToken `json:"pushNotificationToken,omitempty" firestore:"pushNotificationToken,omitempty"`
 
+	CreationTime *int64 `json:"creationTime,omitempty" firestore:"creationTime,omitempty"`
+	LastUseTime  *int64 `json:"lastUseTime,omitempty" firestore:"lastUseTime,omitempty"`
+	UpdateTime   *int64 `json:"updateTime,omitempty" firestore:"updateTime,omitempty"`
+
 	// These are the subcollections to be handled
 	// Notifications         []Notification         `json:"notifications" firestore:"notifications"`
 	// Socials               []SocialMediaAccount   `json:"socials" firestore:"socials"`
