@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 	"unicode"
 
 	stream_chat "github.com/GetStream/stream-chat-go/v5"
@@ -13,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 )
@@ -45,20 +47,28 @@ func ChatAuth(c *gin.Context) {
 		return
 	}
 	if !isManager {
-		if userObject["primarySocial"] != nil && userObject["primarySocial"] != "" {
+		user := trendlymodels.User{}
+		err = user.Get(userId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
+			return
+		}
+		if user.CreationTime == nil {
+			fUser, err := fauth.Client.GetUser(context.Background(), userId)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
+				return
+			}
+			user.CreationTime = aws.Int64(fUser.UserMetadata.CreationTimestamp)
+		}
+		user.LastUseTime = aws.Int64(time.Now().UnixMilli())
+		if user.PrimarySocial != nil && *user.PrimarySocial != "" {
 			// Get the user's primary social media account
 			primarySocial := userObject["primarySocial"].(string)
 			social := trendlymodels.Socials{}
 			err := social.Get(userId, primarySocial)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting primary social media account", "error": err.Error()})
-				return
-			}
-
-			user := trendlymodels.User{}
-			err = user.Get(userId)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
 				return
 			}
 
@@ -79,29 +89,18 @@ func ChatAuth(c *gin.Context) {
 				}
 			}
 
-			_, err = user.Insert(userId)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
-				return
-			}
 		} else if userObject["backend"] == nil {
-			user := trendlymodels.User{}
-			err = user.Get(userId)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
-				return
-			}
 			user.Backend = &trendlymodels.BackendData{
 				Followers:  aws.Int(0),
 				Reach:      aws.Int(0),
 				Engagement: aws.Int(0),
 				Rating:     aws.Int(5),
 			}
-			_, err = user.Insert(userId)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
-				return
-			}
+		}
+		_, err = user.Insert(userId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
+			return
 		}
 	}
 
