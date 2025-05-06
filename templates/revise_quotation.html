@@ -1,0 +1,81 @@
+<!-- 
+  Dynamic Variables:
+    {{.InfluencerName}}      => Name of the influencer
+    {{.BrandName}}           => Name of the brand requesting revision
+    {{.CollabTitle}}         => Title of the collaboration
+    {{.RevisionRequestTime}} => Timestamp of the revision request
+    {{.RevisionNote}}        => Optional note or reason provided by the brand
+    {{.ReviseLink}}          => Link for the influencer to review and revise the quotation
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Quotation Revision Requested</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fafafa;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #f57c00;
+        }
+
+        a.button {
+            background-color: #f57c00;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>📝 Quotation Revision Requested</h2>
+        <p>Hi <strong>{{.InfluencerName}}</strong>,</p>
+
+        <p>The brand <strong>{{.BrandName}}</strong> has requested a revision to your quotation for the collaboration
+            "<strong>{{.CollabTitle}}</strong>".</p>
+
+        <p><strong>Requested At:</strong> {{.RevisionRequestTime}}</p>
+
+        {{if .RevisionNote}}
+        <p><strong>Note from the brand:</strong></p>
+        <blockquote>{{.RevisionNote}}</blockquote>
+        {{end}}
+
+        <a href="{{.ReviseLink}}" class="button">Revise Your Quotation</a>
+
+        <div class="footer">
+            You're receiving this email because you're an active influencer on Trendly and submitted a quotation for a
+            collaboration.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

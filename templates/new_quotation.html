@@ -1,0 +1,76 @@
+<!-- 
+  Dynamic Variables:
+    {{.BrandMemberName}}   => Name of the brand team member receiving the email
+    {{.InfluencerName}}    => Name of the influencer who submitted the revised quotation
+    {{.CollabTitle}}       => Title of the collaboration
+    {{.SubmissionTime}}    => Time when the revised quotation was submitted
+    {{.QuotationAmount}}   => New quotation amount
+    {{.ReviewLink}}        => Link for brand to view and review the quotation
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>New Quotation Submitted</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fafafa;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #00796B;
+        }
+
+        a.button {
+            background-color: #00796B;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>💼 New Quotation Submitted</h2>
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p><strong>{{.InfluencerName}}</strong> has submitted a revised quotation for the collaboration
+            "<strong>{{.CollabTitle}}</strong>".</p>
+
+        <p><strong>Submitted At:</strong> {{.SubmissionTime}}</p>
+        <p><strong>New Quotation:</strong> ₹{{.QuotationAmount}}</p>
+
+        <a href="{{.ReviewLink}}" class="button">Review Quotation</a>
+
+        <div class="footer">
+            You're receiving this email because you're listed as a brand member on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>
