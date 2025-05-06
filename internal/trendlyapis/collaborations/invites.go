@@ -1,9 +1,11 @@
 package trendlyCollabs
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
@@ -32,6 +34,13 @@ func SendInvitation(c *gin.Context) {
 		return
 	}
 
+	brand := &trendlymodels.Brand{}
+	err = brand.Get(collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
 	// {{.InfluencerName}}  => Name of the influencer receiving the invite
 	// {{.BrandName}}       => Name of the brand sending the invitation
 	// {{.CollabTitle}}     => Title of the collaboration
@@ -39,6 +48,8 @@ func SendInvitation(c *gin.Context) {
 
 	myemail.SendCustomHTMLEmail(*user.Email, templates.InfluencerInvitedToCollab, templates.SubjectBrandInvitedYouToCollab, map[string]interface{}{
 		"InfluencerName": user.Name,
+		"BrandName":      brand.Name,
 		"CollabTitle":    collab.Name,
+		"ApplyLink":      fmt.Sprintf("%s/collaboration/%s", constants.TRENDLY_CREATORS_FE, collabId),
 	})
 }
