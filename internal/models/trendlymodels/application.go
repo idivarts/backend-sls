@@ -1,5 +1,11 @@
 package trendlymodels
 
+import (
+	"context"
+
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+)
+
 type Application struct {
 	UserID                string                      `json:"userId" firestore:"userId"`
 	CollaborationID       string                      `json:"collaborationId" firestore:"collaborationId"`
@@ -22,4 +28,17 @@ type ApplicationFileAttachment struct {
 	URL  string `json:"url" firestore:"url"`
 	Name string `json:"name" firestore:"name"`
 	Type string `json:"type" firestore:"type"`
+}
+
+func (b *Application) Get(collabID, userID string) error {
+	res, err := firestoredb.Client.Collection("collaborations").Doc(collabID).Collection("applications").Doc(userID).Get(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = res.DataTo(b)
+	if err != nil {
+		return err
+	}
+	return err
 }
