@@ -1,0 +1,75 @@
+<!-- 
+  Dynamic Variables:
+    {{.BrandName}}         => Name of the brand
+    {{.CollabTitle}}       => Title of the collaboration
+    {{.InfluencerName}}    => Full name of the influencer who applied
+    {{.InfluencerEmail}}   => Email of the influencer
+    {{.ApplicationTime}}   => Timestamp of the application
+    {{.CollabLink}}        => Direct link to view the collaboration
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>New Application Received</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fafafa;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #222;
+        }
+
+        a.button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>👋 New Application for "{{.CollabTitle}}"</h2>
+        <p>Hi <strong>{{.BrandName}}</strong>,</p>
+
+        <p><strong>{{.InfluencerName}}</strong> (<a href="mailto:{{.InfluencerEmail}}">{{.InfluencerEmail}}</a>) has
+            just applied to your collaboration "<strong>{{.CollabTitle}}</strong>" on Trendly.</p>
+
+        <p><strong>Applied At:</strong> {{.ApplicationTime}}</p>
+
+        <a href="{{.CollabLink}}" class="button">View Collaboration</a>
+
+        <div class="footer">
+            You are receiving this email because you are listed as a team member of {{.BrandName}} on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>
