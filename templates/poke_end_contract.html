@@ -1,0 +1,77 @@
+<!-- 
+  Dynamic Variables:
+    {{.BrandMemberName}}   => Name of the brand team member receiving the email
+    {{.InfluencerName}}    => Name of the influencer who sent the nudge
+    {{.CollabTitle}}       => Title of the collaboration
+    {{.PokeTime}}          => Timestamp when the poke was sent
+    {{.EndLink}}           => Link to end the contract and rate the influencer
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>End Collaboration Request</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #d84315;
+        }
+
+        a.button {
+            background-color: #d84315;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>🔔 End Collaboration Reminder</h2>
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p>The influencer <strong>{{.InfluencerName}}</strong> has requested to end the collaboration
+            "<strong>{{.CollabTitle}}</strong>" that you’re part of.</p>
+
+        <p><strong>Requested At:</strong> {{.PokeTime}}</p>
+
+        <p>To complete the process and enable rating, please review the status and end the collaboration from your
+            dashboard.</p>
+
+        <a href="{{.EndLink}}" class="button">End Collaboration & Rate Influencer</a>
+
+        <div class="footer">
+            You're receiving this email because you're associated with a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>
