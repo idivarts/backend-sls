@@ -5,6 +5,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type BrandMember struct {
@@ -29,4 +30,30 @@ func (b *BrandMember) Get(brandID, userID string) error {
 		return err
 	}
 	return err
+}
+
+func GetAllBrandMembers(brandID string) ([]BrandMember, error) {
+	var members []BrandMember
+
+	iter := firestoredb.Client.Collection("brands").Doc(brandID).Collection("members").Documents(context.Background())
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, err
+		}
+
+		var member BrandMember
+		if err := doc.DataTo(&member); err != nil {
+			return nil, err
+		}
+
+		members = append(members, member)
+	}
+
+	return members, nil
 }
