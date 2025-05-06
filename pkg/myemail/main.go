@@ -1,8 +1,10 @@
 package myemail
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
+	"html/template"
 	"log"
 	"os"
 
@@ -68,4 +70,25 @@ func SendEmailUsingTemplate(toEmail, templateID string, dynamicData map[string]i
 		response.StatusCode, response.Body, response.Headers)
 
 	return nil
+}
+
+func SendCustomHTMLEmail(toEmail, templatePath string, subject string, data map[string]interface{}) error {
+	// Load and parse the HTML template
+	tmpl, err := template.ParseFiles(templatePath)
+	if err != nil {
+		return err
+	}
+
+	var body bytes.Buffer
+	if err := tmpl.Execute(&body, data); err != nil {
+		return err
+	}
+
+	from := mail.NewEmail(senderName, senderEmail)
+	to := mail.NewEmail("", toEmail)
+	message := mail.NewSingleEmail(from, subject, to, "", body.String())
+
+	client := sendgrid.NewSendClient(apiKey)
+	_, err = client.Send(message)
+	return err
 }
