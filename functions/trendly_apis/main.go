@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
+	trendlyCollabs "github.com/idivarts/backend-sls/internal/trendlyapis/collaborations"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
 
@@ -25,6 +26,17 @@ func main() {
 	apiV1.POST("/chat/notification", trendlyapis.Notify)
 
 	apiV1.POST("/brands/members", trendlyapis.CreateBrandMember)
+
+	apiV1.POST("/collaboration/:collabId/invitations", trendlyCollabs.SendInvitation)
+	apiV1.POST("/collaboration/:collabId/applications", trendlyCollabs.SendApplication)
+	apiV1.PUT("/collaboration/:collabId/applications/:applicationId", trendlyCollabs.EditApplication)
+
+	apiV1.POST("/collaboration/:collabId/applications/:applicationId/:action", trendlyCollabs.ApplicationAction) // accept|reject|revise
+
+	apiV1.POST("/collaboration/:collabId", trendlyCollabs.StartCollaboration) // if called by influencer - ask, else start collab
+
+	apiV1.POST("/contracts/:contractId", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
+	apiV1.POST("/contracts/:contractId/feedback", trendlyCollabs.GiveContractFeedback)
 
 	apihandler.StartLambda()
 }
