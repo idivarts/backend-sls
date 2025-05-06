@@ -1,0 +1,72 @@
+<!-- 
+  Dynamic Variables:
+    {{.InfluencerName}} => Name of the new influencer
+    {{.ExploreLink}}     => Link to explore active collaborations
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to Trendly</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #ff4081;
+        }
+
+        a.button {
+            background-color: #ff4081;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>🎉 Welcome to Trendly, {{.InfluencerName}}!</h2>
+
+        <p>We're thrilled to have you join the Trendly creator community!</p>
+
+        <p>With Trendly, you can easily find paid and barter collaborations, apply for exciting brand deals, and get
+            paid securely through our platform.</p>
+
+        <p>Ready to explore your first campaign?</p>
+
+        <a href="{{.ExploreLink}}" class="button">Explore Collaborations</a>
+
+        <div class="footer">
+            Thank you for joining Trendly. We can't wait to see your creativity shine!<br />
+            Need help? Visit the Help section in the app.
+        </div>
+    </div>
+</body>
+
+</html>

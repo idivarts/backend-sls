@@ -1,0 +1,73 @@
+<!-- 
+  Dynamic Variables:
+    {{.BrandName}}    => Name of the brand
+    {{.ManagerName}}  => Name of the brand manager
+    {{.CreateLink}}   => Link to create the first collaboration
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to Trendly</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #4CAF50;
+        }
+
+        a.button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>🚀 Welcome to Trendly, {{.ManagerName}}!</h2>
+
+        <p>We're excited to have <strong>{{.BrandName}}</strong> join the Trendly community.</p>
+
+        <p>Start connecting with top creators and run seamless collaborations with ease. Trendly makes it simple to
+            manage, pay, and track your influencer partnerships in one place.</p>
+
+        <p>Ready to launch your first campaign?</p>
+
+        <a href="{{.CreateLink}}" class="button">Create Collaboration</a>
+
+        <div class="footer">
+            Thank you for choosing Trendly. Let’s build something great together!<br />
+            You can always manage your collaborations through the Trendly Brands app.
+        </div>
+    </div>
+</body>
+
+</html>
