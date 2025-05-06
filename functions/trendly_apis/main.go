@@ -27,15 +27,14 @@ func main() {
 
 	apiV1.POST("/brands/members", trendlyapis.CreateBrandMember)
 
-	apiV1.POST("/collaborations/:collabId/invitations", trendlyCollabs.SendInvitation)
-	apiV1.POST("/collaborations/:collabId/applications", trendlyCollabs.SendApplication)
-	apiV1.PUT("/collaborations/:collabId/applications/:applicationId", trendlyCollabs.EditApplication)
+	apiV1.POST("/collaborations/:collabId/invitations/:userId", trendlyCollabs.SendInvitation)
+	apiV1.POST("/collaborations/:collabId/applications/:userId", trendlyCollabs.SendApplication)
+	apiV1.PUT("/collaborations/:collabId/applications/:userId", trendlyCollabs.EditApplication)
 
-	apiV1.POST("/collaborations/:collabId/applications/:applicationId/:action", trendlyCollabs.ApplicationAction) // accept|reject|revise
+	apiV1.POST("/collaborations/:collabId/applications/:userId/:action", trendlyCollabs.ApplicationAction) // accept|reject|revise
 
-	apiV1.POST("/collaborations/:collabId", trendlyCollabs.StartCollaboration) // if called by influencer - ask, else start collab
-
-	apiV1.POST("/contracts/:contractId", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
+	apiV1.POST("/contracts/:contractId", trendlyCollabs.StartContract)   // if called by influencer - ask, else start the contract
+	apiV1.POST("/contracts/:contractId/end", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
 	apiV1.POST("/contracts/:contractId/feedback", trendlyCollabs.GiveContractFeedback)
 
 	apihandler.StartLambda()
