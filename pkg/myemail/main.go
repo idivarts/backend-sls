@@ -12,6 +12,8 @@ import (
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
+type TemplatePath string
+
 var (
 	senderName  = os.Getenv("SENDGRID_NAME")
 	senderEmail = os.Getenv("SENDGRID_EMAIL")
@@ -72,9 +74,9 @@ func SendEmailUsingTemplate(toEmail, templateID string, dynamicData map[string]i
 	return nil
 }
 
-func SendCustomHTMLEmail(toEmail, templatePath string, subject string, data map[string]interface{}) error {
+func SendCustomHTMLEmail(toEmail string, templatePath TemplatePath, subject string, data map[string]interface{}) error {
 	// Load and parse the HTML template
-	tmpl, err := template.ParseFiles(templatePath)
+	tmpl, err := template.ParseFiles(string(templatePath))
 	if err != nil {
 		return err
 	}
@@ -90,5 +92,39 @@ func SendCustomHTMLEmail(toEmail, templatePath string, subject string, data map[
 
 	client := sendgrid.NewSendClient(apiKey)
 	_, err = client.Send(message)
+	return err
+}
+
+func SendCustomHTMLEmailToMultipleRecipients(toEmails []string, templatePath TemplatePath, subject string, data map[string]interface{}) error {
+	// Load and parse the HTML template
+	tmpl, err := template.ParseFiles(string(templatePath))
+	if err != nil {
+		return err
+	}
+
+	var body bytes.Buffer
+	if err := tmpl.Execute(&body, data); err != nil {
+		return err
+	}
+
+	from := mail.NewEmail(senderName, senderEmail)
+	message := mail.NewV3Mail()
+	message.SetFrom(from)
+	message.Subject = subject
+	message.AddContent(mail.NewContent("text/html", body.String()))
+
+	// Create one personalization object for all recipients
+	personalization := mail.NewPersonalization()
+	for _, email := range toEmails {
+		to := mail.NewEmail("", email)
+		personalization.AddTos(to)
+	}
+	message.AddPersonalizations(personalization)
+
+	client := sendgrid.NewSendClient(apiKey)
+	_, err = client.Send(message)
+	if err != nil {
+		log.Printf("Failed to send bulk email: %v", err)
+	}
 	return err
 }
