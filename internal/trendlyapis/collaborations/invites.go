@@ -2,6 +2,7 @@ package trendlyCollabs
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -45,6 +46,8 @@ func SendInvitation(c *gin.Context) {
 		return
 	}
 
+	log.Println("Got Brands, Collabs and User")
+
 	notif := &trendlymodels.Notification{
 		Title:       fmt.Sprintf("You have been invited to %s", collab.Name),
 		Description: fmt.Sprintf("%s (from %s) has invited you to this collaboration. Apply Now!", managerName, brand.Name),
@@ -61,6 +64,8 @@ func SendInvitation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
+
+	log.Println("Created Notifications... Now sending email")
 
 	// {{.InfluencerName}}  => Name of the influencer receiving the invite
 	// {{.BrandName}}       => Name of the brand sending the invitation
