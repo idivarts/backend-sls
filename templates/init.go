@@ -2,6 +2,7 @@ package templates
 
 import "github.com/idivarts/backend-sls/pkg/myemail"
 
+// /Users/rsinha/iDiv/backend-sls/
 const (
 	ApplicationAccepted               myemail.TemplatePath = "templates/application_accepted.html"
 	ApplicationRejected               myemail.TemplatePath = "templates/application_rejected.html"

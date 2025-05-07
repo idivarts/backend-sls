@@ -70,7 +70,7 @@ func (u *Notification) Insert(collection NotificationCollection, id string) (*me
 
 	if len(tokens) > 0 {
 		return fmessaging.Client.SendEachForMulticast(context.Background(), &messaging.MulticastMessage{
-			Tokens: []string{},
+			Tokens: tokens,
 			Data:   map[string]string{},
 			Notification: &messaging.Notification{
 				Title: u.Title,

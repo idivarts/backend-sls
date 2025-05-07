@@ -72,12 +72,16 @@ func SendInvitation(c *gin.Context) {
 	// {{.CollabTitle}}     => Title of the collaboration
 	// {{.ApplyLink}}       => Link to view/apply for the collaboration
 
-	myemail.SendCustomHTMLEmail(*user.Email, templates.InfluencerInvitedToCollab, templates.SubjectBrandInvitedYouToCollab, map[string]interface{}{
+	err = myemail.SendCustomHTMLEmail(*user.Email, templates.InfluencerInvitedToCollab, templates.SubjectBrandInvitedYouToCollab, map[string]interface{}{
 		"InfluencerName": user.Name,
 		"BrandName":      brand.Name,
 		"CollabTitle":    collab.Name,
 		"ApplyLink":      fmt.Sprintf("%s/collaboration/%s", constants.TRENDLY_CREATORS_FE, collabId),
 	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully notified user for message"})
 }

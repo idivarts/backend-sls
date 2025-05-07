@@ -1,7 +1,7 @@
 package trendlyCollabs_test
 
 import (
-	"log"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -9,7 +9,11 @@ import (
 )
 
 func TestInvites(t *testing.T) {
-	c := &gin.Context{}
+	// Create a ResponseRecorder to inspect the response later
+	w := httptest.NewRecorder()
+	// Create a new Gin context
+	c, _ := gin.CreateTestContext(w)
+
 	// /collaborations/1zpmgWGbbkUxuzx9g1sW/invitations/PVqKf3REinNvALQRQHFvKXpN1gx2
 	c.Params = gin.Params{
 		{
@@ -21,6 +25,7 @@ func TestInvites(t *testing.T) {
 			Value: "PVqKf3REinNvALQRQHFvKXpN1gx2",
 		},
 	}
+
 	trendlyCollabs.SendInvitation(c)
-	log.Println("Success")
+	t.Log("Success", w.Body.String())
 }

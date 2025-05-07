@@ -3,6 +3,7 @@ package myemail
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -21,6 +22,10 @@ var (
 )
 
 func init() {
+	// senderName = "Trendly Support"
+	// senderEmail = "no-reply@idiv.in"
+	// os.Setenv("SENDGRID_API_KEY", "U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v")
+
 	base64key := os.Getenv("SENDGRID_API_KEY")
 	// Decode the string
 	decodedBytes, err := base64.StdEncoding.DecodeString(base64key)
@@ -91,7 +96,11 @@ func SendCustomHTMLEmail(toEmail string, templatePath TemplatePath, subject stri
 	message := mail.NewSingleEmail(from, subject, to, "", body.String())
 
 	client := sendgrid.NewSendClient(apiKey)
-	_, err = client.Send(message)
+	mLog, err := client.Send(message)
+	log.Println("Mail Delivery:", mLog.StatusCode, mLog.Body)
+	if mLog.StatusCode >= 300 {
+		return errors.New(mLog.Body)
+	}
 	return err
 }
 
