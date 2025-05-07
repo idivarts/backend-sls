@@ -17,7 +17,7 @@ import (
 func SendApplication(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType != "user" {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Managers can call this endpoint"})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Users can call this endpoint"})
 	}
 	collabId := c.Param("collabId")
 	userId := c.Param("userId")
