@@ -19,7 +19,7 @@ func SendInvitation(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Managers can call this endpoint"})
 	}
 	collabId := c.Param("collabId")
-	userId := c.Param("collabId")
+	userId := c.Param("userId")
 
 	manager := middlewares.GetUserObject(c)
 	managerName, _ := manager["name"].(string)
