@@ -4,6 +4,7 @@
     {{.BrandName}}       => Name of the brand sending the invitation
     {{.CollabTitle}}     => Title of the collaboration
     {{.ApplyLink}}       => Link to view/apply for the collaboration
+    {{.Message}}         => Include message from the brand manager
 -->
 
 <!DOCTYPE html>
@@ -61,6 +62,14 @@
 
         <p>This could be a great opportunity for you! Tap the button below to view the details and apply if you're
             interested.</p>
+
+        {{if .Message}}
+        <div
+            style="background-color: #f1f8ff; border-left: 4px solid #0073e6; padding: 16px; margin: 20px 0; border-radius: 6px;">
+            <p style="margin: 0 0 8px 0;"><strong>Personal message from {{.BrandName}}:</strong></p>
+            <p style="margin: 0; font-style: italic;">"{{.Message}}"</p>
+        </div>
+        {{end}}
 
         <a href="{{.ApplyLink}}" class="button">View Collaboration</a>
 
