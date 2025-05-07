@@ -3,6 +3,7 @@ package trendlyCollabs
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
@@ -19,6 +20,9 @@ func SendInvitation(c *gin.Context) {
 	}
 	collabId := c.Param("collabId")
 	userId := c.Param("collabId")
+
+	manager := middlewares.GetUserObject(c)
+	managerName, _ := manager["name"].(string)
 
 	user := &trendlymodels.User{}
 	err := user.Get(userId)
@@ -41,6 +45,23 @@ func SendInvitation(c *gin.Context) {
 		return
 	}
 
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("You have been invited to %s", collab.Name),
+		Description: fmt.Sprintf("%s (from %s) has invited you to this collaboration. Apply Now!", managerName, brand.Name),
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &collabId,
+			UserID:          &userId,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "invitation",
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
 	// {{.InfluencerName}}  => Name of the influencer receiving the invite
 	// {{.BrandName}}       => Name of the brand sending the invitation
 	// {{.CollabTitle}}     => Title of the collaboration
@@ -52,4 +73,5 @@ func SendInvitation(c *gin.Context) {
 		"CollabTitle":    collab.Name,
 		"ApplyLink":      fmt.Sprintf("%s/collaboration/%s", constants.TRENDLY_CREATORS_FE, collabId),
 	})
+
 }
