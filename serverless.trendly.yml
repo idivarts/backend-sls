@@ -91,7 +91,7 @@ functions:
     package:
       include:
         - 'service-account.json'
-        - 'templates'
+        # - 'templates/'
     timeout: 30
     events:
       - http: ANY /api/v1/{proxy+}
@@ -100,7 +100,7 @@ functions:
     package:
       include:
         - 'service-account.json'
-        - 'templates'
+        # - 'templates/'
     timeout: 30
     events:
       - http: ANY /instagram
@@ -112,7 +112,7 @@ functions:
     package:
       include:
         - 'service-account.json'
-        - 'templates'
+        # - 'templates/'
     events:
       - websocket: $connect
       - websocket: $disconnect
@@ -122,7 +122,7 @@ functions:
     package:
       include:
         - 'service-account.json'
-        - 'templates'
+        # - 'templates/'
     events:
       - http: ANY /s3/v1/{proxy+}
   # processVideoUpload:
@@ -142,6 +142,7 @@ functions:
 package:
   patterns:
     - "!./**"
+    - "templates/**"
   individually: true
 
 resources:

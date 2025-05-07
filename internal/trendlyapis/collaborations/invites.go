@@ -46,6 +46,13 @@ func SendInvitation(c *gin.Context) {
 		return
 	}
 
+	invite := &trendlymodels.Invitation{}
+	err = invite.Get(collabId, userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
 	log.Println("Got Brands, Collabs and User")
 
 	notif := &trendlymodels.Notification{
@@ -72,12 +79,17 @@ func SendInvitation(c *gin.Context) {
 	// {{.CollabTitle}}     => Title of the collaboration
 	// {{.ApplyLink}}       => Link to view/apply for the collaboration
 
-	err = myemail.SendCustomHTMLEmail(*user.Email, templates.InfluencerInvitedToCollab, templates.SubjectBrandInvitedYouToCollab, map[string]interface{}{
+	data := map[string]interface{}{
 		"InfluencerName": user.Name,
 		"BrandName":      brand.Name,
 		"CollabTitle":    collab.Name,
 		"ApplyLink":      fmt.Sprintf("%s/collaboration/%s", constants.TRENDLY_CREATORS_FE, collabId),
-	})
+	}
+	if invite.Message != "" {
+		data["Message"] = invite.Message
+	}
+
+	err = myemail.SendCustomHTMLEmail(*user.Email, templates.InfluencerInvitedToCollab, templates.SubjectBrandInvitedYouToCollab, data)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
