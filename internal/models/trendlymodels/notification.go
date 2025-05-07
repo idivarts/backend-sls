@@ -37,39 +37,43 @@ var (
 	errorCollectionFetch = errors.New("user-manager-collection-fetch-error")
 )
 
-func (u *Notification) Insert(collection NotificationCollection, id string) (*messaging.BatchResponse, error) {
+func (u *Notification) Insert(collection NotificationCollection, id string) (*messaging.BatchResponse, []string, error) {
 	tokens := []string{}
+	emails := []string{}
 	if collection == USER_COLLECTION {
-		t, err := sendUnitNotification(collection, id, u)
+		t, e, err := sendUnitNotification(collection, id, u)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		tokens = append(tokens, t...)
+		emails = append(emails, *e)
 	} else if collection == MANAGER_COLLECTION {
-		t, err := sendUnitNotification(collection, id, u)
+		t, e, err := sendUnitNotification(collection, id, u)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		tokens = append(tokens, t...)
+		emails = append(emails, *e)
 	} else if collection == BRAND_COLLECTION {
 		bMembers, err := GetAllBrandMembers(id)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, v := range bMembers {
 			// Just sending the last insert details for the sake of keeping it consistent
-			t, err := sendUnitNotification(MANAGER_COLLECTION, v.ManagerID, u)
+			t, e, err := sendUnitNotification(MANAGER_COLLECTION, v.ManagerID, u)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			tokens = append(tokens, t...)
+			emails = append(emails, *e)
 		}
 	} else {
-		return nil, errorCollection
+		return nil, nil, errorCollection
 	}
 
 	if len(tokens) > 0 {
-		return fmessaging.Client.SendEachForMulticast(context.Background(), &messaging.MulticastMessage{
+		r, e := fmessaging.Client.SendEachForMulticast(context.Background(), &messaging.MulticastMessage{
 			Tokens: tokens,
 			Data:   map[string]string{},
 			Notification: &messaging.Notification{
@@ -96,34 +100,38 @@ func (u *Notification) Insert(collection NotificationCollection, id string) (*me
 			},
 			FCMOptions: &messaging.FCMOptions{},
 		})
+		return r, nil, e
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
-func sendUnitNotification(collection NotificationCollection, id string, u *Notification) ([]string, error) {
+func sendUnitNotification(collection NotificationCollection, id string, u *Notification) ([]string, *string, error) {
 	tokens := []string{}
+	emails := ""
 	if collection == USER_COLLECTION {
 		user := &User{}
 		err := user.Get(id)
 		if err != nil {
-			return nil, errorCollectionFetch
+			return nil, nil, errorCollectionFetch
 		}
 		tokens = append(tokens, user.PushNotificationToken.Web...)
 		tokens = append(tokens, user.PushNotificationToken.IOS...)
 		tokens = append(tokens, user.PushNotificationToken.Android...)
+		emails = *user.Email
 	} else if collection == MANAGER_COLLECTION {
 		manager := &Manager{}
 		err := manager.Get(id)
 		if err != nil {
-			return nil, errorCollectionFetch
+			return nil, nil, errorCollectionFetch
 		}
 		tokens = append(tokens, manager.PushNotificationToken.Web...)
 		tokens = append(tokens, manager.PushNotificationToken.IOS...)
 		tokens = append(tokens, manager.PushNotificationToken.Android...)
+		emails = manager.Email
 	}
 	_, _, err := firestoredb.Client.Collection(string(collection)).Doc(id).Collection("notifications").Add(context.Background(), u)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return tokens, err
+	return tokens, &emails, err
 }

@@ -66,7 +66,7 @@ func SendInvitation(c *gin.Context) {
 		TimeStamp: time.Now().UnixMilli(),
 		Type:      "invitation",
 	}
-	_, err = notif.Insert(trendlymodels.USER_COLLECTION, userId)
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, userId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
