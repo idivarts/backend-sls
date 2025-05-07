@@ -1,0 +1,75 @@
+<!-- 
+  Dynamic Variables:
+    {{.InfluencerName}}    => Name of the influencer
+    {{.BrandName}}         => Name of the brand that accepted the application
+    {{.CollabTitle}}       => Title of the collaboration
+    {{.AcceptanceTime}}    => Timestamp of acceptance
+    {{.CollabLink}}        => Link to view the collaboration details
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Application Accepted</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fafafa;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #222;
+        }
+
+        a.button {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>🎉 Your Application Was Accepted!</h2>
+        <p>Hi <strong>{{.InfluencerName}}</strong>,</p>
+
+        <p>Good news! Your application to the collaboration "<strong>{{.CollabTitle}}</strong>" by
+            <strong>{{.BrandName}}</strong> has been accepted.</p>
+
+        <p><strong>Accepted At:</strong> {{.AcceptanceTime}}</p>
+
+        <a href="{{.CollabLink}}" class="button">View Collaboration</a>
+
+        <div class="footer">
+            You're receiving this email because you're an active influencer on Trendly and applied to this
+            collaboration.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

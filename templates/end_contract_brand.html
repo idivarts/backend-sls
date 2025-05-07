@@ -1,0 +1,66 @@
+<!-- 
+  Dynamic Variables:
+    {{.BrandMemberName}}   => Name of the brand team member receiving the email
+    {{.InfluencerName}}    => Name of the influencer whose contract was ended
+    {{.CollabTitle}}       => Title of the collaboration
+    {{.EndDate}}           => Date the contract was ended
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Contract Ended Confirmation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #4caf50;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>✅ Contract Successfully Ended</h2>
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p>You've successfully ended the contract for the collaboration titled "<strong>{{.CollabTitle}}</strong>" with
+            <strong>{{.InfluencerName}}</strong> on <strong>{{.EndDate}}</strong>.
+        </p>
+
+        <p>Thank you for submitting your rating for the influencer. Your feedback helps maintain a high standard across
+            our platform.</p>
+
+        <p><strong>Note:</strong> To ensure fairness, your rating will remain hidden until the influencer also rates
+            you. We’ll notify you once they submit their review.</p>
+
+        <div class="footer">
+            You're receiving this email because you're involved in a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

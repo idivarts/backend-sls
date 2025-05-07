@@ -78,10 +78,6 @@ type BackendData struct {
 	Rating     *int `json:"rating,omitempty" firestore:"rating,omitempty"`
 }
 
-type Notification struct {
-	// Define Notification structure fields here
-}
-
 type SocialMediaAccount struct {
 	// Define Social Media Account structure fields here
 }

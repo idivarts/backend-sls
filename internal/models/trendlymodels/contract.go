@@ -1,5 +1,11 @@
 package trendlymodels
 
+import (
+	"context"
+
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+)
+
 type Contract struct {
 	UserID          string `json:"userId" firestore:"userId"`
 	ManagerID       string `json:"managerId" firestore:"managerId"`
@@ -7,4 +13,17 @@ type Contract struct {
 	BrandID         string `json:"brandId" firestore:"brandId"`
 	StreamChannelID string `json:"streamChannelId" firestore:"streamChannelId"`
 	Status          int    `json:"status" firestore:"status"`
+}
+
+func (b *Contract) Get(contractID string) error {
+	res, err := firestoredb.Client.Collection("contracts").Doc(contractID).Get(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = res.DataTo(b)
+	if err != nil {
+		return err
+	}
+	return err
 }

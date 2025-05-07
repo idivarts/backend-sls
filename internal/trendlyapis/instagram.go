@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/instagram"
@@ -18,7 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const INSTAGRAM_REDIRECT = "https://be.trendly.now/instagram/auth"
+var INSTAGRAM_REDIRECT = fmt.Sprintf("%s%s", constants.TRENDLY_BE, "/instagram/auth")
 
 func InstagramRedirect(ctx *gin.Context) {
 	redirect_type := ctx.Query("redirect_type")
@@ -56,7 +57,7 @@ func InstagramAuthRedirect(ctx *gin.Context) {
 	if redirect_type == "1" {
 		redirectUri = "http://localhost:8081/insta-redirect"
 	} else if redirect_type == "2" {
-		redirectUri = "https://creators.trendly.now/insta-redirect"
+		redirectUri = fmt.Sprintf("%s%s", constants.TRENDLY_CREATORS_FE, "/insta-redirect")
 	} else if redirect_type == "3" || redirect_type == "4" {
 		redirectUri = "fb567254166026958://authorize"
 	} else {

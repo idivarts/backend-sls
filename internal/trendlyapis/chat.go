@@ -195,33 +195,36 @@ func ChatChannel(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid request", "error": err.Error()})
 		return
 	}
+	CreateChannel(c, req)
+}
 
+func CreateChannel(c *gin.Context, req ICreateChannel) bool {
 	userId, b := middlewares.GetUserId(c)
 	if !b {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "User not found"})
-		return
+		return false
 	}
 	if middlewares.GetUserType(c) != "manager" {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Only Managers can create new channels"})
-		return
+		return false
 	}
 
 	if req.UserID == userId {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Current user cannot be equal to the user ID"})
-		return
+		return false
 	}
 
 	collabObj, err := firestoredb.Client.Collection("collaborations").Doc(req.CollaborationID).Get(context.Background())
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Collaboration not found", "error": err.Error()})
-		return
+		return false
 	}
 	collabMap := collabObj.Data()
 
 	_, err = firestoredb.Client.Collection("contracts").Where("collaborationId", "==", req.CollaborationID).Where("userId", "==", req.UserID).Documents(context.Background()).Next()
 	if err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Contract already exists"})
-		return
+		return false
 	}
 
 	// if err == nil {
@@ -242,7 +245,7 @@ func ChatChannel(c *gin.Context) {
 			manager, err2 := firestoredb.Client.Collection("managers").Doc(id).Get(context.Background())
 			if err2 != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user and/or manager", "error1": err.Error(), "error2": err2.Error()})
-				return
+				return false
 			}
 			uObj = manager.Data()
 			isManager = true
@@ -262,20 +265,20 @@ func ChatChannel(c *gin.Context) {
 			})
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating/updating user in chat", "error": err.Error()})
-				return
+				return false
 			}
 			uObj["isChatConnected"] = true
 			if isManager {
 				_, err := firestoredb.Client.Collection("managers").Doc(id).Set(context.Background(), uObj)
 				if err != nil {
 					c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating manager", "error": err.Error()})
-					return
+					return false
 				}
 			} else {
 				_, err := firestoredb.Client.Collection("users").Doc(id).Set(context.Background(), uObj)
 				if err != nil {
 					c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
-					return
+					return false
 				}
 			}
 		}
@@ -293,7 +296,7 @@ func ChatChannel(c *gin.Context) {
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating channel", "error": err.Error()})
-		return
+		return false
 	}
 
 	contract := trendlymodels.Contract{
@@ -308,9 +311,10 @@ func ChatChannel(c *gin.Context) {
 		_, err = firestoredb.Client.Collection("contracts").Doc(contractId).Set(context.Background(), contract)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating contract", "error": err.Error()})
-			return
+			return false
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Channel Created", "channel": res.Channel, "contractId": contractId, "contract": contract})
+	return true
 }
