@@ -56,7 +56,7 @@ func SendInvitation(c *gin.Context) {
 		TimeStamp: time.Now().UnixMilli(),
 		Type:      "invitation",
 	}
-	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, userId)
+	_, err = notif.Insert(trendlymodels.USER_COLLECTION, userId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
@@ -74,4 +74,5 @@ func SendInvitation(c *gin.Context) {
 		"ApplyLink":      fmt.Sprintf("%s/collaboration/%s", constants.TRENDLY_CREATORS_FE, collabId),
 	})
 
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully notified user for message"})
 }
