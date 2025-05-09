@@ -1,13 +1,11 @@
 package trendlyCollabs
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	stream_chat "github.com/GetStream/stream-chat-go/v5"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
@@ -187,14 +185,10 @@ func EditApplication(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Collab fetch issue"})
 		return
 	}
-	channel := streamchat.Client.Channel("messaging", contract.StreamChannelID)
-	_, err = channel.SendMessage(context.Background(), &stream_chat.Message{
-		Text: fmt.Sprintf("Quotation for this collaboration has been updated by %s", userName),
-		Type: stream_chat.MessageTypeSystem,
-	}, "system")
 
+	err = streamchat.SendSystemMessage(contract.StreamChannelID, fmt.Sprintf("Quotation for this collaboration has been updated by %s", userName))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Stream Message issue"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Stream Send error"})
 		return
 	}
 
