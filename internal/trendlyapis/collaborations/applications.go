@@ -98,5 +98,85 @@ func SendApplication(c *gin.Context) {
 }
 
 func EditApplication(c *gin.Context) {
+	userType := middlewares.GetUserType(c)
+	if userType != "user" {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Users can call this endpoint"})
+	}
+	collabId := c.Param("collabId")
+	userId := c.Param("userId")
 
+	user := middlewares.GetUserObject(c)
+	userName, _ := user["name"].(string)
+	// userEmail, _ := user["email"].(string)
+
+	collab := &trendlymodels.Collaboration{}
+	err := collab.Get(collabId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	brand := &trendlymodels.Brand{}
+	err = brand.Get(collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	application := &trendlymodels.Application{}
+	err = application.Get(collabId, userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	log.Println("Got Brands, Collabs and User")
+
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("%s has changed their Quotation", userName),
+		Description: fmt.Sprintf("You have received a new quotation on the collaboration %s", collab.Name),
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &collabId,
+			UserID:          &userId,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "new-quotation",
+	}
+	_, emails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	log.Println("Created Notifications... Now sending email")
+
+	// 	<!--
+	//   Dynamic Variables:
+	//     {{.BrandMemberName}}   => Name of the brand team member receiving the email
+	//     {{.InfluencerName}}    => Name of the influencer who submitted the revised quotation
+	//     {{.CollabTitle}}       => Title of the collaboration
+	//     {{.SubmissionTime}}    => Time when the revised quotation was submitted
+	//     {{.QuotationAmount}}   => New quotation amount
+	//     {{.NewTimeline}}       => Stores the new timeline
+	//     {{.ReviewLink}}        => Link for brand to view and review the quotation
+	// -->
+
+	data := map[string]interface{}{
+		"BrandMemberName": brand.Name,
+		"InfluencerName":  userName,
+		"CollabTitle":     collab.Name,
+		"SubmissionTime":  time.Now().String(),
+		"QuotationAmount": application.Quotation,
+		"NewTimeline":     time.UnixMicro(application.Timeline).String(),
+		"ReviewLink":      fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, collabId),
+	}
+
+	err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationQuotationResubmitted, templates.SubjectNewQuotationReceived, data)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully notified user for message"})
 }
