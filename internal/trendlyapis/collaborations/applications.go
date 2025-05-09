@@ -1,16 +1,19 @@
 package trendlyCollabs
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	stream_chat "github.com/GetStream/stream-chat-go/v5"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
 
@@ -112,21 +115,21 @@ func EditApplication(c *gin.Context) {
 	collab := &trendlymodels.Collaboration{}
 	err := collab.Get(collabId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Collaboration fetch issue"})
 		return
 	}
 
 	brand := &trendlymodels.Brand{}
 	err = brand.Get(collab.BrandID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Brand fetch issue"})
 		return
 	}
 
 	application := &trendlymodels.Application{}
 	err = application.Get(collabId, userId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Application fetch issue"})
 		return
 	}
 
@@ -145,7 +148,7 @@ func EditApplication(c *gin.Context) {
 	}
 	_, emails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, collab.BrandID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Notification creation issue"})
 		return
 	}
 
@@ -174,7 +177,24 @@ func EditApplication(c *gin.Context) {
 
 	err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationQuotationResubmitted, templates.SubjectNewQuotationReceived, data)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "email sending issue"})
+		return
+	}
+
+	contract := &trendlymodels.Contract{}
+	err = contract.GetByCollab(collabId, userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Collab fetch issue"})
+		return
+	}
+	channel := streamchat.Client.Channel("messaging", contract.StreamChannelID)
+	_, err = channel.SendMessage(context.Background(), &stream_chat.Message{
+		Text: fmt.Sprintf("Quotation for this collaboration has been updated by %s", userName),
+		Type: stream_chat.MessageTypeSystem,
+	}, "system")
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Stream Message issue"})
 		return
 	}
 
