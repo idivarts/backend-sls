@@ -159,7 +159,7 @@ func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	if isManager {
+	if !isManager {
 		user := trendlymodels.User{}
 		err = json.Unmarshal(jsonBody, &user)
 		if err != nil {
