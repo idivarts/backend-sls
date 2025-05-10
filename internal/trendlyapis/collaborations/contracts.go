@@ -10,6 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
@@ -91,7 +92,7 @@ func EndContract(c *gin.Context) {
 			"InfluencerName": user.Name,
 			"BrandName":      brand.Name,
 			"CollabTitle":    collab.Name,
-			"EndDate":        time.Now().String(),
+			"EndDate":        mytime.FormatPrettyIST(time.Now()),
 			"RatingLink":     fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contractId),
 		}
 		err = myemail.SendCustomHTMLEmail(*user.Email, templates.CollaborationEndedInfluencer, templates.SubjectContractEndedForInfluencer, data)
@@ -109,7 +110,7 @@ func EndContract(c *gin.Context) {
 			"BrandMemberName": brand.Name,
 			"InfluencerName":  user.Name,
 			"CollabTitle":     collab.Name,
-			"EndDate":         time.Now().String(),
+			"EndDate":         mytime.FormatPrettyIST(time.Now()),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationEndedBrand, templates.SubjectContractEndedForBrand, data)
 		if err != nil {
@@ -193,7 +194,7 @@ func requestToEndContract(c *gin.Context) {
 			"BrandMemberName": brand.Name,
 			"InfluencerName":  user.Name,
 			"CollabTitle":     collab.Name,
-			"PokeTime":        time.Now().String(),
+			"PokeTime":        mytime.FormatPrettyIST(time.Now()),
 			"EndLink":         fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationEndNudged, templates.SubjectNudgeToEndContract, data)

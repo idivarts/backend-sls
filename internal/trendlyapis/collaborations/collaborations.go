@@ -10,6 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
@@ -89,7 +90,7 @@ func StartContract(c *gin.Context) {
 		data := map[string]interface{}{
 			"RecipientName": user.Name,
 			"CollabTitle":   collab.Name,
-			"StartDate":     time.Now().String(),
+			"StartDate":     mytime.FormatPrettyIST(time.Now()),
 			"ContractLink":  fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contractId),
 		}
 		err = myemail.SendCustomHTMLEmail(*user.Email, templates.CollaborationStarted, templates.SubjectCollaborationStarted, data)
@@ -102,7 +103,7 @@ func StartContract(c *gin.Context) {
 		data := map[string]interface{}{
 			"RecipientName": brand.Name,
 			"CollabTitle":   collab.Name,
-			"StartDate":     time.Now().String(),
+			"StartDate":     mytime.FormatPrettyIST(time.Now()),
 			"ContractLink":  fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationStarted, templates.SubjectCollaborationStarted, data)
@@ -187,7 +188,7 @@ func requestToStart(c *gin.Context) {
 			"BrandMemberName": brand.Name,
 			"InfluencerName":  user.Name,
 			"CollabTitle":     collab.Name,
-			"PokeTime":        time.Now().String(),
+			"PokeTime":        mytime.FormatPrettyIST(time.Now()),
 			"StartLink":       fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationStartRequested, templates.SubjectStartCollabReminderToBrand, data)
