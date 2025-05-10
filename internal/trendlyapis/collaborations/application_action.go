@@ -87,7 +87,7 @@ func notifyApplicationAccepted(userId string, collab trendlymodels.Collaboration
 	// Push Notification
 	notif := &trendlymodels.Notification{
 		Title:       fmt.Sprintf("Your application for %s is accepted", collab.Name),
-		Description: "Start messaging the brand manager to get your contract started.",
+		Description: "Start messaging the brand to get your contract started.",
 		IsRead:      false,
 		Data: &trendlymodels.NotificationData{
 			CollaborationID: &collab.Name,
@@ -117,7 +117,7 @@ func notifyApplicationAccepted(userId string, collab trendlymodels.Collaboration
 		"BrandName":      brand.Name,
 		"CollabTitle":    collab.Name,
 		"AcceptanceTime": time.Now().String(),
-		"CollabLink":     fmt.Sprintf("%s/messages", constants.TRENDLY_CREATORS_FE),
+		"CollabLink":     fmt.Sprintf("%s/messages?channelId=%s", constants.TRENDLY_CREATORS_FE, contract.StreamChannelID),
 	}
 
 	if user.Email != nil {
