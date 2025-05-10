@@ -2,6 +2,7 @@ package trendlyapis
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -104,52 +105,6 @@ func ChatAuth(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
 			return
 		}
-
-		if user.Email != nil && *user.Email != "" {
-			phone := ""
-			pCent := 0
-			if user.PhoneNumber != nil {
-				phone = *user.PhoneNumber
-			}
-			if user.Profile != nil {
-				pCent = *user.Profile.CompletionPercentage
-			}
-			contacts := []hubspot.ContactDetails{{
-				Email:             *user.Email,
-				Name:              user.Name,
-				Phone:             phone,
-				IsManager:         false,
-				ProfileCompletion: pCent,
-				LastActivityTime:  user.LastUseTime,
-				CreationTime:      user.CreationTime,
-			}}
-			err = hubspot.CreateOrUpdateContacts(contacts)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating hubspot", "error": err.Error()})
-				return
-			}
-		}
-	} else {
-		manager := trendlymodels.Manager{}
-		err = manager.Get(userId)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
-			return
-		}
-
-		contacts := []hubspot.ContactDetails{{
-			Email:       manager.Email,
-			Name:        manager.Name,
-			Phone:       manager.PhoneNumber,
-			IsManager:   true,
-			CompanyName: "", // Currenly its difficult to fetch the company name
-		}}
-
-		err = hubspot.CreateOrUpdateContacts(contacts)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating hubspot", "error": err.Error()})
-			return
-		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Chat Authentication successful"})
@@ -186,6 +141,7 @@ func ChatConnect(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating/updating user in chat", "error": err.Error()})
 		return
 	}
+	updateHubSpot(isManager, userObject)
 
 	token, err := streamchat.CreateToken(userId)
 	if err != nil {
@@ -193,6 +149,64 @@ func ChatConnect(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Chat Connected", "token": token})
+}
+
+func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
+	jsonBody, err := json.Marshal(userObject)
+	if err != nil {
+		return err
+	}
+	if isManager {
+		user := trendlymodels.User{}
+		err = json.Unmarshal(jsonBody, &user)
+		if err != nil {
+			return err
+		}
+
+		if user.Email != nil && *user.Email != "" {
+			phone := ""
+			pCent := 0
+			if user.PhoneNumber != nil {
+				phone = *user.PhoneNumber
+			}
+			if user.Profile != nil {
+				pCent = *user.Profile.CompletionPercentage
+			}
+			contacts := []hubspot.ContactDetails{{
+				Email:             *user.Email,
+				Name:              user.Name,
+				Phone:             phone,
+				IsManager:         false,
+				ProfileCompletion: pCent,
+				LastActivityTime:  user.LastUseTime,
+				CreationTime:      user.CreationTime,
+			}}
+			err := hubspot.CreateOrUpdateContacts(contacts)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		manager := trendlymodels.Manager{}
+		err = json.Unmarshal(jsonBody, &manager)
+		if err != nil {
+			return err
+		}
+
+		contacts := []hubspot.ContactDetails{{
+			Email:       manager.Email,
+			Name:        manager.Name,
+			Phone:       manager.PhoneNumber,
+			IsManager:   true,
+			CompanyName: "", // Currenly its difficult to fetch the company name
+		}}
+
+		err := hubspot.CreateOrUpdateContacts(contacts)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // GenerateKey converts a string to a valid key and appends a random 5-digit number,
