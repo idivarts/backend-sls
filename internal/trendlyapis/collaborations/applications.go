@@ -19,6 +19,7 @@ func SendApplication(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType != "user" {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Users can call this endpoint"})
+		return
 	}
 	collabId := c.Param("collabId")
 	userId := c.Param("userId")
@@ -102,6 +103,7 @@ func EditApplication(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType != "user" {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Users can call this endpoint"})
+		return
 	}
 	collabId := c.Param("collabId")
 	userId := c.Param("userId")
