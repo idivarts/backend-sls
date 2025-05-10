@@ -204,5 +204,5 @@ func requestToStart(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully Notified for starting contract"})
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully Requested to start contract"})
 }
