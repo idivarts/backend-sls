@@ -17,6 +17,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/hubspot"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 )
 
@@ -101,6 +102,52 @@ func ChatAuth(c *gin.Context) {
 		_, err = user.Insert(userId)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating user", "error": err.Error()})
+			return
+		}
+
+		if user.Email != nil && *user.Email != "" {
+			phone := ""
+			pCent := 0
+			if user.PhoneNumber != nil {
+				phone = *user.PhoneNumber
+			}
+			if user.Profile != nil {
+				pCent = *user.Profile.CompletionPercentage
+			}
+			contacts := []hubspot.ContactDetails{{
+				Email:             *user.Email,
+				Name:              user.Name,
+				Phone:             phone,
+				IsManager:         false,
+				ProfileCompletion: pCent,
+				LastActivityTime:  user.LastUseTime,
+				CreationTime:      user.CreationTime,
+			}}
+			err = hubspot.CreateOrUpdateContacts(contacts)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating hubspot", "error": err.Error()})
+				return
+			}
+		}
+	} else {
+		manager := trendlymodels.Manager{}
+		err = manager.Get(userId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in getting user", "error": err.Error()})
+			return
+		}
+
+		contacts := []hubspot.ContactDetails{{
+			Email:       manager.Email,
+			Name:        manager.Name,
+			Phone:       manager.PhoneNumber,
+			IsManager:   true,
+			CompanyName: "", // Currenly its difficult to fetch the company name
+		}}
+
+		err = hubspot.CreateOrUpdateContacts(contacts)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Error in updating hubspot", "error": err.Error()})
 			return
 		}
 	}

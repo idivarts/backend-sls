@@ -57,3 +57,29 @@ func GetAllBrandMembers(brandID string) ([]BrandMember, error) {
 
 	return members, nil
 }
+
+func GetAllBrandFromManager(managerId string) ([]BrandMember, error) {
+	var members []BrandMember
+
+	iter := firestoredb.Client.CollectionGroup("members").Where("managerId", "==", managerId).Documents(context.Background())
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, err
+		}
+
+		var member BrandMember
+		if err := doc.DataTo(&member); err != nil {
+			return nil, err
+		}
+
+		members = append(members, member)
+	}
+
+	return members, nil
+}

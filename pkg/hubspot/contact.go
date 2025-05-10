@@ -3,6 +3,7 @@ package hubspot
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,10 +17,17 @@ type ContactDetails struct {
 	IsManager         bool   // user_type
 	CompanyName       string //company
 	ProfileCompletion int    // profile_completion
+	CreationTime      *int64
+	LastActivityTime  *int64
 }
 
 func CreateOrUpdateContacts(contacts []ContactDetails) error {
 	accessToken := apiKey
+
+	if len(contacts) == 0 {
+		return errors.New("empty-array")
+	}
+
 	inputs := []map[string]interface{}{}
 	for _, contact := range contacts {
 		// Split full name into first and last name
@@ -40,10 +48,16 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 		}
 		if firstName != "" {
 			payloadProperties["firstname"] = firstName
+		} else {
+			payloadProperties["firstname"] = "-"
 		}
+
 		if lastName != "" {
 			payloadProperties["lastname"] = lastName
+		} else {
+			payloadProperties["lastname"] = "-"
 		}
+
 		if contact.Phone != "" {
 			payloadProperties["phone"] = contact.Phone
 		}
@@ -61,6 +75,14 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 
 		if contact.IsManager && contact.CompanyName != "" {
 			payloadProperties["company"] = contact.CompanyName
+		}
+
+		if contact.CreationTime != nil && *contact.CreationTime != 0 {
+			payloadProperties["creation_time"] = *contact.CreationTime
+		}
+
+		if contact.LastActivityTime != nil && *contact.LastActivityTime != 0 {
+			payloadProperties["last_use_time"] = *contact.LastActivityTime
 		}
 
 		// if contact.IsManager {
