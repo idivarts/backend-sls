@@ -30,21 +30,21 @@ func SendApplication(c *gin.Context) {
 	collab := &trendlymodels.Collaboration{}
 	err := collab.Get(collabId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching collaboration"})
 		return
 	}
 
 	brand := &trendlymodels.Brand{}
 	err = brand.Get(collab.BrandID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching Brand"})
 		return
 	}
 
 	application := &trendlymodels.Application{}
 	err = application.Get(collabId, userId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching application"})
 		return
 	}
 
@@ -63,7 +63,7 @@ func SendApplication(c *gin.Context) {
 	}
 	_, emails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, collab.BrandID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error inserting notification"})
 		return
 	}
 
@@ -90,7 +90,7 @@ func SendApplication(c *gin.Context) {
 
 	err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.ApplicationSent, templates.SubjectInfluencerAppliedToCollab, data)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error sending email"})
 		return
 	}
 
@@ -113,21 +113,21 @@ func EditApplication(c *gin.Context) {
 	collab := &trendlymodels.Collaboration{}
 	err := collab.Get(collabId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Collaboration fetch issue"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Collaboration fetch issue"})
 		return
 	}
 
 	brand := &trendlymodels.Brand{}
 	err = brand.Get(collab.BrandID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Brand fetch issue"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Brand fetch issue"})
 		return
 	}
 
 	application := &trendlymodels.Application{}
 	err = application.Get(collabId, userId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Application fetch issue"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Application fetch issue"})
 		return
 	}
 
@@ -146,7 +146,7 @@ func EditApplication(c *gin.Context) {
 	}
 	_, emails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, collab.BrandID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Notification creation issue"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Notification creation issue"})
 		return
 	}
 
@@ -175,20 +175,20 @@ func EditApplication(c *gin.Context) {
 
 	err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationQuotationResubmitted, templates.SubjectNewQuotationReceived, data)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "email sending issue"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "email sending issue"})
 		return
 	}
 
 	contract := &trendlymodels.Contract{}
 	err = contract.GetByCollab(collabId, userId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Collab fetch issue"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Collab fetch issue"})
 		return
 	}
 
 	err = streamchat.SendSystemMessage(contract.StreamChannelID, fmt.Sprintf("Quotation for this collaboration has been updated by %s", userName))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error(), "error": "Stream Send error"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Stream Send error"})
 		return
 	}
 
