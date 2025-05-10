@@ -86,7 +86,7 @@ func SendApplication(c *gin.Context) {
 		"InfluencerName":  userName,
 		"CollabTitle":     collab.Name,
 		"InfluencerEmail": userEmail,
-		"ApplicationTime": mytime.FormatPrettyIST(time.UnixMicro(application.TimeStamp)),
+		"ApplicationTime": mytime.FormatPrettyIST(time.UnixMilli(application.TimeStamp)),
 		"CollabLink":      fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, collabId),
 	}
 
@@ -172,7 +172,7 @@ func EditApplication(c *gin.Context) {
 		"CollabTitle":     collab.Name,
 		"SubmissionTime":  mytime.FormatPrettyIST(time.Now()),
 		"QuotationAmount": application.Quotation,
-		"NewTimeline":     mytime.FormatPrettyIST(time.UnixMicro(application.Timeline)),
+		"NewTimeline":     mytime.FormatPrettyIST(time.UnixMilli(application.Timeline)),
 		"ReviewLink":      fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, collabId),
 	}
 
