@@ -100,9 +100,9 @@ func (u *Notification) Insert(collection NotificationCollection, id string) (*me
 			},
 			FCMOptions: &messaging.FCMOptions{},
 		})
-		return r, nil, e
+		return r, emails, e
 	}
-	return nil, nil, nil
+	return nil, emails, nil
 }
 
 func sendUnitNotification(collection NotificationCollection, id string, u *Notification) ([]string, *string, error) {
