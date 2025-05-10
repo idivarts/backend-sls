@@ -107,6 +107,8 @@ func ChatAuth(c *gin.Context) {
 		}
 	}
 
+	updateHubSpot(isManager, userObject)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Chat Authentication successful"})
 }
 
