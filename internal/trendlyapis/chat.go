@@ -118,16 +118,18 @@ func ChatConnect(c *gin.Context) {
 	}
 
 	userObject := middlewares.GetUserObject(c)
+	isManager := false
+	if middlewares.GetUserType(c) == "manager" {
+		isManager = true
+	}
+
+	updateHubSpot(isManager, userObject)
 
 	if userObject["isChatConnected"] != true {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not connected"})
 		return
 	}
 
-	isManager := false
-	if middlewares.GetUserType(c) == "manager" {
-		isManager = true
-	}
 	name, _ := userObject["name"].(string)
 	profileImage, _ := userObject["profileImage"].(string)
 	// Upsert user to the stream chat
@@ -141,7 +143,6 @@ func ChatConnect(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating/updating user in chat", "error": err.Error()})
 		return
 	}
-	updateHubSpot(isManager, userObject)
 
 	token, err := streamchat.CreateToken(userId)
 	if err != nil {
