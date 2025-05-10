@@ -123,17 +123,18 @@ func SendCustomHTMLEmailToMultipleRecipients(toEmails []string, templatePath Tem
 	message.AddContent(mail.NewContent("text/html", body.String()))
 
 	// Create one personalization object for all recipients
-	personalization := mail.NewPersonalization()
 	for _, email := range toEmails {
 		to := mail.NewEmail("", email)
+		personalization := mail.NewPersonalization()
 		personalization.AddTos(to)
+		message.AddPersonalizations(personalization)
 	}
-	message.AddPersonalizations(personalization)
 
 	client := sendgrid.NewSendClient(apiKey)
 	_, err = client.Send(message)
 	if err != nil {
 		log.Printf("Failed to send bulk email: %v", err)
 	}
+	// log.Println("Mail Data", x)
 	return err
 }

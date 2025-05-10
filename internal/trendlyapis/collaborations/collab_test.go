@@ -1,11 +1,16 @@
 package trendlyCollabs_test
 
 import (
+	"fmt"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	trendlyCollabs "github.com/idivarts/backend-sls/internal/trendlyapis/collaborations"
+	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/templates"
 )
 
 func TestInvites(t *testing.T) {
@@ -28,4 +33,22 @@ func TestInvites(t *testing.T) {
 
 	trendlyCollabs.SendInvitation(c)
 	t.Log("Success", w.Body.String())
+}
+
+func TestMultiEmail(t *testing.T) {
+	data := map[string]interface{}{
+		"BrandName":       "brand.Name",
+		"InfluencerName":  "userName",
+		"CollabTitle":     "collab.Name",
+		"InfluencerEmail": "userEmail",
+		"ApplicationTime": time.Now().String(),
+		"CollabLink":      fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, "collabId"),
+	}
+
+	err := myemail.SendCustomHTMLEmailToMultipleRecipients([]string{"rahul@idiv.in", "debanganamukherjee86@gmail.com"}, templates.ApplicationSent, templates.SubjectInfluencerAppliedToCollab, data)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	t.Log("Successful")
 }
