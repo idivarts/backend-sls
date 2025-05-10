@@ -2,7 +2,6 @@ package trendlyapis
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -18,7 +17,6 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/hubspot"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 )
 
@@ -152,65 +150,6 @@ func ChatConnect(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Chat Connected", "token": token})
-}
-
-func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
-	jsonBody, err := json.Marshal(userObject)
-	if err != nil {
-		return err
-	}
-	if !isManager {
-		user := trendlymodels.User{}
-		err = json.Unmarshal(jsonBody, &user)
-		if err != nil {
-			return err
-		}
-
-		if user.Email != nil && *user.Email != "" {
-			phone := ""
-			pCent := 0
-			if user.PhoneNumber != nil {
-				phone = *user.PhoneNumber
-			}
-			if user.Profile != nil {
-				pCent = *user.Profile.CompletionPercentage
-			}
-			contacts := []hubspot.ContactDetails{{
-				Email:             *user.Email,
-				Name:              user.Name,
-				Phone:             phone,
-				IsManager:         false,
-				ProfileCompletion: pCent,
-				LastActivityTime:  aws.Int64(time.Now().UnixMilli()),
-				CreationTime:      user.CreationTime,
-			}}
-			err := hubspot.CreateOrUpdateContacts(contacts)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		manager := trendlymodels.Manager{}
-		err = json.Unmarshal(jsonBody, &manager)
-		if err != nil {
-			return err
-		}
-
-		contacts := []hubspot.ContactDetails{{
-			Email:            manager.Email,
-			Name:             manager.Name,
-			Phone:            manager.PhoneNumber,
-			IsManager:        true,
-			CompanyName:      "", // Currenly its difficult to fetch the company name
-			LastActivityTime: aws.Int64(time.Now().UnixMilli()),
-		}}
-
-		err := hubspot.CreateOrUpdateContacts(contacts)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // GenerateKey converts a string to a valid key and appends a random 5-digit number,
