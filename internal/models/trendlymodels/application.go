@@ -12,7 +12,7 @@ type Application struct {
 	Status                string                      `json:"status" firestore:"status"`
 	TimeStamp             int64                       `json:"timeStamp" firestore:"timeStamp"`
 	Message               string                      `json:"message" firestore:"message"`
-	Quotation             string                      `json:"quotation" firestore:"quotation"`
+	Quotation             int                         `json:"quotation" firestore:"quotation"`
 	AnswersFromInfluencer []InfluencerAnswer          `json:"answersFromInfluencer" firestore:"answersFromInfluencer"`
 	Timeline              int64                       `json:"timeline" firestore:"timeline"`
 	Attachments           []interface{}               `json:"attachments" firestore:"attachments"`

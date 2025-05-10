@@ -21,6 +21,7 @@ func ApplicationAction(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType != "manager" {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Managers can call this endpoint"})
+		return
 	}
 	managerId, b := middlewares.GetUserId(c)
 	if !b {
