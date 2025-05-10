@@ -5,6 +5,7 @@
     {{.CollabTitle}}       => Title of the collaboration
     {{.SubmissionTime}}    => Time when the revised quotation was submitted
     {{.QuotationAmount}}   => New quotation amount
+    {{.NewTimeline}}       => Stores the new timeline
     {{.ReviewLink}}        => Link for brand to view and review the quotation
 -->
 
@@ -62,7 +63,12 @@
             "<strong>{{.CollabTitle}}</strong>".</p>
 
         <p><strong>Submitted At:</strong> {{.SubmissionTime}}</p>
-        <p><strong>New Quotation:</strong> ₹{{.QuotationAmount}}</p>
+
+        <div
+            style="border: 2px solid #00796B; padding: 12px; border-radius: 6px; background-color: #f1fdfb; margin-top: 16px;">
+            <p><strong>New Quotation:</strong> ₹{{.QuotationAmount}}</p>
+            <p><strong>New Timeline:</strong> {{.NewTimeline}}</p>
+        </div>
 
         <a href="{{.ReviewLink}}" class="button">Review Quotation</a>
 

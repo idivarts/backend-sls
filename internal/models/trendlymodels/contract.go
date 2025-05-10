@@ -27,3 +27,18 @@ func (b *Contract) Get(contractID string) error {
 	}
 	return err
 }
+
+func (b *Contract) GetByCollab(collabId, userId string) error {
+	iter := firestoredb.Client.Collection("contracts").Where("collaborationId", "==", collabId).Where("userId", "==", userId).Documents(context.Background())
+
+	res, err := iter.Next()
+	if err != nil {
+		return err
+	}
+
+	err = res.DataTo(b)
+	if err != nil {
+		return err
+	}
+	return err
+}
