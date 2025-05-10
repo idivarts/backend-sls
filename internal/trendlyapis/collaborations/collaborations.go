@@ -123,5 +123,86 @@ func StartContract(c *gin.Context) {
 }
 
 func requestToStart(c *gin.Context) {
+	contractId := c.Param(("contractId"))
 
+	contract := trendlymodels.Contract{}
+	err := contract.Get(contractId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching contract"})
+		return
+	}
+
+	collab := trendlymodels.Collaboration{}
+	err = collab.Get(contract.CollaborationID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching collaboration"})
+		return
+	}
+
+	brand := trendlymodels.Brand{}
+	err = brand.Get(contract.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching Brand"})
+		return
+	}
+
+	user := trendlymodels.User{}
+	err = user.Get(contract.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching user"})
+		return
+	}
+
+	// Send Push Notification
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("Please start the contract : %s", collab.Name),
+		Description: fmt.Sprintf("%s has asked to start the contract. Please review that.", user.Name),
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &contract.CollaborationID,
+			UserID:          &contract.UserID,
+			GroupID:         &contractId,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "contract-start-request",
+	}
+	_, emails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Send Email notification
+
+	// 	<!--
+	//   Dynamic Variables:
+	// {{.BrandMemberName}}    => Name of the brand team member receiving the email
+	// {{.InfluencerName}}     => Name of the influencer who sent the poke
+	// {{.CollabTitle}}        => Title of the collaboration
+	// {{.PokeTime}}           => Timestamp when the poke was sent
+	// {{.StartLink}}          => Link for the brand to start the collaboration
+	// -->
+	if len(emails) > 0 {
+		data := map[string]interface{}{
+			"BrandMemberName": brand.Name,
+			"InfluencerName":  user.Name,
+			"CollabTitle":     collab.Name,
+			"PokeTime":        time.Now().String(),
+			"StartLink":       fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
+		}
+		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationStartRequested, templates.SubjectStartCollabReminderToBrand, data)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	// Send Stream Notification
+	err = streamchat.SendSystemMessage(contract.StreamChannelID, fmt.Sprintf("To %s\nPlease start the contract if everything is discussed. %s is waiting on you to get started with his work", brand.Name, user.Name))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Stream Error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully Notified for starting contract"})
 }
