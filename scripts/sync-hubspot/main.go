@@ -51,8 +51,8 @@ func main() {
 		}
 	}
 	log.Println("Got all docs", len(contacts))
-	for i := 0; i < len(contacts); i += 20 {
-		err := hubspot.CreateOrUpdateContacts(contacts[i:min(i+20, len(contacts))])
+	for i := 0; i < len(contacts); i += 100 {
+		err := hubspot.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
 		if err != nil {
 			panic(err.Error())
 		}
