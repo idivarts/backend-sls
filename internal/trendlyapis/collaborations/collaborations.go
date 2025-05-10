@@ -1,8 +1,17 @@
 package trendlyCollabs
 
 import (
+	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/streamchat"
+	"github.com/idivarts/backend-sls/templates"
 )
 
 // Starting a collab | Request to start
@@ -12,7 +21,105 @@ func StartContract(c *gin.Context) {
 		requestToStart(c)
 		return
 	}
+	contractId := c.Param(("contractId"))
 
+	contract := trendlymodels.Contract{}
+	err := contract.Get(contractId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching contract"})
+		return
+	}
+
+	collab := trendlymodels.Collaboration{}
+	err = collab.Get(contract.CollaborationID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching collaboration"})
+		return
+	}
+
+	brand := trendlymodels.Brand{}
+	err = brand.Get(contract.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching Brand"})
+		return
+	}
+
+	user := trendlymodels.User{}
+	err = user.Get(contract.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching user"})
+		return
+	}
+
+	// Send Push Notification
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("The contract is started : %s", collab.Name),
+		Description: "You can now find the details on the contract's menu",
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &contract.CollaborationID,
+			UserID:          &contract.UserID,
+			GroupID:         &contractId,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "contract-started",
+	}
+	_, emails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, contract.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Send Email notification
+
+	// 	<!--
+	//   Dynamic Variables:
+	// {{.RecipientName}}     => Name of the recipient (Brand or Influencer)
+	// {{.CollabTitle}}       => Title of the collaboration
+	// {{.StartDate}}         => Date when the collaboration was started
+	// {{.ContractLink}}      => Link to view the created contract
+	// -->
+
+	if user.Email != nil {
+		data := map[string]interface{}{
+			"RecipientName": user.Name,
+			"CollabTitle":   collab.Name,
+			"StartDate":     time.Now().String(),
+			"ContractLink":  fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contractId),
+		}
+		err = myemail.SendCustomHTMLEmail(*user.Email, templates.CollaborationStarted, templates.SubjectCollaborationStarted, data)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if len(emails) > 0 {
+		data := map[string]interface{}{
+			"RecipientName": brand.Name,
+			"CollabTitle":   collab.Name,
+			"StartDate":     time.Now().String(),
+			"ContractLink":  fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
+		}
+		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationStarted, templates.SubjectCollaborationStarted, data)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	// Send Stream Notification
+	err = streamchat.SendSystemMessage(contract.StreamChannelID, "Congratulations!! The contract has been started!\nYou can find the contract details on the contract menu")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Stream Error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully Notified for starting contract"})
 }
 
 func requestToStart(c *gin.Context) {
