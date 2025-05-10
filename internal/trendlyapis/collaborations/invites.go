@@ -18,6 +18,7 @@ func SendInvitation(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType != "manager" {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Only Managers can call this endpoint"})
+		return
 	}
 	collabId := c.Param("collabId")
 	userId := c.Param("userId")
