@@ -178,7 +178,7 @@ func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
 				Phone:             phone,
 				IsManager:         false,
 				ProfileCompletion: pCent,
-				LastActivityTime:  user.LastUseTime,
+				LastActivityTime:  aws.Int64(time.Now().UnixMilli()),
 				CreationTime:      user.CreationTime,
 			}}
 			err := hubspot.CreateOrUpdateContacts(contacts)
@@ -194,11 +194,12 @@ func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
 		}
 
 		contacts := []hubspot.ContactDetails{{
-			Email:       manager.Email,
-			Name:        manager.Name,
-			Phone:       manager.PhoneNumber,
-			IsManager:   true,
-			CompanyName: "", // Currenly its difficult to fetch the company name
+			Email:            manager.Email,
+			Name:             manager.Name,
+			Phone:            manager.PhoneNumber,
+			IsManager:        true,
+			CompanyName:      "", // Currenly its difficult to fetch the company name
+			LastActivityTime: aws.Int64(time.Now().UnixMilli()),
 		}}
 
 		err := hubspot.CreateOrUpdateContacts(contacts)
