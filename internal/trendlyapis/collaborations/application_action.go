@@ -63,11 +63,12 @@ func ApplicationAction(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "Successfully rejected application"})
 		return
 	} else if action == "revise" {
-		err = notifyToReviseApplication()
+		err = notifyToReviseApplication(userId, collabId, *collab)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 			return
 		}
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully sent revision request"})
 		return
 	}
 	c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid request. Please provide correct action"})
@@ -136,6 +137,73 @@ func notifyApplicationAccepted(userId string, collab trendlymodels.Collaboration
 	return nil
 }
 
-func notifyToReviseApplication() error {
+func notifyToReviseApplication(userId, collabId string, collab trendlymodels.Collaboration) error {
+	user := trendlymodels.User{}
+	err := user.Get(userId)
+	if err != nil {
+		return err
+	}
+	brand := trendlymodels.Brand{}
+	err = brand.Get(collab.BrandID)
+	if err != nil {
+		return err
+	}
+
+	contract := trendlymodels.Contract{}
+	err = contract.GetByCollab(collabId, userId)
+	if err != nil {
+		return err
+	}
+
+	// Push Notification
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("Revise your quotation for %s", collab.Name),
+		Description: "Please open your contract details and revise your quotation",
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &collab.Name,
+			UserID:          &userId,
+			GroupID:         &contract.StreamChannelID,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "revise-quotation",
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, userId)
+	if err != nil {
+		return err
+	}
+
+	// 	<!--
+	//   Dynamic Variables:
+	//     {{.InfluencerName}}      => Name of the influencer
+	//     {{.BrandName}}           => Name of the brand requesting revision
+	//     {{.CollabTitle}}         => Title of the collaboration
+	//     {{.RevisionRequestTime}} => Timestamp of the revision request
+	//     {{.RevisionNote}}        => Optional note or reason provided by the brand
+	//     {{.ReviseLink}}          => Link for the influencer to review and revise the quotation
+	// -->
+
+	data := map[string]interface{}{
+		"InfluencerName":      user.Name,
+		"BrandName":           brand.Name,
+		"CollabTitle":         collab.Name,
+		"RevisionRequestTime": time.Now().String(),
+		// "RevisionNote":""
+		"CollabLink": fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contract.StreamChannelID),
+	}
+
+	if user.Email != nil {
+		err = myemail.SendCustomHTMLEmail(*user.Email, templates.CollaborationQuotationRequested, templates.SubjectQuotationRevisionRequested, data)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Stream Notification
+	err = streamchat.SendSystemMessage(contract.StreamChannelID, fmt.Sprintf("Hello %s,\nPlease revise your quotation from the application info screen so that a contract can be started", user.Name))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
