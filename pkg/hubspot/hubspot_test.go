@@ -7,11 +7,15 @@ import (
 )
 
 func TestDataPush(t *testing.T) {
-	err := hubspot.CreateOrUpdateContact(hubspot.ContactDetails{
-		Email: "rahul@idiv.in",
-		Name:  "Rahul Sinha 2",
-		Phone: "7604007156",
-	})
+	err := hubspot.CreateOrUpdateContacts([]hubspot.ContactDetails{{
+		Email:             "rahul@idiv.in",
+		Name:              "Rahul Sinha",
+		Phone:             "7604007156",
+		IsManager:         true,
+		CompanyName:       "Trendly",
+		ProfileCompletion: 90,
+		IsEmailVerified:   true,
+	}})
 	if err != nil {
 		t.Error(err.Error())
 	}
