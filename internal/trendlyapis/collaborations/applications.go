@@ -11,6 +11,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
@@ -85,7 +86,7 @@ func SendApplication(c *gin.Context) {
 		"InfluencerName":  userName,
 		"CollabTitle":     collab.Name,
 		"InfluencerEmail": userEmail,
-		"ApplicationTime": time.UnixMicro(application.TimeStamp).String(),
+		"ApplicationTime": mytime.FormatPrettyIST(time.UnixMicro(application.TimeStamp)),
 		"CollabLink":      fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, collabId),
 	}
 
@@ -169,9 +170,9 @@ func EditApplication(c *gin.Context) {
 		"BrandMemberName": brand.Name,
 		"InfluencerName":  userName,
 		"CollabTitle":     collab.Name,
-		"SubmissionTime":  time.Now().String(),
+		"SubmissionTime":  mytime.FormatPrettyIST(time.Now()),
 		"QuotationAmount": application.Quotation,
-		"NewTimeline":     time.UnixMicro(application.Timeline).String(),
+		"NewTimeline":     mytime.FormatPrettyIST(time.UnixMicro(application.Timeline)),
 		"ReviewLink":      fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, collabId),
 	}
 

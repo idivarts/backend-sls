@@ -10,6 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/constants"
 	trendlyCollabs "github.com/idivarts/backend-sls/internal/trendlyapis/collaborations"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/templates"
 )
 
@@ -41,7 +42,7 @@ func TestMultiEmail(t *testing.T) {
 		"InfluencerName":  "userName",
 		"CollabTitle":     "collab.Name",
 		"InfluencerEmail": "userEmail",
-		"ApplicationTime": time.Now().String(),
+		"ApplicationTime": mytime.FormatPrettyIST(time.Now()),
 		"CollabLink":      fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, "collabId"),
 	}
 

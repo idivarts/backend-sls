@@ -12,6 +12,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
@@ -118,7 +119,7 @@ func notifyApplicationAccepted(userId string, collab trendlymodels.Collaboration
 		"InfluencerName": user.Name,
 		"BrandName":      brand.Name,
 		"CollabTitle":    collab.Name,
-		"AcceptanceTime": time.Now().String(),
+		"AcceptanceTime": mytime.FormatPrettyIST(time.Now()),
 		"CollabLink":     fmt.Sprintf("%s/messages?channelId=%s", constants.TRENDLY_CREATORS_FE, contract.StreamChannelID),
 	}
 
@@ -188,7 +189,7 @@ func notifyToReviseApplication(userId, collabId string, collab trendlymodels.Col
 		"InfluencerName":      user.Name,
 		"BrandName":           brand.Name,
 		"CollabTitle":         collab.Name,
-		"RevisionRequestTime": time.Now().String(),
+		"RevisionRequestTime": mytime.FormatPrettyIST(time.Now()),
 		// "RevisionNote":""
 		"CollabLink": fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contract.StreamChannelID),
 	}
