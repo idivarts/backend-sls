@@ -16,7 +16,6 @@ type ContactDetails struct {
 	IsManager         bool   // user_type
 	CompanyName       string //company
 	ProfileCompletion int    // profile_completion
-	IsEmailVerified   bool   // hs_content_membership_email_confirmed
 }
 
 func CreateOrUpdateContacts(contacts []ContactDetails) error {

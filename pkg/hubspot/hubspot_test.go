@@ -14,7 +14,6 @@ func TestDataPush(t *testing.T) {
 		IsManager:         true,
 		CompanyName:       "Trendly",
 		ProfileCompletion: 90,
-		IsEmailVerified:   true,
 	}})
 	if err != nil {
 		t.Error(err.Error())
