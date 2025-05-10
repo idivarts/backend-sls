@@ -107,6 +107,8 @@ func ChatAuth(c *gin.Context) {
 		}
 	}
 
+	updateHubSpot(isManager, userObject)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Chat Authentication successful"})
 }
 
@@ -157,7 +159,7 @@ func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	if isManager {
+	if !isManager {
 		user := trendlymodels.User{}
 		err = json.Unmarshal(jsonBody, &user)
 		if err != nil {
