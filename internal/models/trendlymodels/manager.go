@@ -15,6 +15,7 @@ type ManagerSettings struct {
 type Manager struct {
 	Name                  string                `json:"name" firestore:"name"`
 	Email                 string                `json:"email" firestore:"email"`
+	IsAdmin               bool                  `json:"isAdmin" firestore:"isAdmin"`
 	PhoneNumber           string                `json:"phoneNumber,omitempty" firestore:"phoneNumber,omitempty"`
 	Location              string                `json:"location,omitempty" firestore:"location,omitempty"`
 	IsChatConnected       bool                  `json:"isChatConnected,omitempty" firestore:"isChatConnected,omitempty"`
