@@ -17,15 +17,15 @@ type User struct {
 	Location              *string                `json:"location,omitempty" firestore:"location,omitempty"`
 	EmailVerified         *bool                  `json:"emailVerified,omitempty" firestore:"emailVerified,omitempty"`
 	PhoneVerified         *bool                  `json:"phoneVerified,omitempty" firestore:"phoneVerified,omitempty"`
+	IsVerified            *bool                  `json:"isVerified,omitempty" firestore:"isVerified,omitempty"`
 	Profile               *UserProfile           `json:"profile,omitempty" firestore:"profile,omitempty"`
-	Preferences           *UserPreferences       `json:"preferences,omitempty" firestore:"preferences,omitempty"`
-	Settings              *UserSettings          `json:"settings,omitempty" firestore:"settings,omitempty"`
 	Backend               *BackendData           `json:"backend,omitempty" firestore:"backend,omitempty"`
 	PushNotificationToken *PushNotificationToken `json:"pushNotificationToken,omitempty" firestore:"pushNotificationToken,omitempty"`
-
-	CreationTime *int64 `json:"creationTime,omitempty" firestore:"creationTime,omitempty"`
-	LastUseTime  *int64 `json:"lastUseTime,omitempty" firestore:"lastUseTime,omitempty"`
-	UpdateTime   *int64 `json:"updateTime,omitempty" firestore:"updateTime,omitempty"`
+	Preferences           *UserPreferences       `json:"preferences,omitempty" firestore:"preferences,omitempty"`
+	Settings              *UserSettings          `json:"settings,omitempty" firestore:"settings,omitempty"`
+	CreationTime          *int64                 `json:"creationTime,omitempty" firestore:"creationTime,omitempty"`
+	LastUseTime           *int64                 `json:"lastUseTime,omitempty" firestore:"lastUseTime,omitempty"`
+	UpdateTime            *int64                 `json:"updateTime,omitempty" firestore:"updateTime,omitempty"`
 
 	// These are the subcollections to be handled
 	// Notifications         []Notification         `json:"notifications" firestore:"notifications"`
@@ -57,18 +57,25 @@ type UserAttachment struct {
 }
 
 type UserPreferences struct {
-	// This would change very soon by Dev's efforts
-
-	// Question1 []string `json:"question1,omitempty" firestore:"question1,omitempty"`
-	// Question2 []string `json:"question2,omitempty" firestore:"question2,omitempty"`
-	// Question3 []string `json:"question3,omitempty" firestore:"question3,omitempty"`
-	// Question4 []string `json:"question4,omitempty" firestore:"question4,omitempty"`
+	BudgetForPaidCollabs       []int    `json:"budgetForPaidCollabs,omitempty" firestore:"budgetForPaidCollabs,omitempty"`
+	ContentCategory            []string `json:"contentCategory,omitempty" firestore:"contentCategory,omitempty"`
+	ContentWillingToPost       []string `json:"contentWillingToPost,omitempty" firestore:"contentWillingToPost,omitempty"`
+	Goal                       *string  `json:"goal,omitempty" firestore:"goal,omitempty"`
+	MaximumMonthlyCollabs      []int    `json:"maximumMonthlyCollabs,omitempty" firestore:"maximumMonthlyCollabs,omitempty"`
+	PreferredBrandIndustries   []string `json:"preferredBrandIndustries,omitempty" firestore:"preferredBrandIndustries,omitempty"`
+	PreferredCollaborationType *string  `json:"preferredCollaborationType,omitempty" firestore:"preferredCollaborationType,omitempty"`
+	PreferredLanguages         []string `json:"preferredLanguages,omitempty" firestore:"preferredLanguages,omitempty"`
+	PreferredVideoType         *string  `json:"preferredVideoType,omitempty" firestore:"preferredVideoType,omitempty"`
 }
 
 type UserSettings struct {
-	Theme             *string `json:"theme,omitempty" firestore:"theme,omitempty"`
+	AccountStatus     *string `json:"accountStatus,omitempty" firestore:"accountStatus,omitempty"`
+	Availability      *string `json:"availability,omitempty" firestore:"availability,omitempty"`
+	DataSharing       *string `json:"dataSharing,omitempty" firestore:"dataSharing,omitempty"`
 	EmailNotification *bool   `json:"emailNotification,omitempty" firestore:"emailNotification,omitempty"`
+	ProfileVisibility *string `json:"profileVisibility,omitempty" firestore:"profileVisibility,omitempty"`
 	PushNotification  *bool   `json:"pushNotification,omitempty" firestore:"pushNotification,omitempty"`
+	Theme             *string `json:"theme,omitempty" firestore:"theme,omitempty"`
 }
 
 type BackendData struct {
@@ -89,7 +96,7 @@ type PushNotificationToken struct {
 }
 
 func (u *User) Insert(uid string) (*firestore.WriteResult, error) {
-	res, err := firestoredb.Client.Collection("users").Doc(uid).Set(context.Background(), u)
+	res, err := firestoredb.Client.Collection("users").Doc(uid).Set(context.Background(), u, firestore.MergeAll)
 
 	if err != nil {
 		return nil, err
