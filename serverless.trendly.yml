@@ -26,7 +26,7 @@ provider:
     SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v
     SENDGRID_NAME: Trendly
-    SENDGRID_EMAIL: no-reply@idiv.in
+    SENDGRID_EMAIL: no-reply@trendly.now
     HUBSPOT_API_KEY: cGF0LW5hMS04YmU4ZmViNi03Nzg2LTQ3NzYtYWE5MC02Y2E3ZTg0NDBiNzk=
   iam:
     role:
