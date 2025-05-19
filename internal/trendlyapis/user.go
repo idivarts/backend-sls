@@ -39,6 +39,12 @@ func DeativateUser(c *gin.Context) {
 		return
 	}
 
+	err = fauth.Client.RevokeRefreshTokens(context.Background(), userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error revoking the user session"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully deactivated the user"})
 }
 
