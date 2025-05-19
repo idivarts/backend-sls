@@ -37,5 +37,8 @@ func main() {
 	apiV1.POST("/contracts/:contractId/end", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
 	apiV1.POST("/contracts/:contractId/feedback", trendlyCollabs.GiveContractFeedback)
 
+	apiV1.DELETE("/users/deactivate", trendlyapis.DeativateUser)
+	apiV1.DELETE("/users/delete", trendlyapis.DeleteUser)
+
 	apihandler.StartLambda()
 }
