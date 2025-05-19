@@ -36,7 +36,7 @@ type SocialsPrivate struct {
 }
 
 func (s *SocialsPrivate) Set(userId, id string) (*firestore.WriteResult, error) {
-	res, err := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socialsPrivate", userId)).Doc(id).Set(context.Background(), s, firestore.MergeAll)
+	res, err := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socialsPrivate", userId)).Doc(id).Set(context.Background(), s)
 
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (s *SocialsPrivate) Get(userId, id string) error {
 }
 
 func (s *Socials) Insert(userId string) (*firestore.WriteResult, error) {
-	res, err := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socials", userId)).Doc(s.ID).Set(context.Background(), s, firestore.MergeAll)
+	res, err := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socials", userId)).Doc(s.ID).Set(context.Background(), s)
 
 	if err != nil {
 		return nil, err
