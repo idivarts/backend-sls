@@ -160,11 +160,23 @@ package:
 
 resources:
   Resources:
+    StreamMessageDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: StreamMessageDLQ
+
     StreamMessageQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: StreamMessageQueue
         VisibilityTimeout: 60
+        MaximumMessageSize: 262144  # 256 KB
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - StreamMessageDLQ
+              - Arn
+          maxReceiveCount: 5
 
     # --------------------------------------------------------------------------------------
     # ------------- S3 for Videos -----------------------------------------------------
