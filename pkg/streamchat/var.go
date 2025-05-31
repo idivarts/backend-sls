@@ -26,7 +26,15 @@ func init() {
 		panic(err.Error())
 	}
 
-	settings := &stream.AppSettings{EnforceUniqueUsernames: "no"}
+	client.UpdateChannelType(context.Background(), "messaging", map[string]interface{}{
+		"reminders":   true,
+		"read_events": true,
+	})
+
+	settings := &stream.AppSettings{
+		EnforceUniqueUsernames: "no",
+		RemindersInterval:      300,
+	}
 	_, err = client.UpdateAppSettings(context.Background(), settings)
 	if err != nil {
 		panic(err.Error())
