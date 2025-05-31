@@ -96,6 +96,19 @@ functions:
     timeout: 30
     events:
       - http: ANY /api/v1/{proxy+}
+  stream_sqs_hook:
+    handler: functions/stream_sqs_hook/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - StreamMessageQueue
+              - Arn
   insta_apis:
     handler: functions/unauth_apis/main.go
     package:
@@ -147,6 +160,11 @@ package:
 
 resources:
   Resources:
+    StreamMessageQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: StreamMessageQueue
+        VisibilityTimeout: 60
 
     # --------------------------------------------------------------------------------------
     # ------------- S3 for Videos -----------------------------------------------------
