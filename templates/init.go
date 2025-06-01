@@ -21,4 +21,5 @@ const (
 	CollaborationStarted              myemail.TemplatePath = "templates/start_collaboration.html"
 	InfluencerJoined                  myemail.TemplatePath = "templates/welcome_influencer.html"
 	BrandCreated                      myemail.TemplatePath = "templates/welcome_brand.html"
+	MessageReminder                   myemail.TemplatePath = "templates/message_reminder.html"
 )
