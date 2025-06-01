@@ -23,13 +23,7 @@ func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 			webhook.Type, webhook.User.Name)
 
 		if webhook.Type == "user.unread_message_reminder" {
-			for channelID, reminderData := range webhook.Channels {
-				fmt.Printf("Channel ID: %s\n", channelID)
-				fmt.Printf("Messages: %d\n", len(reminderData.Messages))
-				for _, message := range reminderData.Messages {
-					fmt.Printf("Message ID: %s, Text: %s\n", message.ID, message.Text)
-				}
-			}
+			HandleUnreadMessage(&webhook)
 		} else {
 			fmt.Printf("Unhandled event type: %s\n", webhook.Type)
 		}
