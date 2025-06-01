@@ -37,6 +37,7 @@ type ReminderChannel struct {
 	Members       []ChannelMember `json:"members"`
 	MemberCount   int             `json:"member_count"`
 	Config        ChannelConfig   `json:"config"`
+	Name          string          `json:"name"`
 }
 
 type ChannelMember struct {
