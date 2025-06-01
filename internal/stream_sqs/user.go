@@ -37,7 +37,7 @@ func HandleUnreadMessage(body *StreamWebhook) {
 	// {{.OpenChatLink}}      => Link to open the chat in the app
 	data := map[string]interface{}{
 		"RecipientName":       user.Name,
-		"CollabTitle":         channel.Channel.Config.Name,                                                      // Assuming the first channel is the relevant one
+		"CollabTitle":         channel.Channel.Name,                                                             // Assuming the first channel is the relevant one
 		"FirstPendingMessage": channel.Messages[0].Text,                                                         // Preview of the first unread message
 		"PendingCount":        len(channel.Messages),                                                            // Total number of unread messages
 		"OpenChatLink":        fmt.Sprintf("%s/channel/%s", constants.TRENDLY_CREATORS_FE, channel.Channel.CID), // Link to open the chat
