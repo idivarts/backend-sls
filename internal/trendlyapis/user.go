@@ -17,15 +17,6 @@ func userPreChecks(user *trendlymodels.User) bool {
 	if user == nil {
 		return false
 	}
-	if user.Settings == nil {
-		user.Settings = &trendlymodels.UserSettings{}
-	}
-	if user.Settings.AccountStatus == nil {
-		user.Settings.AccountStatus = aws.String("Activated")
-	}
-	if *user.Settings.AccountStatus != "Activated" {
-		return false
-	}
 
 	// Add all prechecks like all contracts should be in closed state
 	return true
