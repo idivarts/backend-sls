@@ -112,7 +112,7 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	_, err = streamchat.Client.DeleteUser(context.Background(), userId, stream_chat.DeleteUserWithHardDelete())
+	_, err = streamchat.Client.DeleteUser(context.Background(), userId, stream_chat.DeleteUserWithMarkMessagesDeleted())
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error removing user on Stream"})
 		return
