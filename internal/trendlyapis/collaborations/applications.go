@@ -54,7 +54,7 @@ func SendApplication(c *gin.Context) {
 
 	notif := &trendlymodels.Notification{
 		Title:       fmt.Sprintf("Received new application : %s", userName),
-		Description: fmt.Sprintf("You have receive appliaction on the collaboration %s", collab.Name),
+		Description: fmt.Sprintf("You have received application on the collaboration %s", collab.Name),
 		IsRead:      false,
 		Data: &trendlymodels.NotificationData{
 			CollaborationID: &collabId,
