@@ -15,6 +15,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	"github.com/idivarts/backend-sls/templates"
 )
 
 type IBrandMember struct {
@@ -35,11 +36,20 @@ func CreateBrandMember(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
+	user := middlewares.GetUserObject(c)
+	inviterName := user["name"].(string)
 
 	cUser := &trendlymodels.BrandMember{}
 	err := cUser.Get(req.BrandID, userId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not a part of brand", "data": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "User not a part of brand", "error": err.Error()})
+		return
+	}
+
+	brand := &trendlymodels.Brand{}
+	err = brand.Get(req.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Can't find the brand"})
 		return
 	}
 
@@ -102,15 +112,26 @@ func CreateBrandMember(c *gin.Context) {
 		return
 	}
 
-	err = myemail.SendEmailUsingTemplate(userRecord.Email, "d-1c924f9017cc45728243bef1ebe4cda3", map[string]interface{}{
-		"invitationUrl": link,
-	})
+	// 	<!--
+	//   Dynamic Variables:
+	//     {{.RecipientName}}   => Name of the invited team member
+	//     {{.InviterName}}     => Name of the person who invited them
+	//     {{.BrandName}}       => Name of the brand
+	//     {{.AcceptLink}}      => Link to accept the invitation and join the brand
+	// -->
+	data := map[string]interface{}{
+		"RecipientName": req.Name,
+		"InviterName":   inviterName,
+		"BrandName":     brand.Name,
+		"AcceptLink":    link,
+	}
+	err = myemail.SendCustomHTMLEmail(userRecord.Email, templates.BrandEmailInvite, templates.SubjectBrandEmailInvite, data)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": userRecord, "link": link})
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully parsed JSON", "user": userRecord, "manager": manager, "link": link})
 }
 
 // GenerateInvitationLink creates a password reset link

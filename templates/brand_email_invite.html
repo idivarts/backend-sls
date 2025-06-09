@@ -1,0 +1,74 @@
+<!-- 
+  Dynamic Variables:
+    {{.RecipientName}}   => Name of the invited team member
+    {{.InviterName}}     => Name of the person who invited them
+    {{.BrandName}}       => Name of the brand
+    {{.AcceptLink}}      => Link to accept the invitation and join the brand
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>You've Been Invited to Join a Brand on Trendly</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #3f51b5;
+        }
+
+        a.button {
+            background-color: #3f51b5;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>👋 You've Been Invited to Join {{.BrandName}}</h2>
+
+        <p>Hi <strong>{{.RecipientName}}</strong>,</p>
+
+        <p><strong>{{.InviterName}}</strong> has invited you to join the brand <strong>{{.BrandName}}</strong> on
+            Trendly to collaborate on influencer campaigns.</p>
+
+        <p>Click the button below to accept the invitation and start collaborating with your team:</p>
+
+        <a href="{{.AcceptLink}}" class="button">Accept Invitation</a>
+
+        <div class="footer">
+            You're receiving this email because someone added your email to their brand on Trendly.<br />
+            If this wasn't you, you can safely ignore this email.
+        </div>
+    </div>
+</body>
+
+</html>
