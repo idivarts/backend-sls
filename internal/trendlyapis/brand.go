@@ -14,11 +14,13 @@ import (
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 )
 
 type IBrandMember struct {
-	BrandID string `json:"brandId" binding:"required"`
-	Email   string `json:"email" binding:"required"`
+	BrandID string  `json:"brandId" binding:"required"`
+	Email   string  `json:"email" binding:"required"`
+	Name    *string `json:"name"`
 }
 
 func CreateBrandMember(c *gin.Context) {
@@ -45,10 +47,13 @@ func CreateBrandMember(c *gin.Context) {
 
 	if err != nil {
 		userToCreate := (&auth.UserToCreate{}).Email(req.Email).EmailVerified(false)
+		if req.Name != nil {
+			userToCreate = userToCreate.DisplayName(*req.Name)
+		}
 
 		userRecord, err = fauth.Client.CreateUser(context.Background(), userToCreate)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error creating User Record"})
 			return
 		}
 	}
@@ -60,8 +65,34 @@ func CreateBrandMember(c *gin.Context) {
 	}
 	_, err = bManager.Set(req.BrandID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to insert Brand Member"})
 		return
+	}
+
+	manager := trendlymodels.Manager{}
+	err = manager.Get(userRecord.UID)
+	if err != nil {
+		manager = trendlymodels.Manager{
+			Name:            myutil.DerefString(req.Name),
+			Email:           req.Email,
+			IsAdmin:         false,
+			IsChatConnected: false,
+			Settings: &trendlymodels.ManagerSettings{
+				Theme:             "light",
+				EmailNotification: true,
+				PushNotification:  true,
+			},
+			PushNotificationToken: trendlymodels.PushNotificationToken{
+				IOS:     []string{},
+				Android: []string{},
+				Web:     []string{},
+			},
+		}
+		_, err = manager.Insert(userRecord.UID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to insert Manager"})
+			return
+		}
 	}
 
 	// fauth.Client.EmailSignInLink()
