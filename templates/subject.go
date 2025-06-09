@@ -19,4 +19,5 @@ const (
 	SubjectPasswordReset              = "Reset your Trendly password"
 	SubjectPasswordChanged            = "Your Trendly password has been changed"
 	SubjectUnreadMessageReminder      = "You have unread messages on Trendly"
+	SubjectBrandEmailInvite           = "You have been invited on Trendly"
 )

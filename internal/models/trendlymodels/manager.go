@@ -3,6 +3,7 @@ package trendlymodels
 import (
 	"context"
 
+	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
@@ -34,4 +35,9 @@ func (u *Manager) Get(managerId string) error {
 		return err
 	}
 	return err
+}
+
+func (u *Manager) Insert(managerId string) (*firestore.WriteResult, error) {
+	wr, err := firestoredb.Client.Collection("managers").Doc(managerId).Set(context.Background(), u)
+	return wr, err
 }
