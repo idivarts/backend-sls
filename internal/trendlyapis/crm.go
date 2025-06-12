@@ -9,7 +9,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/myemail"
 )
 
-func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
+func updateContact(isManager bool, userObject map[string]interface{}) error {
 	jsonBody, err := json.Marshal(userObject)
 	if err != nil {
 		return err
