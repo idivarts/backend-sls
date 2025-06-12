@@ -8,20 +8,22 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/idivarts/backend-sls/pkg/myemail"
 )
 
-type ContactDetails struct {
-	Email             string
-	Name              string // Will be split into First and Last name
-	Phone             string
-	IsManager         bool   // user_type
-	CompanyName       string //company
-	ProfileCompletion int    // profile_completion
-	CreationTime      *int64
-	LastActivityTime  *int64
-}
+// type ContactDetails struct {
+// 	Email             string
+// 	Name              string // Will be split into First and Last name
+// 	Phone             string
+// 	IsManager         bool   // user_type
+// 	CompanyName       string //company
+// 	ProfileCompletion int    // profile_completion
+// 	CreationTime      *int64
+// 	LastActivityTime  *int64
+// }
 
-func CreateOrUpdateContacts(contacts []ContactDetails) error {
+func CreateOrUpdateContacts(contacts []myemail.ContactDetails) error {
 	accessToken := apiKey
 
 	if len(contacts) == 0 {
