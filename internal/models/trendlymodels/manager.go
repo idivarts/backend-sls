@@ -23,6 +23,13 @@ type Manager struct {
 	ProfileImage          string                `json:"profileImage,omitempty" firestore:"profileImage,omitempty"`
 	Settings              *ManagerSettings      `json:"settings,omitempty" firestore:"settings,omitempty"`
 	PushNotificationToken PushNotificationToken `json:"pushNotificationToken" firestore:"pushNotificationToken"`
+
+	Moderations struct {
+		BlockedInfluencers  []string `json:"blockedInfluencers,omitempty" firestore:"blockedInfluencers,omitempty"`
+		ReportedInfluencers []string `json:"reportedInfluencers,omitempty" firestore:"reportedInfluencers,omitempty"`
+	} `json:"moderations,omitempty" firestore:"moderations,omitempty"`
+
+	CreationTime int64 `json:"creationTime" firestore:"creationTime"`
 }
 
 func (u *Manager) Get(managerId string) error {

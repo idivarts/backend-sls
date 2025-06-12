@@ -22,9 +22,9 @@ var (
 )
 
 func init() {
-	// senderName = "Trendly Support"
-	// senderEmail = "no-reply@idiv.in"
-	// os.Setenv("SENDGRID_API_KEY", "U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v")
+	senderName = "Trendly Support"
+	senderEmail = "no-reply@idiv.in"
+	os.Setenv("SENDGRID_API_KEY", "U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v")
 
 	base64key := os.Getenv("SENDGRID_API_KEY")
 	// Decode the string
