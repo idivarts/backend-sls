@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/hubspot"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 )
 
@@ -39,6 +40,7 @@ func updateContact(isManager bool, userObject map[string]interface{}) error {
 				LastActivityTime:  aws.Int64(time.Now().UnixMilli()),
 				CreationTime:      user.CreationTime,
 			}}
+			go hubspot.CreateOrUpdateContacts(contacts)
 			err := myemail.CreateOrUpdateContacts(contacts)
 			if err != nil {
 				return err
@@ -61,6 +63,7 @@ func updateContact(isManager bool, userObject map[string]interface{}) error {
 			CreationTime:     aws.Int64(manager.CreationTime),
 		}}
 
+		go hubspot.CreateOrUpdateContacts(contacts)
 		err := myemail.CreateOrUpdateContacts(contacts)
 		if err != nil {
 			return err
