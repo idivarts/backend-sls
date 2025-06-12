@@ -10,7 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/myemail"
 )
 
-func updateContact(isManager bool, userObject map[string]interface{}) error {
+func updateContact(isManager bool, userId string, userObject map[string]interface{}) error {
 	jsonBody, err := json.Marshal(userObject)
 	if err != nil {
 		return err
@@ -53,18 +53,24 @@ func updateContact(isManager bool, userObject map[string]interface{}) error {
 			return err
 		}
 
+		brand, _ := trendlymodels.GetMyFirstBrand(userId)
+		brandName := ""
+		if brand != nil {
+			brandName = brand.Name
+		}
+
 		contacts := []myemail.ContactDetails{{
 			Email:            manager.Email,
 			Name:             manager.Name,
 			Phone:            manager.PhoneNumber,
 			IsManager:        true,
-			CompanyName:      "", // Currenly its difficult to fetch the company name
+			CompanyName:      brandName, // Currenly its difficult to fetch the company name
 			LastActivityTime: aws.Int64(time.Now().UnixMilli()),
 			CreationTime:     aws.Int64(manager.CreationTime),
 		}}
 
 		go hubspot.CreateOrUpdateContacts(contacts)
-		err := myemail.CreateOrUpdateContacts(contacts)
+		err = myemail.CreateOrUpdateContacts(contacts)
 		if err != nil {
 			return err
 		}

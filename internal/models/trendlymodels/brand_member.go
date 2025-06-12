@@ -58,7 +58,7 @@ func GetAllBrandMembers(brandID string) ([]BrandMember, error) {
 	return members, nil
 }
 
-func GetAllBrandFromManager(managerId string) ([]BrandMember, error) {
+func GetMyBrandMemberships(managerId string) ([]BrandMember, error) {
 	var members []BrandMember
 
 	iter := firestoredb.Client.CollectionGroup("members").Where("managerId", "==", managerId).Documents(context.Background())
@@ -82,4 +82,70 @@ func GetAllBrandFromManager(managerId string) ([]BrandMember, error) {
 	}
 
 	return members, nil
+}
+
+func GetMyBrands(managerId string) ([]Brand, error) {
+	var brands []Brand
+
+	brandIds := []string{}
+
+	iter := firestoredb.Client.CollectionGroup("members").Where("managerId", "==", managerId).Documents(context.Background())
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, err
+		}
+
+		brandId := doc.Ref.Parent.Parent.ID
+		brandIds = append(brandIds, brandId)
+	}
+
+	iter2 := firestoredb.Client.Collection("brands").Where(firestore.DocumentID, "in", brandIds).Documents(context.Background())
+	defer iter2.Stop()
+	for {
+		doc, err := iter2.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, err
+		}
+
+		var brand Brand
+		if err := doc.DataTo(&brand); err != nil {
+			return nil, err
+		}
+
+		brands = append(brands, brand)
+	}
+
+	return brands, nil
+}
+
+func GetMyFirstBrand(managerId string) (*Brand, error) {
+	var brand Brand
+
+	iter := firestoredb.Client.CollectionGroup("members").Where("managerId", "==", managerId).Limit(1).Documents(context.Background())
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err != nil {
+		return nil, err
+	}
+	brandId := doc.Ref.Parent.Parent.ID
+
+	doc, err = firestoredb.Client.Collection("brands").Doc(brandId).Get(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := doc.DataTo(&brand); err != nil {
+		return nil, err
+	}
+	return &brand, nil
 }
