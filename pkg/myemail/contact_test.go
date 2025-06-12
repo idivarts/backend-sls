@@ -32,3 +32,11 @@ func TestGetData(t *testing.T) {
 	}
 	t.Log("Success", len(contact), "contacts found")
 }
+
+func TestGetJobStatus(t *testing.T) {
+	status, err := myemail.GetJobStatus("08a60b99-816f-4f93-aea5-c9dc33c54649")
+	if err != nil {
+		t.Error(err.Error())
+	}
+	t.Log("Job Status:", status)
+}

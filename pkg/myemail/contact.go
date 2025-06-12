@@ -99,8 +99,16 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("error: %s", resp.Status)
 	}
+	var response struct {
+		JobID string `json:"job_id"`
+	}
 
-	log.Printf("SendGrid contact upload response status: %s\n", resp.Status)
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		log.Printf("Error decoding response: %v\n", err)
+		return err
+	}
+
+	log.Printf("SendGrid contact upload job ID and status: %s | %s\n", response.JobID, resp.Status)
 	return nil
 }
 
@@ -174,6 +182,52 @@ func FetchContacts() ([]ContactDetails, error) {
 	log.Printf("Fetched %d contacts from SendGrid\n", len(contacts))
 
 	return contacts, nil
+}
+
+func GetJobStatus(jobID string) (string, error) {
+	sendgridAPIKey := apiKey // Set this to your SendGrid API key
+
+	if jobID == "" {
+		return "", errors.New("jobID cannot be empty")
+	}
+
+	url := fmt.Sprintf("https://api.sendgrid.com/v3/marketing/contacts/imports/%s", jobID)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("Error creating HTTP request: %v\n", err)
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sendgridAPIKey))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error making request to SendGrid: %v\n", err)
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("error: %s", resp.Status)
+	}
+
+	var response map[string]interface{}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		log.Printf("Error decoding response: %v\n", err)
+		return "", err
+	}
+
+	formattedResponse, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		log.Printf("Error formatting response: %v\n", err)
+		return "", err
+	}
+	log.Printf("Formatted response: %s\n", string(formattedResponse))
+
+	log.Printf("Job ID %s status: %s\n", jobID, response["status"])
+	return response["status"].(string), nil
 }
 
 // Helper to split name into first and last
