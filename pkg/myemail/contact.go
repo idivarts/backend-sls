@@ -104,6 +104,78 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 	return nil
 }
 
+func FetchContacts() ([]ContactDetails, error) {
+	sendgridAPIKey := apiKey // Set this to your SendGrid API key
+
+	url := "https://api.sendgrid.com/v3/marketing/contacts"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("Error creating HTTP request: %v\n", err)
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sendgridAPIKey))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error making request to SendGrid: %v\n", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("error: %s", resp.Status)
+	}
+
+	var response struct {
+		Result []struct {
+			Email        string                 `json:"email"`
+			FirstName    string                 `json:"first_name"`
+			LastName     string                 `json:"last_name"`
+			PhoneNumber  string                 `json:"phone_number"`
+			CustomFields map[string]interface{} `json:"custom_fields"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		log.Printf("Error decoding response: %v\n", err)
+		return nil, err
+	}
+
+	var contacts []ContactDetails
+	for _, res := range response.Result {
+		contact := ContactDetails{
+			Email: res.Email,
+			Name:  fmt.Sprintf("%s %s", res.FirstName, res.LastName),
+			Phone: res.PhoneNumber,
+		}
+
+		if userType, ok := res.CustomFields["user_type"].(float64); ok {
+			contact.IsManager = userType == 1
+		}
+		if company, ok := res.CustomFields["company"].(string); ok {
+			contact.CompanyName = company
+		}
+		if profileCompletion, ok := res.CustomFields["profile_completion"].(float64); ok {
+			contact.ProfileCompletion = int(profileCompletion)
+		}
+		if creationTime, ok := res.CustomFields["creation_time"].(float64); ok {
+			creationTimeInt := int64(creationTime)
+			contact.CreationTime = &creationTimeInt
+		}
+		if lastUseTime, ok := res.CustomFields["last_use_time"].(float64); ok {
+			lastUseTimeInt := int64(lastUseTime)
+			contact.LastActivityTime = &lastUseTimeInt
+		}
+
+		contacts = append(contacts, contact)
+	}
+	log.Printf("Fetched %d contacts from SendGrid\n", len(contacts))
+
+	return contacts, nil
+}
+
 // Helper to split name into first and last
 func splitName(fullName string) []string {
 	parts := strings.Split(fullName, " ")

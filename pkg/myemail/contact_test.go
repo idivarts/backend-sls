@@ -24,3 +24,11 @@ func TestDataPush(t *testing.T) {
 	}
 	t.Log("Success")
 }
+
+func TestGetData(t *testing.T) {
+	contact, err := myemail.FetchContacts()
+	if err != nil {
+		t.Error(err.Error())
+	}
+	t.Log("Success", len(contact), "contacts found")
+}
