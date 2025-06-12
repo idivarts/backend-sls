@@ -34,7 +34,7 @@ func TestGetData(t *testing.T) {
 }
 
 func TestGetJobStatus(t *testing.T) {
-	status, err := myemail.GetJobStatus("08a60b99-816f-4f93-aea5-c9dc33c54649")
+	status, err := myemail.GetJobStatus("dfa71a35-a149-4f9d-890b-b1dfc9251f49")
 	if err != nil {
 		t.Error(err.Error())
 	}

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type ContactDetails struct {
@@ -58,11 +59,17 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 		if contact.ProfileCompletion > 0 {
 			customFields["profile_completion"] = contact.ProfileCompletion
 		}
-		if contact.CreationTime != nil {
-			customFields["creation_time"] = *contact.CreationTime
-		}
-		if contact.LastActivityTime != nil {
-			customFields["last_use_time"] = *contact.LastActivityTime
+		if loc, err := time.LoadLocation("Asia/Kolkata"); err == nil {
+			if contact.CreationTime != nil {
+				t := time.UnixMilli(*contact.CreationTime).In(loc)
+				customFields["creation_time"] = t.Format(time.RFC3339)
+			}
+			if contact.LastActivityTime != nil {
+				t := time.UnixMilli(*contact.LastActivityTime).In(loc)
+				customFields["last_use_time"] = t.Format(time.RFC3339)
+			}
+		} else {
+			log.Printf("Error loading IST timezone: %v", err)
 		}
 		contactPayload["custom_fields"] = customFields
 
