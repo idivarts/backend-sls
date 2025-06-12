@@ -6,10 +6,10 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/hubspot"
+	"github.com/idivarts/backend-sls/pkg/myemail"
 )
 
-func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
+func updateContact(isManager bool, userObject map[string]interface{}) error {
 	jsonBody, err := json.Marshal(userObject)
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
 			if user.Profile != nil {
 				pCent = *user.Profile.CompletionPercentage
 			}
-			contacts := []hubspot.ContactDetails{{
+			contacts := []myemail.ContactDetails{{
 				Email:             *user.Email,
 				Name:              user.Name,
 				Phone:             phone,
@@ -39,7 +39,7 @@ func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
 				LastActivityTime:  aws.Int64(time.Now().UnixMilli()),
 				CreationTime:      user.CreationTime,
 			}}
-			err := hubspot.CreateOrUpdateContacts(contacts)
+			err := myemail.CreateOrUpdateContacts(contacts)
 			if err != nil {
 				return err
 			}
@@ -51,16 +51,17 @@ func updateHubSpot(isManager bool, userObject map[string]interface{}) error {
 			return err
 		}
 
-		contacts := []hubspot.ContactDetails{{
+		contacts := []myemail.ContactDetails{{
 			Email:            manager.Email,
 			Name:             manager.Name,
 			Phone:            manager.PhoneNumber,
 			IsManager:        true,
 			CompanyName:      "", // Currenly its difficult to fetch the company name
 			LastActivityTime: aws.Int64(time.Now().UnixMilli()),
+			CreationTime:     aws.Int64(manager.CreationTime),
 		}}
 
-		err := hubspot.CreateOrUpdateContacts(contacts)
+		err := myemail.CreateOrUpdateContacts(contacts)
 		if err != nil {
 			return err
 		}
