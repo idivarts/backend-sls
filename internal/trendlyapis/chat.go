@@ -105,7 +105,7 @@ func ChatAuth(c *gin.Context) {
 		}
 	}
 
-	updateContact(isManager, userObject)
+	updateContact(isManager, userId, userObject)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Chat Authentication successful"})
 }
@@ -123,7 +123,7 @@ func ChatConnect(c *gin.Context) {
 		isManager = true
 	}
 
-	updateContact(isManager, userObject)
+	updateContact(isManager, userId, userObject)
 
 	if userObject["isChatConnected"] != true {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Chat not connected"})

@@ -126,3 +126,26 @@ func GetMyBrands(managerId string) ([]Brand, error) {
 
 	return brands, nil
 }
+
+func GetMyFirstBrand(managerId string) (*Brand, error) {
+	var brand Brand
+
+	iter := firestoredb.Client.CollectionGroup("members").Where("managerId", "==", managerId).Limit(1).Documents(context.Background())
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err != nil {
+		return nil, err
+	}
+	brandId := doc.Ref.Parent.Parent.ID
+
+	doc, err = firestoredb.Client.Collection("brands").Doc(brandId).Get(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := doc.DataTo(&brand); err != nil {
+		return nil, err
+	}
+	return &brand, nil
+}
