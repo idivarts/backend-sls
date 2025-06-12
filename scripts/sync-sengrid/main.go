@@ -35,6 +35,11 @@ func syncManagers() {
 		if err != nil {
 			panic(err.Error())
 		}
+		brand, _ := trendlymodels.GetMyFirstBrand(doc.Ref.ID)
+		brandName := ""
+		if brand != nil {
+			brandName = brand.Name
+		}
 
 		if manager.Email != "" {
 			if manager.CreationTime == 0 {
@@ -45,6 +50,7 @@ func syncManagers() {
 				Name:         manager.Name,
 				IsManager:    true,
 				CreationTime: &manager.CreationTime,
+				CompanyName:  brandName,
 				// Phone:             phone,
 				// ProfileCompletion: pCent,
 				// LastActivityTime:  manager.LastUseTime,
