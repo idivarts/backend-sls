@@ -17,11 +17,17 @@ type InstagramBriefProfile struct {
 
 type InstagramProfile struct {
 	InstagramBriefProfile
-	ProfilePictureURL string `json:"profile_picture_url" firestore:"profile_picture_url"`
-	FollowersCount    int    `json:"followers_count" firestore:"followers_count"`
-	FollowsCount      int    `json:"follows_count" firestore:"follows_count"`
-	MediaCount        int    `json:"media_count" firestore:"media_count"`
-	Website           string `json:"website" firestore:"website"`
+	ProfilePictureURL string             `json:"profile_picture_url" firestore:"profile_picture_url"`
+	FollowersCount    int                `json:"followers_count" firestore:"followers_count"`
+	FollowsCount      int                `json:"follows_count" firestore:"follows_count"`
+	MediaCount        int                `json:"media_count" firestore:"media_count"`
+	Website           string             `json:"website" firestore:"website"`
+	ApproxMetrics     InstaApproxMetrics `json:"approxMetrics" firestore:"approxMetrics"`
+}
+type InstaApproxMetrics struct {
+	Views        string `json:"views" firestore:"views"`
+	Interactions string `json:"interactions" firestore:"interactions"`
+	Followers    string `json:"followers" firestore:"followers"`
 }
 
 func GetInstagramInBrief(instagramId string, accessToken string) (*InstagramBriefProfile, error) {
