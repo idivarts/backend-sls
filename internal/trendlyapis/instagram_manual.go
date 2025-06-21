@@ -15,6 +15,11 @@ type IInstagramManualReq struct {
 	Handle         string `json:"handle"`
 	ProfileImage   string `json:"profileImage"`
 	DashboardImage string `json:"dashboardImage"`
+
+	SocialID            *string `json:"socialId"`
+	FollowerRange       string  `json:"followerRange"`
+	MonthlyViews        string  `json:"monthlyViews"`
+	MonthlyInteractions string  `json:"monthlyInteractions"`
 }
 
 func ConnectInstagramManual(ctx *gin.Context) {
@@ -32,6 +37,9 @@ func ConnectInstagramManual(ctx *gin.Context) {
 
 	// Generate a random social ID
 	socialId := uuid.NewString()
+	if req.SocialID != nil {
+		socialId = *req.SocialID
+	}
 
 	user := trendlymodels.User{}
 	err := user.Get(userId)
@@ -61,6 +69,11 @@ func ConnectInstagramManual(ctx *gin.Context) {
 			FollowsCount:      0,
 			MediaCount:        0,
 			Website:           "",
+			ApproxMetrics: messenger.InstaApproxMetrics{
+				Views:        req.MonthlyViews,
+				Interactions: req.MonthlyInteractions,
+				Followers:    req.FollowerRange,
+			},
 		},
 		FBProfile: nil,
 		SocialScreenShots: []string{
