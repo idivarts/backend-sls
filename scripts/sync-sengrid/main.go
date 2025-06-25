@@ -73,6 +73,7 @@ func syncUsers() {
 	iter := firestoredb.Client.Collection("users").Documents(context.Background())
 	defer iter.Stop()
 
+	incompleteProfiles := 0
 	contacts := []myemail.ContactDetails{}
 	for {
 		doc, err := iter.Next()
@@ -107,9 +108,12 @@ func syncUsers() {
 				CreationTime:      user.CreationTime,
 				LastActivityTime:  user.LastUseTime,
 			})
+			if pCent < 60 {
+				incompleteProfiles++
+			}
 		}
 	}
-	log.Println("Got all docs", len(contacts))
+	log.Println("Got all docs", len(contacts), incompleteProfiles, ":", len(contacts)-incompleteProfiles)
 	for i := 0; i < len(contacts); i += 100 {
 		err := myemail.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
 		if err != nil {
