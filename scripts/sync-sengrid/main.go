@@ -31,6 +31,10 @@ func syncManagers() {
 			}
 			panic(err.Error())
 		}
+		if time.Since(doc.UpdateTime) > 48*time.Hour {
+			continue
+		}
+
 		log.Println("Creating Doc")
 		manager := &trendlymodels.Manager{}
 		err = doc.DataTo(manager)
@@ -83,6 +87,10 @@ func syncUsers() {
 			}
 			panic(err.Error())
 		}
+		if time.Since(doc.UpdateTime) > 48*time.Hour {
+			continue
+		}
+
 		log.Println("Creating Doc")
 		user := &trendlymodels.User{}
 		err = doc.DataTo(user)
