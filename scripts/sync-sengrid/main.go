@@ -12,7 +12,9 @@ import (
 )
 
 func main() {
+	log.Println("Syncing Users")
 	syncUsers()
+	log.Println("Syncing Managers")
 	syncManagers()
 	log.Println("Sync Completed")
 }
