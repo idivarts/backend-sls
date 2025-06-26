@@ -30,7 +30,7 @@ func SyncUsers(iterative bool) error {
 			continue
 		}
 
-		log.Println("Creating Doc")
+		log.Println("Creating Doc", doc.Ref.ID)
 		user := &trendlymodels.User{}
 		err = doc.DataTo(user)
 		if err != nil {
@@ -116,6 +116,25 @@ func SyncUsers(iterative bool) error {
 			data[len(data)-1].CollaborationType = collabType
 		}
 	}
+
+	log.Println("Deleting", len(data))
+	query, err := trendlybq.BQInfluencers{}.DeleteMultipleSQL(INFLUENCER_TABLE, data)
+	if err != nil {
+		log.Fatalf("Failed to create query: %v", err)
+		return err
+	}
+	deleteJob, err := query.Run(context.Background())
+	status, err := deleteJob.Wait(context.Background())
+	if err != nil {
+		log.Fatalf("Error while waiting for delete job to finish: %v", err)
+		return err
+	}
+	if status.Err() != nil {
+		log.Fatalf("Delete job failed: %v", status.Err())
+		return status.Err()
+	}
+
+	log.Println("Deletion Completed", len(data))
 
 	batchSize := 100
 	for i := 0; i < len(data); i += batchSize {

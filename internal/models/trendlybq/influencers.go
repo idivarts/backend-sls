@@ -56,6 +56,18 @@ func (data BQInfluencers) GetInsertSQL(table string) (*bigquery.Query, error) {
 
 	return query, nil
 }
+func (_ BQInfluencers) DeleteMultipleSQL(table string, data []BQInfluencers) (*bigquery.Query, error) {
+	sql := "DELETE FROM `" + table + "` WHERE id IN UNNEST(@ids)"
+
+	parameters := []bigquery.QueryParameter{
+		{Name: "ids", Value: extractIDs(data)},
+	}
+	query := myquery.Client.Query(sql)
+	query.Parameters = parameters
+
+	return query, nil
+}
+
 func (_ BQInfluencers) GetInsertMultipleSQL(table string, data []BQInfluencers) (*bigquery.Query, error) {
 	sql := "INSERT INTO `" + table + "` (categories, collaboration_type, completion_percentage, follower_count, id, interaction_count, languages, location, post_type, preferred_brand_industries, primary_social, reach_count, social_type) VALUES "
 
@@ -91,6 +103,14 @@ func (_ BQInfluencers) GetInsertMultipleSQL(table string, data []BQInfluencers) 
 	query.Parameters = parameters
 
 	return query, nil
+}
+
+func extractIDs(data []BQInfluencers) []string {
+	ids := []string{}
+	for _, d := range data {
+		ids = append(ids, d.ID)
+	}
+	return ids
 }
 
 // -------- USER LISTING
