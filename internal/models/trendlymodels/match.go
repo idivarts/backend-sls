@@ -1,6 +1,11 @@
 package trendlymodels
 
-import "github.com/doug-martin/goqu/v9"
+import (
+	"fmt"
+
+	"cloud.google.com/go/bigquery"
+	"github.com/idivarts/backend-sls/pkg/myquery"
+)
 
 type BQInfluencers struct {
 	ID string `db:"id" bigquery:"id"`
@@ -28,24 +33,64 @@ type BQInfluencerViews struct {
 	Time         int64  `db:"time" bigquery:"time"`
 }
 
-func (data BQInfluencers) GetInsertSQL(table string) (*string, error) {
-	ds := goqu.Insert(table).Rows(data)
-	sql, _, err := ds.ToSQL()
-	if err != nil {
-		return nil, err
+func (data BQInfluencers) GetInsertSQL(table string) (*bigquery.Query, error) {
+	sql := "INSERT INTO `" + table + "` (categories, collaboration_type, completion_percentage, follower_count, id, interaction_count, languages, location, post_type, preferred_brand_industries, primary_social, reach_count, social_type) VALUES (@categories, @collaboration_type, @completion_percentage, @follower_count, @id, @interaction_count, @languages, @location, @post_type, @preferred_brand_industries, @primary_social, @reach_count, @social_type)"
+
+	query := myquery.Client.Query(sql)
+
+	query.Parameters = []bigquery.QueryParameter{
+		{Name: "categories", Value: data.Categories},
+		{Name: "collaboration_type", Value: data.CollaborationType},
+		{Name: "completion_percentage", Value: data.CompletionPercentage},
+		{Name: "follower_count", Value: data.FollowerCount},
+		{Name: "id", Value: data.ID},
+		{Name: "interaction_count", Value: data.InteractionCount},
+		{Name: "languages", Value: data.Languages},
+		{Name: "location", Value: data.Location},
+		{Name: "post_type", Value: data.PostType},
+		{Name: "preferred_brand_industries", Value: data.PreferredBrandIndustries},
+		{Name: "primary_social", Value: data.PrimarySocial},
+		{Name: "reach_count", Value: data.ReachCount},
+		{Name: "social_type", Value: data.SocialType},
 	}
 
-	return &sql, err
+	return query, nil
 }
+func (_ BQInfluencers) GetInsertMultipleSQL(table string, data []BQInfluencers) (*bigquery.Query, error) {
+	sql := "INSERT INTO `" + table + "` (categories, collaboration_type, completion_percentage, follower_count, id, interaction_count, languages, location, post_type, preferred_brand_industries, primary_social, reach_count, social_type) VALUES "
 
-func GetMultipleInsertSQL(table string, data []interface{}) (*string, error) {
-	ds := goqu.Insert(table).Rows(data...)
-	sql, _, err := ds.ToSQL()
-	if err != nil {
-		return nil, err
+	parameters := []bigquery.QueryParameter{}
+	valuePlaceholders := ""
+
+	for index, d := range data {
+		if index > 0 {
+			valuePlaceholders += ", "
+		}
+		valuePlaceholders += fmt.Sprintf("(@categories_%d, @collaboration_type_%d, @completion_percentage_%d, @follower_count_%d, @id_%d, @interaction_count_%d, @languages_%d, @location_%d, @post_type_%d, @preferred_brand_industries_%d, @primary_social_%d, @reach_count_%d, @social_type_%d)", index, index, index, index, index, index, index, index, index, index, index, index, index)
+
+		parameters = append(parameters,
+			bigquery.QueryParameter{Name: fmt.Sprintf("categories_%d", index), Value: d.Categories},
+			bigquery.QueryParameter{Name: fmt.Sprintf("collaboration_type_%d", index), Value: d.CollaborationType},
+			bigquery.QueryParameter{Name: fmt.Sprintf("completion_percentage_%d", index), Value: d.CompletionPercentage},
+			bigquery.QueryParameter{Name: fmt.Sprintf("follower_count_%d", index), Value: d.FollowerCount},
+			bigquery.QueryParameter{Name: fmt.Sprintf("id_%d", index), Value: d.ID},
+			bigquery.QueryParameter{Name: fmt.Sprintf("interaction_count_%d", index), Value: d.InteractionCount},
+			bigquery.QueryParameter{Name: fmt.Sprintf("languages_%d", index), Value: d.Languages},
+			bigquery.QueryParameter{Name: fmt.Sprintf("location_%d", index), Value: d.Location},
+			bigquery.QueryParameter{Name: fmt.Sprintf("post_type_%d", index), Value: d.PostType},
+			bigquery.QueryParameter{Name: fmt.Sprintf("preferred_brand_industries_%d", index), Value: d.PreferredBrandIndustries},
+			bigquery.QueryParameter{Name: fmt.Sprintf("primary_social_%d", index), Value: d.PrimarySocial},
+			bigquery.QueryParameter{Name: fmt.Sprintf("reach_count_%d", index), Value: d.ReachCount},
+			bigquery.QueryParameter{Name: fmt.Sprintf("social_type_%d", index), Value: d.SocialType},
+		)
 	}
 
-	return &sql, err
+	sql += valuePlaceholders
+
+	query := myquery.Client.Query(sql)
+	query.Parameters = parameters
+
+	return query, nil
 }
 
 // -------- USER LISTING
