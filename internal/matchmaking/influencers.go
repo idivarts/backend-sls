@@ -13,7 +13,7 @@ import (
 )
 
 type IBrandMember struct {
-	BrandID string `json:"brandId" binding:"required"`
+	BrandID string `form:"brandId" binding:"required"`
 }
 
 const (
@@ -27,7 +27,7 @@ const (
 
 func GetInfluencers(c *gin.Context) {
 	var req IBrandMember
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Input is incorrect"})
 		return
 	}
