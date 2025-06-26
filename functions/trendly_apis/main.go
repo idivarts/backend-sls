@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/idivarts/backend-sls/internal/matchmaking"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
 	trendlyCollabs "github.com/idivarts/backend-sls/internal/trendlyapis/collaborations"
@@ -41,6 +42,9 @@ func main() {
 
 	commonV1.DELETE("/users/deactivate", trendlyapis.DeativateUser)
 	commonV1.DELETE("/users/delete", trendlyapis.DeleteUser)
+
+	// Managers Explore influencer api
+	managerApisV1.GET("/influencers", matchmaking.GetInfluencers)
 
 	apihandler.StartLambda()
 }
