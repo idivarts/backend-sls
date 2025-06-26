@@ -97,6 +97,18 @@ functions:
       - schedule:
           rate: cron(0 12 * * ? *)  # Runs every day at 12:00 PM UTC
           enabled: true
+  matchmaking:
+    handler: scripts/matchmaking/main.go
+    package:
+      include:
+        - 'service-account.json'
+    timeout: 1000
+    events:
+      - schedule:
+          rate:
+            - cron(30 2 * * ? *)   # 8:00 AM IST daily
+            - cron(30 14 * * ? *)  # 8:00 PM IST daily
+          enabled: true
   trendly_apis:
     handler: functions/trendly_apis/main.go
     package:
