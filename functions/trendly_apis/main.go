@@ -8,37 +8,39 @@ import (
 )
 
 func main() {
-	apiV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware())
+	userApisV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("users"))
+	managerApisV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
+	commonV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("common"))
 
-	apiV1.POST("/socials/facebook", trendlyapis.FacebookLogin)
-	apiV1.POST("/socials/instagram", trendlyapis.ConnectInstagram)
-	apiV1.POST("/socials/instagram/manual", trendlyapis.ConnectInstagramManual)
+	userApisV1.POST("/socials/facebook", trendlyapis.FacebookLogin)
+	userApisV1.POST("/socials/instagram", trendlyapis.ConnectInstagram)
+	userApisV1.POST("/socials/instagram/manual", trendlyapis.ConnectInstagramManual)
 
 	// Calculate Insights
-	apiV1.POST("/socials/insights", trendlyapis.FetchInsights)
+	userApisV1.POST("/socials/insights", trendlyapis.FetchInsights)
 
 	// Get Social Medias
-	apiV1.GET("/socials/medias", trendlyapis.FetchMedias)
+	userApisV1.GET("/socials/medias", trendlyapis.FetchMedias)
 
-	apiV1.POST("/chat/auth", trendlyapis.ChatAuth)
-	apiV1.POST("/chat/connect", trendlyapis.ChatConnect)
-	apiV1.POST("/chat/channel", trendlyapis.ChatChannel)
-	apiV1.POST("/chat/notification", trendlyapis.Notify)
+	commonV1.POST("/chat/auth", trendlyapis.ChatAuth)
+	commonV1.POST("/chat/connect", trendlyapis.ChatConnect)
+	commonV1.POST("/chat/channel", trendlyapis.ChatChannel)
+	// userApisV1.POST("/chat/notification", trendlyapis.Notify)
 
-	apiV1.POST("/brands/members", trendlyapis.CreateBrandMember)
+	managerApisV1.POST("/brands/members", trendlyapis.CreateBrandMember)
 
-	apiV1.POST("/collaborations/:collabId/invitations/:userId", trendlyCollabs.SendInvitation)
-	apiV1.POST("/collaborations/:collabId/applications/:userId", trendlyCollabs.SendApplication)
-	apiV1.PUT("/collaborations/:collabId/applications/:userId", trendlyCollabs.EditApplication)
+	managerApisV1.POST("/collaborations/:collabId/invitations/:userId", trendlyCollabs.SendInvitation)
+	userApisV1.POST("/collaborations/:collabId/applications/:userId", trendlyCollabs.SendApplication)
+	userApisV1.PUT("/collaborations/:collabId/applications/:userId", trendlyCollabs.EditApplication)
 
-	apiV1.POST("/collaborations/:collabId/applications/:userId/:action", trendlyCollabs.ApplicationAction) // accept|reject|revise
+	managerApisV1.POST("/collaborations/:collabId/applications/:userId/:action", trendlyCollabs.ApplicationAction) // accept|reject|revise
 
-	apiV1.POST("/contracts/:contractId", trendlyCollabs.StartContract)   // if called by influencer - ask, else start the contract
-	apiV1.POST("/contracts/:contractId/end", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
-	apiV1.POST("/contracts/:contractId/feedback", trendlyCollabs.GiveContractFeedback)
+	commonV1.POST("/contracts/:contractId", trendlyCollabs.StartContract)   // if called by influencer - ask, else start the contract
+	commonV1.POST("/contracts/:contractId/end", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
+	userApisV1.POST("/contracts/:contractId/feedback", trendlyCollabs.GiveContractFeedback)
 
-	apiV1.DELETE("/users/deactivate", trendlyapis.DeativateUser)
-	apiV1.DELETE("/users/delete", trendlyapis.DeleteUser)
+	commonV1.DELETE("/users/deactivate", trendlyapis.DeativateUser)
+	commonV1.DELETE("/users/delete", trendlyapis.DeleteUser)
 
 	apihandler.StartLambda()
 }
