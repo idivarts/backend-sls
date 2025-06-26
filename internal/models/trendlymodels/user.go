@@ -59,8 +59,8 @@ type UserAttachment struct {
 }
 
 type UserPreferences struct {
-	BudgetForPaidCollabs       []int    `json:"budgetForPaidCollabs,omitempty" firestore:"budgetForPaidCollabs,omitempty"`
-	ContentCategory            []string `json:"contentCategory,omitempty" firestore:"contentCategory,omitempty"`
+	BudgetForPaidCollabs []int `json:"budgetForPaidCollabs,omitempty" firestore:"budgetForPaidCollabs,omitempty"`
+	// ContentCategory            []string `json:"contentCategory,omitempty" firestore:"contentCategory,omitempty"`
 	ContentWillingToPost       []string `json:"contentWillingToPost,omitempty" firestore:"contentWillingToPost,omitempty"`
 	Goal                       *string  `json:"goal,omitempty" firestore:"goal,omitempty"`
 	MaximumMonthlyCollabs      []int    `json:"maximumMonthlyCollabs,omitempty" firestore:"maximumMonthlyCollabs,omitempty"`

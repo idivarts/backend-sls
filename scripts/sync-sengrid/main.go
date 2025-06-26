@@ -12,7 +12,9 @@ import (
 )
 
 func main() {
+	log.Println("Syncing Users")
 	syncUsers()
+	log.Println("Syncing Managers")
 	syncManagers()
 	log.Println("Sync Completed")
 }
@@ -29,6 +31,10 @@ func syncManagers() {
 			}
 			panic(err.Error())
 		}
+		if time.Since(doc.UpdateTime) > 48*time.Hour {
+			continue
+		}
+
 		log.Println("Creating Doc")
 		manager := &trendlymodels.Manager{}
 		err = doc.DataTo(manager)
@@ -71,6 +77,7 @@ func syncUsers() {
 	iter := firestoredb.Client.Collection("users").Documents(context.Background())
 	defer iter.Stop()
 
+	incompleteProfiles := 0
 	contacts := []myemail.ContactDetails{}
 	for {
 		doc, err := iter.Next()
@@ -80,6 +87,10 @@ func syncUsers() {
 			}
 			panic(err.Error())
 		}
+		if time.Since(doc.UpdateTime) > 48*time.Hour {
+			continue
+		}
+
 		log.Println("Creating Doc")
 		user := &trendlymodels.User{}
 		err = doc.DataTo(user)
@@ -105,9 +116,12 @@ func syncUsers() {
 				CreationTime:      user.CreationTime,
 				LastActivityTime:  user.LastUseTime,
 			})
+			if pCent < 60 {
+				incompleteProfiles++
+			}
 		}
 	}
-	log.Println("Got all docs", len(contacts))
+	log.Println("Got all docs", len(contacts), incompleteProfiles, ":", len(contacts)-incompleteProfiles)
 	for i := 0; i < len(contacts); i += 100 {
 		err := myemail.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
 		if err != nil {

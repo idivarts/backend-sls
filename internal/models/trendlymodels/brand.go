@@ -28,8 +28,14 @@ type BrandProfile struct {
 }
 
 type BrandPreferences struct {
-	PromotionType        []string `json:"promotionType,omitempty" firestore:"promotionType,omitempty"`
-	InfluencerCategories []string `json:"influencerCategories,omitempty" firestore:"influencerCategories,omitempty"`
+	PromotionType          []string `json:"promotionType,omitempty" firestore:"promotionType,omitempty"`
+	InfluencerCategories   []string `json:"influencerCategories,omitempty" firestore:"influencerCategories,omitempty"`
+	Languages              []string `json:"languages,omitempty" firestore:"languages,omitempty"`
+	Locations              []string `json:"locations,omitempty" firestore:"locations,omitempty"`
+	Platforms              []string `json:"platforms,omitempty" firestore:"platforms,omitempty"`
+	CollaborationPostTypes []string `json:"collaborationPostTypes,omitempty" firestore:"collaborationPostTypes,omitempty"`
+	TimeCommitments        []string `json:"timeCommitments,omitempty" firestore:"timeCommitments,omitempty"`
+	ContentVideoType       []string `json:"contentVideoType,omitempty" firestore:"contentVideoType,omitempty"`
 }
 
 type BrandBackend struct {

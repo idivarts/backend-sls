@@ -1,8 +1,14 @@
 package myutil
 
+import "strings"
+
 func DerefString(s *string) string {
 	if s != nil {
 		return *s
 	}
 	return ""
+}
+
+func ContainsIgnoreCase(base, search string) bool {
+	return strings.Contains(strings.ToLower(base), strings.ToLower(search))
 }
