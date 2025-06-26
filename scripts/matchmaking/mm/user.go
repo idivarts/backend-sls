@@ -26,7 +26,7 @@ func SyncUsers(iterative bool) error {
 			}
 			panic(err.Error())
 		}
-		if iterative && time.Since(doc.UpdateTime) > 28*time.Hour {
+		if iterative && time.Since(doc.UpdateTime) > 16*time.Hour {
 			continue
 		}
 
