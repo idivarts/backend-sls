@@ -20,7 +20,7 @@ func main() {
 	log.Println("Successful Connection")
 
 	log.Println("Syncing Users")
-	mm.SyncUsers(true)
+	mm.SyncUsers(false)
 
 	// log.Println("Syncing Brands")
 	// mm.SyncBrands(false)
