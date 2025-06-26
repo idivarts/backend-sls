@@ -1,4 +1,4 @@
-package trendlymodels
+package trendlybq
 
 import (
 	"fmt"

@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myutil"
@@ -16,7 +17,7 @@ func SyncUsers(iterative bool) error {
 	iter := firestoredb.Client.Collection("users").Documents(context.Background())
 	defer iter.Stop()
 
-	data := []trendlymodels.BQInfluencers{}
+	data := []trendlybq.BQInfluencers{}
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -37,7 +38,7 @@ func SyncUsers(iterative bool) error {
 		}
 
 		if user.Profile != nil {
-			data = append(data, trendlymodels.BQInfluencers{
+			data = append(data, trendlybq.BQInfluencers{
 				ID:                   doc.Ref.ID,
 				Location:             myutil.DerefString(user.Location),
 				Categories:           user.Profile.Category,
@@ -56,7 +57,7 @@ func SyncUsers(iterative bool) error {
 			data[len(data)-1].CollaborationType = []string{myutil.DerefString(user.Preferences.PreferredCollaborationType)}
 		}
 	}
-	query, err := trendlymodels.BQInfluencers{}.GetInsertMultipleSQL(INFLUENCER_TABLE, data)
+	query, err := trendlybq.BQInfluencers{}.GetInsertMultipleSQL(INFLUENCER_TABLE, data)
 
 	j, err := query.Run(context.Background())
 	if err != nil {
