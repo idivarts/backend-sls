@@ -31,6 +31,19 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 			if user.Profile != nil {
 				pCent = *user.Profile.CompletionPercentage
 			}
+			socialUrl := ""
+			if user.PrimarySocial != nil {
+				social := trendlymodels.Socials{}
+				err = social.Get(userId, *user.PrimarySocial)
+				if err != nil {
+					return err
+				}
+				if social.IsInstagram {
+					socialUrl = "https://www.instagram.com/" + social.InstaProfile.Username
+				} else {
+					socialUrl = "https://www.facebook.com/" + social.FBProfile.ID
+				}
+			}
 			contacts := []myemail.ContactDetails{{
 				Email:             *user.Email,
 				Name:              user.Name,
@@ -39,6 +52,7 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 				ProfileCompletion: pCent,
 				LastActivityTime:  aws.Int64(time.Now().UnixMilli()),
 				CreationTime:      user.CreationTime,
+				SocialLink:        socialUrl,
 			}}
 			go hubspot.CreateOrUpdateContacts(contacts)
 			err := myemail.CreateOrUpdateContacts(contacts)

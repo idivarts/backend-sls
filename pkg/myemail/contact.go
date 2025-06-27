@@ -17,6 +17,7 @@ type ContactDetails struct {
 	Phone             string
 	IsManager         bool   // custom: user_type
 	CompanyName       string // custom: company
+	SocialLink        string
 	ProfileCompletion int    // custom: profile_completion
 	CreationTime      *int64 // custom: creation_time
 	LastActivityTime  *int64 // custom: last_use_time
