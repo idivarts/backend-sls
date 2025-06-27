@@ -4,6 +4,7 @@ import (
 	"context"
 
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type Application struct {
@@ -15,7 +16,7 @@ type Application struct {
 	Quotation             int                         `json:"quotation" firestore:"quotation"`
 	AnswersFromInfluencer []InfluencerAnswer          `json:"answersFromInfluencer" firestore:"answersFromInfluencer"`
 	Timeline              int64                       `json:"timeline" firestore:"timeline"`
-	Attachments           []interface{}               `json:"attachments" firestore:"attachments"`
+	Attachments           []UserAttachment            `json:"attachments" firestore:"attachments"`
 	FileAttachments       []ApplicationFileAttachment `json:"fileAttachments" firestore:"fileAttachments"`
 }
 
@@ -41,4 +42,30 @@ func (b *Application) Get(collabID, userID string) error {
 		return err
 	}
 	return err
+}
+
+func GetAllApplications(collabID string) ([]Application, error) {
+	applications := []Application{}
+
+	iter := firestoredb.Client.Collection("collaborations").Doc(collabID).Collection("applications").Documents(context.Background())
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, err
+		}
+
+		application := Application{}
+		if err := doc.DataTo(&application); err != nil {
+			return nil, err
+		}
+
+		applications = append(applications, application)
+	}
+
+	return applications, nil
 }

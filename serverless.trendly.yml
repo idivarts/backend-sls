@@ -102,7 +102,7 @@ functions:
     package:
       include:
         - 'service-account.json'
-    timeout: 1000
+    timeout: 900
     events:
       - schedule:
           rate:
