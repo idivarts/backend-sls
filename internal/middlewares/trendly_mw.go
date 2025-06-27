@@ -43,13 +43,15 @@ func TrendlyMiddleware(model string) gin.HandlerFunc {
 		} else {
 			user, err := firestoredb.Client.Collection(model).Doc(userId).Get(context.Background())
 			if err != nil {
-				if model == "managers" {
-					c.Set("userType", "manager")
-					c.Set("manager", user.Data())
-				} else {
-					c.Set("userType", "user")
-					c.Set("user", user.Data())
-				}
+				c.JSON(http.StatusBadRequest, gin.H{"error": "User not found in User nor Manager Databse"})
+				return
+			}
+			if model == "managers" {
+				c.Set("userType", "manager")
+				c.Set("manager", user.Data())
+			} else {
+				c.Set("userType", "user")
+				c.Set("user", user.Data())
 			}
 		}
 
