@@ -17,6 +17,7 @@ type ContactDetails struct {
 	Phone             string
 	IsManager         bool   // custom: user_type
 	CompanyName       string // custom: company
+	SocialLink        string
 	ProfileCompletion int    // custom: profile_completion
 	CreationTime      *int64 // custom: creation_time
 	LastActivityTime  *int64 // custom: last_use_time
@@ -58,6 +59,9 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 		}
 		if contact.ProfileCompletion > 0 {
 			customFields["profile_completion"] = contact.ProfileCompletion
+		}
+		if contact.SocialLink != "" {
+			customFields["social_link"] = contact.SocialLink
 		}
 		if loc, err := time.LoadLocation("Asia/Kolkata"); err == nil {
 			if contact.CreationTime != nil {

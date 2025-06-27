@@ -104,6 +104,21 @@ func syncUsers() {
 			if user.PhoneNumber != nil {
 				phone = *user.PhoneNumber
 			}
+			socialUrl := ""
+			if user.PrimarySocial != nil {
+				social := trendlymodels.Socials{}
+				err = social.Get(doc.Ref.ID, *user.PrimarySocial)
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				if social.IsInstagram {
+					socialUrl = "https://www.instagram.com/" + social.InstaProfile.Username
+				} else {
+					socialUrl = "https://www.facebook.com/" + social.FBProfile.ID
+				}
+			}
+
 			if user.Profile != nil {
 				pCent = *user.Profile.CompletionPercentage
 			}
@@ -115,6 +130,7 @@ func syncUsers() {
 				ProfileCompletion: pCent,
 				CreationTime:      user.CreationTime,
 				LastActivityTime:  user.LastUseTime,
+				SocialLink:        socialUrl,
 			})
 			if pCent < 60 {
 				incompleteProfiles++
