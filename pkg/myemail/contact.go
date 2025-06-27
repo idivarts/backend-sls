@@ -60,6 +60,9 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 		if contact.ProfileCompletion > 0 {
 			customFields["profile_completion"] = contact.ProfileCompletion
 		}
+		if contact.SocialLink != "" {
+			customFields["social_link"] = contact.SocialLink
+		}
 		if loc, err := time.LoadLocation("Asia/Kolkata"); err == nil {
 			if contact.CreationTime != nil {
 				t := time.UnixMilli(*contact.CreationTime).In(loc)
