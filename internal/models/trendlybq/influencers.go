@@ -57,6 +57,7 @@ func (data BQInfluencers) GetInsertSQL(table string) (*bigquery.Query, error) {
 		{Name: "social_type", Value: data.SocialType},
 		{Name: "creation_time", Value: data.CreationTime},
 		{Name: "last_use_time", Value: data.LastUseTime},
+		{Name: "last_use_time", Value: data.LastUseTime},
 	}
 
 	return query, nil
@@ -83,7 +84,7 @@ func (_ BQInfluencers) GetInsertMultipleSQL(table string, data []BQInfluencers) 
 		if index > 0 {
 			valuePlaceholders += ", "
 		}
-		valuePlaceholders += fmt.Sprintf("(@categories_%d, @collaboration_type_%d, @completion_percentage_%d, @follower_count_%d, @id_%d, @interaction_count_%d, @languages_%d, @location_%d, @post_type_%d, @preferred_brand_industries_%d, @primary_social_%d, @reach_count_%d, @social_type_%d, @creation_time_%d, @last_use_time_%d)", index, index, index, index, index, index, index, index, index, index, index, index, index, index, index, index)
+		valuePlaceholders += fmt.Sprintf("(@categories_%d, @collaboration_type_%d, @completion_percentage_%d, @follower_count_%d, @id_%d, @interaction_count_%d, @languages_%d, @location_%d, @post_type_%d, @preferred_brand_industries_%d, @primary_social_%d, @reach_count_%d, @social_type_%d, @creation_time_%d, @last_use_time_%d)", index, index, index, index, index, index, index, index, index, index, index, index, index, index, index)
 
 		parameters = append(parameters,
 			bigquery.QueryParameter{Name: fmt.Sprintf("categories_%d", index), Value: d.Categories},
