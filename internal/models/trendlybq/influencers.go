@@ -25,6 +25,9 @@ type BQInfluencers struct {
 
 	PrimarySocial string `db:"primary_social" bigquery:"primary_social"`
 	SocialType    string `db:"social_type" bigquery:"social_type"`
+
+	CreationTime int64 `db:"creation_time" bigquery:"creation_time"`
+	LastUseTime  int64 `db:"last_use_time" bigquery:"last_use_time"`
 }
 
 type BQInfluencerViews struct {
@@ -34,7 +37,7 @@ type BQInfluencerViews struct {
 }
 
 func (data BQInfluencers) GetInsertSQL(table string) (*bigquery.Query, error) {
-	sql := "INSERT INTO `" + table + "` (categories, collaboration_type, completion_percentage, follower_count, id, interaction_count, languages, location, post_type, preferred_brand_industries, primary_social, reach_count, social_type) VALUES (@categories, @collaboration_type, @completion_percentage, @follower_count, @id, @interaction_count, @languages, @location, @post_type, @preferred_brand_industries, @primary_social, @reach_count, @social_type)"
+	sql := "INSERT INTO `" + table + "` (categories, collaboration_type, completion_percentage, follower_count, id, interaction_count, languages, location, post_type, preferred_brand_industries, primary_social, reach_count, social_type, creation_time, last_use_time) VALUES (@categories, @collaboration_type, @completion_percentage, @follower_count, @id, @interaction_count, @languages, @location, @post_type, @preferred_brand_industries, @primary_social, @reach_count, @social_type, @creation_time, @last_use_time)"
 
 	query := myquery.Client.Query(sql)
 
@@ -52,6 +55,8 @@ func (data BQInfluencers) GetInsertSQL(table string) (*bigquery.Query, error) {
 		{Name: "primary_social", Value: data.PrimarySocial},
 		{Name: "reach_count", Value: data.ReachCount},
 		{Name: "social_type", Value: data.SocialType},
+		{Name: "creation_time", Value: data.CreationTime},
+		{Name: "last_use_time", Value: data.LastUseTime},
 	}
 
 	return query, nil
@@ -69,7 +74,7 @@ func (_ BQInfluencers) DeleteMultipleSQL(table string, data []BQInfluencers) (*b
 }
 
 func (_ BQInfluencers) GetInsertMultipleSQL(table string, data []BQInfluencers) (*bigquery.Query, error) {
-	sql := "INSERT INTO `" + table + "` (categories, collaboration_type, completion_percentage, follower_count, id, interaction_count, languages, location, post_type, preferred_brand_industries, primary_social, reach_count, social_type) VALUES "
+	sql := "INSERT INTO `" + table + "` (categories, collaboration_type, completion_percentage, follower_count, id, interaction_count, languages, location, post_type, preferred_brand_industries, primary_social, reach_count, social_type, creation_time, last_use_time) VALUES "
 
 	parameters := []bigquery.QueryParameter{}
 	valuePlaceholders := ""
@@ -78,7 +83,7 @@ func (_ BQInfluencers) GetInsertMultipleSQL(table string, data []BQInfluencers) 
 		if index > 0 {
 			valuePlaceholders += ", "
 		}
-		valuePlaceholders += fmt.Sprintf("(@categories_%d, @collaboration_type_%d, @completion_percentage_%d, @follower_count_%d, @id_%d, @interaction_count_%d, @languages_%d, @location_%d, @post_type_%d, @preferred_brand_industries_%d, @primary_social_%d, @reach_count_%d, @social_type_%d)", index, index, index, index, index, index, index, index, index, index, index, index, index)
+		valuePlaceholders += fmt.Sprintf("(@categories_%d, @collaboration_type_%d, @completion_percentage_%d, @follower_count_%d, @id_%d, @interaction_count_%d, @languages_%d, @location_%d, @post_type_%d, @preferred_brand_industries_%d, @primary_social_%d, @reach_count_%d, @social_type_%d, @creation_time_%d, @last_use_time_%d)", index, index, index, index, index, index, index, index, index, index, index, index, index, index, index, index)
 
 		parameters = append(parameters,
 			bigquery.QueryParameter{Name: fmt.Sprintf("categories_%d", index), Value: d.Categories},
@@ -94,6 +99,8 @@ func (_ BQInfluencers) GetInsertMultipleSQL(table string, data []BQInfluencers) 
 			bigquery.QueryParameter{Name: fmt.Sprintf("primary_social_%d", index), Value: d.PrimarySocial},
 			bigquery.QueryParameter{Name: fmt.Sprintf("reach_count_%d", index), Value: d.ReachCount},
 			bigquery.QueryParameter{Name: fmt.Sprintf("social_type_%d", index), Value: d.SocialType},
+			bigquery.QueryParameter{Name: fmt.Sprintf("creation_time_%d", index), Value: d.CreationTime},
+			bigquery.QueryParameter{Name: fmt.Sprintf("last_use_time_%d", index), Value: d.LastUseTime},
 		)
 	}
 
