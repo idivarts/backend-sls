@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"regexp"
 	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
@@ -91,7 +92,6 @@ func syncUsers() {
 			continue
 		}
 
-		log.Println("Creating Doc")
 		user := &trendlymodels.User{}
 		err = doc.DataTo(user)
 		if err != nil {
@@ -99,6 +99,13 @@ func syncUsers() {
 		}
 
 		if user.Email != nil && *user.Email != "" {
+			validEmail := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+			if !validEmail.MatchString(*user.Email) {
+				log.Println("Invalid Doc", len(contacts), *user.Email)
+				continue
+			}
+			log.Println("Creating Doc", len(contacts), *user.Email)
+
 			phone := ""
 			pCent := 0
 			if user.PhoneNumber != nil {
@@ -141,6 +148,7 @@ func syncUsers() {
 	for i := 0; i < len(contacts); i += 100 {
 		err := myemail.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
 		if err != nil {
+			log.Println("Error", err.Error())
 			panic(err.Error())
 		}
 		log.Println("Upsert Batch Complete")
