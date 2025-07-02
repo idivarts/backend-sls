@@ -12,6 +12,18 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+func guessGender(name string) string {
+	// return "female"
+	// return "male"
+	return "not-sure"
+}
+
+func guessAllGenders(name []string) []string {
+	// return "female"
+	// return "male"
+	return []string{"not-sure"}
+}
+
 // SyncUsers This will be used to sync users
 func SyncUsers(iterative bool) error {
 	iter := firestoredb.Client.Collection("users").Documents(context.Background())
@@ -72,6 +84,9 @@ func SyncUsers(iterative bool) error {
 				InteractionCount: interaction,
 				PrimarySocial:    sName,
 				SocialType:       sType,
+				CreationTime:     myutil.DerefInt64(user.CreationTime),
+				LastUseTime:      myutil.DerefInt64(user.LastUseTime),
+				EstimatedGender:  guessGender(user.Name),
 			})
 		} else {
 			continue

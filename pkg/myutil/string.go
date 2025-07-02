@@ -12,3 +12,10 @@ func DerefString(s *string) string {
 func ContainsIgnoreCase(base, search string) bool {
 	return strings.Contains(strings.ToLower(base), strings.ToLower(search))
 }
+
+func DerefInt64(s *int64) int64 {
+	if s != nil {
+		return *s
+	}
+	return 0
+}
