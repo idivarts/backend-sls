@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -108,6 +109,8 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		log.Printf("Error response body: %s\n", string(bodyBytes))
 		return fmt.Errorf("error: %s", resp.Status)
 	}
 	var response struct {
