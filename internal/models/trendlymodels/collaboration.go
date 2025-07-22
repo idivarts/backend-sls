@@ -70,11 +70,14 @@ func (b *Collaboration) Get(collabId string) error {
 
 func GetCollabIDs(startAfter *interface{}, limit int) ([]string, error) {
 	var iter *firestore.DocumentIterator
+
+	collection := firestoredb.Client.Collection("collaborations").OrderBy("timeStamp", firestore.Desc)
 	if startAfter == nil {
-		iter = firestoredb.Client.Collection("collaborations").OrderBy("timeStamp", firestore.Desc).Limit(limit).Documents(context.Background())
+		iter = collection.Limit(limit).Documents(context.Background())
 	} else {
-		iter = firestoredb.Client.Collection("collaborations").OrderBy("timeStamp", firestore.Desc).StartAfter(startAfter).Limit(limit).Documents(context.Background())
+		iter = collection.StartAfter(startAfter).Limit(limit).Documents(context.Background())
 	}
+
 	defer iter.Stop()
 
 	collabs := []string{}

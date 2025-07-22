@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type User struct {
@@ -128,4 +129,29 @@ func (u *User) Get(uid string) error {
 		return err
 	}
 	return err
+}
+
+func GetInfluencerIDs(startAfter *interface{}, limit int) ([]string, error) {
+	var iter *firestore.DocumentIterator
+
+	collection := firestoredb.Client.Collection("users").Where("profile.completionPercentage", ">=", 60).OrderBy("lastUseTime", firestore.Desc)
+	if startAfter == nil {
+		iter = collection.Limit(limit).Documents(context.Background())
+	} else {
+		iter = collection.StartAfter(startAfter).Limit(limit).Documents(context.Background())
+	}
+
+	defer iter.Stop()
+	influencers := []string{}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		influencers = append(influencers, doc.Ref.ID)
+	}
+	return influencers, nil
 }
