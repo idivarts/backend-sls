@@ -1,0 +1,103 @@
+<!-- 
+  Dynamic Variables:
+    {{.RecipientName}}   => Name of the influencer receiving the invite
+    {{.SenderName}}      => Name of the influencer who sent the invite
+    {{.Reason}}          => Reason or idea shared in the invite
+    {{.CollabType}}      => Type of collaboration being proposed (comma separated)
+    {{.CollabMode}}      => Collaboration type: Paid or Free
+    {{.BudgetMin}}       => Minimum proposed budget (can be blank if free)
+    {{.BudgetMax}}       => Maximum proposed budget (can be blank if free)
+    {{.ActionLink}}      => Link to open the Trendly app for this invite
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>You've Got a New Collaboration Invite!</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #3f51b5;
+        }
+
+        .highlight {
+            background: #f0f0ff;
+            padding: 10px;
+            border-left: 4px solid #3f51b5;
+            margin: 12px 0;
+            font-style: italic;
+        }
+
+        .section {
+            margin-top: 16px;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        a.button {
+            background-color: #3f51b5;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>✨ New Collaboration Invite!</h2>
+
+        <p>Hey <strong>{{.RecipientName}}</strong>,</p>
+
+        <p><strong>{{.SenderName}}</strong> has invited you to collaborate on a new idea via Trendly.</p>
+
+        <div class="section">
+            <p class="label">💡 Here's their pitch:</p>
+            <div class="highlight">{{.Reason}}</div>
+        </div>
+
+        <div class="section">
+            <p><span class="label">Collab Type:</span> {{.CollabType}}</p>
+            <p><span class="label">Collaboration Mode:</span> {{.CollabMode}}</p>
+            {{ if eq .CollabMode "Paid" }}
+            <p><span class="label">Budget:</span> ₹{{.BudgetMin}} – ₹{{.BudgetMax}}</p>
+            {{ end }}
+        </div>
+
+        <a href="{{.ActionLink}}" class="button">View & Respond in App</a>
+
+        <div class="footer">
+            This invite was sent through Trendly. Please open the app to respond or continue the conversation.
+        </div>
+    </div>
+</body>
+
+</html>

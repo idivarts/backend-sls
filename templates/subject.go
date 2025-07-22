@@ -20,4 +20,7 @@ const (
 	SubjectPasswordChanged            = "Your Trendly password has been changed"
 	SubjectUnreadMessageReminder      = "You have unread messages on Trendly"
 	SubjectBrandEmailInvite           = "You have been invited on Trendly"
+	SubjectInfluencerInvite           = "You’ve received a new collab idea on Trendly 💡"
+	SubjectInfluencerInviteAccepted   = "Your collab invite was accepted! Start chatting now 🎉"
+	SubjectInfluencerInviteRejected   = "Your invite wasn’t accepted—but don’t stop creating ✨"
 )
