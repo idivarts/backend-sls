@@ -21,7 +21,8 @@ const (
 		id
 		FROM ` +
 		"`trendly-9ab99.matches.influencers`" +
-		` ORDER BY reach_count desc, RAND()
+		` where completion_percentage > 40
+		ORDER BY reach_count desc, last_use_time desc
 		LIMIT 100`
 )
 
