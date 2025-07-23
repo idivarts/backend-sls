@@ -25,6 +25,7 @@ func main() {
 	commonV1.DELETE("/users/deactivate", trendlyapis.DeativateUser)
 	commonV1.DELETE("/users/delete", trendlyapis.DeleteUser)
 
+	apihandler.StartLambda()
 }
 func handleManagerAPIs() {
 	managerApisV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
@@ -37,8 +38,6 @@ func handleManagerAPIs() {
 
 	// Managers Explore influencer api
 	managerApisV1.GET("/influencers", matchmaking.GetInfluencers)
-
-	apihandler.StartLambda()
 }
 
 func handleUserAPIs() {
