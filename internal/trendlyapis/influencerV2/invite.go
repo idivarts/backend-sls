@@ -20,11 +20,3 @@ func InviteInfluencer(c *gin.Context) {
 	firestoredb.Client.Collection("users").Doc(influencerId).Collection("invitations").Doc(userId)
 
 }
-
-func AcceptInfluencerInvite(c *gin.Context) {
-
-}
-
-func RejectInfluencerInvite(c *gin.Context) {
-
-}

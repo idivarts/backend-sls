@@ -19,7 +19,7 @@ func handleManagerAPIs() {
 }
 
 func handleUserAPIs() {
-	userApisV1 := apihandler.GinEngine.Group("/api/search", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("users"))
+	userApisV1 := apihandler.GinEngine.Group("/api/matchmaking", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("users"))
 
 	userApisV1.GET("/influencer-for-influencer", matchmaking.GetInfluencerForInfluencer)
 	userApisV1.GET("/collaborations", matchmaking.GetCollaborationIDs) // This api will be used to get the list of collaboration

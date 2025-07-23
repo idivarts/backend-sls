@@ -118,6 +118,42 @@ functions:
     timeout: 30
     events:
       - http: ANY /api/v1/{proxy+}
+  trendly_v2_apis:
+    handler: functions/trendly_apis_v2/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /api/v2/{proxy+}
+  trendly_collabs_apis:
+    handler: functions/trendly_collabs/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /api/collabs/{proxy+}
+  trendly_matchmaking_apis:
+    handler: functions/trendly_matchmaking/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /api/matchmaking/{proxy+}
+  trendly_influencers_apis:
+    handler: functions/trendly_influencers/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /api/influencers/{proxy+}
   stream_sqs_hook:
     handler: functions/stream_sqs_hook/main.go
     package:
