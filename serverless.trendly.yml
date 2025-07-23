@@ -119,7 +119,7 @@ functions:
     events:
       - http: ANY /api/v1/{proxy+}
   trendly_v2_apis:
-    handler: functions/trendly_apis_v2/main.go
+    handler: functions/trendly_v2/main.go
     package:
       include:
         - 'service-account.json'
