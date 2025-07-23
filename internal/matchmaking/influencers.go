@@ -2,12 +2,15 @@ package matchmaking
 
 import (
 	"context"
+	"log"
 	"net/http"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myquery"
 	"google.golang.org/api/iterator"
 )
@@ -25,6 +28,11 @@ const (
 		ORDER BY reach_count desc, last_use_time desc
 		LIMIT 100`
 )
+
+type ExploreInfluencerCache struct {
+	Time int64    `json:"time" firstore:"time"`
+	IDs  []string `json:"ids" firestore:"ids"`
+}
 
 func GetInfluencers(c *gin.Context) {
 	var req IBrandMember
@@ -53,10 +61,35 @@ func GetInfluencers(c *gin.Context) {
 		return
 	}
 
-	ids, err := RunBQ()
+	cacheKey := "explore-infuencer-cache"
+	ids := []string{}
+	cachedData := ExploreInfluencerCache{}
+
+	userSnap, err := firestoredb.Client.Collection("cached").Doc(cacheKey).Get(context.Background())
+	if err == nil {
+		err = userSnap.DataTo(&cachedData)
+		if err == nil {
+			if len(cachedData.IDs) > 0 && cachedData.Time > time.Now().Add(-6*time.Hour).UnixMilli() {
+				ids = cachedData.IDs
+			}
+		}
+	}
+
+	if len(ids) > 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "Succesfully fetched data from cache", "data": ids})
+		return
+	}
+
+	ids, err = RunBQ()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Executing Query"})
 		return
+	}
+	cachedData.IDs = ids
+	cachedData.Time = time.Now().UnixMilli()
+	_, err = firestoredb.Client.Collection("cached").Doc(cacheKey).Set(context.Background(), cachedData)
+	if err != nil {
+		log.Println("Error caching data:", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Succesfully fetched data", "data": ids})
