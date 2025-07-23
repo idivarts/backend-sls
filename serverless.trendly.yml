@@ -5,6 +5,7 @@ provider:
   name: aws
   architecture: arm64
   runtime: provided.al2
+  versionFunctions: true  # Enables versioning of Lambda functions
   environment:
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
@@ -143,6 +144,7 @@ functions:
         - 'service-account.json'
         - 'templates/*'
     timeout: 30
+    provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /api/matchmaking/{proxy+}
   trendly_influencers_apis:
@@ -174,6 +176,7 @@ functions:
         - 'service-account.json'
         - 'templates/*'
     timeout: 30
+    provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /instagram
       - http: ANY /instagram/{proxy+}
