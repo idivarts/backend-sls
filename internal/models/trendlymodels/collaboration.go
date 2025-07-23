@@ -3,7 +3,9 @@ package trendlymodels
 import (
 	"context"
 
+	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type Collaboration struct {
@@ -64,4 +66,30 @@ func (b *Collaboration) Get(collabId string) error {
 		return err
 	}
 	return err
+}
+
+func GetCollabIDs(startAfter *interface{}, limit int) ([]string, error) {
+	var iter *firestore.DocumentIterator
+
+	collection := firestoredb.Client.Collection("collaborations").OrderBy("timeStamp", firestore.Desc)
+	if startAfter == nil {
+		iter = collection.Limit(limit).Documents(context.Background())
+	} else {
+		iter = collection.StartAfter(startAfter).Limit(limit).Documents(context.Background())
+	}
+
+	defer iter.Stop()
+
+	collabs := []string{}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		collabs = append(collabs, doc.Ref.ID)
+	}
+	return collabs, nil
 }

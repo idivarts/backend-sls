@@ -23,4 +23,7 @@ const (
 	BrandCreated                      myemail.TemplatePath = "templates/welcome_brand.html"
 	MessageReminder                   myemail.TemplatePath = "templates/message_reminder.html"
 	BrandEmailInvite                  myemail.TemplatePath = "templates/brand_email_invite.html"
+	InfluencerInvite                  myemail.TemplatePath = "templates/influencer_invite.html"
+	InfluencerInviteAccepted          myemail.TemplatePath = "templates/influencer_accepted.html"
+	InfluencerInviteRejected          myemail.TemplatePath = "templates/influencer_rejected.html"
 )

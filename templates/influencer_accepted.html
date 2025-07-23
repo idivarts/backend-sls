@@ -1,0 +1,71 @@
+<!-- 
+  Dynamic Variables:
+    {{.RecipientName}}   => Name of the influencer who sent the invite
+    {{.AcceptorName}}    => Name of the influencer who accepted the invite
+    {{.ChatLink}}        => Link to open the chat inside the Trendly app
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Your Invite Has Been Accepted!</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #3f51b5;
+        }
+
+        a.button {
+            background-color: #3f51b5;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>🎉 Your Invite Was Accepted!</h2>
+
+        <p>Hi <strong>{{.RecipientName}}</strong>,</p>
+
+        <p><strong>{{.AcceptorName}}</strong> has accepted your collaboration invite on Trendly.</p>
+
+        <p>We've connected both of you on Trendly chat so you can take your idea forward together!</p>
+
+        <a href="{{.ChatLink}}" class="button">Open Chat</a>
+
+        <div class="footer">
+            Thank you for using Trendly. Let's make amazing content together!
+        </div>
+    </div>
+</body>
+
+</html>
