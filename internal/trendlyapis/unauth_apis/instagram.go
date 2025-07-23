@@ -1,4 +1,4 @@
-package trendlyapis
+package trendlyunauth
 
 import (
 	"context"
@@ -19,8 +19,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var INSTAGRAM_REDIRECT = fmt.Sprintf("%s%s", constants.TRENDLY_BE, "/instagram/auth")
-
 func InstagramRedirect(ctx *gin.Context) {
 	redirect_type := ctx.Query("redirect_type")
 	if redirect_type == "" {
@@ -37,7 +35,7 @@ func InstagramRedirect(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{"error": "Instagram client id not found"})
 		return
 	}
-	redirect_uri := fmt.Sprintf("%s/%s", INSTAGRAM_REDIRECT, redirect_type)
+	redirect_uri := fmt.Sprintf("%s/%s", constants.INSTAGRAM_REDIRECT, redirect_type)
 	ctx.Redirect(302, fmt.Sprintf("https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0&client_id=%s&redirect_uri=%s&response_type=code&scope=instagram_business_basic,instagram_business_manage_insights", clientId, url.QueryEscape(redirect_uri)))
 }
 
@@ -67,23 +65,19 @@ func InstagramAuthRedirect(ctx *gin.Context) {
 	ctx.Redirect(302, fmt.Sprintf("%s?code=%s", redirectUri, code))
 }
 
-type IInstaAuth struct {
-	Code         string `json:"code"`
-	RedirectType string `json:"redirect_type"`
-}
 type ITokenResponse struct {
 	FirebaseCustomToken string `json:"firebaseCustomToken"`
 	IsExistingUser      bool   `json:"isExistingUser"`
 }
 
 func InstagramAuth(ctx *gin.Context) {
-	var req IInstaAuth
+	var req constants.IInstaAuth
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	redirect_uri := fmt.Sprintf("%s/%s", INSTAGRAM_REDIRECT, req.RedirectType)
+	redirect_uri := fmt.Sprintf("%s/%s", constants.INSTAGRAM_REDIRECT, req.RedirectType)
 	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, redirect_uri)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
