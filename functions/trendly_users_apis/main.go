@@ -4,7 +4,6 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
 	trendlyCollabs "github.com/idivarts/backend-sls/internal/trendlyapis/collaborations"
-	influencerv2 "github.com/idivarts/backend-sls/internal/trendlyapis/influencerV2"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
 
@@ -26,7 +25,6 @@ func handleUserAPIs() {
 	// Get Social Medias
 	userApisV1.GET("/socials/medias", trendlyapis.FetchMedias)
 
-	userApisV1.GET("/collaborations", influencerv2.GetCollaborationIDs) // This api will be used to get the list of collaboration
 	userApisV1.POST("/collaborations/:collabId/applications/:userId", trendlyCollabs.SendApplication)
 	userApisV1.PUT("/collaborations/:collabId/applications/:userId", trendlyCollabs.EditApplication)
 

@@ -1,4 +1,4 @@
-package influencerv2
+package matchmaking
 
 import (
 	"net/http"
@@ -7,7 +7,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
-func GetInfluencerIDs(c *gin.Context) {
+func GetInfluencerForInfluencer(c *gin.Context) {
 	influencers, err := trendlymodels.GetInfluencerIDs(nil, 100)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Influencers not found"})
