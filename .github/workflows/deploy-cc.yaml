@@ -3,7 +3,7 @@ name: Deploy Crowdy Chat Function
 on:
   push:
     branches:
-      - master
+      - crowdy-chat
 
 jobs:
   deploy:
