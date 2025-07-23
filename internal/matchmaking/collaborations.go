@@ -1,4 +1,4 @@
-package influencerv2
+package matchmaking
 
 import (
 	"net/http"

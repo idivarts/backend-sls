@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
@@ -134,7 +135,7 @@ func saveSocialPrivateDefered(fbPPage trendlymodels.SocialsPrivate, userId, vId 
 }
 
 func ConnectInstagram(ctx *gin.Context) {
-	var req IInstaAuth
+	var req constants.IInstaAuth
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -146,7 +147,7 @@ func ConnectInstagram(ctx *gin.Context) {
 		return
 	}
 
-	redirect_uri := fmt.Sprintf("%s/%s", INSTAGRAM_REDIRECT, req.RedirectType)
+	redirect_uri := fmt.Sprintf("%s/%s", constants.INSTAGRAM_REDIRECT, req.RedirectType)
 	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, redirect_uri)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})

@@ -53,13 +53,13 @@ func handleUserAPIs() {
 	// Get Social Medias
 	userApisV1.GET("/socials/medias", trendlyapis.FetchMedias)
 
-	userApisV1.GET("/collaborations", influencerv2.GetCollaborationIDs) // This api will be used to get the list of collaboration
+	userApisV1.GET("/collaborations", matchmaking.GetCollaborationIDs) // This api will be used to get the list of collaboration
 	userApisV1.POST("/collaborations/:collabId/applications/:userId", trendlyCollabs.SendApplication)
 	userApisV1.PUT("/collaborations/:collabId/applications/:userId", trendlyCollabs.EditApplication)
 
 	userApisV1.POST("/contracts/:contractId/feedback", trendlyCollabs.GiveContractFeedback)
 
-	userApisV1.GET("/influencers/invite", influencerv2.GetInfluencerIDs)
+	userApisV1.GET("/influencers/invite", matchmaking.GetInfluencerForInfluencer)
 	userApisV1.POST("/influencers/invite/:influencerId", influencerv2.InviteInfluencer)
 	userApisV1.POST("/influencers/invite/:influencerId/accept", influencerv2.AcceptInfluencerInvite)
 	userApisV1.POST("/influencers/invite/:influencerId/reject", influencerv2.RejectInfluencerInvite)
