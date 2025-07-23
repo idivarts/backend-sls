@@ -14,5 +14,5 @@ func GetInfluencerForInfluencer(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": "Influencers not found", "influencers": influencers})
+	c.JSON(http.StatusOK, gin.H{"data": "Influencers found", "influencers": influencers})
 }
