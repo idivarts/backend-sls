@@ -13,7 +13,7 @@ func main() {
 	apihandler.StartLambda()
 }
 func handleManagerAPIs() {
-	managerApisV1 := apihandler.GinEngine.Group("/api/search", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
+	managerApisV1 := apihandler.GinEngine.Group("/api/matchmaking", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 
 	managerApisV1.GET("/influencer-for-brand", matchmaking.GetInfluencers)
 }

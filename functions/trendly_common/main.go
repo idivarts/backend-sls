@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	commonV1 := apihandler.GinEngine.Group("/api/v1", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("common"))
+	commonV1 := apihandler.GinEngine.Group("/api/common", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("common"))
 
 	commonV1.POST("/chat/auth", trendlyapis.ChatAuth)
 	commonV1.POST("/chat/connect", trendlyapis.ChatConnect)
