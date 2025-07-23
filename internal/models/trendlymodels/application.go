@@ -21,8 +21,8 @@ type Application struct {
 }
 
 type InfluencerAnswer struct {
-	Question int    `json:"question" firestore:"question"`
-	Answer   string `json:"answer" firestore:"answer"`
+	Question interface{} `json:"question" firestore:"question"`
+	Answer   string      `json:"answer" firestore:"answer"`
 }
 
 type ApplicationFileAttachment struct {

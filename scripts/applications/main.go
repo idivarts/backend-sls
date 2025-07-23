@@ -5,13 +5,14 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
 const (
-	CollaborationID = "ha7stTh6UlB5jl4hkoeR"
+	CollaborationID = "cvRCjk3i1J1t7UflMNUz"
+	ServiceCharge   = 1000
 )
 
 func main() {
@@ -36,7 +37,7 @@ func main() {
 	defer writer.Flush()
 
 	// Write CSV header
-	writer.Write([]string{"User", "Social", "TimeStamp", "Message", "Quotation", "Timeline", "Social Data", "Application Attachment", "Profile Attachment", "Question / Answers"})
+	writer.Write([]string{"Name", "Followers", "Reach", "Engagement", "Budget", "Profile Link", "Message From Influencer"}) // "Social Data", "Application Attachment", "Profile Attachment", "Question / Answers",
 
 	// Write each application as a CSV row
 	for _, app := range applications {
@@ -53,57 +54,26 @@ func main() {
 			log.Println(err)
 			continue
 		}
-		socialUrl := ""
-		socialData := ""
-		applicationAttachments := ""
-		profileAttachments := ""
-		questionAnswers := ""
+		// socialUrl := ""
+		applicationUrl := "https://brands.trendly.now/collaboration-application?collaborationId=" + CollaborationID + "&applicationId=" + app.UserID
 
-		if social.IsInstagram {
-			socialUrl = "https://www.instagram.com/" + social.InstaProfile.Username
-
-			if len(social.SocialScreenShots) > 0 {
-				socialData += social.SocialScreenShots[0] + "\n" + social.SocialScreenShots[1] + "\n"
-			}
-
-			socialData += `Followers : ` + social.InstaProfile.ApproxMetrics.Followers + "\nViews : " + social.InstaProfile.ApproxMetrics.Views + "\nInteractions : " + social.InstaProfile.ApproxMetrics.Interactions
-		} else {
-			socialUrl = "https://www.facebook.com/" + social.FBProfile.ID
-		}
-
-		for _, v := range app.Attachments {
-			if v.ImageURL != nil {
-				applicationAttachments += (*v.ImageURL) + "\n"
-			}
-			if v.AppleURL != nil {
-				applicationAttachments += (*v.AppleURL) + "\n"
-			}
-		}
-		for _, v := range user.Profile.Attachments {
-			if v.ImageURL != nil {
-				profileAttachments += (*v.ImageURL) + "\n"
-			}
-			if v.AppleURL != nil {
-				profileAttachments += (*v.AppleURL) + "\n"
-			}
-		}
-
-		for _, v := range app.AnswersFromInfluencer {
-			questionAnswers += "Question : " + collab.QuestionsToInfluencers[v.Question] + "\n"
-			questionAnswers += "Answer : " + v.Answer + "\n\n----\n"
+		// if social.IsInstagram {
+		// 	socialUrl = "https://www.instagram.com/" + social.InstaProfile.Username
+		// } else {
+		// 	socialUrl = "https://www.facebook.com/" + social.FBProfile.ID
+		// }
+		if social.InstaProfile == nil {
+			social.InstaProfile = &messenger.InstagramProfile{}
 		}
 
 		writer.Write([]string{
 			user.Name,
-			socialUrl,
-			time.UnixMilli(app.TimeStamp).Format("2006-01-02 15:04:05"),
+			social.InstaProfile.ApproxMetrics.Followers,
+			social.InstaProfile.ApproxMetrics.Views,
+			social.InstaProfile.ApproxMetrics.Interactions,
+			strconv.Itoa(app.Quotation + ServiceCharge),
+			applicationUrl,
 			app.Message,
-			strconv.Itoa(app.Quotation),
-			strconv.FormatInt(app.Timeline, 10),
-			socialData,
-			applicationAttachments,
-			profileAttachments,
-			questionAnswers,
 		})
 	}
 
