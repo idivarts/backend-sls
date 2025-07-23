@@ -61,7 +61,7 @@ func GetInfluencers(c *gin.Context) {
 		return
 	}
 
-	cacheKey := "explore-infuencer-cache"
+	cacheKey := "explore-influencer-cache"
 	ids := []string{}
 	cachedData := ExploreInfluencerCache{}
 
