@@ -30,7 +30,7 @@ const (
 )
 
 type ExploreInfluencerCache struct {
-	Time int64    `json:"time" firstore:"time"`
+	Time int64    `json:"time" firestore:"time"`
 	IDs  []string `json:"ids" firestore:"ids"`
 }
 
