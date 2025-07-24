@@ -1,7 +1,6 @@
 package influencerv2
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/templates"
@@ -43,7 +41,7 @@ func InviteInfluencer(c *gin.Context) {
 
 	user := middlewares.GetUserObject(c)
 
-	_, err = firestoredb.Client.Collection("users").Doc(influencerId).Collection("invitations").Doc(userId).Get(context.Background())
+	err = (&trendlymodels.InfluencerInvite{}).Get(influencerId, userId)
 	if err == nil {
 		// If no error, it means the invitation already exists
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invitation already exists", "message": "Invitation already exists for this influencer"})
@@ -51,6 +49,7 @@ func InviteInfluencer(c *gin.Context) {
 	}
 
 	req.Status = 0 // Set status to Pending
+	req.InfluencerId = userId
 	_, err = req.Insert(influencerId, userId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to send invitation"})
