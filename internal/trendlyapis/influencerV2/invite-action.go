@@ -38,7 +38,7 @@ func AcceptInfluencerInvite(c *gin.Context) {
 	// user := middlewares.GetUserObject(c)
 
 	invitation := &trendlymodels.InfluencerInvite{}
-	err = invitation.Get(influencerId, userId)
+	err = invitation.Get(userId, influencerId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invitation doesnt exist"})
 		return
@@ -110,7 +110,7 @@ func RejectInfluencerInvite(c *gin.Context) {
 	// user := middlewares.GetUserObject(c)
 
 	invitation := &trendlymodels.InfluencerInvite{}
-	err = invitation.Get(influencerId, userId)
+	err = invitation.Get(userId, influencerId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invitation doesnt exist"})
 		return
