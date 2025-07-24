@@ -34,6 +34,12 @@ func AcceptInfluencerInvite(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Influencer not found"})
 		return
 	}
+	user := &trendlymodels.User{}
+	err = user.Get(userId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "User not found"})
+		return
+	}
 
 	// user := middlewares.GetUserObject(c)
 
@@ -57,6 +63,14 @@ func AcceptInfluencerInvite(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Unable to create channel"})
 		return
+	}
+	if user.IsChatConnected != true {
+		user.IsChatConnected = true
+		user.Insert(userId)
+	}
+	if influencer.IsChatConnected != true {
+		influencer.IsChatConnected = true
+		influencer.Insert(influencerId)
 	}
 
 	// Dynamic Variables:
