@@ -20,5 +20,5 @@ func GetCollaborationIDs(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": "Collabs not found", "collabs": collabs})
+	c.JSON(http.StatusOK, gin.H{"data": "Collabs found", "collabs": collabs})
 }
