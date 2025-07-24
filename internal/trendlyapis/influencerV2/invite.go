@@ -50,7 +50,7 @@ func InviteInfluencer(c *gin.Context) {
 
 	req.Status = 0 // Set status to Pending
 	req.InfluencerId = userId
-	_, err = req.Insert(influencerId, userId)
+	_, err = req.Insert(influencerId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to send invitation"})
 		return

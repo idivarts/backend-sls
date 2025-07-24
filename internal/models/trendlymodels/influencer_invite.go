@@ -2,6 +2,7 @@ package trendlymodels
 
 import (
 	"context"
+	"errors"
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
@@ -33,8 +34,11 @@ func (b *InfluencerInvite) Get(userID, influencerId string) error {
 	return err
 }
 
-func (s *InfluencerInvite) Insert(userId, influencerId string) (*firestore.WriteResult, error) {
-	res, err := firestoredb.Client.Collection("users").Doc(userId).Collection("invitations").Doc(influencerId).Set(context.Background(), s)
+func (s *InfluencerInvite) Insert(userId string) (*firestore.WriteResult, error) {
+	if s.InfluencerId == "" {
+		return nil, errors.New("influencerId-required")
+	}
+	res, err := firestoredb.Client.Collection("users").Doc(userId).Collection("invitations").Doc(s.InfluencerId).Set(context.Background(), s)
 
 	if err != nil {
 		return nil, err
