@@ -16,12 +16,12 @@ import (
 const (
 	sqlI2I = `SELECT id
 FROM(
-	SELECT *, IF(LOWER(location)=LOWER(@location), 100, ROUND(RAND()*101)) as lRank
-	FROM  ` + "`trendly-9ab99.matches.influencers`" + ` 
+	SELECT *, IF(LOWER(location)=LOWER(@location), 100, IF((RAND()*20)>19, 100, 99)) as lRank,
+	IF(reach_count>20000 AND follower_count>1000, 1, 0) as rRank
+	FROM ` + "`trendly-9ab99.matches.influencers`" + ` 
 	where completion_percentage>40
 )
-where IF(lRank>100 AND reach_count < 10000, false, true)
-order by lRank desc, reach_count desc, last_use_time desc
+order by lRank desc, rRank desc, last_use_time desc
 LIMIT 100`
 )
 
