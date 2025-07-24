@@ -7,7 +7,7 @@ import (
 )
 
 func TestInfluencers(t *testing.T) {
-	ids, err := matchmaking.RunBQ()
+	ids, err := matchmaking.RunBQ2("Kolkata")
 	if err != nil {
 		t.Fatal(err)
 	}

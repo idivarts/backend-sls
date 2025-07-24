@@ -22,9 +22,8 @@ type IBrandMember struct {
 const (
 	sql = `SELECT 
 		id
-		FROM ` +
-		"`trendly-9ab99.matches.influencers`" +
-		` where completion_percentage > 40
+		FROM ` + "`trendly-9ab99.matches.influencers`" + ` 
+		where completion_percentage > 40
 		ORDER BY reach_count desc, last_use_time desc
 		LIMIT 100`
 )
