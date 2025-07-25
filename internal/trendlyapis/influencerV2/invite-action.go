@@ -59,6 +59,11 @@ func AcceptInfluencerInvite(c *gin.Context) {
 	// Create a Message thread between these two people
 	channel, err := streamchat.Client.CreateChannel(context.Background(), "messaging", "", userId, &stream_chat.ChannelRequest{
 		Members: []string{userId, influencerId},
+		ExtraData: map[string]interface{}{
+			"influencerId": influencerId,
+			"userId":       userId,
+			"threadType":   "influencer-invite",
+		},
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Unable to create channel"})
@@ -83,7 +88,7 @@ func AcceptInfluencerInvite(c *gin.Context) {
 		"ChatLink":      fmt.Sprintf("%s/messages?channelId=%s", constants.TRENDLY_CREATORS_FE, channel.Channel.ID),
 	}
 
-	err = myemail.SendCustomHTMLEmail(myutil.DerefString(influencer.Email), templates.InfluencerInvite, templates.SubjectInfluencerInvite, data)
+	err = myemail.SendCustomHTMLEmail(myutil.DerefString(influencer.Email), templates.InfluencerInviteAccepted, templates.SubjectInfluencerInviteAccepted, data)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error Sending Email"})
 		return
@@ -149,7 +154,7 @@ func RejectInfluencerInvite(c *gin.Context) {
 		"ExploreLink":     fmt.Sprintf("%s/influencers", constants.TRENDLY_CREATORS_FE), // Example link, replace with actual link if needed
 	}
 
-	err = myemail.SendCustomHTMLEmail(myutil.DerefString(influencer.Email), templates.InfluencerInvite, templates.SubjectInfluencerInvite, data)
+	err = myemail.SendCustomHTMLEmail(myutil.DerefString(influencer.Email), templates.InfluencerInviteRejected, templates.SubjectInfluencerInviteRejected, data)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error Sending Email"})
 		return
