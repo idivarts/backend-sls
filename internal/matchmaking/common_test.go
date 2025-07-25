@@ -13,7 +13,7 @@ func TestInfluencers(t *testing.T) {
 	// AND language in ("English", "Hindi")
 
 	// ids, err := matchmaking.RunBQ2("Kolkata")
-	ids, err := matchmaking.RunBQ(trendlymodels.BrandPreferences{
+	ids, err := matchmaking.RunBQ(&trendlymodels.BrandPreferences{
 		Locations:            []string{"Kolkata"},
 		InfluencerCategories: []string{"Fashion / Beauty", "Food"},
 		Languages:            []string{"English", "Hindi"},

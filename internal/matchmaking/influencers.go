@@ -3,16 +3,13 @@ package matchmaking
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myquery"
 	"google.golang.org/api/iterator"
 )
@@ -79,40 +76,40 @@ func GetInfluencers(c *gin.Context) {
 		return
 	}
 
-	cacheKey := "explore-influencer-cache"
-	ids := []string{}
-	cachedData := ExploreInfluencerCache{}
+	// cacheKey := "explore-influencer-cache"
+	// ids := []string{}
+	// cachedData := ExploreInfluencerCache{}
 
-	userSnap, err := firestoredb.Client.Collection("cached").Doc(cacheKey).Get(context.Background())
-	if err == nil {
-		err = userSnap.DataTo(&cachedData)
-		if err == nil {
-			if len(cachedData.IDs) > 0 && cachedData.Time > time.Now().Add(-6*time.Hour).UnixMilli() {
-				ids = cachedData.IDs
-			}
-		}
-	}
+	// userSnap, err := firestoredb.Client.Collection("cached").Doc(cacheKey).Get(context.Background())
+	// if err == nil {
+	// 	err = userSnap.DataTo(&cachedData)
+	// 	if err == nil {
+	// 		if len(cachedData.IDs) > 0 && cachedData.Time > time.Now().Add(-6*time.Hour).UnixMilli() {
+	// 			ids = cachedData.IDs
+	// 		}
+	// 	}
+	// }
 
-	if len(ids) > 0 {
-		c.JSON(http.StatusOK, gin.H{"message": "Succesfully fetched data from cache", "data": ids})
-		return
-	}
+	// if len(ids) > 0 {
+	// 	c.JSON(http.StatusOK, gin.H{"message": "Succesfully fetched data from cache", "data": ids})
+	// 	return
+	// }
 
-	ids, err = RunBQ(trendlymodels.BrandPreferences{})
+	ids, err := RunBQ(brand.Preferences)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Executing Query"})
 		return
 	}
-	cachedData.IDs = ids
-	cachedData.Time = time.Now().UnixMilli()
-	_, err = firestoredb.Client.Collection("cached").Doc(cacheKey).Set(context.Background(), cachedData)
-	if err != nil {
-		log.Println("Error caching data:", err)
-	}
+	// cachedData.IDs = ids
+	// cachedData.Time = time.Now().UnixMilli()
+	// _, err = firestoredb.Client.Collection("cached").Doc(cacheKey).Set(context.Background(), cachedData)
+	// if err != nil {
+	// 	log.Println("Error caching data:", err)
+	// }
 
 	c.JSON(http.StatusOK, gin.H{"message": "Succesfully fetched data", "data": ids})
 }
-func RunBQ(preference trendlymodels.BrandPreferences) ([]string, error) {
+func RunBQ(preference *trendlymodels.BrandPreferences) ([]string, error) {
 	// AND location in ("Delhi")
 	// AND category in ("Fashion / Beauty", "Food")
 	// AND language in ("English", "Hindi")
@@ -121,14 +118,16 @@ func RunBQ(preference trendlymodels.BrandPreferences) ([]string, error) {
 	category := ""
 	language := ""
 
-	if preference.Locations != nil && len(preference.Locations) > 0 {
-		location = fmt.Sprintf("AND location in (\"%s\")", strings.Join(preference.Locations, `", "`))
-	}
-	if preference.InfluencerCategories != nil && len(preference.InfluencerCategories) > 0 {
-		category = fmt.Sprintf("AND category in (\"%s\")", strings.Join(preference.InfluencerCategories, `", "`))
-	}
-	if preference.Languages != nil && len(preference.Languages) > 0 {
-		language = fmt.Sprintf("AND language in (\"%s\")", strings.Join(preference.Languages, `", "`))
+	if preference != nil {
+		if preference.Locations != nil && len(preference.Locations) > 0 {
+			location = fmt.Sprintf("AND location in (\"%s\")", strings.Join(preference.Locations, `", "`))
+		}
+		if preference.InfluencerCategories != nil && len(preference.InfluencerCategories) > 0 {
+			category = fmt.Sprintf("AND category in (\"%s\")", strings.Join(preference.InfluencerCategories, `", "`))
+		}
+		if preference.Languages != nil && len(preference.Languages) > 0 {
+			language = fmt.Sprintf("AND language in (\"%s\")", strings.Join(preference.Languages, `", "`))
+		}
 	}
 
 	sql := fmt.Sprintf(sqlFmt, location, category, language)
