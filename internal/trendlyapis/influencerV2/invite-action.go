@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	stream_chat "github.com/GetStream/stream-chat-go/v5"
 	"github.com/gin-gonic/gin"
@@ -65,6 +66,11 @@ func AcceptInfluencerInvite(c *gin.Context) {
 			"threadType":   "influencer-invite",
 		},
 	})
+
+	// "influencer-invite"
+	// "influencer-invite-accepted"
+	// "influencer-invite-rejected"
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Unable to create channel"})
 		return
@@ -76,6 +82,24 @@ func AcceptInfluencerInvite(c *gin.Context) {
 	if influencer.IsChatConnected != true {
 		influencer.IsChatConnected = true
 		influencer.Insert(influencerId)
+	}
+
+	// Push Notification
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("%s accepted your invite", user.Name),
+		Description: "Start messaging the influencer for the collaboration.",
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			UserID:  &userId,
+			GroupID: &channel.Channel.ID,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "influencer-invite-accepted",
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, influencerId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error Sending Notification"})
+		return
 	}
 
 	// Dynamic Variables:
@@ -139,6 +163,23 @@ func RejectInfluencerInvite(c *gin.Context) {
 	_, err = invitation.Insert(userId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to reject invitation"})
+		return
+	}
+
+	// Push Notification
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("%s has rejected your invite", middlewares.GetUserObject(c)["name"].(string)),
+		Description: "Dont worry! Keep sending invites to other influencers.",
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			UserID: &userId,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "influencer-invite-rejected",
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, influencerId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error Sending Notification"})
 		return
 	}
 

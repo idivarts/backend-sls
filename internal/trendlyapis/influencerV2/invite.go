@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
@@ -53,6 +54,23 @@ func InviteInfluencer(c *gin.Context) {
 	_, err = req.Insert(influencerId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to send invitation"})
+		return
+	}
+
+	// Push Notification
+	notif := &trendlymodels.Notification{
+		Title:       fmt.Sprintf("%s has invited to collaborate", user["name"].(string)),
+		Description: "Review their request and decide whether to accept or reject the invitation.",
+		IsRead:      false,
+		Data: &trendlymodels.NotificationData{
+			UserID: &userId,
+		},
+		TimeStamp: time.Now().UnixMilli(),
+		Type:      "influencer-invite",
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, influencerId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error Sending Notification"})
 		return
 	}
 
