@@ -2,8 +2,10 @@ package matchmaking
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -20,12 +22,29 @@ type IBrandMember struct {
 }
 
 const (
-	sql = `SELECT 
-		id
+	sqlFmt = `select id
+from (
+	SELECT id,
+		ARRAY_AGG(distinct location) AS locations,
+		ARRAY_AGG(distinct category) AS categories,
+		ARRAY_AGG(distinct language) AS languages,
+		ANY_VALUE(rRank) AS rRank,
+		ANY_VALUE(last_use_time) AS last_use_time
+	FROM(
+		SELECT *,
+		IF(reach_count>20000 AND follower_count>1000, 1, 0) as rRank
 		FROM ` + "`trendly-9ab99.matches.influencers`" + ` 
-		where completion_percentage > 40
-		ORDER BY reach_count desc, last_use_time desc
-		LIMIT 100`
+		LEFT JOIN UNNEST(categories) as category
+		LEFT JOIN UNNEST(languages) as language
+		where completion_percentage>40
+		%s
+		%s
+		%s
+	)
+	group by id
+	order by rRank desc, last_use_time desc
+)
+LIMIT 100`
 )
 
 type ExploreInfluencerCache struct {
@@ -79,7 +98,7 @@ func GetInfluencers(c *gin.Context) {
 		return
 	}
 
-	ids, err = RunBQ()
+	ids, err = RunBQ(trendlymodels.BrandPreferences{})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Executing Query"})
 		return
@@ -93,7 +112,28 @@ func GetInfluencers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Succesfully fetched data", "data": ids})
 }
-func RunBQ() ([]string, error) {
+func RunBQ(preference trendlymodels.BrandPreferences) ([]string, error) {
+	// AND location in ("Delhi")
+	// AND category in ("Fashion / Beauty", "Food")
+	// AND language in ("English", "Hindi")
+
+	location := ""
+	category := ""
+	language := ""
+
+	if preference.Locations != nil && len(preference.Locations) > 0 {
+		location = fmt.Sprintf("AND location in (\"%s\")", strings.Join(preference.Locations, `", "`))
+	}
+	if preference.InfluencerCategories != nil && len(preference.InfluencerCategories) > 0 {
+		category = fmt.Sprintf("AND category in (\"%s\")", strings.Join(preference.InfluencerCategories, `", "`))
+	}
+	if preference.Languages != nil && len(preference.Languages) > 0 {
+		language = fmt.Sprintf("AND language in (\"%s\")", strings.Join(preference.Languages, `", "`))
+	}
+
+	sql := fmt.Sprintf(sqlFmt, location, category, language)
+	// log.Println("Running Query:", sql)
+
 	q := myquery.Client.Query(sql)
 	data, err := q.Read(context.Background())
 	if err != nil {
