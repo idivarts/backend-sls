@@ -34,6 +34,7 @@ from (
 		LEFT JOIN UNNEST(categories) as category
 		LEFT JOIN UNNEST(languages) as language
 		where completion_percentage>40
+		AND id NOT IN ("MvLmVKwUcXXZXfBfQHSnq5udnaO2", "mmUwj1YlPUVn0h2hlN4qVw1bEZo1", "jEZf51INayY4ZcJs2ck0XWR8Ptj2")
 		%s
 		%s
 		%s
