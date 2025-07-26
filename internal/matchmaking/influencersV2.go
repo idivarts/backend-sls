@@ -20,6 +20,7 @@ FROM(
 	IF(reach_count>20000 AND follower_count>1000, 1, 0) as rRank
 	FROM ` + "`trendly-9ab99.matches.influencers`" + ` 
 	where completion_percentage>40
+	AND id NOT IN ("MvLmVKwUcXXZXfBfQHSnq5udnaO2", "mmUwj1YlPUVn0h2hlN4qVw1bEZo1", "jEZf51INayY4ZcJs2ck0XWR8Ptj2")
 )
 order by lRank desc, rRank desc, last_use_time desc
 LIMIT 100`
