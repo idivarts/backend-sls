@@ -67,6 +67,19 @@ func AcceptInfluencerInvite(c *gin.Context) {
 			"threadType":   "influencer-invite",
 		},
 	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Unable to create channel"})
+		return
+	}
+
+	if user.IsChatConnected != true {
+		user.IsChatConnected = true
+		user.Insert(userId)
+	}
+	if influencer.IsChatConnected != true {
+		influencer.IsChatConnected = true
+		influencer.Insert(influencerId)
+	}
 
 	_, err = channel.Channel.SendMessage(context.Background(), &stream_chat.Message{
 		Text: invitation.Reason,
@@ -75,21 +88,12 @@ func AcceptInfluencerInvite(c *gin.Context) {
 		log.Println("Could not send message", err.Error())
 	}
 
-	// "influencer-invite"
-	// "influencer-invite-accepted"
-	// "influencer-invite-rejected"
-
+	_, err = channel.Channel.SendMessage(context.Background(), &stream_chat.Message{
+		Text: "This is your cue to break the ice 🧊✨\nGo ahead, discuss your collab idea, pitch your content plan, or just say hey!",
+		Type: stream_chat.MessageTypeSystem,
+	}, "system")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Unable to create channel"})
-		return
-	}
-	if user.IsChatConnected != true {
-		user.IsChatConnected = true
-		user.Insert(userId)
-	}
-	if influencer.IsChatConnected != true {
-		influencer.IsChatConnected = true
-		influencer.Insert(influencerId)
+		log.Println("Could not send System message", err.Error())
 	}
 
 	// Push Notification
