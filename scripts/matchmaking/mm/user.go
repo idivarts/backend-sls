@@ -29,6 +29,7 @@ func SyncUsers(iterative bool) error {
 	iter := firestoredb.Client.Collection("users").Documents(context.Background())
 	defer iter.Stop()
 
+	total := 0
 	data := []trendlybq.BQInfluencers{}
 	for {
 		doc, err := iter.Next()
@@ -41,6 +42,7 @@ func SyncUsers(iterative bool) error {
 		if iterative && time.Since(doc.UpdateTime) > 16*time.Hour {
 			continue
 		}
+		total++
 
 		log.Println("Creating Doc", doc.Ref.ID)
 		user := &trendlymodels.User{}
@@ -131,7 +133,7 @@ func SyncUsers(iterative bool) error {
 			data[len(data)-1].CollaborationType = collabType
 		}
 	}
-
+	log.Println("Total vs Valid", total, len(data))
 	log.Println("Deleting", len(data))
 	query, err := trendlybq.BQInfluencers{}.DeleteMultipleSQL(INFLUENCER_TABLE, data)
 	if err != nil {

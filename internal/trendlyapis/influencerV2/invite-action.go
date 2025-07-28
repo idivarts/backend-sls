@@ -3,6 +3,7 @@ package influencerv2
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -66,6 +67,13 @@ func AcceptInfluencerInvite(c *gin.Context) {
 			"threadType":   "influencer-invite",
 		},
 	})
+
+	_, err = channel.Channel.SendMessage(context.Background(), &stream_chat.Message{
+		Text: invitation.Reason,
+	}, influencerId)
+	if err != nil {
+		log.Println("Could not send message", err.Error())
+	}
 
 	// "influencer-invite"
 	// "influencer-invite-accepted"
