@@ -9,6 +9,17 @@ import (
 	razorpay "github.com/razorpay/razorpay-go"
 )
 
+var (
+	Client     *razorpay.Client
+	apiKey     = ""
+	apiSecret  = ""
+	webhookKey = ""
+)
+
+const (
+	RedirectUrl = "https://brand.trendly.now"
+)
+
 type RazorpaySecrets struct {
 	APIKey     string `json:"key"`
 	APISecret  string `json:"secret"`
@@ -36,13 +47,6 @@ func loadSecrets() RazorpaySecrets {
 
 	return secrets.RazorPay
 }
-
-var (
-	Client     *razorpay.Client
-	apiKey     = ""
-	apiSecret  = ""
-	webhookKey = ""
-)
 
 func init() {
 	secrets := loadSecrets()

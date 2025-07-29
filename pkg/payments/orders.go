@@ -2,7 +2,7 @@ package payments
 
 import "log"
 
-func CreateOrder(amountInRs int, notes map[string]interface{}) {
+func CreateOrder(amountInRs int, notes map[string]interface{}) (map[string]interface{}, error) {
 	// This function will handle the creation of an order.
 	// It will interact with Razorpay's API to create an order and return the order details.
 	// The implementation will be added later.
@@ -17,7 +17,9 @@ func CreateOrder(amountInRs int, notes map[string]interface{}) {
 
 	if err != nil {
 		log.Println("Error creating order:", err)
-		return
+		return nil, err
 	}
 	log.Println("Order created successfully:", order)
+
+	return order, nil
 }
