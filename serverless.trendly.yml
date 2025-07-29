@@ -163,6 +163,26 @@ functions:
     timeout: 30
     events:
       - http: ANY /api/influencers/{proxy+}
+  trendly_razorpay_apis:
+    handler: functions/razorpay/apis/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /razorpay/{proxy+}
+  trendly_payment_webhooks:
+    handler: functions/razorpay/webhook/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /payment_webhooks
   stream_sqs_hook:
     handler: functions/stream_sqs_hook/main.go
     package:
