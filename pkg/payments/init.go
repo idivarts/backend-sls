@@ -17,7 +17,7 @@ var (
 )
 
 const (
-	RedirectUrl = "https://brand.trendly.now"
+	RedirectUrl = "https://brands.trendly.now"
 )
 
 type RazorpaySecrets struct {
