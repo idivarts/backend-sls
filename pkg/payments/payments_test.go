@@ -7,5 +7,5 @@ import (
 )
 
 func TestCreateOrder(t *testing.T) {
-	payments.CreateOrder()
+	payments.CreateOrder(499, map[string]interface{}{})
 }
