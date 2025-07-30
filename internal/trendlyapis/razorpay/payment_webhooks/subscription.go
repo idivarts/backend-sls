@@ -2,6 +2,7 @@ package paymentwebhooks
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
@@ -10,7 +11,7 @@ import (
 type SubscriptionNotes struct {
 	BrandID      string `json:"brandId"`
 	PlanName     string `json:"planName"`
-	IsGrowthPlan bool   `json:"isGrowthPlan"`
+	IsGrowthPlan string `json:"isGrowthPlan"`
 }
 type SubscriptionEntity struct {
 	ID                  string            `json:"id"`
@@ -40,7 +41,7 @@ type SubscriptionEntity struct {
 	RemainingCount      int               `json:"remaining_count"`
 }
 
-func handleSubscription(event RazorpayWebhookEvent) error {
+func HandleSubscription(event RazorpayWebhookEvent) error {
 
 	subscription := event.Payload.Subscription.Entity
 
@@ -53,10 +54,17 @@ func handleSubscription(event RazorpayWebhookEvent) error {
 	if err != nil {
 		return err
 	}
+	if brand.Billing == nil {
+		brand.Billing = &trendlymodels.BrandBilling{}
+	}
 
 	brand.Billing.Subscription = &subscription.ID
 	brand.Billing.BillingStatus = &subscription.Status
-	brand.Billing.IsGrowthPlan = &subscription.Notes.IsGrowthPlan
+	if subscription.Notes.IsGrowthPlan != "" {
+		if i, err := strconv.Atoi(subscription.Notes.IsGrowthPlan); err == nil {
+			brand.Billing.IsGrowthPlan = myutil.BoolPtr(i > 0)
+		}
+	}
 
 	switch *brand.Billing.BillingStatus {
 	case "created":

@@ -66,12 +66,12 @@ func Handler(c *gin.Context) {
 	// TODO: Unmarshal JSON and handle event
 	var event RazorpayWebhookEvent
 	if err := json.Unmarshal(bodyBytes, &event); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Failed to parse webhook payload", "data": string(bodyBytes)})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Failed to parse webhook payload"})
 		return
 	}
 
 	if strings.HasPrefix(event.Event, "subscription") {
-		handleSubscription(event)
+		HandleSubscription(event)
 	} else if strings.HasPrefix(event.Event, "payment_link") {
 		handlePaymentLink(event)
 	}

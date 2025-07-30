@@ -21,7 +21,7 @@ type OrderEntity struct {
 	LateAuthConfigID      *string                `json:"late_auth_config_id"`
 	MerchantID            string                 `json:"merchant_id"`
 	Method                *string                `json:"method"`
-	Notes                 []string               `json:"notes"`
+	Notes                 map[string]string      `json:"notes"`
 	Offers                map[string]interface{} `json:"offers"`
 	OrderMetas            []interface{}          `json:"order_metas"`
 	OrderRelationships    []interface{}          `json:"order_relationships"`
