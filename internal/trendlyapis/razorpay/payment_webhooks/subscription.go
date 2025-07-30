@@ -10,7 +10,7 @@ import (
 type SubscriptionNotes struct {
 	BrandID      string `json:"brandId"`
 	PlanName     string `json:"planName"`
-	IsGrowthPlan bool   `json:"isGrowthPlan"`
+	IsGrowthPlan int    `json:"isGrowthPlan"`
 }
 type SubscriptionEntity struct {
 	ID                  string            `json:"id"`
@@ -56,7 +56,7 @@ func handleSubscription(event RazorpayWebhookEvent) error {
 
 	brand.Billing.Subscription = &subscription.ID
 	brand.Billing.BillingStatus = &subscription.Status
-	brand.Billing.IsGrowthPlan = &subscription.Notes.IsGrowthPlan
+	brand.Billing.IsGrowthPlan = myutil.BoolPtr(subscription.Notes.IsGrowthPlan > 0)
 
 	switch *brand.Billing.BillingStatus {
 	case "created":
