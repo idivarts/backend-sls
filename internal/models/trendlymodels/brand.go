@@ -16,6 +16,11 @@ type Brand struct {
 	Backend     *BrandBackend     `json:"backend,omitempty" firestore:"backend,omitempty"`
 	Survey      *BrandSurvey      `json:"survey,omitempty" firestore:"survey,omitempty"`
 
+	IsBillingDisabled bool `json:"isBillingDisabled" firestore:"isBillingDisabled"`
+	Billing           *struct {
+		Subscription *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
+		Status       *int    `json:"status,omitempty" firestore:"status,omitempty"`
+	} `json:"billing,omitempty" firestore:"billing,omitempty"`
 	// Members       []BrandMember  `json:"members" firestore:"members"`
 	// Notifications []Notification `json:"notifications" firestore:"notifications"`
 }
