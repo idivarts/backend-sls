@@ -4,12 +4,28 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/pkg/payments"
 )
+
+// Define struct to match Razorpay webhook event
+type RazorpayWebhookEvent struct {
+	Entity    string   `json:"entity"`
+	AccountID string   `json:"account_id"`
+	Event     string   `json:"event"`
+	Contains  []string `json:"contains"`
+	Payload   struct {
+		Subscription *struct {
+			Entity SubscriptionEntity `json:"entity"`
+		} `json:"subscription"`
+	} `json:"payload"`
+	CreatedAt int64 `json:"created_at"`
+}
 
 func Handler(c *gin.Context) {
 	webhookSecret := payments.WebhookKey
@@ -39,14 +55,15 @@ func Handler(c *gin.Context) {
 	}
 
 	// TODO: Unmarshal JSON and handle event
-	// You can parse bodyBytes into a map or custom struct based on Razorpay's webhook docs
+	var event RazorpayWebhookEvent
+	if err := json.Unmarshal(bodyBytes, &event); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse webhook payload"})
+		return
+	}
 
-	// Log or process the event
-	// Example (optional):
-	// var event map[string]interface{}
-	// if err := json.Unmarshal(bodyBytes, &event); err == nil {
-	//     fmt.Printf("Received event: %v\n", event)
-	// }
+	if strings.HasPrefix(event.Event, "subscription") {
+
+	}
 
 	// Acknowledge webhook
 	c.JSON(http.StatusOK, gin.H{"status": "Webhook received"})
