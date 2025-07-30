@@ -36,6 +36,6 @@ type PaymentLinkEntity struct {
 	WhatsAppLink bool   `json:"whatsapp_link"`
 }
 
-func HandlePaymentLink(event RazorpayWebhookEvent) {
+func handlePaymentLink(event RazorpayWebhookEvent) {
 
 }
