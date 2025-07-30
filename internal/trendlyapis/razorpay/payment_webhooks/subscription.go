@@ -27,3 +27,7 @@ type SubscriptionEntity struct {
 	OfferID             string            `json:"offer_id"`
 	RemainingCount      int               `json:"remaining_count"`
 }
+
+func handleSubscription(event RazorpayWebhookEvent) {
+
+}
