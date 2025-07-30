@@ -11,12 +11,12 @@ type PaymentLinkEntity struct {
 		Contact string `json:"contact"`
 		Email   string `json:"email"`
 	} `json:"customer"`
-	Description           string                 `json:"description"`
-	ExpireBy              int64                  `json:"expire_by"`
-	ExpiredAt             int64                  `json:"expired_at"`
-	FirstMinPartialAmount int64                  `json:"first_min_partial_amount"`
-	ID                    string                 `json:"id"`
-	Notes                 map[string]interface{} `json:"notes"` // nullable
+	Description           string            `json:"description"`
+	ExpireBy              int64             `json:"expire_by"`
+	ExpiredAt             int64             `json:"expired_at"`
+	FirstMinPartialAmount int64             `json:"first_min_partial_amount"`
+	ID                    string            `json:"id"`
+	Notes                 map[string]string `json:"notes"` // nullable
 	Notify                struct {
 		Email    bool `json:"email"`
 		SMS      bool `json:"sms"`
