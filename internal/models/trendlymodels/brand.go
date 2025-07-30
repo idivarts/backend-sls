@@ -2,7 +2,10 @@ package trendlymodels
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
+	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
@@ -18,9 +21,12 @@ type Brand struct {
 
 	IsBillingDisabled bool `json:"isBillingDisabled" firestore:"isBillingDisabled"`
 	Billing           *struct {
-		Subscription *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
-		Status       *int    `json:"status,omitempty" firestore:"status,omitempty"`
+		Subscription  *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
+		BillingStatus *string `json:"billingStatus,omitempty" firestore:"billingStatus,omitempty"`
+		IsOnTrial     *bool   `json:"isOnTrial,omitempty" firestore:"isOnTrial,omitempty"`
+		Status        *int    `json:"status,omitempty" firestore:"status,omitempty"`
 	} `json:"billing,omitempty" firestore:"billing,omitempty"`
+
 	// Members       []BrandMember  `json:"members" firestore:"members"`
 	// Notifications []Notification `json:"notifications" firestore:"notifications"`
 }
@@ -63,4 +69,25 @@ func (u *Brand) Get(brandId string) error {
 		return err
 	}
 	return err
+}
+
+func (b *Brand) Insert(brandId string) (*firestore.WriteResult, error) {
+	// Marshal the struct to JSON
+	bytes, err := json.Marshal(b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal user: %w", err)
+	}
+
+	// Unmarshal into a map
+	var data map[string]interface{}
+	if err := json.Unmarshal(bytes, &data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal to map: %w", err)
+	}
+
+	res, err := firestoredb.Client.Collection("brands").Doc(brandId).Set(context.Background(), data, firestore.MergeAll)
+
+	if err != nil {
+		return nil, err
+	}
+	return res, err
 }
