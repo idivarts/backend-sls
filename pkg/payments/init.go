@@ -13,7 +13,7 @@ var (
 	Client     *razorpay.Client
 	apiKey     = ""
 	apiSecret  = ""
-	webhookKey = ""
+	WebhookKey = ""
 )
 
 const (
@@ -52,12 +52,12 @@ func init() {
 	secrets := loadSecrets()
 	apiKey = secrets.APIKey
 	apiSecret = secrets.APISecret
-	webhookKey = secrets.WebhookKey
+	WebhookKey = secrets.WebhookKey
 
 	if apiKey == "" || apiSecret == "" {
 		apiKey = "rzp_test_Z9T0fM1E1agkpR"
 		apiSecret = "LaqAVYPBdqdrC4psaoga18nE"
-		webhookKey = "rzp_test_webhook_1234567890"
+		WebhookKey = "rzp_test_webhook_1234567890"
 	}
 
 	Client = razorpay.NewClient(apiKey, apiSecret)
