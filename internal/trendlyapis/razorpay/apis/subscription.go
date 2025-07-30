@@ -68,6 +68,8 @@ func CreateSubscription(c *gin.Context) {
 
 type CancelSubscriptionRequest struct {
 	BrandID string `json:"brandId" binding:"required"`
+	Reason  string `json:"reason" binding:"required"`
+	Note    string `json:"note"`
 }
 
 func CancelSubscription(c *gin.Context) {
