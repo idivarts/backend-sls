@@ -56,12 +56,18 @@ func handleSubscription(event RazorpayWebhookEvent) error {
 
 	brand.Billing.Subscription = &subscription.ID
 	brand.Billing.BillingStatus = &subscription.Status
+	brand.Billing.IsGrowthPlan = &subscription.Notes.IsGrowthPlan
+
 	switch *brand.Billing.BillingStatus {
 	case "created":
 		brand.Billing.Status = myutil.IntPtr(0)
 		break
 	case "authenticated":
+		brand.Billing.IsOnTrial = myutil.BoolPtr(true)
+		brand.Billing.Status = myutil.IntPtr(1)
+		break
 	case "active":
+		brand.Billing.IsOnTrial = myutil.BoolPtr(false)
 		brand.Billing.Status = myutil.IntPtr(1)
 		break
 	case "pending":
