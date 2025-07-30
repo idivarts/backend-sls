@@ -29,6 +29,12 @@ provider:
     SENDGRID_NAME: Trendly
     SENDGRID_EMAIL: no-reply@trendly.now
     HUBSPOT_API_KEY: cGF0LW5hMS04YmU4ZmViNi03Nzg2LTQ3NzYtYWE5MC02Y2E3ZTg0NDBiNzk=
+
+    # All Razorpay related variables
+    GROWTH_PLAN_ID: plan_QzPMAkZjXYbJV8
+    BUSINESS_PLAN_ID: plan_QzPN1kyqCq0ePk
+    COLLAB_BOOST_AMOUNT: 799
+    COLLAB_HANDLING_LINK: https://rzp.io/rzp/A5hU0EUn
   iam:
     role:
       statements:
