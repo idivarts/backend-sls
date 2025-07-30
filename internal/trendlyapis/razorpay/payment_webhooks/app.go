@@ -23,6 +23,15 @@ type RazorpayWebhookEvent struct {
 		Subscription *struct {
 			Entity SubscriptionEntity `json:"entity"`
 		} `json:"subscription"`
+		Order *struct {
+			Entity OrderEntity `json:"entity"`
+		} `json:"order"`
+		Payment *struct {
+			Entity PaymentEntity `json:"entity"`
+		} `json:"payment"`
+		PaymentLink *struct {
+			Entity PaymentLinkEntity `json:"entity"`
+		} `json:"payment_link"`
 	} `json:"payload"`
 	CreatedAt int64 `json:"created_at"`
 }
