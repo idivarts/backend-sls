@@ -71,7 +71,7 @@ func Handler(c *gin.Context) {
 	}
 
 	if strings.HasPrefix(event.Event, "subscription") {
-		handleSubscription(event)
+		HandleSubscription(event)
 	} else if strings.HasPrefix(event.Event, "payment_link") {
 		handlePaymentLink(event)
 	}
