@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	apihandler.GinEngine.GET("/payment_webhooks", paymentwebhooks.Handler)
+	apihandler.GinEngine.Any("/payment_webhooks", paymentwebhooks.Handler)
 
 	apihandler.StartLambda()
 }
