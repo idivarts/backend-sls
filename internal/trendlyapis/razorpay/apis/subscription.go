@@ -11,7 +11,7 @@ import (
 )
 
 type CreateSubscriptionRequest struct {
-	BrandID      string `json:"brandId,required"`
+	BrandID      string `json:"brandId" binding:"required"`
 	IsGrowthPlan bool   `json:"isGrowthPlan"`
 }
 
@@ -67,7 +67,7 @@ func CreateSubscription(c *gin.Context) {
 }
 
 type CancelSubscriptionRequest struct {
-	BrandID string `json:"brandId,required"`
+	BrandID string `json:"brandId" binding:"required"`
 }
 
 func CancelSubscription(c *gin.Context) {
