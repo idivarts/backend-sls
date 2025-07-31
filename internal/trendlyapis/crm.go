@@ -54,7 +54,7 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 				CreationTime:      user.CreationTime,
 				SocialLink:        socialUrl,
 			}}
-			go hubspot.CreateOrUpdateContacts(contacts)
+			// go hubspot.CreateOrUpdateContacts(contacts)
 			err := myemail.CreateOrUpdateContacts(contacts)
 			if err != nil {
 				return err
@@ -71,6 +71,10 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 		brandName := ""
 		if brand != nil {
 			brandName = brand.Name
+		}
+
+		if brand.Profile != nil && brand.Profile.PhoneNumber != nil {
+			manager.PhoneNumber = *brand.Profile.PhoneNumber
 		}
 
 		contacts := []myemail.ContactDetails{{

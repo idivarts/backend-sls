@@ -34,10 +34,11 @@ type BrandBilling struct {
 }
 
 type BrandProfile struct {
-	About      *string  `json:"about,omitempty" firestore:"about,omitempty"`
-	Banner     *string  `json:"banner,omitempty" firestore:"banner,omitempty"`
-	Industries []string `json:"industries,omitempty" firestore:"industries,omitempty"`
-	Website    *string  `json:"website,omitempty" firestore:"website,omitempty"`
+	About       *string  `json:"about,omitempty" firestore:"about,omitempty"`
+	Banner      *string  `json:"banner,omitempty" firestore:"banner,omitempty"`
+	Industries  []string `json:"industries,omitempty" firestore:"industries,omitempty"`
+	Website     *string  `json:"website,omitempty" firestore:"website,omitempty"`
+	PhoneNumber *string  `json:"phone,omitempty" firestore:"phone,omitempty"`
 }
 
 type BrandPreferences struct {
