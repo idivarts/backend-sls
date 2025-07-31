@@ -53,6 +53,10 @@ func CreateSubscription(c *gin.Context) {
 		planId = BUSINESS_PLAN_ID
 	}
 
+	if brand.Billing == nil {
+		trialDays = 0
+	}
+
 	link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 1, map[string]interface{}{
 		"brandId":      req.BrandID,
 		"planName":     planName,
