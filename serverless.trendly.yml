@@ -31,10 +31,10 @@ provider:
     HUBSPOT_API_KEY: cGF0LW5hMS04YmU4ZmViNi03Nzg2LTQ3NzYtYWE5MC02Y2E3ZTg0NDBiNzk=
 
     # All Razorpay related variables
-    GROWTH_PLAN_ID: plan_QzPMAkZjXYbJV8
-    BUSINESS_PLAN_ID: plan_QzPN1kyqCq0ePk
+    GROWTH_PLAN_ID: plan_QywVXV2flgIY7N
+    BUSINESS_PLAN_ID: plan_QywX8bnObf3P42
     COLLAB_BOOST_AMOUNT: 799
-    COLLAB_HANDLING_LINK: https://rzp.io/rzp/A5hU0EUn
+    COLLAB_HANDLING_LINK: https://rzp.io/rzp/collaboration-handling-support
   iam:
     role:
       statements:
