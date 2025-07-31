@@ -52,16 +52,20 @@ func syncManagers() {
 			if manager.CreationTime == 0 {
 				manager.CreationTime = time.Now().UnixMilli()
 			}
-			contacts = append(contacts, myemail.ContactDetails{
+			mContact := myemail.ContactDetails{
 				Email:        manager.Email,
 				Name:         manager.Name,
 				IsManager:    true,
 				CreationTime: &manager.CreationTime,
 				CompanyName:  brandName,
-				// Phone:             phone,
-				// ProfileCompletion: pCent,
-				// LastActivityTime:  manager.LastUseTime,
-			})
+			}
+			if brand.Profile != nil && brand.Profile.PhoneNumber != nil {
+				mContact.Phone = *brand.Profile.PhoneNumber
+			}
+			if brand.Profile != nil && brand.Profile.Website != nil {
+				mContact.SocialLink = *brand.Profile.Website
+			}
+			contacts = append(contacts, mContact)
 		}
 	}
 	log.Println("Got all docs", len(contacts))
