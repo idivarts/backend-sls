@@ -59,11 +59,13 @@ func syncManagers() {
 				CreationTime: &manager.CreationTime,
 				CompanyName:  brandName,
 			}
-			if brand.Profile != nil && brand.Profile.PhoneNumber != nil {
-				mContact.Phone = *brand.Profile.PhoneNumber
-			}
-			if brand.Profile != nil && brand.Profile.Website != nil {
-				mContact.SocialLink = *brand.Profile.Website
+			if brand != nil {
+				if brand.Profile != nil && brand.Profile.PhoneNumber != nil {
+					mContact.Phone = *brand.Profile.PhoneNumber
+				}
+				if brand.Profile != nil && brand.Profile.Website != nil {
+					mContact.SocialLink = *brand.Profile.Website
+				}
 			}
 			contacts = append(contacts, mContact)
 		}
