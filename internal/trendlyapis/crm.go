@@ -54,7 +54,7 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 				CreationTime:      user.CreationTime,
 				SocialLink:        socialUrl,
 			}}
-			go hubspot.CreateOrUpdateContacts(contacts)
+			// go hubspot.CreateOrUpdateContacts(contacts)
 			err := myemail.CreateOrUpdateContacts(contacts)
 			if err != nil {
 				return err
@@ -76,12 +76,17 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 		contacts := []myemail.ContactDetails{{
 			Email:            manager.Email,
 			Name:             manager.Name,
-			Phone:            manager.PhoneNumber,
 			IsManager:        true,
 			CompanyName:      brandName, // Currenly its difficult to fetch the company name
 			LastActivityTime: aws.Int64(time.Now().UnixMilli()),
 			CreationTime:     aws.Int64(manager.CreationTime),
 		}}
+		if brand.Profile != nil && brand.Profile.PhoneNumber != nil {
+			contacts[0].Phone = *brand.Profile.PhoneNumber
+		}
+		if brand.Profile != nil && brand.Profile.Website != nil {
+			contacts[0].SocialLink = *brand.Profile.Website
+		}
 
 		go hubspot.CreateOrUpdateContacts(contacts)
 		err = myemail.CreateOrUpdateContacts(contacts)
