@@ -8,9 +8,21 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
+
+// CleanName removes all non-alphabetic characters and replaces them with a space
+func CleanName(name string) string {
+	// Replace all characters that are not A-Z, a-z, or space with a space
+	re := regexp.MustCompile(`[^a-zA-Z ]+`)
+	cleaned := re.ReplaceAllString(name, " ")
+
+	// Replace multiple spaces with a single space and trim the result
+	reSpace := regexp.MustCompile(`\s+`)
+	return strings.TrimSpace(reSpace.ReplaceAllString(cleaned, " "))
+}
 
 type ContactDetails struct {
 	Email             string
@@ -38,6 +50,7 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 		}
 
 		if contact.Name != "" {
+			contact.Name = CleanName(contact.Name)
 			contactPayload["first_name"] = strings.Split(contact.Name, " ")[0]
 			if parts := splitName(contact.Name); len(parts) > 1 {
 				contactPayload["last_name"] = parts[1]
