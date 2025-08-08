@@ -177,6 +177,7 @@ functions:
         - 'key-secrets.json'
         - 'templates/*'
     timeout: 30
+    provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /razorpay/{proxy+}
   trendly_payment_webhooks:
@@ -187,6 +188,7 @@ functions:
         - 'key-secrets.json'
         - 'templates/*'
     timeout: 30
+    provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /payment_webhooks
   stream_sqs_hook:
