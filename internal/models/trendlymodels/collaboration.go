@@ -71,7 +71,7 @@ func (b *Collaboration) Get(collabId string) error {
 func GetCollabIDs(startAfter *interface{}, limit int) ([]string, error) {
 	var iter *firestore.DocumentIterator
 
-	collection := firestoredb.Client.Collection("collaborations").OrderBy("timeStamp", firestore.Desc)
+	collection := firestoredb.Client.Collection("collaborations").Where("status", "==", "active").OrderBy("timeStamp", firestore.Desc)
 	if startAfter == nil {
 		iter = collection.Limit(limit).Documents(context.Background())
 	} else {
