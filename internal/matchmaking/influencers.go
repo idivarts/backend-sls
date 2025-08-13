@@ -29,7 +29,7 @@ from (
 		ANY_VALUE(last_use_time) AS last_use_time
 	FROM(
 		SELECT *,
-		IF(reach_count>20000 AND follower_count>1000, 1, 0) as rRank
+		IF(reach_count>20000 AND follower_count>5000, 1, 0) as rRank
 		FROM ` + "`trendly-9ab99.matches.influencers`" + ` 
 		LEFT JOIN UNNEST(categories) as category
 		LEFT JOIN UNNEST(languages) as language
