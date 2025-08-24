@@ -2,16 +2,15 @@ package paymentwebhooks
 
 import (
 	"errors"
-	"strconv"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 )
 
 type SubscriptionNotes struct {
-	BrandID      string `json:"brandId"`
-	PlanName     string `json:"planName"`
-	IsGrowthPlan string `json:"isGrowthPlan"`
+	BrandID   string `json:"brandId"`
+	PlanKey   string `json:"planKey"`
+	PlanCycle string `json:"planCycle"`
 }
 type SubscriptionEntity struct {
 	ID                  string            `json:"id"`
@@ -60,10 +59,11 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 
 	brand.Billing.Subscription = &subscription.ID
 	brand.Billing.BillingStatus = &subscription.Status
-	if subscription.Notes.IsGrowthPlan != "" {
-		if i, err := strconv.Atoi(subscription.Notes.IsGrowthPlan); err == nil {
-			brand.Billing.IsGrowthPlan = myutil.BoolPtr(i > 0)
-		}
+	if subscription.Notes.PlanKey != "" {
+		brand.Billing.PlanKey = &subscription.Notes.PlanKey
+	}
+	if subscription.Notes.PlanCycle != "" {
+		brand.Billing.PlanCycle = &subscription.Notes.PlanCycle
 	}
 
 	switch *brand.Billing.BillingStatus {
