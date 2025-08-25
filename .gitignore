@@ -24,7 +24,7 @@ node_modules
 dist
 **/service-account**.json
 .DS_Store
-applications.csv
+applications*.csv
 key-secrets*.json
 new-leads.csv
 new-notion-leads.csv
