@@ -174,9 +174,9 @@ func GenerateKey(namePtr *string) string {
 	randomNumber := rand.Intn(90000) + 10000 // Ensures a 5-digit number
 	randomSuffix := fmt.Sprintf("-%d", randomNumber)
 
-	// Ensure the key does not exceed 150 characters
+	// Ensure the key does not exceed 60 characters
 	// Subtract the length of the random suffix to determine max length for validKey
-	maxKeyLength := 150 - len(randomSuffix)
+	maxKeyLength := 60 - len(randomSuffix)
 	key := validKey.String()
 
 	if len(key) > maxKeyLength {
