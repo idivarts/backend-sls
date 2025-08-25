@@ -1,9 +1,8 @@
 package streamchat
 
 import (
-	"context"
-	"log"
 	"os"
+	"time"
 
 	stream "github.com/GetStream/stream-chat-go/v5"
 )
@@ -21,25 +20,25 @@ func init() {
 		streamClient = os.Getenv("STREAM_CLIENT")
 		streamSecret = os.Getenv("STREAM_SECRET")
 	}
-	client, err := stream.NewClient(streamClient, streamSecret)
+	client, err := stream.NewClient(streamClient, streamSecret, stream.WithTimeout(60*time.Second))
 	if err != nil {
 		panic(err.Error())
 	}
 
-	client.UpdateChannelType(context.Background(), "messaging", map[string]interface{}{
-		"reminders":   true,
-		"read_events": true,
-	})
+	// client.UpdateChannelType(context.Background(), "messaging", map[string]interface{}{
+	// 	"reminders":   true,
+	// 	"read_events": true,
+	// })
 
-	settings := &stream.AppSettings{
-		EnforceUniqueUsernames: "no",
-		RemindersInterval:      300,
-	}
-	_, err = client.UpdateAppSettings(context.Background(), settings)
-	if err != nil {
-		panic(err.Error())
-	}
-	log.Println("Stream Chat client initialized")
+	// settings := &stream.AppSettings{
+	// 	EnforceUniqueUsernames: "no",
+	// 	RemindersInterval:      300,
+	// }
+	// _, err = client.UpdateAppSettings(context.Background(), settings)
+	// if err != nil {
+	// 	panic(err.Error())
+	// }
+	// log.Println("Stream Chat client initialized")
 
 	Client = client
 }
