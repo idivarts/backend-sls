@@ -108,7 +108,7 @@ func CancelSubscription(c *gin.Context) {
 		return
 	}
 
-	data, err := payments.CancelSubscription(myutil.DerefString(brand.Billing.Subscription), true)
+	data, err := payments.CancelSubscription(myutil.DerefString(brand.Billing.Subscription), (brand.Billing.BillingStatus != nil && *brand.Billing.BillingStatus == "active"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Not a part of the current brand"})
 		return

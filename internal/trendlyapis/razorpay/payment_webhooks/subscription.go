@@ -2,9 +2,11 @@ package paymentwebhooks
 
 import (
 	"errors"
+	"log"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	"github.com/idivarts/backend-sls/pkg/payments"
 )
 
 type SubscriptionNotes struct {
@@ -56,6 +58,14 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 	}
 	if brand.Billing == nil {
 		brand.Billing = &trendlymodels.BrandBilling{}
+	}
+
+	if brand.Billing.Subscription != nil && *brand.Billing.Subscription != "" && *brand.Billing.Subscription != subscription.ID {
+		// Cancel the subscription before adding new
+		_, err = payments.CancelSubscription(*brand.Billing.Subscription, (brand.Billing.BillingStatus != nil && *brand.Billing.BillingStatus == "active"))
+		if err != nil {
+			log.Println("Unable to cancel previous subscription", *brand.Billing.Subscription, err)
+		}
 	}
 
 	brand.Billing.Subscription = &subscription.ID

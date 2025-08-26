@@ -13,7 +13,6 @@ func main() {
 	handler.POST("/cancel-subscription", razorpayapis.CancelSubscription)
 
 	handler.POST("/subscriptions/create", razorpayapis.CreateSubscriptionV2)
-	handler.POST("/subscriptions/upgrade", razorpayapis.UpdateSubscription)
 	handler.POST("/subscriptions/cancel", razorpayapis.CancelSubscription)
 
 	handler.POST("/collaborations/boost", razorpayapis.CollaborationBoost)
