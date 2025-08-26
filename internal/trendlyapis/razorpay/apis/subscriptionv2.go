@@ -55,11 +55,11 @@ func CreateSubscriptionV2(c *gin.Context) {
 
 	planId := "" //payments.Plans[planKey+":"+planCycle]
 
-	plans, err := payments.Client.Plan.All(map[string]interface{}{
+	body, err := payments.Client.Plan.All(map[string]interface{}{
 		"from": PLAN_LAST_TIME,
 	}, nil)
-	if items, ok := plans["items"].([]interface{}); ok {
-		for _, item := range items {
+	if plans, ok := body["items"].([]interface{}); ok {
+		for _, item := range plans {
 			var plan paymentwebhooks.PlanEntity
 			b, _ := json.Marshal(item)   // convert map[string]interface{} -> []byte
 			_ = json.Unmarshal(b, &plan) // convert []byte -> struct
