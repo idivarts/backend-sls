@@ -8,9 +8,10 @@ import (
 )
 
 type SubscriptionNotes struct {
-	BrandID   string `json:"brandId"`
-	PlanKey   string `json:"planKey"`
-	PlanCycle string `json:"planCycle"`
+	BrandID     string `json:"brandId"`
+	PlanKey     string `json:"planKey"`
+	PlanCycle   string `json:"planCycle"`
+	PlanVersion string `json:"planVersion"`
 }
 type SubscriptionEntity struct {
 	ID                  string            `json:"id"`
