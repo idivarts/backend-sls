@@ -12,6 +12,9 @@ func main() {
 	handler.POST("/create-subscription", razorpayapis.CreateSubscription)
 	handler.POST("/cancel-subscription", razorpayapis.CancelSubscription)
 
+	handler.POST("/subscriptions/create", razorpayapis.CreateSubscriptionV2)
+	handler.POST("/subscriptions/cancel", razorpayapis.CancelSubscription)
+
 	handler.POST("/collaborations/boost", razorpayapis.CollaborationBoost)
 	handler.POST("/collaborations/handle", razorpayapis.CollaborationHandleSupport)
 

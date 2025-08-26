@@ -14,6 +14,7 @@ var (
 	apiKey     = ""
 	apiSecret  = ""
 	WebhookKey = ""
+	Plans      = map[string]string{}
 )
 
 const (
@@ -21,9 +22,10 @@ const (
 )
 
 type RazorpaySecrets struct {
-	APIKey     string `json:"key"`
-	APISecret  string `json:"secret"`
-	WebhookKey string `json:"webhookKey"`
+	APIKey     string            `json:"key"`
+	APISecret  string            `json:"secret"`
+	WebhookKey string            `json:"webhookKey"`
+	Plans      map[string]string `json:"plans"`
 }
 
 type KeySecretJson struct {
@@ -53,6 +55,7 @@ func init() {
 	apiKey = secrets.APIKey
 	apiSecret = secrets.APISecret
 	WebhookKey = secrets.WebhookKey
+	Plans = secrets.Plans
 
 	if apiKey == "" || apiSecret == "" {
 		apiKey = "rzp_test_Z9T0fM1E1agkpR"

@@ -27,9 +27,9 @@ func CreateSubscriptionLink(planId string, totalBillingCycles, trialDays, expire
 	return link["short_url"].(string), err
 }
 
-func CancelSubscription(subscriptionId string) (map[string]interface{}, error) {
+func CancelSubscription(subscriptionId string, cancelAtEnd bool) (map[string]interface{}, error) {
 	data := map[string]interface{}{
-		"cancel_at_cycle_end": false,
+		"cancel_at_cycle_end": cancelAtEnd,
 	}
 	data, err := Client.Subscription.Cancel(subscriptionId, data, nil)
 	if err != nil {

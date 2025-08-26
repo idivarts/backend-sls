@@ -2,16 +2,18 @@ package paymentwebhooks
 
 import (
 	"errors"
-	"strconv"
+	"log"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	"github.com/idivarts/backend-sls/pkg/payments"
 )
 
 type SubscriptionNotes struct {
-	BrandID      string `json:"brandId"`
-	PlanName     string `json:"planName"`
-	IsGrowthPlan string `json:"isGrowthPlan"`
+	BrandID     string `json:"brandId"`
+	PlanKey     string `json:"planKey"`
+	PlanCycle   string `json:"planCycle"`
+	PlanVersion string `json:"planVersion"`
 }
 type SubscriptionEntity struct {
 	ID                  string            `json:"id"`
@@ -58,12 +60,21 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 		brand.Billing = &trendlymodels.BrandBilling{}
 	}
 
+	if brand.Billing.Subscription != nil && *brand.Billing.Subscription != "" && *brand.Billing.Subscription != subscription.ID {
+		// Cancel the subscription before adding new
+		_, err = payments.CancelSubscription(*brand.Billing.Subscription, (brand.Billing.BillingStatus != nil && *brand.Billing.BillingStatus == "active"))
+		if err != nil {
+			log.Println("Unable to cancel previous subscription", *brand.Billing.Subscription, err)
+		}
+	}
+
 	brand.Billing.Subscription = &subscription.ID
 	brand.Billing.BillingStatus = &subscription.Status
-	if subscription.Notes.IsGrowthPlan != "" {
-		if i, err := strconv.Atoi(subscription.Notes.IsGrowthPlan); err == nil {
-			brand.Billing.IsGrowthPlan = myutil.BoolPtr(i > 0)
-		}
+	if subscription.Notes.PlanKey != "" {
+		brand.Billing.PlanKey = &subscription.Notes.PlanKey
+	}
+	if subscription.Notes.PlanCycle != "" {
+		brand.Billing.PlanCycle = &subscription.Notes.PlanCycle
 	}
 
 	switch *brand.Billing.BillingStatus {
