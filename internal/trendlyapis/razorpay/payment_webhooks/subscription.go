@@ -69,6 +69,7 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 	}
 
 	brand.Billing.Subscription = &subscription.ID
+	brand.Billing.SubscriptionUrl = subscription.ShortURL
 	brand.Billing.BillingStatus = &subscription.Status
 	if subscription.Notes.PlanKey != "" {
 		brand.Billing.PlanKey = &subscription.Notes.PlanKey

@@ -26,8 +26,9 @@ type Brand struct {
 	// Notifications []Notification `json:"notifications" firestore:"notifications"`
 }
 type BrandBilling struct {
-	Subscription  *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
-	BillingStatus *string `json:"billingStatus,omitempty" firestore:"billingStatus,omitempty"`
+	Subscription    *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
+	SubscriptionUrl *string `json:"subscriptionUrl,omitempty" firestore:"subscriptionUrl,omitempty"`
+	BillingStatus   *string `json:"billingStatus,omitempty" firestore:"billingStatus,omitempty"`
 	// IsGrowthPlan  *bool   `json:"isGrowthPlan,omitempty" firestore:"isGrowthPlan,omitempty"`
 	PlanKey   *string `json:"planKey,omitempty" firestore:"planKey,omitempty"`
 	PlanCycle *string `json:"planCycle,omitempty" firestore:"planCycle,omitempty"`
