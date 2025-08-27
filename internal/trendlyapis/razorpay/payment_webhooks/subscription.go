@@ -60,6 +60,12 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 		brand.Billing = &trendlymodels.BrandBilling{}
 	}
 
+	if brand.Billing.Subscription != nil && brand.Billing.Subscription != &subscription.ID &&
+		subscription.Status != "active" &&
+		brand.Billing.Status != nil && *brand.Billing.Status == 1 {
+		return errors.New("subscription-cant-be-replaced-unless-active")
+	}
+
 	if brand.Billing.Subscription != nil && *brand.Billing.Subscription != "" && *brand.Billing.Subscription != subscription.ID {
 		// Cancel the subscription before adding new
 		_, err = payments.CancelSubscription(*brand.Billing.Subscription, (brand.Billing.BillingStatus != nil && *brand.Billing.BillingStatus == "active"))
