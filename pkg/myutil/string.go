@@ -23,6 +23,9 @@ func DerefInt64(s *int64) int64 {
 func IntPtr(i int) *int {
 	return &i
 }
+func StrPtr(i string) *string {
+	return &i
+}
 
 func BoolPtr(b bool) *bool {
 	return &b
