@@ -1,5 +1,12 @@
 package paymentwebhooks
 
+import (
+	"errors"
+
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/myutil"
+)
+
 type PaymentLinkEntity struct {
 	AcceptPartial bool   `json:"accept_partial"`
 	Amount        int64  `json:"amount"`
@@ -16,7 +23,7 @@ type PaymentLinkEntity struct {
 	ExpiredAt             int64             `json:"expired_at"`
 	FirstMinPartialAmount int64             `json:"first_min_partial_amount"`
 	ID                    string            `json:"id"`
-	Notes                 map[string]string `json:"notes"` // nullable
+	Notes                 SubscriptionNotes `json:"notes"` // nullable
 	Notify                struct {
 		Email    bool `json:"email"`
 		SMS      bool `json:"sms"`
@@ -36,6 +43,59 @@ type PaymentLinkEntity struct {
 	WhatsAppLink bool   `json:"whatsapp_link"`
 }
 
-func handlePaymentLink(event RazorpayWebhookEvent) {
+// Accepted Value for Status
+// created
+// partially_paid
+// expired
+// cancelled
+// paid
 
+func handlePaymentLink(event RazorpayWebhookEvent) error {
+	paymentLink := event.Payload.PaymentLink.Entity
+	if paymentLink.Notes.BrandID == "" {
+		return errors.New("brandid-null")
+	}
+
+	brand := &trendlymodels.Brand{}
+	err := brand.Get(paymentLink.Notes.BrandID)
+	if err != nil {
+		return err
+	}
+	if brand.Billing == nil {
+		brand.Billing = &trendlymodels.BrandBilling{}
+	}
+
+	if brand.Billing.PaymentLinkId != nil && brand.Billing.PaymentLinkId != &paymentLink.ID &&
+		paymentLink.Status != "paid" &&
+		brand.Billing.Status != nil && *brand.Billing.Status == 1 {
+		return errors.New("payment-link-cant-be-replaced-unless-active")
+	}
+
+	brand.Billing.PaymentLinkId = &paymentLink.ID
+	// brand.Billing.SubscriptionUrl = subscription.ShortURL
+	brand.Billing.BillingStatus = myutil.StrPtr("active")
+	if paymentLink.Notes.PlanKey != "" {
+		brand.Billing.PlanKey = &paymentLink.Notes.PlanKey
+	}
+	if paymentLink.Notes.PlanCycle != "" {
+		brand.Billing.PlanCycle = &paymentLink.Notes.PlanCycle
+	}
+
+	switch *brand.Billing.BillingStatus {
+	case "paid":
+		brand.Billing.IsOnTrial = myutil.BoolPtr(false)
+		brand.Billing.Status = myutil.IntPtr(1)
+		break
+	default:
+		brand.Billing.IsOnTrial = myutil.BoolPtr(true)
+		brand.Billing.Status = myutil.IntPtr(0)
+		break
+	}
+
+	_, err = brand.Insert(paymentLink.Notes.BrandID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

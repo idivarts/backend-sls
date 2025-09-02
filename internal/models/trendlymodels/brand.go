@@ -27,6 +27,7 @@ type Brand struct {
 }
 type BrandBilling struct {
 	Subscription    *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
+	PaymentLinkId   *string `json:"paymentLinkId,omitempty" firestore:"paymentLinkId,omitempty"`
 	SubscriptionUrl *string `json:"subscriptionUrl,omitempty" firestore:"subscriptionUrl,omitempty"`
 	BillingStatus   *string `json:"billingStatus,omitempty" firestore:"billingStatus,omitempty"`
 	// IsGrowthPlan  *bool   `json:"isGrowthPlan,omitempty" firestore:"isGrowthPlan,omitempty"`
