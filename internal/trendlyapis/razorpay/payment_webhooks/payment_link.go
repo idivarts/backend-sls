@@ -81,7 +81,7 @@ func handlePaymentLink(event RazorpayWebhookEvent) error {
 		brand.Billing.PlanCycle = &paymentLink.Notes.PlanCycle
 	}
 
-	switch *brand.Billing.BillingStatus {
+	switch paymentLink.Status {
 	case "paid":
 		brand.Billing.IsOnTrial = myutil.BoolPtr(false)
 		brand.Billing.Status = myutil.IntPtr(1)
