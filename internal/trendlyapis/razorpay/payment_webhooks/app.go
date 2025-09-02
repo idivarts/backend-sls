@@ -66,7 +66,8 @@ func Handler(c *gin.Context) {
 	// TODO: Unmarshal JSON and handle event
 	var event RazorpayWebhookEvent
 	if err := json.Unmarshal(bodyBytes, &event); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Failed to parse webhook payload"})
+		c.JSON(http.StatusOK, gin.H{"message": "Webhook failed to parse, but acknowledged", "error": err.Error()})
+		// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Failed to parse webhook payload"})
 		return
 	}
 
