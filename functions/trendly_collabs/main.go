@@ -20,6 +20,9 @@ func main() {
 func handleManagerAPIs() {
 	managerApisV1 := apihandler.GinEngine.Group("/api/collabs", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 
+	managerApisV1.POST("/influencers/:influencerId/unlock", trendlyCollabs.InfluencerUnlocked)
+	managerApisV1.POST("/influencers/:influencerId/message", trendlyCollabs.SendMessage)
+
 	managerApisV1.POST("/collaborations/:collabId/invitations/:userId", trendlyCollabs.SendInvitation)
 
 	managerApisV1.POST("/collaborations/:collabId/applications/:userId/:action", trendlyCollabs.ApplicationAction) // accept|reject|revise
