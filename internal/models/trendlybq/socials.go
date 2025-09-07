@@ -4,9 +4,9 @@ type Socials struct {
 	ID         string `db:"id" bigquery:"id"`
 	SocialType string `db:"social_type" bigquery:"social_type"`
 
-	Gender     string   `db:"gender" bigquery:"gender"`
-	Categories []string `db:"categories" bigquery:"categories"`
-	Location   string   `db:"location" bigquery:"location"`
+	Gender   string   `db:"gender" bigquery:"gender"`
+	Niches   []string `db:"niches" bigquery:"niches"`
+	Location string   `db:"location" bigquery:"location"`
 
 	FollowerCount  int `db:"follower_count" bigquery:"follower_count"`
 	ContentCount   int `db:"follower_count" bigquery:"follower_count"`
@@ -19,8 +19,9 @@ type Socials struct {
 	QualityScore    int     `db:"quality_score" bigquery:"quality_score"`
 	EngagementRate  float32 `db:"engagement_rate" bigquery:"engagement_rate"`
 
-	Name string `db:"name" bigquery:"name"`
-	Bio  string `db:"bio" bigquery:"bio"`
+	Name     string `db:"name" bigquery:"name"`
+	Bio      string `db:"bio" bigquery:"bio"`
+	category string `db:"category" bigquery:"category"`
 
 	ProfileVerified bool `db:"profile_verified" bigquery:"profile_verified"`
 	HasContacts     bool `db:"has_contacts" bigquery:"has_contacts"`
