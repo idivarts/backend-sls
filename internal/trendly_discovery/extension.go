@@ -8,11 +8,12 @@ import (
 
 // ScrapedProfile represents the payload coming from your scraper.
 type ScrapedProfile struct {
-	SectionsCount int   `json:"sectionsCount" binding:"gte=0"`
-	HeaderIndexed bool  `json:"headerIndexed"`
-	About         About `json:"about" binding:"required"`
-	Stats         Stats `json:"stats"`
-	Reels         Reels `json:"reels"`
+	SectionsCount int    `json:"sectionsCount" binding:"gte=0"`
+	HeaderIndexed bool   `json:"headerIndexed"`
+	About         About  `json:"about" binding:"required"`
+	Stats         Stats  `json:"stats"`
+	Reels         Reels  `json:"reels"`
+	Manual        Manual `json:"manual"`
 }
 
 // About holds profile "about" info.
@@ -74,6 +75,13 @@ type ReelOverlays struct {
 	HasHoverOverlay bool   `json:"has_hover_overlay"`
 	Likes           Metric `json:"likes"`
 	Comments        Metric `json:"comments"`
+}
+
+type Manual struct {
+	Gender          string   `json:"gender"`
+	Niches          []string `json:"niches"`
+	Location        string   `json:"location"`
+	AestheticsScore int      `json:"aestheticsScore" binding:"gte=0,lte=100"`
 }
 
 func AddProfile(c *gin.Context) {
