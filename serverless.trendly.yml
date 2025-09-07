@@ -118,6 +118,16 @@ functions:
             - cron(30 2 * * ? *)   # 8:00 AM IST daily
             - cron(30 14 * * ? *)  # 8:00 PM IST daily
           enabled: true
+  trendly_discovery:
+    handler: functions/trendly_discovery/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /discovery/{proxy+}
   trendly_apis:
     handler: functions/trendly_apis/main.go
     package:
