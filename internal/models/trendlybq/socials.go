@@ -8,10 +8,11 @@ type Socials struct {
 	Niches   []string `db:"niches" bigquery:"niches"`
 	Location string   `db:"location" bigquery:"location"`
 
-	FollowerCount  int `db:"follower_count" bigquery:"follower_count"`
-	ContentCount   int `db:"follower_count" bigquery:"follower_count"`
-	ViewsCount     int `db:"views_count" bigquery:"views_count"`            //views
-	EnagamentCount int `db:"engagement_count" bigquery:"engagements_count"` //engagement
+	FollowerCount     int `db:"follower_count" bigquery:"follower_count"`
+	ContentCount      int `db:"content_count" bigquery:"content_count"`             //posts
+	ReelScrappedCount int `db:"reel_scrapped_count" bigquery:"reel_scrapped_count"` //scrapped reels
+	ViewsCount        int `db:"views_count" bigquery:"views_count"`                 //views
+	EnagamentCount    int `db:"engagement_count" bigquery:"engagements_count"`      //engagement
 
 	AverageViews    float32 `db:"average_views" bigquery:"average_views"`
 	AverageLikes    float32 `db:"average_likes" bigquery:"average_likes"`
@@ -19,14 +20,20 @@ type Socials struct {
 	QualityScore    int     `db:"quality_score" bigquery:"quality_score"`
 	EngagementRate  float32 `db:"engagement_rate" bigquery:"engagement_rate"`
 
-	Name     string `db:"name" bigquery:"name"`
-	Bio      string `db:"bio" bigquery:"bio"`
-	category string `db:"category" bigquery:"category"`
+	Username   string `db:"username" bigquery:"username"`
+	Name       string `db:"name" bigquery:"name"`
+	Bio        string `db:"bio" bigquery:"bio"`
+	category   string `db:"category" bigquery:"category"`
+	ProfilePic string `db:"profile_pic" bigquery:"profile_pic"`
 
 	ProfileVerified bool `db:"profile_verified" bigquery:"profile_verified"`
 	HasContacts     bool `db:"has_contacts" bigquery:"has_contacts"`
 
 	Reels []Reel `db:"reels" bigquery:"reels"`
+	Links []Link `db:"links" bigquery:"links"`
+
+	HasFollowButton  bool `db:"has_follow_button" bigquery:"has_follow_button"`
+	HasMessageButton bool `db:"has_message_button" bigquery:"has_message_button"`
 
 	AddedBy string `db:"added_by" bigquery:"added_by"`
 
@@ -34,10 +41,15 @@ type Socials struct {
 	LastUpdateTime int64 `db:"last_update_time" bigquery:"last_update_time"`
 }
 
+type Link struct {
+	URL       string `db:"url" bigquery:"url"`
+	LinkTitle string `db:"link_title" bigquery:"link_title"`
+}
 type Reel struct {
+	ID            string `db:"id" bigquery:"id"`
 	ThumbnailURL  string `db:"thumbnail_url" bigquery:"thumbnail_url"`
-	Caption       string `db:"caption" bigquery:"caption"`
 	URL           string `db:"url" bigquery:"url"`
+	Caption       string `db:"caption" bigquery:"caption"`
 	Pinned        bool   `db:"pinned" bigquery:"pinned"`
 	ViewsCount    *int   `db:"views_count" bigquery:"views_count"`
 	LikesCount    *int   `db:"likes_count" bigquery:"likes_count"`
