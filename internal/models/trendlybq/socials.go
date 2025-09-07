@@ -2,9 +2,16 @@ package trendlybq
 
 import (
 	"context"
+	"log"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/pkg/myquery"
+	"google.golang.org/api/iterator"
+)
+
+const (
+	SocialsFullTableName = "`trendly-9ab99.matches.socials`"
 )
 
 type Socials struct {
@@ -65,12 +72,48 @@ type Reel struct {
 	CommentsCount bigquery.NullInt64 `db:"comments_count" bigquery:"comments_count"`
 }
 
+func (data *Socials) GetID() string {
+	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.SocialType+data.Username))
+	return ID.String()
+}
+
 func (data *Socials) Insert() error {
+	data.ID = data.GetID()
 	inserter := myquery.Client.Dataset("matches").Table(`socials`).Inserter()
 	if err := inserter.Put(context.Background(), []*Socials{
 		data,
 	}); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (data *Socials) GetInstagram(username string) error {
+	data.Username = username
+	data.SocialType = "instagram"
+	id := data.GetID()
+
+	// query := myquery.Client.Dataset("matches").Table(`socials`).Read(context.Background())
+	q := myquery.Client.Query(`
+	SELECT *
+	FROM ` + SocialsFullTableName + `
+	WHERE id = '` + id + `'
+	LIMIT 1
+`)
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		err := it.Next(data)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

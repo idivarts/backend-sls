@@ -8,7 +8,8 @@ import (
 
 func TestSocialInsert(t *testing.T) {
 	data := trendlybq.Socials{
-		ID: "123",
+		SocialType: "instagram",
+		Username:   "test_username",
 	}
 
 	err := data.Insert()
@@ -17,4 +18,15 @@ func TestSocialInsert(t *testing.T) {
 	}
 
 	t.Log("Inserted")
+}
+
+func TestSocialGet(t *testing.T) {
+	data := &trendlybq.Socials{}
+
+	err := data.GetInstagram("test_username")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	t.Log("Found:", data)
 }

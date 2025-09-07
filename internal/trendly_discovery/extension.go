@@ -7,7 +7,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 )
@@ -104,10 +103,7 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(req.About.Username))
-
 	data := trendlybq.Socials{
-		ID:                ID.String(),
 		SocialType:        "instagram",
 		Gender:            req.Manual.Gender,
 		Niches:            req.Manual.Niches,
@@ -213,7 +209,8 @@ func CheckUsername(c *gin.Context) {
 		return
 	}
 
-	// ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(username))
+	user := trendlybq.Socials{}
+	err := user.GetInstagram(username)
 
-	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": false, "lastUpdate": nil})
+	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": err == nil, "lastUpdate": user.LastUpdateTime})
 }
