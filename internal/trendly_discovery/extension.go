@@ -2,8 +2,13 @@ package trendlydiscovery
 
 import (
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 )
 
 // ScrapedProfile represents the payload coming from your scraper.
@@ -25,6 +30,7 @@ type About struct {
 	Bio         string       `json:"bio"`
 	Links       []AboutLink  `json:"links" binding:"dive"`
 	MutualsText string       `json:"mutualsText"`
+	IsVerified  bool         `json:"isVerified"`
 	Actions     AboutActions `json:"actions"`
 }
 
@@ -91,7 +97,109 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "data": req})
+	adderUserId, b := middlewares.GetUserId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "User not authenticated", "error": "UserId not found"})
+		return
+	}
+
+	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(req.About.Username))
+
+	data := trendlybq.Socials{
+		ID:                ID.String(),
+		SocialType:        "instagram",
+		Gender:            req.Manual.Gender,
+		Niches:            req.Manual.Niches,
+		Location:          req.Manual.Location,
+		FollowerCount:     *req.Stats.Followers.Value,
+		ContentCount:      *req.Stats.Posts.Value,
+		FollowingCount:    *req.Stats.Following.Value,
+		Username:          req.About.Username,
+		Name:              req.About.FullName,
+		Bio:               req.About.Bio,
+		Category:          req.About.Category,
+		ProfilePic:        req.About.ProfilePic,
+		ProfileVerified:   req.About.IsVerified,
+		HasContacts:       len(req.About.Links) > 0,
+		HasFollowButton:   req.About.Actions.HasFollowButton,
+		HasMessageButton:  req.About.Actions.HasMessageButton,
+		ReelScrappedCount: len(req.Reels.Items),
+		QualityScore:      req.Manual.AestheticsScore,
+		CreationTime:      time.Now().UnixMicro(), // TODO: set actual creation time
+		LastUpdateTime:    time.Now().UnixMicro(),
+		AddedBy:           adderUserId,
+
+		ViewsCount:     0,
+		EnagamentCount: 0,
+
+		AverageViews:    0,
+		AverageLikes:    0,
+		AverageComments: 0,
+
+		EngagementRate: 0,
+
+		Reels: []trendlybq.Reel{},
+		Links: []trendlybq.Link{},
+	}
+
+	for _, link := range req.About.Links {
+		data.Links = append(data.Links, trendlybq.Link{
+			URL:  link.URL,
+			Text: link.Text,
+		})
+	}
+
+	eRates := []float32{}
+	totalLikes := int64(0)
+	totalViews := int64(0)
+	totalComments := int64(0)
+	for _, reel := range req.Reels.Items {
+		parts := strings.Split(reel.URL, "/")
+		data.Reels = append(data.Reels, trendlybq.Reel{
+			ID:            parts[len(parts)-1],
+			ThumbnailURL:  reel.Thumbnail,
+			URL:           reel.URL,
+			Caption:       "",
+			Pinned:        reel.Pinned,
+			ViewsCount:    reel.Views.Value,
+			LikesCount:    reel.Overlays.Likes.Value,
+			CommentsCount: reel.Overlays.Comments.Value,
+		})
+		var views, likes, comments int64
+
+		if reel.Views.Value != nil {
+			if !reel.Pinned {
+				data.ViewsCount += *reel.Views.Value
+			}
+			views = *reel.Views.Value
+		}
+		if reel.Overlays.Likes.Value != nil {
+			if !reel.Pinned {
+				data.EnagamentCount += *reel.Overlays.Likes.Value
+			}
+			likes = *reel.Overlays.Likes.Value
+		}
+		if reel.Overlays.Comments.Value != nil {
+			if !reel.Pinned {
+				data.EnagamentCount += *reel.Overlays.Comments.Value
+			}
+			comments = *reel.Overlays.Comments.Value
+		}
+		if views != 0 {
+			eRates = append(eRates, float32(likes+comments)*100/float32(views))
+		} else {
+			eRates = append(eRates, 0)
+		}
+		totalLikes += likes
+		totalComments += comments
+		totalViews += views
+	}
+
+	data.AverageViews = float32(totalViews) / float32(len(req.Reels.Items))
+	data.AverageLikes = float32(totalLikes) / float32(len(req.Reels.Items))
+	data.AverageComments = float32(totalComments) / float32(len(req.Reels.Items))
+
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "data": data})
 }
 
 func CheckUsername(c *gin.Context) {
@@ -100,6 +208,8 @@ func CheckUsername(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Username is required"})
 		return
 	}
+
+	// ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(username))
 
 	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": false, "lastUpdate": nil})
 }
