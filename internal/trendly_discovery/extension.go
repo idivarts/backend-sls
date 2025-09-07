@@ -209,7 +209,7 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "data": data})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID})
 }
 
 func CheckUsername(c *gin.Context) {
