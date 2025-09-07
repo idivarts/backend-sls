@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/middlewares"
@@ -161,9 +162,9 @@ func AddProfile(c *gin.Context) {
 			URL:           reel.URL,
 			Caption:       "",
 			Pinned:        reel.Pinned,
-			ViewsCount:    reel.Views.Value,
-			LikesCount:    reel.Overlays.Likes.Value,
-			CommentsCount: reel.Overlays.Comments.Value,
+			ViewsCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil},
+			LikesCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil},
+			CommentsCount: bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil},
 		})
 		var views, likes, comments int64
 
@@ -172,18 +173,21 @@ func AddProfile(c *gin.Context) {
 				data.ViewsCount += *reel.Views.Value
 			}
 			views = *reel.Views.Value
+			data.Reels[len(data.Reels)-1].ViewsCount.Int64 = views
 		}
 		if reel.Overlays.Likes.Value != nil {
 			if !reel.Pinned {
 				data.EnagamentsCount += *reel.Overlays.Likes.Value
 			}
 			likes = *reel.Overlays.Likes.Value
+			data.Reels[len(data.Reels)-1].LikesCount.Int64 = likes
 		}
 		if reel.Overlays.Comments.Value != nil {
 			if !reel.Pinned {
 				data.EnagamentsCount += *reel.Overlays.Comments.Value
 			}
 			comments = *reel.Overlays.Comments.Value
+			data.Reels[len(data.Reels)-1].CommentsCount.Int64 = comments
 		}
 		if views != 0 {
 			eRates = append(eRates, float32(likes+comments)*100/float32(views))

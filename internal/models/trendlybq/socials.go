@@ -1,5 +1,12 @@
 package trendlybq
 
+import (
+	"context"
+
+	"cloud.google.com/go/bigquery"
+	"github.com/idivarts/backend-sls/pkg/myquery"
+)
+
 type Socials struct {
 	ID         string `db:"id" bigquery:"id"`
 	SocialType string `db:"social_type" bigquery:"social_type"`
@@ -48,12 +55,22 @@ type Link struct {
 	Text string `db:"text" bigquery:"text"`
 }
 type Reel struct {
-	ID            string `db:"id" bigquery:"id"`
-	ThumbnailURL  string `db:"thumbnail_url" bigquery:"thumbnail_url"`
-	URL           string `db:"url" bigquery:"url"`
-	Caption       string `db:"caption" bigquery:"caption"`
-	Pinned        bool   `db:"pinned" bigquery:"pinned"`
-	ViewsCount    *int64 `db:"views_count" bigquery:"views_count"`
-	LikesCount    *int64 `db:"likes_count" bigquery:"likes_count"`
-	CommentsCount *int64 `db:"comments_count" bigquery:"comments_count"`
+	ID            string             `db:"id" bigquery:"id"`
+	ThumbnailURL  string             `db:"thumbnail_url" bigquery:"thumbnail_url"`
+	URL           string             `db:"url" bigquery:"url"`
+	Caption       string             `db:"caption" bigquery:"caption"`
+	Pinned        bool               `db:"pinned" bigquery:"pinned"`
+	ViewsCount    bigquery.NullInt64 `db:"views_count" bigquery:"views_count"`
+	LikesCount    bigquery.NullInt64 `db:"likes_count" bigquery:"likes_count"`
+	CommentsCount bigquery.NullInt64 `db:"comments_count" bigquery:"comments_count"`
+}
+
+func (data *Socials) Insert() error {
+	inserter := myquery.Client.Dataset("matches").Table(`socials`).Inserter()
+	if err := inserter.Put(context.Background(), []*Socials{
+		data,
+	}); err != nil {
+		return err
+	}
+	return nil
 }
