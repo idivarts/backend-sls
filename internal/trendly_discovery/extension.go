@@ -150,10 +150,14 @@ func AddProfile(c *gin.Context) {
 	totalLikes := int64(0)
 	totalViews := int64(0)
 	totalComments := int64(0)
-	for _, reel := range req.Reels.Items {
+	for index, reel := range req.Reels.Items {
 		parts := strings.Split(reel.URL, "/")
+		id := "reelindex" + string(index)
+		if len(parts) >= 2 {
+			id = parts[len(parts)-2]
+		}
 		data.Reels = append(data.Reels, trendlybq.Reel{
-			ID:            parts[len(parts)-1],
+			ID:            id,
 			ThumbnailURL:  reel.Thumbnail,
 			URL:           reel.URL,
 			Caption:       "",
@@ -198,6 +202,12 @@ func AddProfile(c *gin.Context) {
 	data.AverageViews = float32(totalViews) / float32(len(req.Reels.Items))
 	data.AverageLikes = float32(totalLikes) / float32(len(req.Reels.Items))
 	data.AverageComments = float32(totalComments) / float32(len(req.Reels.Items))
+
+	err := data.Insert()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "data": data})
 }
