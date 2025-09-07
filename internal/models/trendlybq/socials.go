@@ -8,11 +8,11 @@ type Socials struct {
 	Niches   []string `db:"niches" bigquery:"niches"`
 	Location string   `db:"location" bigquery:"location"`
 
-	FollowerCount  int64 `db:"follower_count" bigquery:"follower_count"`
-	FollowingCount int64 `db:"following_count" bigquery:"following_count"`
-	ContentCount   int64 `db:"content_count" bigquery:"content_count"`        //posts
-	ViewsCount     int64 `db:"views_count" bigquery:"views_count"`            //views
-	EnagamentCount int64 `db:"engagement_count" bigquery:"engagements_count"` //engagement
+	FollowerCount   int64 `db:"follower_count" bigquery:"follower_count"`
+	FollowingCount  int64 `db:"following_count" bigquery:"following_count"`
+	ContentCount    int64 `db:"content_count" bigquery:"content_count"`        //posts
+	ViewsCount      int64 `db:"views_count" bigquery:"views_count"`            //views
+	EnagamentsCount int64 `db:"engagement_count" bigquery:"engagements_count"` //engagement
 
 	ReelScrappedCount int `db:"reel_scrapped_count" bigquery:"reel_scrapped_count"` //scrapped reels
 

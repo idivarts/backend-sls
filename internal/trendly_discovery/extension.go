@@ -129,8 +129,8 @@ func AddProfile(c *gin.Context) {
 		LastUpdateTime:    time.Now().UnixMicro(),
 		AddedBy:           adderUserId,
 
-		ViewsCount:     0,
-		EnagamentCount: 0,
+		ViewsCount:      0,
+		EnagamentsCount: 0,
 
 		AverageViews:    0,
 		AverageLikes:    0,
@@ -175,13 +175,13 @@ func AddProfile(c *gin.Context) {
 		}
 		if reel.Overlays.Likes.Value != nil {
 			if !reel.Pinned {
-				data.EnagamentCount += *reel.Overlays.Likes.Value
+				data.EnagamentsCount += *reel.Overlays.Likes.Value
 			}
 			likes = *reel.Overlays.Likes.Value
 		}
 		if reel.Overlays.Comments.Value != nil {
 			if !reel.Pinned {
-				data.EnagamentCount += *reel.Overlays.Comments.Value
+				data.EnagamentsCount += *reel.Overlays.Comments.Value
 			}
 			comments = *reel.Overlays.Comments.Value
 		}
