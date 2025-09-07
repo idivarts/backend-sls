@@ -59,3 +59,18 @@ func TrendlyMiddleware(model string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func TrendlyExtension() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetHeader("X-USER-ID")
+		if userID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "X-USER-ID header is missing"})
+			c.Abort()
+			return
+		}
+		c.Set("firebaseUID", userID)
+
+		// Continue to the next handler
+		c.Next()
+	}
+}
