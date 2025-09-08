@@ -94,9 +94,9 @@ type AudienceFilter struct {
 	// Interests   []WeightedField `json:"interests"`   // Audience interest IDs with weight (default 0.3)
 	// Age         []WeightedField `json:"age"`         // Audience age groups with weight (default 0.3). ID enum: "13-17","18-24","25-34","35-44","45-64","65-"
 
-	Gender      WeightedField `json:"gender"`      // Audience gender with weight (default 0.5). ID enum: "MALE","FEMALE"
-	AgeRange    WeightedAge   `json:"ageRange"`    // Alternate way to specify a continuous audience age range with weight (cannot combine with Age)
-	Credibility float64       `json:"credibility"` // Audience credibility (1 - fake followers). E.g., 0.75 = 25% fake
+	Gender      *WeightedField `json:"gender"`      // Audience gender with weight (default 0.5). ID enum: "MALE","FEMALE"
+	AgeRange    *WeightedAge   `json:"ageRange"`    // Alternate way to specify a continuous audience age range with weight (cannot combine with Age)
+	Credibility float64        `json:"credibility"` // Audience credibility (1 - fake followers). E.g., 0.75 = 25% fake
 }
 
 type WeightedField struct {
@@ -169,80 +169,80 @@ func main() {
 
 	token := string(tokenBytes)
 
-	_ = []*AudienceFilter{
-		{
-			Gender: WeightedField{
-				ID:     "MALE",
-				Weight: 0.6,
-			},
-			AgeRange: WeightedAge{
-				Min:    "18",
-				Max:    "24",
-				Weight: 0.6,
-			},
-			Credibility: 0.75,
-		},
-		{
-			Gender: WeightedField{
-				ID:     "MALE",
-				Weight: 0.6,
-			},
-			AgeRange: WeightedAge{
-				Min:    "25",
-				Max:    "35",
-				Weight: 0.6,
-			},
-			Credibility: 0.75,
-		},
-		{
-			Gender: WeightedField{
-				ID:     "MALE",
-				Weight: 0.6,
-			},
-			AgeRange: WeightedAge{
-				Min:    "36",
-				Max:    "65",
-				Weight: 0.6,
-			},
-			Credibility: 0.75,
-		},
-		{
-			Gender: WeightedField{
-				ID:     "FEMALE",
-				Weight: 0.6,
-			},
-			AgeRange: WeightedAge{
-				Min:    "18",
-				Max:    "24",
-				Weight: 0.6,
-			},
-			Credibility: 0.75,
-		},
-		{
-			Gender: WeightedField{
-				ID:     "FEMALE",
-				Weight: 0.6,
-			},
-			AgeRange: WeightedAge{
-				Min:    "25",
-				Max:    "35",
-				Weight: 0.6,
-			},
-			Credibility: 0.75,
-		},
-		{
-			Gender: WeightedField{
-				ID:     "FEMALE",
-				Weight: 0.6,
-			},
-			AgeRange: WeightedAge{
-				Min:    "36",
-				Max:    "65",
-				Weight: 0.6,
-			},
-			Credibility: 0.75,
-		},
-	}
+	// _ = []*AudienceFilter{
+	// 	{
+	// 		Gender: WeightedField{
+	// 			ID:     "MALE",
+	// 			Weight: 0.6,
+	// 		},
+	// 		AgeRange: WeightedAge{
+	// 			Min:    "18",
+	// 			Max:    "24",
+	// 			Weight: 0.6,
+	// 		},
+	// 		Credibility: 0.75,
+	// 	},
+	// 	{
+	// 		Gender: WeightedField{
+	// 			ID:     "MALE",
+	// 			Weight: 0.6,
+	// 		},
+	// 		AgeRange: WeightedAge{
+	// 			Min:    "25",
+	// 			Max:    "35",
+	// 			Weight: 0.6,
+	// 		},
+	// 		Credibility: 0.75,
+	// 	},
+	// 	{
+	// 		Gender: WeightedField{
+	// 			ID:     "MALE",
+	// 			Weight: 0.6,
+	// 		},
+	// 		AgeRange: WeightedAge{
+	// 			Min:    "36",
+	// 			Max:    "65",
+	// 			Weight: 0.6,
+	// 		},
+	// 		Credibility: 0.75,
+	// 	},
+	// 	{
+	// 		Gender: WeightedField{
+	// 			ID:     "FEMALE",
+	// 			Weight: 0.6,
+	// 		},
+	// 		AgeRange: WeightedAge{
+	// 			Min:    "18",
+	// 			Max:    "24",
+	// 			Weight: 0.6,
+	// 		},
+	// 		Credibility: 0.75,
+	// 	},
+	// 	{
+	// 		Gender: WeightedField{
+	// 			ID:     "FEMALE",
+	// 			Weight: 0.6,
+	// 		},
+	// 		AgeRange: WeightedAge{
+	// 			Min:    "25",
+	// 			Max:    "35",
+	// 			Weight: 0.6,
+	// 		},
+	// 		Credibility: 0.75,
+	// 	},
+	// 	{
+	// 		Gender: WeightedField{
+	// 			ID:     "FEMALE",
+	// 			Weight: 0.6,
+	// 		},
+	// 		AgeRange: WeightedAge{
+	// 			Min:    "36",
+	// 			Max:    "65",
+	// 			Weight: 0.6,
+	// 		},
+	// 		Credibility: 0.75,
+	// 	},
+	// }
 
 	// Example minimal request
 	reqBody := SearchRequest{
@@ -259,6 +259,9 @@ func main() {
 				EngagementRate: 0.02, // 2%
 				Location:       []int{INDIA_LOCATION_ID},
 				ReelsPlays:     Range{Min: aws.Int(500000)},
+			},
+			Audience: &AudienceFilter{
+				Credibility: 0.75,
 			},
 			// Audience: audienceFilters[0],
 		},
