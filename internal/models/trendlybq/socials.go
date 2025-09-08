@@ -7,7 +7,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/pkg/myquery"
-	"google.golang.org/api/iterator"
 )
 
 const (
@@ -106,14 +105,10 @@ func (data *Socials) GetInstagram(username string) error {
 		log.Fatal(err)
 	}
 
-	for {
-		err := it.Next(data)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return err
-		}
+	err = it.Next(data)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
