@@ -258,7 +258,7 @@ func main() {
 				Followers:      Range{Min: aws.Int(10000), Max: aws.Int(100000)},
 				EngagementRate: 0.02, // 2%
 				Location:       []int{INDIA_LOCATION_ID},
-				ReelsPlays:     Range{Min: aws.Int(500000)},
+				ReelsPlays:     Range{Min: aws.Int(100000)},
 			},
 			Audience: &AudienceFilter{
 				Credibility: 0.75,
