@@ -203,6 +203,8 @@ func AddProfile(c *gin.Context) {
 	data.AverageLikes = float32(totalLikes) / float32(len(req.Reels.Items))
 	data.AverageComments = float32(totalComments) / float32(len(req.Reels.Items))
 
+	data.EngagementRate = float32(totalLikes+totalComments) * 100 / float32(totalViews)
+
 	err := data.Insert()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
