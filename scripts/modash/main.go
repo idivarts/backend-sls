@@ -255,7 +255,7 @@ func main() {
 		},
 		Filter: Filter{
 			Influencer: InfluencerFilter{
-				Followers:      Range{Min: aws.Int(5000), Max: aws.Int(50000)},
+				Followers:      Range{Min: aws.Int(10000), Max: aws.Int(100000)},
 				EngagementRate: 0.02, // 2%
 				Location:       []int{INDIA_LOCATION_ID},
 				ReelsPlays:     Range{Min: aws.Int(100000)},
