@@ -12,97 +12,97 @@ const API_KEY_BASE64 = "TG1kMDAwQWNXSHliQVFlcEVyRXBrTUxUYkZVUmVEZFg="
 
 // --- Structs that match the JSON body ---
 type SearchRequest struct {
-	Page              int    `json:"page"`
-	CalculationMethod string `json:"calculationMethod"`
-	Sort              Sort   `json:"sort"`
-	Filter            Filter `json:"filter"`
+	Page              int    `json:"page"`              // Page number (0..665). Default: 0
+	CalculationMethod string `json:"calculationMethod"` // How to compute averages for likes/comments/shares. Enum: "median" (default), "average"
+	Sort              Sort   `json:"sort"`              // Sorting options (field/value/direction)
+	Filter            Filter `json:"filter"`            // Filters for influencer and audience
 }
 
 type Sort struct {
-	Field     string `json:"field"`
-	Value     int    `json:"value"`
-	Direction string `json:"direction"`
+	Field     string `json:"field"`     // Sorting field. Enum: "engagements", "followers", "engagementRate", "keywords", "audienceGeo", "audienceLang", "audienceGender", "audienceAge", "relevance", "followersGrowth", "audienceInterest", "reelsPlays" (some require corresponding filters)
+	Value     int    `json:"value"`     // Optional numeric value used by some sorts (e.g., audience or keyword relevance). Example: 123
+	Direction string `json:"direction"` // Sort direction. Enum: "asc", "desc"
 }
 
 type Filter struct {
-	Influencer InfluencerFilter `json:"influencer"`
-	Audience   AudienceFilter   `json:"audience"`
+	Influencer InfluencerFilter `json:"influencer"` // Influencer-level filters (profile, content, metrics)
+	Audience   AudienceFilter   `json:"audience"`   // Audience-level filters (demographics/interests) with weights
 }
 
 type InfluencerFilter struct {
 	Followers struct {
-		Min int `json:"min"`
-		Max int `json:"max"`
-	} `json:"followers"`
-	EngagementRate    float64         `json:"engagementRate"`
-	Location          []int           `json:"location"`
-	Language          string          `json:"language"`
-	LastPosted        int             `json:"lastposted"`
-	Relevance         []string        `json:"relevance"`
-	AudienceRelevance []string        `json:"audienceRelevance"`
-	Gender            string          `json:"gender"`
-	Age               Range           `json:"age"`
-	FollowersGrowth   GrowthRate      `json:"followersGrowthRate"`
-	Bio               string          `json:"bio"`
-	HasYouTube        bool            `json:"hasYouTube"`
-	HasContactDetails []ContactFilter `json:"hasContactDetails"`
-	AccountTypes      []int           `json:"accountTypes"`
-	Brands            []int           `json:"brands"`
-	Interests         []int           `json:"interests"`
-	Keywords          string          `json:"keywords"`
-	TextTags          []TextTag       `json:"textTags"`
-	ReelsPlays        Range           `json:"reelsPlays"`
-	IsVerified        bool            `json:"isVerified"`
-	HasSponsoredPosts bool            `json:"hasSponsoredPosts"`
-	Engagements       Range           `json:"engagements"`
-	FilterOperations  []Operation     `json:"filterOperations"`
+		Min int `json:"min"` // Min followers
+		Max int `json:"max"` // Max followers
+	} `json:"followers"` // Followers count filter. Values are rounded: <5k to nearest 1k, >=5k to nearest 5k
+	EngagementRate    float64         `json:"engagementRate"`      // Minimum engagement rate (e.g., 0.02 for 2%)
+	Location          []int           `json:"location"`            // Influencer locations by ID array (use /instagram/locations)
+	Language          string          `json:"language"`            // Influencer language code (use /instagram/languages), e.g., "en"
+	LastPosted        int             `json:"lastposted"`          // Days since last post; must be >= 30
+	Relevance         []string        `json:"relevance"`           // Content/topic relevance tokens. Mix hashtags and @usernames. Max 100 usernames. E.g., ["#cars", "@topgear"]
+	AudienceRelevance []string        `json:"audienceRelevance"`   // Similarity of influencer’s audience to given @usernames
+	Gender            string          `json:"gender"`              // Influencer gender. Enum: "MALE", "FEMALE", "KNOWN", "UNKNOWN"
+	Age               Range           `json:"age"`                 // Influencer age bucket range. Allowed values for Min/Max: 18, 25, 35, 45, 65
+	FollowersGrowth   GrowthRate      `json:"followersGrowthRate"` // Followers growth rate over interval
+	Bio               string          `json:"bio"`                 // Search by bio/full name text
+	HasYouTube        bool            `json:"hasYouTube"`          // Whether influencer has a YouTube channel
+	HasContactDetails []ContactFilter `json:"hasContactDetails"`   // Contact channels presence filter
+	AccountTypes      []int           `json:"accountTypes"`        // Instagram account type IDs. 1=Regular, 2=Business, 3=Creator
+	Brands            []int           `json:"brands"`              // Brand IDs array (use /instagram/brands)
+	Interests         []int           `json:"interests"`           // Interest IDs array (use /instagram/interests)
+	Keywords          string          `json:"keywords"`            // Phrase contained in captions
+	TextTags          []TextTag       `json:"textTags"`            // Posts containing specific hashtags/mentions
+	ReelsPlays        Range           `json:"reelsPlays"`          // Reels plays count range (rounded to nearest 1k)
+	IsVerified        bool            `json:"isVerified"`          // Only verified accounts if true
+	HasSponsoredPosts bool            `json:"hasSponsoredPosts"`   // Only influencers with sponsored posts if true
+	Engagements       Range           `json:"engagements"`         // Engagements count range (rounded). Tip: set min=0 to include hidden likes
+	FilterOperations  []Operation     `json:"filterOperations"`    // Logical operators to combine filters; affects allowed sort fields
 }
 
 type Range struct {
-	Min int `json:"min"`
-	Max int `json:"max"`
+	Min int `json:"min"` // Minimum value
+	Max int `json:"max"` // Maximum value
 }
 
 type GrowthRate struct {
-	Interval string  `json:"interval"`
-	Value    float64 `json:"value"`
-	Operator string  `json:"operator"`
+	Interval string  `json:"interval"` // Required. Time interval enum: "i1month","i2months","i3months","i4months","i5months","i6months"
+	Value    float64 `json:"value"`    // Growth rate threshold (e.g., 0.01 for +1%)
+	Operator string  `json:"operator"` // Required. Comparison operator enum: "gte","gt","lt","lte"
 }
 
 type ContactFilter struct {
-	ContactType  string `json:"contactType"`
-	FilterAction string `json:"filterAction"`
+	ContactType  string `json:"contactType"`  // Channel enum: "bbm","email","facebook","instagram","itunes","kakao","kik","lineid","linktree","pinterest","sarahah","sayat","skype","snapchat","tiktok","tumblr","twitchtv","twitter","vk","wechat","youtube"
+	FilterAction string `json:"filterAction"` // Condition enum: "must" (include), "should" (prefer), "not" (exclude)
 }
 
 type TextTag struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
+	Type  string `json:"type"`  // Tag type enum: "hashtag" or "mention"
+	Value string `json:"value"` // The hashtag/mention value (without #/@ for value, per docs wording)
 }
 
 type Operation struct {
-	Operator string `json:"operator"`
-	Filter   string `json:"filter"`
+	Operator string `json:"operator"` // Logical operator enum: "and","or","not". Using "or" requires at least two filters.
+	Filter   string `json:"filter"`   // Target filter key. Enum: "followers","engagements","engagementRate","lastposted","bio","keywords","relevance","language","gender","age","location","isVerified","interests","brands","accountTypes","hasSponsoredPosts","textTags". Note: If "or" or "not" are used on a filter, you cannot sort by that field.
 }
 
 type AudienceFilter struct {
-	Location    []WeightedField `json:"location"`
-	Language    WeightedField   `json:"language"`
-	Gender      WeightedField   `json:"gender"`
-	Age         []WeightedField `json:"age"`
-	AgeRange    WeightedAge     `json:"ageRange"`
-	Interests   []WeightedField `json:"interests"`
-	Credibility float64         `json:"credibility"`
+	Location    []WeightedField `json:"location"`    // Audience location IDs with weight (default weight 0.2)
+	Language    WeightedField   `json:"language"`    // Audience language code with weight (default 0.2)
+	Gender      WeightedField   `json:"gender"`      // Audience gender with weight (default 0.5). ID enum: "MALE","FEMALE"
+	Age         []WeightedField `json:"age"`         // Audience age groups with weight (default 0.3). ID enum: "13-17","18-24","25-34","35-44","45-64","65-"
+	AgeRange    WeightedAge     `json:"ageRange"`    // Alternate way to specify a continuous audience age range with weight (cannot combine with Age)
+	Interests   []WeightedField `json:"interests"`   // Audience interest IDs with weight (default 0.3)
+	Credibility float64         `json:"credibility"` // Audience credibility (1 - fake followers). E.g., 0.75 = 25% fake
 }
 
 type WeightedField struct {
-	ID     interface{} `json:"id"`
-	Weight float64     `json:"weight"`
+	ID     interface{} `json:"id"`     // The ID value: number for locations/interests, string for language (e.g., "en") or gender (e.g., "MALE") or age bucket (e.g., "18-24")
+	Weight float64     `json:"weight"` // Weight threshold (fraction between 0 and 1)
 }
 
 type WeightedAge struct {
-	Min    string  `json:"min"`
-	Max    string  `json:"max"`
-	Weight float64 `json:"weight"`
+	Min    string  `json:"min"`    // Min audience age. Enum: "13","18","25","35","45","65"
+	Max    string  `json:"max"`    // Max audience age. Enum: "17","24","34","44","64"
+	Weight float64 `json:"weight"` // Weight threshold (default 0.3)
 }
 
 // --- Function to call the API ---
