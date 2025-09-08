@@ -105,11 +105,10 @@ func (data *Socials) GetInstagram(username string) error {
 		log.Fatal(err)
 	}
 
-	for {
-		err := it.Next(data)
-		if err != nil {
-			return err
-		}
+	err = it.Next(data)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
