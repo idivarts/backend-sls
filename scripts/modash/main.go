@@ -6,9 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 const API_KEY_BASE64 = "TG1kMDAwQWNXSHliQVFlcEVyRXBrTUxUYkZVUmVEZFg="
+const INDIA_LOCATION_ID = 304716 // TODO: Verify this ID via /instagram/locations; use the correct India country/location ID
 
 // --- Structs that match the JSON body ---
 type SearchRequest struct {
@@ -26,41 +30,41 @@ type Sort struct {
 
 type Filter struct {
 	Influencer InfluencerFilter `json:"influencer"` // Influencer-level filters (profile, content, metrics)
-	Audience   AudienceFilter   `json:"audience"`   // Audience-level filters (demographics/interests) with weights
+	Audience   *AudienceFilter  `json:"audience"`   // Audience-level filters (demographics/interests) with weights
 }
 
 type InfluencerFilter struct {
-	Followers struct {
-		Min int `json:"min"` // Min followers
-		Max int `json:"max"` // Max followers
-	} `json:"followers"` // Followers count filter. Values are rounded: <5k to nearest 1k, >=5k to nearest 5k
-	EngagementRate    float64         `json:"engagementRate"`      // Minimum engagement rate (e.g., 0.02 for 2%)
-	Location          []int           `json:"location"`            // Influencer locations by ID array (use /instagram/locations)
-	Language          string          `json:"language"`            // Influencer language code (use /instagram/languages), e.g., "en"
-	LastPosted        int             `json:"lastposted"`          // Days since last post; must be >= 30
-	Relevance         []string        `json:"relevance"`           // Content/topic relevance tokens. Mix hashtags and @usernames. Max 100 usernames. E.g., ["#cars", "@topgear"]
-	AudienceRelevance []string        `json:"audienceRelevance"`   // Similarity of influencer’s audience to given @usernames
-	Gender            string          `json:"gender"`              // Influencer gender. Enum: "MALE", "FEMALE", "KNOWN", "UNKNOWN"
-	Age               Range           `json:"age"`                 // Influencer age bucket range. Allowed values for Min/Max: 18, 25, 35, 45, 65
-	FollowersGrowth   GrowthRate      `json:"followersGrowthRate"` // Followers growth rate over interval
-	Bio               string          `json:"bio"`                 // Search by bio/full name text
-	HasYouTube        bool            `json:"hasYouTube"`          // Whether influencer has a YouTube channel
-	HasContactDetails []ContactFilter `json:"hasContactDetails"`   // Contact channels presence filter
-	AccountTypes      []int           `json:"accountTypes"`        // Instagram account type IDs. 1=Regular, 2=Business, 3=Creator
-	Brands            []int           `json:"brands"`              // Brand IDs array (use /instagram/brands)
-	Interests         []int           `json:"interests"`           // Interest IDs array (use /instagram/interests)
-	Keywords          string          `json:"keywords"`            // Phrase contained in captions
-	TextTags          []TextTag       `json:"textTags"`            // Posts containing specific hashtags/mentions
-	ReelsPlays        Range           `json:"reelsPlays"`          // Reels plays count range (rounded to nearest 1k)
-	IsVerified        bool            `json:"isVerified"`          // Only verified accounts if true
-	HasSponsoredPosts bool            `json:"hasSponsoredPosts"`   // Only influencers with sponsored posts if true
-	Engagements       Range           `json:"engagements"`         // Engagements count range (rounded). Tip: set min=0 to include hidden likes
-	FilterOperations  []Operation     `json:"filterOperations"`    // Logical operators to combine filters; affects allowed sort fields
+	// LastPosted        int             `json:"lastposted"`          // Days since last post; must be >= 30
+	// Language          string          `json:"language"`            // Influencer language code (use /instagram/languages), e.g., "en"
+	// Gender            string          `json:"gender"`              // Influencer gender. Enum: "MALE", "FEMALE", "KNOWN", "UNKNOWN"
+	// Age               Range           `json:"age"`                 // Influencer age bucket range. Allowed values for Min/Max: 18, 25, 35, 45, 65
+	// Bio               string          `json:"bio"`                 // Search by bio/full name text
+	// FollowersGrowth   GrowthRate      `json:"followersGrowthRate"` // Followers growth rate over interval
+	// HasYouTube        bool            `json:"hasYouTube"`          // Whether influencer has a YouTube channel
+	// HasContactDetails []ContactFilter `json:"hasContactDetails"`   // Contact channels presence filter
+	// AccountTypes      []int           `json:"accountTypes"`        // Instagram account type IDs. 1=Regular, 2=Business, 3=Creator
+	// Brands            []int           `json:"brands"`              // Brand IDs array (use /instagram/brands)
+	// Interests         []int           `json:"interests"`           // Interest IDs array (use /instagram/interests)
+	// Keywords          string          `json:"keywords"`            // Phrase contained in captions
+	// TextTags          []TextTag       `json:"textTags"`            // Posts containing specific hashtags/mentions
+	// HasSponsoredPosts bool        `json:"hasSponsoredPosts"` // Only influencers with sponsored posts if true
+	// IsVerified       bool        `json:"isVerified"`       // Only verified accounts if true
+	// FilterOperations []Operation `json:"filterOperations"` // Logical operators to combine filters; affects allowed sort fields
+	// Engagements    Range   `json:"engagements"`    // Engagements count range (rounded). Tip: set min=0 to include hidden likes
+
+	// look-a-likes and relevance
+	// AudienceRelevance []string `json:"audienceRelevance"` // Similarity of influencer’s audience to given @usernames
+	// Relevance         []string `json:"relevance"`         // Content/topic relevance tokens. Mix hashtags and @usernames. Max 100 usernames. E.g., ["#cars", "@topgear"]
+
+	Followers      Range   `json:"followers"`      // Followers count filter. Values are rounded: <5k to nearest 1k, >=5k to nearest 5k
+	EngagementRate float64 `json:"engagementRate"` // Minimum engagement rate (e.g., 0.02 for 2%)
+	Location       []int   `json:"location"`       // Influencer locations by ID array (use /instagram/locations)
+	ReelsPlays     Range   `json:"reelsPlays"`     // Reels plays count range (rounded to nearest 1k)
 }
 
 type Range struct {
-	Min int `json:"min"` // Minimum value
-	Max int `json:"max"` // Maximum value
+	Min *int `json:"min"` // Minimum value
+	Max *int `json:"max"` // Maximum value
 }
 
 type GrowthRate struct {
@@ -85,13 +89,14 @@ type Operation struct {
 }
 
 type AudienceFilter struct {
-	Location    []WeightedField `json:"location"`    // Audience location IDs with weight (default weight 0.2)
-	Language    WeightedField   `json:"language"`    // Audience language code with weight (default 0.2)
-	Gender      WeightedField   `json:"gender"`      // Audience gender with weight (default 0.5). ID enum: "MALE","FEMALE"
-	Age         []WeightedField `json:"age"`         // Audience age groups with weight (default 0.3). ID enum: "13-17","18-24","25-34","35-44","45-64","65-"
-	AgeRange    WeightedAge     `json:"ageRange"`    // Alternate way to specify a continuous audience age range with weight (cannot combine with Age)
-	Interests   []WeightedField `json:"interests"`   // Audience interest IDs with weight (default 0.3)
-	Credibility float64         `json:"credibility"` // Audience credibility (1 - fake followers). E.g., 0.75 = 25% fake
+	// Location    []WeightedField `json:"location"`    // Audience location IDs with weight (default weight 0.2)
+	// Language    WeightedField   `json:"language"`    // Audience language code with weight (default 0.2)
+	// Interests   []WeightedField `json:"interests"`   // Audience interest IDs with weight (default 0.3)
+	// Age         []WeightedField `json:"age"`         // Audience age groups with weight (default 0.3). ID enum: "13-17","18-24","25-34","35-44","45-64","65-"
+
+	Gender      WeightedField `json:"gender"`      // Audience gender with weight (default 0.5). ID enum: "MALE","FEMALE"
+	AgeRange    WeightedAge   `json:"ageRange"`    // Alternate way to specify a continuous audience age range with weight (cannot combine with Age)
+	Credibility float64       `json:"credibility"` // Audience credibility (1 - fake followers). E.g., 0.75 = 25% fake
 }
 
 type WeightedField struct {
@@ -113,6 +118,7 @@ func searchInfluencers(token string, reqBody SearchRequest) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("Request Body:", string(bodyBytes))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bodyBytes))
 	if err != nil {
@@ -129,9 +135,31 @@ func searchInfluencers(token string, reqBody SearchRequest) error {
 	}
 	defer resp.Body.Close()
 
+	respBody := new(bytes.Buffer)
+	respBody.ReadFrom(resp.Body)
+	fmt.Println("Response Body:", respBody.String())
+	// Save the response body to a file for inspection
+	file, err := os.Create("response.json")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write(respBody.Bytes())
+	if err != nil {
+		return err
+	}
+
 	fmt.Println("Status:", resp.Status)
 	return nil
 }
+
+// "filterOperations": [
+//         {
+//           "operator": "and",
+//           "filter": "followers"
+//         }
+//       ]
 
 func main() {
 	tokenBytes, err := base64.StdEncoding.DecodeString(API_KEY_BASE64)
@@ -141,20 +169,98 @@ func main() {
 
 	token := string(tokenBytes)
 
+	_ = []*AudienceFilter{
+		{
+			Gender: WeightedField{
+				ID:     "MALE",
+				Weight: 0.6,
+			},
+			AgeRange: WeightedAge{
+				Min:    "18",
+				Max:    "24",
+				Weight: 0.6,
+			},
+			Credibility: 0.75,
+		},
+		{
+			Gender: WeightedField{
+				ID:     "MALE",
+				Weight: 0.6,
+			},
+			AgeRange: WeightedAge{
+				Min:    "25",
+				Max:    "35",
+				Weight: 0.6,
+			},
+			Credibility: 0.75,
+		},
+		{
+			Gender: WeightedField{
+				ID:     "MALE",
+				Weight: 0.6,
+			},
+			AgeRange: WeightedAge{
+				Min:    "36",
+				Max:    "65",
+				Weight: 0.6,
+			},
+			Credibility: 0.75,
+		},
+		{
+			Gender: WeightedField{
+				ID:     "FEMALE",
+				Weight: 0.6,
+			},
+			AgeRange: WeightedAge{
+				Min:    "18",
+				Max:    "24",
+				Weight: 0.6,
+			},
+			Credibility: 0.75,
+		},
+		{
+			Gender: WeightedField{
+				ID:     "FEMALE",
+				Weight: 0.6,
+			},
+			AgeRange: WeightedAge{
+				Min:    "25",
+				Max:    "35",
+				Weight: 0.6,
+			},
+			Credibility: 0.75,
+		},
+		{
+			Gender: WeightedField{
+				ID:     "FEMALE",
+				Weight: 0.6,
+			},
+			AgeRange: WeightedAge{
+				Min:    "36",
+				Max:    "65",
+				Weight: 0.6,
+			},
+			Credibility: 0.75,
+		},
+	}
+
 	// Example minimal request
 	reqBody := SearchRequest{
 		Page:              0,
-		CalculationMethod: "median",
+		CalculationMethod: "median", // keep defaults for medians
 		Sort: Sort{
-			Field:     "followers",
-			Value:     123,
+			Field:     "engagementRate", // sort by follower count
+			Value:     0,                // optional; unused for this sort
 			Direction: "desc",
 		},
 		Filter: Filter{
 			Influencer: InfluencerFilter{
-				Language:   "en",
-				IsVerified: true,
+				Followers:      Range{Min: aws.Int(5000), Max: aws.Int(50000)},
+				EngagementRate: 0.02, // 2%
+				Location:       []int{INDIA_LOCATION_ID},
+				ReelsPlays:     Range{Min: aws.Int(100000)},
 			},
+			// Audience: audienceFilters[0],
 		},
 	}
 
