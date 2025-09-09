@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/pkg/myquery"
 	"google.golang.org/api/iterator"
 )
@@ -110,14 +111,7 @@ func nichesOverlapClause(vals []string) string {
 	return fmt.Sprintf("ARRAY_LENGTH(ARRAY(SELECT 1 FROM UNNEST(niches) n WHERE n IN (%s))) > 0", strings.Join(parts, ","))
 }
 
-// func GetInfluencers(c *gin.Context, req InfluencerFilters) {
-func GetInfluencers(c *gin.Context) {
-	var req InfluencerFilters
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"message": "Invalid Input", "error": err.Error()})
-		return
-	}
-
+func FormSQL(req InfluencerFilters) string {
 	// Build dynamic WHERE clauses
 	conds := []string{}
 
@@ -272,7 +266,7 @@ func GetInfluencers(c *gin.Context) {
   views_count AS views,
   engagements_count AS engagements,
   engagement_rate AS engagementRate
-FROM ` + "`trendly-9ab99.matches.socials`" + `
+FROM ` + trendlybq.SocialsFullTableName + `
 WHERE social_type = 'instagram'`
 
 	if len(conds) > 0 {
@@ -281,7 +275,18 @@ WHERE social_type = 'instagram'`
 
 	// Ordering & pagination
 	base += fmt.Sprintf("\nORDER BY %s %s\nLIMIT %d OFFSET %d", sortCol, strings.ToUpper(dir), limit, offset)
+	return base
+}
 
+// func GetInfluencers(c *gin.Context, req InfluencerFilters) {
+func GetInfluencers(c *gin.Context) {
+	var req InfluencerFilters
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"message": "Invalid Input", "error": err.Error()})
+		return
+	}
+
+	base := FormSQL(req)
 	q := myquery.Client.Query(base)
 	it, err := q.Read(context.Background())
 	if err != nil {
