@@ -18,7 +18,8 @@ func handleUserAPIs() {
 	userApisV1.POST("/extension", trendlydiscovery.AddProfile)
 	userApisV1.GET("/extension", trendlydiscovery.CheckUsername)
 
-	userApisV1.GET("/brand/:brandId/influencers", trendlydiscovery.GetInfluencers)
-	userApisV1.GET("/brand/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
+	brandAPIs := apihandler.GinEngine.Group("/discovery/brands", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 
+	brandAPIs.GET("/:brandId/influencers", trendlydiscovery.GetInfluencers)
+	brandAPIs.GET("/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
 }
