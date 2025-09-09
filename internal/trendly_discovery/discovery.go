@@ -75,6 +75,12 @@ type InfluencerFilters struct {
 	Genders           []string `json:"genders,omitempty"`
 	SelectedNiches    []string `json:"selectedNiches,omitempty"`
 	SelectedLocations []string `json:"selectedLocations,omitempty"`
+
+	// Sorting & pagination
+	Sort          string `json:"sort,omitempty"`           // followers | views | engagement | engagement_rate
+	SortDirection string `json:"sort_direction,omitempty"` // asc | desc (default: desc)
+	Offset        *int   `json:"offset,omitempty"`
+	Limit         *int   `json:"limit,omitempty"`
 }
 
 func escapeBQString(s string) string {
@@ -222,6 +228,39 @@ func GetInfluencers(c *gin.Context) {
 		conds = append(conds, clause)
 	}
 
+	// Resolve sorting & pagination (safe defaults + whitelist)
+	sortMap := map[string]string{
+		"followers":       "follower_count",
+		"views":           "views_count",
+		"engagement":      "engagements_count",
+		"engagements":     "engagements_count",
+		"engagement_rate": "engagement_rate",
+		"er":              "engagement_rate",
+	}
+	sortCol := sortMap[strings.ToLower(strings.TrimSpace(req.Sort))]
+	if sortCol == "" {
+		sortCol = "follower_count"
+	}
+	dir := strings.ToLower(strings.TrimSpace(req.SortDirection))
+	if dir != "asc" {
+		dir = "desc"
+	}
+	// pagination defaults
+	limit := 15
+	if req.Limit != nil {
+		limit = *req.Limit
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	offset := 0
+	if req.Offset != nil && *req.Offset > 0 {
+		offset = *req.Offset
+	}
+
 	// Assemble SQL
 	base := `SELECT
   id AS userId,
@@ -240,8 +279,8 @@ WHERE social_type = 'instagram'`
 		base += "\n  AND " + strings.Join(conds, "\n  AND ")
 	}
 
-	// Default ordering & limit
-	base += "\nORDER BY follower_count DESC\nLIMIT 100"
+	// Ordering & pagination
+	base += fmt.Sprintf("\nORDER BY %s %s\nLIMIT %d OFFSET %d", sortCol, strings.ToUpper(dir), limit, offset)
 
 	q := myquery.Client.Query(base)
 	it, err := q.Read(context.Background())
