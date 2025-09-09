@@ -103,6 +103,13 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
+	checkData := trendlybq.Socials{}
+	err := checkData.GetInstagram(req.About.Username)
+	if err == nil {
+		c.JSON(http.StatusConflict, gin.H{"message": "Profile already exists", "id": checkData.ID})
+		return
+	}
+
 	data := trendlybq.Socials{
 		SocialType:        "instagram",
 		Gender:            req.Manual.Gender,
@@ -205,7 +212,7 @@ func AddProfile(c *gin.Context) {
 
 	data.EngagementRate = float32(totalLikes+totalComments) * 100 / float32(totalViews)
 
-	err := data.Insert()
+	err = data.Insert()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
 		return
