@@ -18,4 +18,7 @@ func handleUserAPIs() {
 	userApisV1.POST("/extension", trendlydiscovery.AddProfile)
 	userApisV1.GET("/extension", trendlydiscovery.CheckUsername)
 
+	userApisV1.GET("/brand/:brandId/influencers", trendlydiscovery.GetInfluencers)
+	userApisV1.GET("/brand/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
+
 }
