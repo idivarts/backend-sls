@@ -17,10 +17,12 @@ func handleUserAPIs() {
 
 	discoveryApi.POST("/extension", trendlydiscovery.AddProfile)
 	discoveryApi.GET("/extension", trendlydiscovery.CheckUsername)
-	discoveryApi.POST("/image-relay", trendlydiscovery.ImageRelay)
 
 	brandAPIs := apihandler.GinEngine.Group("/discovery/brands", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 
 	brandAPIs.POST("/:brandId/influencers", trendlydiscovery.GetInfluencers)
 	brandAPIs.POST("/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
+
+	// Creating a completely open route for image-relay
+	apihandler.GinEngine.GET("/discovery/image-relay", trendlydiscovery.ImageRelay)
 }
