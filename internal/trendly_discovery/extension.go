@@ -204,33 +204,39 @@ func AddProfile(c *gin.Context) {
 			URL:           reel.URL,
 			Caption:       "",
 			Pinned:        reel.Pinned,
-			ViewsCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil},
-			LikesCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil},
-			CommentsCount: bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil},
+			ViewsCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil && *reel.Views.Value > 0},
+			LikesCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil && *reel.Overlays.Likes.Value > 0},
+			CommentsCount: bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil && *reel.Overlays.Comments.Value > 0},
 		})
 
 		var views, likes, comments int64
 
 		if reel.Views.Value != nil {
 			views = *reel.Views.Value
-			data.Reels[len(data.Reels)-1].ViewsCount.Int64 = views
-			viewsList = append(viewsList, views)
+			if views > 0 {
+				data.Reels[len(data.Reels)-1].ViewsCount.Int64 = views
+				viewsList = append(viewsList, views)
+			}
 			if !reel.Pinned {
 				data.ViewsCount += views
 			}
 		}
 		if reel.Overlays.Likes.Value != nil {
 			likes = *reel.Overlays.Likes.Value
-			data.Reels[len(data.Reels)-1].LikesCount.Int64 = likes
-			likesList = append(likesList, likes)
+			if likes > 0 {
+				data.Reels[len(data.Reels)-1].LikesCount.Int64 = likes
+				likesList = append(likesList, likes)
+			}
 			if !reel.Pinned {
 				data.EnagamentsCount += likes
 			}
 		}
 		if reel.Overlays.Comments.Value != nil {
 			comments = *reel.Overlays.Comments.Value
-			data.Reels[len(data.Reels)-1].CommentsCount.Int64 = comments
-			commentsList = append(commentsList, comments)
+			if comments > 0 {
+				data.Reels[len(data.Reels)-1].CommentsCount.Int64 = comments
+				commentsList = append(commentsList, comments)
+			}
 			if !reel.Pinned {
 				data.EnagamentsCount += comments
 			}
