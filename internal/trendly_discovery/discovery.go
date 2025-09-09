@@ -22,7 +22,7 @@ type InfluencerItem struct {
 	URL            string  `json:"url"`
 	Picture        string  `json:"picture"`
 	Followers      int64   `json:"followers"`
-	Views          *int64  `json:"views,omitempty"`
+	Views          int64   `json:"views,omitempty"`
 	Engagements    int64   `json:"engagements"`
 	EngagementRate float64 `json:"engagementRate"`
 }
@@ -301,7 +301,7 @@ func GetInfluencers(c *gin.Context) {
 		URL            string  `bigquery:"url"`
 		Picture        string  `bigquery:"picture"`
 		Followers      int64   `bigquery:"followers"`
-		Views          *int64  `bigquery:"views"`
+		Views          int64   `bigquery:"views"`
 		Engagements    int64   `bigquery:"engagements"`
 		EngagementRate float64 `bigquery:"engagementRate"`
 	}
