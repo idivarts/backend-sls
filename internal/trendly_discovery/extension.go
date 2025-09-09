@@ -2,6 +2,8 @@ package trendlydiscovery
 
 import (
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,6 +12,34 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 )
+
+func medianInt64(xs []int64) float32 {
+	if len(xs) == 0 {
+		return 0
+	}
+	sort.Slice(xs, func(i, j int) bool { return xs[i] < xs[j] })
+	n := len(xs)
+	if n%2 == 1 {
+		return float32(xs[n/2])
+	}
+	a := xs[n/2-1]
+	b := xs[n/2]
+	return float32(a+b) / 2
+}
+
+func medianFloat32(xs []float32) float32 {
+	if len(xs) == 0 {
+		return 0
+	}
+	sort.Slice(xs, func(i, j int) bool { return xs[i] < xs[j] })
+	n := len(xs)
+	if n%2 == 1 {
+		return xs[n/2]
+	}
+	a := xs[n/2-1]
+	b := xs[n/2]
+	return (a + b) / 2
+}
 
 // ScrapedProfile represents the payload coming from your scraper.
 type ScrapedProfile struct {
@@ -154,12 +184,17 @@ func AddProfile(c *gin.Context) {
 	}
 
 	eRates := []float32{}
+	viewsList := []int64{}
+	likesList := []int64{}
+	commentsList := []int64{}
+
 	totalLikes := int64(0)
 	totalViews := int64(0)
 	totalComments := int64(0)
+
 	for index, reel := range req.Reels.Items {
 		parts := strings.Split(reel.URL, "/")
-		id := "reelindex" + string(index)
+		id := "reelindex" + strconv.Itoa(index)
 		if len(parts) >= 2 {
 			id = parts[len(parts)-2]
 		}
@@ -173,44 +208,51 @@ func AddProfile(c *gin.Context) {
 			LikesCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil},
 			CommentsCount: bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil},
 		})
+
 		var views, likes, comments int64
 
 		if reel.Views.Value != nil {
-			if !reel.Pinned {
-				data.ViewsCount += *reel.Views.Value
-			}
 			views = *reel.Views.Value
 			data.Reels[len(data.Reels)-1].ViewsCount.Int64 = views
+			viewsList = append(viewsList, views)
+			if !reel.Pinned {
+				data.ViewsCount += views
+			}
 		}
 		if reel.Overlays.Likes.Value != nil {
-			if !reel.Pinned {
-				data.EnagamentsCount += *reel.Overlays.Likes.Value
-			}
 			likes = *reel.Overlays.Likes.Value
 			data.Reels[len(data.Reels)-1].LikesCount.Int64 = likes
+			likesList = append(likesList, likes)
+			if !reel.Pinned {
+				data.EnagamentsCount += likes
+			}
 		}
 		if reel.Overlays.Comments.Value != nil {
-			if !reel.Pinned {
-				data.EnagamentsCount += *reel.Overlays.Comments.Value
-			}
 			comments = *reel.Overlays.Comments.Value
 			data.Reels[len(data.Reels)-1].CommentsCount.Int64 = comments
+			commentsList = append(commentsList, comments)
+			if !reel.Pinned {
+				data.EnagamentsCount += comments
+			}
 		}
-		if views != 0 {
+
+		// Per-reel engagement rate for median calculation (treat missing likes/comments as 0)
+		if views > 0 {
 			eRates = append(eRates, float32(likes+comments)*100/float32(views))
-		} else {
-			eRates = append(eRates, 0)
 		}
+
 		totalLikes += likes
 		totalComments += comments
 		totalViews += views
 	}
 
-	data.AverageViews = float32(totalViews) / float32(len(req.Reels.Items))
-	data.AverageLikes = float32(totalLikes) / float32(len(req.Reels.Items))
-	data.AverageComments = float32(totalComments) / float32(len(req.Reels.Items))
+	// Use median for the three "averages"
+	data.AverageViews = medianInt64(viewsList)
+	data.AverageLikes = medianInt64(likesList)
+	data.AverageComments = medianInt64(commentsList)
 
-	data.EngagementRate = float32(totalLikes+totalComments) * 100 / float32(totalViews)
+	// Engagement rate as median of per-reel rates
+	data.EngagementRate = medianFloat32(eRates)
 
 	err = data.Insert()
 	if err != nil {
