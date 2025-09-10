@@ -12,3 +12,7 @@ import (
 func FetchInfluencer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "api is functional"})
 }
+
+func RequestConnection(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "api is functional"})
+}
