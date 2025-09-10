@@ -18,7 +18,7 @@ func init() {
 	configFile := os.Getenv("FIREBASE_CONFIG_PATH")
 	log.Println("Config File Path", configFile)
 	if configFile == "" {
-		configFile = "service-account.json"
+		configFile = "/Users/rsinha/iDiv/backend-sls/service-account.json"
 	}
 	sa := option.WithCredentialsFile(configFile)
 

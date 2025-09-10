@@ -3,8 +3,6 @@ package trendlydiscovery
 import (
 	"io"
 	"net/http"
-	neturl "net/url"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,11 +15,11 @@ func ImageRelay(c *gin.Context) {
 		return
 	}
 
-	u, err := neturl.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		c.String(http.StatusBadRequest, "invalid url")
-		return
-	}
+	// u, err := neturl.Parse(raw)
+	// if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+	// 	c.String(http.StatusBadRequest, "invalid url")
+	// 	return
+	// }
 
 	// Basic host allowlist to prevent open-proxy abuse. Adjust as needed.
 	// host := strings.ToLower(u.Host)
@@ -33,7 +31,7 @@ func ImageRelay(c *gin.Context) {
 	}
 
 	// Build upstream request
-	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, raw, nil)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "request build error")
 		return
@@ -56,61 +54,46 @@ func ImageRelay(c *gin.Context) {
 	}
 
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	iresp, err := client.Do(req)
 	if err != nil {
 		c.String(http.StatusBadGateway, "upstream fetch failed")
 		return
 	}
-	defer resp.Body.Close()
+	defer iresp.Body.Close()
 
 	// Prepare response headers
-	h := c.Writer.Header()
+	tresHeader := c.Writer.Header()
 
 	// Content-Type: prefer upstream value; fall back to common types
-	ct := resp.Header.Get("Content-Type")
-	if ct == "" {
-		p := strings.ToLower(u.Path)
-		switch {
-		case strings.HasSuffix(p, ".png"):
-			ct = "image/png"
-		case strings.HasSuffix(p, ".webp"):
-			ct = "image/webp"
-		case strings.HasSuffix(p, ".jpg") || strings.HasSuffix(p, ".jpeg"):
-			ct = "image/jpeg"
-		default:
-			ct = "application/octet-stream"
-		}
-	}
-	h.Set("Content-Type", ct)
+	ct := iresp.Header.Get("Content-Type")
+	tresHeader.Set("Content-Type", ct)
 
 	// Key header so COEP pages can embed this resource
-	h.Set("Cross-Origin-Resource-Policy", "cross-origin")
+	tresHeader.Set("Cross-Origin-Resource-Policy", "cross-origin")
 
 	// Reasonable caching (we don't store the image server-side)
-	if cache := resp.Header.Get("Cache-Control"); cache != "" {
+	if cache := iresp.Header.Get("Cache-Control"); cache != "" {
 		// Respect upstream if provided
-		h.Set("Cache-Control", cache)
-	} else {
-		h.Set("Cache-Control", "public, max-age=86400, immutable")
+		tresHeader.Set("Cache-Control", cache)
 	}
 
 	// Propagate helpful headers when present
-	if v := resp.Header.Get("ETag"); v != "" {
-		h.Set("ETag", v)
+	if v := iresp.Header.Get("ETag"); v != "" {
+		tresHeader.Set("ETag", v)
 	}
-	if v := resp.Header.Get("Last-Modified"); v != "" {
-		h.Set("Last-Modified", v)
+	if v := iresp.Header.Get("Last-Modified"); v != "" {
+		tresHeader.Set("Last-Modified", v)
 	}
-	if v := resp.Header.Get("Accept-Ranges"); v != "" {
-		h.Set("Accept-Ranges", v)
+	if v := iresp.Header.Get("Accept-Ranges"); v != "" {
+		tresHeader.Set("Accept-Ranges", v)
 	}
-	if v := resp.Header.Get("Content-Range"); v != "" {
-		h.Set("Content-Range", v)
+	if v := iresp.Header.Get("Content-Range"); v != "" {
+		tresHeader.Set("Content-Range", v)
 	}
 
 	// Mirror upstream status (200/206/304/etc.) and stream body
-	c.Status(resp.StatusCode)
-	if _, err := io.Copy(c.Writer, resp.Body); err != nil {
+	c.Status(iresp.StatusCode)
+	if _, err := io.Copy(c.Writer, iresp.Body); err != nil {
 		// Client disconnected or network error while streaming; nothing else to do
 		return
 	}

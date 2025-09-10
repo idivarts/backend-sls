@@ -21,7 +21,8 @@ func handleUserAPIs() {
 	brandAPIs := apihandler.GinEngine.Group("/discovery/brands", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 
 	brandAPIs.POST("/:brandId/influencers", trendlydiscovery.GetInfluencers)
-	brandAPIs.POST("/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
+	brandAPIs.GET("/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
+	brandAPIs.POST("/:brandId/influencers/:influencerId", trendlydiscovery.RequestConnection)
 
 	// Creating a completely open route for image-relay
 	apihandler.GinEngine.GET("/discovery/image-relay", trendlydiscovery.ImageRelay)

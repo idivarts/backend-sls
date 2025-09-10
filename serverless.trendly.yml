@@ -52,6 +52,8 @@ provider:
             - "s3:PutObject"
             - "s3:ListBucket"
           Resource: 
+            - arn:aws:s3:::${self:service}-discovery-resources
+            - arn:aws:s3:::${self:service}-discovery-resources/*
             - arn:aws:s3:::${self:service}-video-uploads
             - arn:aws:s3:::${self:service}-video-uploads/*
             - arn:aws:s3:::${self:service}-image-uploads
