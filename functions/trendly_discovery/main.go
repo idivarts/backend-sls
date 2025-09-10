@@ -22,7 +22,7 @@ func handleUserAPIs() {
 
 	brandAPIs.POST("/:brandId/influencers", trendlydiscovery.GetInfluencers)
 	brandAPIs.GET("/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
-	brandAPIs.POST("/:brandId/influencers/:influencerId", trendlydiscovery.RequestConnection)
+	// brandAPIs.POST("/:brandId/influencers/:influencerId", trendlydiscovery.RequestConnection)
 
 	// Creating a completely open route for image-relay
 	apihandler.GinEngine.GET("/discovery/image-relay", trendlydiscovery.ImageRelay)
