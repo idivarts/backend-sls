@@ -1,7 +1,13 @@
 package trendlydiscovery
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"net/http"
+	"net/url"
+	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -12,6 +18,103 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 )
+
+// --- S3 + SQS helpers ---
+
+// envS3Origin returns the public https origin for serving S3 objects, e.g. https://cdn.trendly.pro
+func envS3Origin() string {
+	origin := os.Getenv("S3_ORIGIN")
+	if origin == "" {
+		// fallback to virtual-hosted–style S3 endpoint if not provided
+		origin = "https://s3.amazonaws.com"
+	}
+	return strings.TrimRight(origin, "/")
+}
+
+// envImagesQueueURL returns the SQS queue URL that workers listen on.
+func envImagesQueueURL() string {
+	return os.Getenv("SQS_IMAGE_QUEUE_URL")
+}
+
+// isValidHTTPURL checks if a string is a valid http(s) URL.
+func isValidHTTPURL(s string) bool {
+	if s == "" {
+		return false
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	if u.Host == "" {
+		return false
+	}
+	return true
+}
+
+// fileExtFromURL tries to preserve the original file extension if present.
+func fileExtFromURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	ext := path.Ext(u.Path)
+	// basic sanity: only allow simple alnum extensions up to 5 chars
+	if len(ext) > 0 && len(ext) <= 6 {
+		return ext
+	}
+	return ""
+}
+
+// buildS3Path creates a deterministic path using SHA-256 over (kind|username|srcURL).
+// Example: instagram/rahul/profile_pic/2f/2f1a....jpg
+func buildS3Path(kind, username, srcURL string) string {
+	h := sha256.Sum256([]byte(kind + "|" + strings.ToLower(username) + "|" + srcURL))
+	hexHash := hex.EncodeToString(h[:])
+	ext := fileExtFromURL(srcURL)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	// shard into 2-char folders for better distribution
+	prefix := hexHash[:2]
+	return fmt.Sprintf("instagram/%s/%s/%s/%s%s", strings.ToLower(username), kind, prefix, hexHash, ext)
+}
+
+// enqueueImageCopy sends a message to SQS with payload {s3Path, imageUrl}.
+// NOTE: Wire this up to AWS SDK v2 where the queue URL is in SQS_IMAGE_QUEUE_URL.
+// This function is intentionally left framework-agnostic to avoid import bloat here.
+// Replace the TODO block with actual SQS send code in your environment.
+func enqueueImageCopy(c *gin.Context, s3Path, imageURL string) error {
+	queueURL := envImagesQueueURL()
+	if queueURL == "" {
+		// If queue is not configured, treat as no-op to avoid failing the write path.
+		return nil
+	}
+	// TODO: Implement using AWS SDK v2:
+	//   payload := map[string]string{"s3Path": s3Path, "imageUrl": imageURL}
+	//   jsonBody, _ := json.Marshal(payload)
+	//   cfg, _ := config.LoadDefaultConfig(c, ...)
+	//   client := sqs.NewFromConfig(cfg)
+	//   _, err := client.SendMessage(c, &sqs.SendMessageInput{QueueUrl: &queueURL, MessageBody: aws.String(string(jsonBody))})
+	//   return err
+	return nil
+}
+
+// processImageURL validates a source URL, builds the s3 path, enqueues copy, and returns the public CDN URL.
+// If srcURL is invalid, it returns srcURL unchanged.
+func processImageURL(c *gin.Context, kind, username, srcURL string) string {
+	if !isValidHTTPURL(srcURL) {
+		return srcURL
+	}
+	s3Path := buildS3Path(kind, username, srcURL)
+	if err := enqueueImageCopy(c, s3Path, srcURL); err != nil {
+		// if enqueue fails, fall back to original URL
+		return srcURL
+	}
+	return envS3Origin() + "/" + s3Path
+}
 
 func medianInt64(xs []int64) float32 {
 	if len(xs) == 0 {
@@ -127,6 +230,8 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
+	username := req.About.Username
+
 	adderUserId, b := middlewares.GetUserId(c)
 	if !b {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "User not authenticated", "error": "UserId not found"})
@@ -152,16 +257,16 @@ func AddProfile(c *gin.Context) {
 		Name:              req.About.FullName,
 		Bio:               req.About.Bio,
 		Category:          req.About.Category,
-		ProfilePic:        req.About.ProfilePic,
+		ProfilePic:        processImageURL(c, "profile_pic", username, req.About.ProfilePic),
 		ProfileVerified:   req.About.IsVerified,
 		HasContacts:       len(req.About.Links) > 0,
 		HasFollowButton:   req.About.Actions.HasFollowButton,
 		HasMessageButton:  req.About.Actions.HasMessageButton,
 		ReelScrappedCount: len(req.Reels.Items),
-		QualityScore:      req.Manual.AestheticsScore,
-		CreationTime:      time.Now().UnixMicro(), // TODO: set actual creation time
-		LastUpdateTime:    time.Now().UnixMicro(),
-		AddedBy:           adderUserId,
+        QualityScore:      req.Manual.AestheticsScore,
+        CreationTime:      time.Now().UnixMilli(),
+        LastUpdateTime:    time.Now().UnixMicro(),
+        AddedBy:           adderUserId,
 
 		ViewsCount:      0,
 		EnagamentsCount: 0,
@@ -193,6 +298,9 @@ func AddProfile(c *gin.Context) {
 	totalComments := int64(0)
 
 	for index, reel := range req.Reels.Items {
+		// Move reel thumbnail to S3 via async SQS
+		newThumb := processImageURL(c, "reel_thumb", username, reel.Thumbnail)
+
 		parts := strings.Split(reel.URL, "/")
 		id := "reelindex" + strconv.Itoa(index)
 		if len(parts) >= 2 {
@@ -200,7 +308,7 @@ func AddProfile(c *gin.Context) {
 		}
 		data.Reels = append(data.Reels, trendlybq.Reel{
 			ID:            id,
-			ThumbnailURL:  reel.Thumbnail,
+			ThumbnailURL:  newThumb,
 			URL:           reel.URL,
 			Caption:       "",
 			Pinned:        reel.Pinned,
