@@ -2,7 +2,6 @@ package myemail
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
@@ -25,20 +24,10 @@ func init() {
 	if os.Getenv("SENDGRID_API_KEY") == "" {
 		senderName = "Trendly Support"
 		senderEmail = "no-reply@idiv.in"
-		os.Setenv("SENDGRID_API_KEY", "U0cuUC1mbHlIbndRanlKNzRoUXRNSHpCZy43R1MwY3Y0M0gzMzc1SS1mSFBET2VGU3Z3eWFhaTVXdHhhSTF2VGVSNk5v")
+		apiKey = os.Getenv("SENDGRID_API_KEY")
+	} else {
+		apiKey = os.Getenv("SENDGRID_API_KEY")
 	}
-
-	base64key := os.Getenv("SENDGRID_API_KEY")
-	// Decode the string
-	decodedBytes, err := base64.StdEncoding.DecodeString(base64key)
-	if err != nil {
-		log.Fatalf("Failed to decode base64 string: %v", err)
-	}
-
-	// Convert the bytes to string
-	apiKey = string(decodedBytes)
-	// fmt.Println("Decoded string:", decodedStr)
-
 }
 
 // SendEmailUsingTemplate This will be used to send email using template
