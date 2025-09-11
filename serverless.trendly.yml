@@ -18,7 +18,7 @@ provider:
     FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
     INSTA_CLIENT_ID: 1166596944824933
     INSTA_CLIENT_SECRET: ${env:INSTA_CLIENT_SECRET}
-    STREAM_CLIENT: 3xgzx3kxp5jy
+    STREAM_CLIENT: gg9xameygwse
     STREAM_SECRET: ${env:STREAM_SECRET}
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
     BRAND_LOGIN_URL: "https://brands.trendly.now/login"
