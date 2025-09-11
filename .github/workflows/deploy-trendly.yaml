@@ -27,6 +27,12 @@ jobs:
       - run: go mod download
       - name: Add Service JSON and Deploy
         env:
+          JWT_ENCODE_KEY: ${{ secrets.JWT_ENCODE_KEY }}
+          FB_CLIENT_SECRET: ${{ secrets.FB_CLIENT_SECRET }}
+          INSTA_CLIENT_SECRET: ${{ secrets.INSTA_CLIENT_SECRET }}
+          STREAM_SECRET: ${{ secrets.STREAM_SECRET }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_BASE64: ${{ secrets.TRENDLY_SERVICE_ACCOUNT }}
           TRENDLY_KEY_SECRETS_BASE64: ${{ secrets.TRENDLY_KEY_SECRETS }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
