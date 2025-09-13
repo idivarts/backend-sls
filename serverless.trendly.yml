@@ -25,7 +25,7 @@ provider:
     SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
     SENDGRID_NAME: Trendly
-    SENDGRID_EMAIL: no-reply@trendly.now
+    SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
     # All Razorpay related variables
     GROWTH_PLAN_ID: plan_QywVXV2flgIY7N
