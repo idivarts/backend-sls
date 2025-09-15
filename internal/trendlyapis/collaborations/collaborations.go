@@ -15,6 +15,18 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
+func StartCollaboration(c *gin.Context) {
+	userType := middlewares.GetUserType(c)
+	if userType == "user" {
+		requestToStart(c)
+		return
+	}
+	collabId := c.Param(("collabId"))
+	updating := (c.Query("update") != "")
+
+	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "updating": updating})
+}
+
 // Starting a collab | Request to start
 func StartContract(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
