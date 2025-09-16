@@ -15,6 +15,10 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
+func evaluateCollab(collab *trendlymodels.Collaboration) bool {
+	// Write function to evaluate if the content is good content is not temporary kind of posting
+	return true
+}
 func StartCollaboration(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType == "user" {
@@ -23,6 +27,44 @@ func StartCollaboration(c *gin.Context) {
 	}
 	collabId := c.Param(("collabId"))
 	updating := (c.Query("update") != "")
+
+	collab := &trendlymodels.Collaboration{}
+	err := collab.Get(collabId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Collab"})
+		return
+	}
+
+	brand := trendlymodels.Brand{}
+	err = brand.Get(collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
+		return
+	}
+
+	if brand.Credits.Collaboration <= 0 {
+		collab.Status = "deleted"
+	}
+
+	if collab.Status == "active" && !evaluateCollab(collab) {
+		collab.Status = "deleted"
+	}
+
+	if !updating && collab.Status != "deleted" {
+		brand.Credits.Collaboration -= 1
+	}
+
+	_, err = collab.Insert(collabId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Inserting Collab"})
+		return
+	}
+
+	_, err = brand.Insert(collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Saving Brand"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "updating": updating})
 }
