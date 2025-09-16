@@ -188,6 +188,12 @@ func CreateSubscriptionV2(c *gin.Context) {
 			TrialEnds:       &tEndTime,
 			Status:          myutil.IntPtr(0),
 		}
+
+		if req.AdminData != nil && req.AdminData.OneTimePayment != nil {
+			brand.Billing.Subscription = nil
+			brand.Billing.PaymentLinkId = &id
+		}
+
 		_, err = brand.Insert(req.BrandID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Brand Subscription"})
