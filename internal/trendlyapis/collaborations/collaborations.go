@@ -98,6 +98,10 @@ func StartContract(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching Brand"})
 		return
 	}
+	if brand.Credits.Contract <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient-credits", "message": "Insufficient Credit to Start Contract"})
+		return
+	}
 
 	user := trendlymodels.User{}
 	err = user.Get(contract.UserID)
@@ -171,6 +175,13 @@ func StartContract(c *gin.Context) {
 	err = streamchat.SendSystemMessage(contract.StreamChannelID, "Congratulations!! The contract has been started!\nYou can find the contract details on the contract menu")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Stream Error"})
+		return
+	}
+
+	brand.Credits.Contract -= 1
+	_, err = brand.Insert(contract.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating brand Credits"})
 		return
 	}
 
