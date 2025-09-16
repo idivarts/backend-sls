@@ -194,6 +194,8 @@ func CreateSubscriptionV2(c *gin.Context) {
 			brand.Billing.PaymentLinkId = &id
 		}
 
+		brand.HasPayWall = true
+
 		_, err = brand.Insert(req.BrandID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Brand Subscription"})
