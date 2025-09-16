@@ -19,7 +19,7 @@ func evaluateCollab(collab *trendlymodels.Collaboration) bool {
 	// Write function to evaluate if the content is good content is not temporary kind of posting
 	return true
 }
-func StartCollaboration(c *gin.Context) {
+func PostCollaboration(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType == "user" {
 		requestToStart(c)
