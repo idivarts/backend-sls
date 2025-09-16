@@ -18,6 +18,20 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
+type IBrand struct {
+	BrandID string `json:"brandId" binding:"required"`
+}
+
+func CreateBrand(c *gin.Context) {
+	var req IBrand
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully iniated the brand"})
+}
+
 type IBrandMember struct {
 	BrandID string  `json:"brandId" binding:"required"`
 	Email   string  `json:"email" binding:"required"`

@@ -24,6 +24,7 @@ func main() {
 func handleManagerAPIs() {
 	managerApisV1 := apihandler.GinEngine.Group("/api/v2", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 	managerApisV1.POST("/brands/members", trendlyapis.CreateBrandMember)
+	managerApisV1.POST("/brands/create", trendlyapis.CreateBrand)
 }
 
 func handleUserAPIs() {
