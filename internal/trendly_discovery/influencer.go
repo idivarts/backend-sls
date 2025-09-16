@@ -197,7 +197,13 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	trustMult := 0.8 + 0.004*trust
 	trustMult = clampFloat(trustMult, 0.8, 1.2)
 
-	followersBased := (followers / 1000.0) * basePerK * nicheMult * erMult * verMult * trustMult
+	// Quality multiplier (0.6–1.3)
+	// quality: 0 (cheap creators) → 0.6x, 100 (rich/classy/aesthetic) → 1.3x
+	quality := float64(social.QualityScore)
+	qualityMult := 0.6 + 0.007*quality // maps 0..100 → 0.8..1.3
+	qualityMult = clampFloat(qualityMult, 0.6, 1.3)
+
+	followersBased := (followers / 1000.0) * basePerK * nicheMult * erMult * verMult * trustMult * qualityMult
 	followersMin := followersBased * 0.75
 	followersMax := followersBased * 1.25
 
@@ -212,8 +218,8 @@ func calculateBudget(social *trendlybq.Socials) Range {
 		} else if er < 0.01 {
 			cpmLow, cpmHigh = 150, 400
 		}
-		viewsMin = (avgViews / 1000.0) * cpmLow * nicheMult * verMult
-		viewsMax = (avgViews / 1000.0) * cpmHigh * nicheMult * verMult
+		viewsMin = (avgViews / 1000.0) * cpmLow * nicheMult * verMult * qualityMult
+		viewsMax = (avgViews / 1000.0) * cpmHigh * nicheMult * verMult * qualityMult
 	} else {
 		// Fallback to followers if views unknown
 		viewsMin, viewsMax = followersMin, followersMax
