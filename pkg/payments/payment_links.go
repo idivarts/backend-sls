@@ -8,7 +8,7 @@ type Customer struct {
 	PhoneNumber string
 }
 
-func CreatePaymentLink(amountInRs int, contact Customer, notes map[string]interface{}) (string, error) {
+func CreatePaymentLink(amountInRs int, contact Customer, notes map[string]interface{}) (string, string, error) {
 	linkData := map[string]interface{}{
 		"amount":   amountInRs * 100,
 		"currency": "INR",
@@ -23,8 +23,8 @@ func CreatePaymentLink(amountInRs int, contact Customer, notes map[string]interf
 	}
 	link, err := Client.PaymentLink.Create(linkData, nil)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	log.Println("Link", link)
-	return link["short_url"].(string), err
+	return link["id"].(string), link["short_url"].(string), err
 }

@@ -24,12 +24,13 @@ type CreateSubscriptionRequestV2 struct {
 	AdminData *AdminData `json:"adminData,omitempty"`
 }
 type AdminData struct {
-	IsOnTrial bool    `json:"isOnTrial"`
-	TrialDays int     `json:"trialDays"`
-	Email     string  `json:"email"`
-	Password  string  `json:"password"`
-	Phone     string  `json:"phone"`
-	OfferId   *string `json:"offerId,omitempty"`
+	IsOnTrial      bool    `json:"isOnTrial"`
+	TrialDays      int     `json:"trialDays"`
+	Email          string  `json:"email"`
+	Password       string  `json:"password"`
+	Phone          string  `json:"phone"`
+	OfferId        *string `json:"offerId,omitempty"`
+	OneTimePayment *int    `json:"oneTimePayment,omitempty"`
 }
 
 func CreateSubscriptionV2(c *gin.Context) {
@@ -146,14 +147,29 @@ func CreateSubscriptionV2(c *gin.Context) {
 		}
 	}
 
-	id, link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, map[string]interface{}{
+	notes := map[string]interface{}{
 		"brandId":   req.BrandID,
 		"planKey":   planKey,
 		"planCycle": planCycle,
-	}, offerId)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to create subscription link"})
-		return
+	}
+
+	var id, link string
+
+	if req.AdminData != nil && req.AdminData.OneTimePayment != nil {
+		id, link, err = payments.CreatePaymentLink(700, payments.Customer{
+			Email:       req.AdminData.Email,
+			PhoneNumber: req.AdminData.Phone,
+		}, notes)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to create one time payment link"})
+			return
+		}
+	} else {
+		id, link, err = payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, notes, offerId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to create subscription link"})
+			return
+		}
 	}
 
 	if req.AdminData != nil && req.AdminData.IsOnTrial {

@@ -12,7 +12,7 @@ func TestCreateOrder(t *testing.T) {
 }
 
 func TestCreatePaymentLink(t *testing.T) {
-	link, err := payments.CreatePaymentLink(499, payments.Customer{
+	_, link, err := payments.CreatePaymentLink(499, payments.Customer{
 		Name:        "Rahul",
 		Email:       "rahul.test1@idiv.in",
 		PhoneNumber: "9905264774",

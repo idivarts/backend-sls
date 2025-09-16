@@ -54,6 +54,7 @@ type BrandBilling struct {
 	PlanCycle *string `json:"planCycle,omitempty" firestore:"planCycle,omitempty"`
 	IsOnTrial *bool   `json:"isOnTrial,omitempty" firestore:"isOnTrial,omitempty"`
 	TrialEnds *int64  `json:"trialEnds,omitempty" firestore:"trialEnds,omitempty"`
+	EndsAt    *int64  `json:"endsAt,omitempty" firestore:"endsAt,omitempty"`
 	Status    *int    `json:"status,omitempty" firestore:"status,omitempty"`
 }
 
