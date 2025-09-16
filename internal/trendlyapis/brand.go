@@ -29,6 +29,35 @@ func CreateBrand(c *gin.Context) {
 		return
 	}
 
+	brand := trendlymodels.Brand{}
+	err := brand.Get(req.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid Input"})
+		return
+	}
+
+	brand.IsBillingDisabled = false
+	brand.Billing = &trendlymodels.BrandBilling{
+		BillingStatus: myutil.StrPtr("active"),
+		PlanKey:       myutil.StrPtr("starter"),
+		PlanCycle:     myutil.StrPtr("yearly"),
+		Status:        myutil.IntPtr(1),
+	}
+
+	brand.Credits = trendlymodels.BrandCredits{
+		Influencer:    5,
+		Discovery:     1,
+		Connection:    0,
+		Collaboration: 1,
+		Contract:      1,
+	}
+
+	_, err = brand.Insert(req.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in inserting"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully iniated the brand"})
 }
 
