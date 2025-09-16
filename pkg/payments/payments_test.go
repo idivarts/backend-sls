@@ -26,7 +26,7 @@ func TestCreatePaymentLink(t *testing.T) {
 // plan_QPkwSFj9oy45l6
 
 func TestCreateSubscriptionLink(t *testing.T) {
-	link, err := payments.CreateSubscriptionLink("plan_QPkwSFj9oy45l6", 12, 3, 1, map[string]interface{}{})
+	_, link, err := payments.CreateSubscriptionLink("plan_QPkwSFj9oy45l6", 12, 3, 1, map[string]interface{}{}, "")
 	if err != nil {
 		t.Error(err)
 	}
