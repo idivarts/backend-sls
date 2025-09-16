@@ -22,8 +22,25 @@ type Brand struct {
 	IsBillingDisabled bool          `json:"isBillingDisabled" firestore:"isBillingDisabled"`
 	Billing           *BrandBilling `json:"billing,omitempty" firestore:"billing,omitempty"`
 
+	UnlockedInfluencers   []string               `json:"unlockedInfluencers,omitempty" firestore:"unlockedInfluencers,omitempty"`
+	DiscoveredInfluencers []string               `json:"discoveredInfluencers,omitempty" firestore:"discoveredInfluencers,omitempty"`
+	ConnectedInfluencers  BrandInfluencerConnect `json:"connectedInfluencers" firestore:"connectedInfluencers"`
+
+	Credits BrandCredits `json:"credits" firestore:"credits"`
+
 	// Members       []BrandMember  `json:"members" firestore:"members"`
 	// Notifications []Notification `json:"notifications" firestore:"notifications"`
+}
+type BrandInfluencerConnect struct {
+	Requested []string `json:"requested,omitempty" firestore:"requested,omitempty"`
+	Connected []string `json:"connected,omitempty" firestore:"connected,omitempty"`
+}
+type BrandCredits struct {
+	Influencer    int `json:"influencer" firestore:"influencer"`
+	Discovery     int `json:"discovery" firestore:"discovery"`
+	Connection    int `json:"connection" firestore:"connection"`
+	Collaboration int `json:"collaboration" firestore:"collaboration"`
+	Contract      int `json:"contract" firestore:"contract"`
 }
 type BrandBilling struct {
 	Subscription    *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
