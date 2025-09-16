@@ -5,12 +5,16 @@ import (
 	"time"
 )
 
-func CreateSubscriptionLink(planId string, totalBillingCycles, trialDays, expireDays int, notes map[string]interface{}) (string, error) {
+func CreateSubscriptionLink(planId string, totalBillingCycles, trialDays, expireDays int, notes map[string]interface{}, offerId string) (string, string, error) {
 	linkData := map[string]interface{}{
 		"plan_id":         planId,
 		"total_count":     totalBillingCycles,
 		"customer_notify": true,
 		"notes":           notes,
+	}
+
+	if offerId != "" {
+		linkData["offer_id"] = offerId
 	}
 	if trialDays > 0 {
 		linkData["start_at"] = time.Now().Add(time.Duration(trialDays * 24 * int(time.Hour))).Unix()
@@ -21,10 +25,10 @@ func CreateSubscriptionLink(planId string, totalBillingCycles, trialDays, expire
 
 	link, err := Client.Subscription.Create(linkData, nil)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	log.Println("Link", link)
-	return link["short_url"].(string), err
+	return link["id"].(string), link["short_url"].(string), err
 }
 
 func CancelSubscription(subscriptionId string, cancelAtEnd bool) (map[string]interface{}, error) {

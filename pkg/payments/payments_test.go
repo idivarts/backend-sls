@@ -12,7 +12,7 @@ func TestCreateOrder(t *testing.T) {
 }
 
 func TestCreatePaymentLink(t *testing.T) {
-	link, err := payments.CreatePaymentLink(499, payments.Customer{
+	_, link, err := payments.CreatePaymentLink(499, payments.Customer{
 		Name:        "Rahul",
 		Email:       "rahul.test1@idiv.in",
 		PhoneNumber: "9905264774",
@@ -26,7 +26,7 @@ func TestCreatePaymentLink(t *testing.T) {
 // plan_QPkwSFj9oy45l6
 
 func TestCreateSubscriptionLink(t *testing.T) {
-	link, err := payments.CreateSubscriptionLink("plan_QPkwSFj9oy45l6", 12, 3, 1, map[string]interface{}{})
+	_, link, err := payments.CreateSubscriptionLink("plan_QPkwSFj9oy45l6", 12, 3, 1, map[string]interface{}{}, "")
 	if err != nil {
 		t.Error(err)
 	}

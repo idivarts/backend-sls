@@ -57,11 +57,11 @@ func CreateSubscription(c *gin.Context) {
 		trialDays = 0
 	}
 
-	link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, map[string]interface{}{
+	_, link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, map[string]interface{}{
 		"brandId":      req.BrandID,
 		"planName":     planName,
 		"isGrowthPlan": req.IsGrowthPlan,
-	})
+	}, "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to create subscription link"})
 		return

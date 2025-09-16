@@ -42,6 +42,7 @@ func CreateBrand(c *gin.Context) {
 		PlanKey:       myutil.StrPtr("starter"),
 		PlanCycle:     myutil.StrPtr("yearly"),
 		Status:        myutil.IntPtr(1),
+		IsOnTrial:     myutil.BoolPtr(false),
 	}
 
 	brand.Credits = trendlymodels.BrandCredits{
@@ -51,6 +52,7 @@ func CreateBrand(c *gin.Context) {
 		Collaboration: 1,
 		Contract:      1,
 	}
+	brand.HasPayWall = false
 
 	_, err = brand.Insert(req.BrandID)
 	if err != nil {
