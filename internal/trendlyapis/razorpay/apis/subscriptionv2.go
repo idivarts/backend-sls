@@ -95,6 +95,10 @@ func CreateSubscriptionV2(c *gin.Context) {
 	offerId := ""
 	if req.AdminData != nil {
 		if req.AdminData.IsOnTrial {
+			if req.AdminData.TrialDays <= 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "trial-error", "message": "Trial Days should be atleast for one day"})
+				return
+			}
 			trialDays = req.AdminData.TrialDays
 		}
 		if req.AdminData.OfferId != nil {
