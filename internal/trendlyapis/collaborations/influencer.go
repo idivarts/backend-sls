@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 )
 
 type requestWithBrands struct {
@@ -23,6 +24,28 @@ func InfluencerUnlocked(c *gin.Context) {
 	managerId, b := middlewares.GetUserId(c)
 	if !b {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Error fetching userId from token"})
+		return
+	}
+
+	brand := &trendlymodels.Brand{}
+	err := brand.Get(req.BrandId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching brand"})
+		return
+	}
+
+	brand.UnlockedInfluencers, b = myutil.AppendUnique(brand.UnlockedInfluencers, influenerId)
+	if b {
+		if brand.Credits.Influencer <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient-credits", "message": "Insufficient Credits"})
+			return
+		}
+		brand.Credits.Influencer -= 1
+	}
+
+	_, err = brand.Insert(req.BrandId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Inserting Brand with Unlocked Influencers"})
 		return
 	}
 
