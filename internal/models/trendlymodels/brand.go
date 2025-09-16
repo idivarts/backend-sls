@@ -28,6 +28,8 @@ type Brand struct {
 
 	Credits BrandCredits `json:"credits" firestore:"credits"`
 
+	HasPayWall bool `json:"hasPayWall" firestore:"hasPayWall"`
+
 	// Members       []BrandMember  `json:"members" firestore:"members"`
 	// Notifications []Notification `json:"notifications" firestore:"notifications"`
 }
@@ -51,6 +53,7 @@ type BrandBilling struct {
 	PlanKey   *string `json:"planKey,omitempty" firestore:"planKey,omitempty"`
 	PlanCycle *string `json:"planCycle,omitempty" firestore:"planCycle,omitempty"`
 	IsOnTrial *bool   `json:"isOnTrial,omitempty" firestore:"isOnTrial,omitempty"`
+	TrialEnds *int64  `json:"trialEnds,omitempty" firestore:"trialEnds,omitempty"`
 	Status    *int    `json:"status,omitempty" firestore:"status,omitempty"`
 }
 
