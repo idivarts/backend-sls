@@ -14,11 +14,7 @@ func TestUpload(t *testing.T) {
 	os.Setenv("S3_BUCKET", "trendly-discovery-bucket")
 	os.Setenv("S3_URL", "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
 
-	picture := "https://instagram.fccu27-1.fna.fbcdn.net/v/t51.2885-19/311454657_170545628899938_4001728139220018973_n.jpg?efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby4xMDgwLmMyIn0&_nc_ht=instagram.fccu27-1.fna.fbcdn.net&_nc_cat=106&_nc_oc=Q6cZ2QG36z__HDB8I7sZbYHsX4bJ5cBNQ5bvw2GzPZZ16Sb9fwuHNdFBoGOnUMJ2ov9ysVdPcveGr5Z1Q5b-QeIKpQh8&_nc_ohc=6nJ_ib3-0CwQ7kNvwFXKBez&_nc_gid=gXfAAQp5TmSYLR_7yuUatg&edm=AP4sbd4BAAAA&ccb=7-5&oh=00_AfZlOM3sXuzsrwIHnjW-ij-GF_tb4toln35GFQEmtY74Dg&oe=68CDA291&_nc_sid=7a9f4b"
+	// picture := "https://instagram.fccu27-1.fna.fbcdn.net/v/t51.2885-19/311454657_170545628899938_4001728139220018973_n.jpg?efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby4xMDgwLmMyIn0&_nc_ht=instagram.fccu27-1.fna.fbcdn.net&_nc_cat=106&_nc_oc=Q6cZ2QG36z__HDB8I7sZbYHsX4bJ5cBNQ5bvw2GzPZZ16Sb9fwuHNdFBoGOnUMJ2ov9ysVdPcveGr5Z1Q5b-QeIKpQh8&_nc_ohc=6nJ_ib3-0CwQ7kNvwFXKBez&_nc_gid=gXfAAQp5TmSYLR_7yuUatg&edm=AP4sbd4BAAAA&ccb=7-5&oh=00_AfZlOM3sXuzsrwIHnjW-ij-GF_tb4toln35GFQEmtY74Dg&oe=68CDA291&_nc_sid=7a9f4b"
 
-	url, err := trendly_discovery_sqs.DownloadAndUploadToS3(picture, "test/")
-	if err != nil {
-		t.Error(err)
-	}
-	t.Log(url)
+	trendly_discovery_sqs.MoveImagesToS3("95d0838c-a5d2-5849-ba4a-b5ea0d7f67a9")
 }

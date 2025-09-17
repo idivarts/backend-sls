@@ -28,6 +28,32 @@ func MoveImagesToS3(socialId string) {
 		return
 	}
 
+	if social.ProfilePic != "" {
+		p, err := DownloadAndUploadToS3(social.ProfilePic, fmt.Sprintf("instagram/%s/profile-", social.ID))
+		if err != nil {
+			log.Println("Error Uploading Profile Pic", socialId, err.Error())
+			return
+		}
+		social.ProfilePic = p
+	}
+
+	for i, v := range social.Reels {
+		if v.ThumbnailURL != "" {
+			p, err := DownloadAndUploadToS3(v.ThumbnailURL, fmt.Sprintf("instagram/%s/reels-", social.ID))
+			if err != nil {
+				log.Println("Error Uploading Reel Pic", socialId, v.ID, err.Error())
+				return
+			}
+			social.Reels[i].ThumbnailURL = p
+		}
+	}
+
+	err = social.Update()
+	if err != nil {
+		log.Println("Error Updating Social", socialId, err.Error())
+		return
+	}
+	log.Println("Success")
 }
 
 // DownloadAndUploadToS3 downloads the image from URL, saves it to /tmp, and uploads to S3.

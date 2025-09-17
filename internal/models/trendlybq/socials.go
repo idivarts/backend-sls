@@ -87,6 +87,23 @@ func (data *Socials) Insert() error {
 	return nil
 }
 
+func (data *Socials) Update() error {
+	sql := "DELETE FROM `" + SocialsFullTableName + "` WHERE id ='" + data.ID + "'"
+
+	query := myquery.Client.Query(sql)
+	deleteJob, err := query.Run(context.Background())
+	status, err := deleteJob.Wait(context.Background())
+	if err != nil {
+		log.Fatalf("Error while waiting for delete job to finish: %v", err)
+		return err
+	}
+	if status.Err() != nil {
+		log.Fatalf("Delete job failed: %v", status.Err())
+		return status.Err()
+	}
+	return data.Insert()
+}
+
 func (data *Socials) Get(id string) error {
 	q := myquery.Client.Query(`
     SELECT *
