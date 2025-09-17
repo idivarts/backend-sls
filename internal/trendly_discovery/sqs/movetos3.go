@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
+	neturl "net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -75,13 +79,31 @@ func DownloadAndUploadToS3(url, path string) (string, error) {
 	client := s3.New(sess)
 
 	// Generate object key
-	filename := filepath.Base(tmpFile.Name()) + filepath.Ext(url)
+	// Derive a stable filename using the URL's path-based extension (ignoring query params).
+	// Fallback to Content-Type from the response headers if the URL has no extension.
+	base := strings.TrimSuffix(filepath.Base(tmpFile.Name()), filepath.Ext(tmpFile.Name()))
+	ext := fileExtFromURL(url)
+	if ext == "" {
+		if ctype := resp.Header.Get("Content-Type"); ctype != "" {
+			if exts, _ := mime.ExtensionsByType(ctype); len(exts) > 0 {
+				ext = exts[0]
+			}
+		}
+	}
+	if ext == "" {
+		ext = ".bin"
+	}
+	filename := base + ext
+
 	key := path + filename
 
+	ct := resp.Header.Get("Content-Type")
+
 	_, err = client.PutObject(&s3.PutObjectInput{
-		Bucket: aws.String(S3Bucket),
-		Key:    aws.String(key),
-		Body:   tmpFile,
+		Bucket:      aws.String(S3Bucket),
+		Key:         aws.String(key),
+		Body:        tmpFile,
+		ContentType: aws.String(ct),
 	})
 	if err != nil {
 		log.Println("Error uploading to S3:", err)
@@ -90,6 +112,16 @@ func DownloadAndUploadToS3(url, path string) (string, error) {
 
 	// ---- Step 4: Return S3 URL ----
 	return fmt.Sprintf("%s/%s", S3URL, key), nil
+}
+
+// fileExtFromURL extracts the extension from a URL path (ignoring query params and fragments).
+// It returns a lowercase extension like ".jpg" or an empty string if none is found.
+func fileExtFromURL(rawURL string) string {
+	u, err := neturl.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(path.Ext(u.Path))
 }
 
 // S3_BUCKET: trendly-discovery-bucket
