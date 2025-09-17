@@ -87,6 +87,39 @@ type BrandSurvey struct {
 	CollaborationValue *string `json:"collaborationValue,omitempty" firestore:"collaborationValue,omitempty"`
 }
 
+var (
+	PlanCreditsMap = map[string]BrandCredits{
+		"starter": BrandCredits{
+			Influencer:    5,
+			Discovery:     1,
+			Connection:    0,
+			Collaboration: 1,
+			Contract:      1,
+		},
+		"growth": BrandCredits{
+			Influencer:    50,
+			Discovery:     1,
+			Connection:    0,
+			Collaboration: 5,
+			Contract:      8,
+		},
+		"pro": BrandCredits{
+			Influencer:    200,
+			Discovery:     50,
+			Connection:    20,
+			Collaboration: 100,
+			Contract:      200,
+		},
+		"enterprise": BrandCredits{
+			Influencer:    200,
+			Discovery:     200,
+			Connection:    50,
+			Collaboration: 100,
+			Contract:      200,
+		},
+	}
+)
+
 func (u *Brand) Get(brandId string) error {
 	res, err := firestoredb.Client.Collection("brands").Doc(brandId).Get((context.Background()))
 	if err != nil {
