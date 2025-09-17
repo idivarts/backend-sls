@@ -69,8 +69,15 @@ func SendMessage(c *gin.Context) {
 		return
 	}
 
-	user := trendlymodels.User{}
-	err := user.Get(influenerId)
+	manager := &trendlymodels.Manager{}
+	err := manager.Get(managerId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching user"})
+		return
+	}
+
+	user := &trendlymodels.User{}
+	err = user.Get(influenerId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching user"})
 		return
@@ -109,6 +116,24 @@ func SendMessage(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Stream Error"})
 		return
+	}
+
+	if !manager.IsChatConnected {
+		manager.IsChatConnected = true
+		_, err = manager.Insert(managerId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error saving manager"})
+			return
+		}
+
+	}
+	if !user.IsChatConnected {
+		user.IsChatConnected = true
+		_, err = user.Insert(influenerId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error saving influencer"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully Notified for starting contract", "channel": channel})
