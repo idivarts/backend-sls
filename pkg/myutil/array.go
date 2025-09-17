@@ -9,6 +9,15 @@ func AppendUnique(slice []string, val string) ([]string, bool) {
 	return append(slice, val), true
 }
 
+func Includes(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
+}
+
 func AppendUniqueWithMap(slice []string, val string) []string {
 	m := make(map[string]struct{}, len(slice))
 	for _, id := range slice {
