@@ -32,8 +32,9 @@ func MoveImagesToS3(socialId string) {
 		p, err := DownloadAndUploadToS3(social.ProfilePic, fmt.Sprintf("instagram/%s/profile-", social.ID))
 		if err != nil {
 			log.Println("Error Uploading Profile Pic", socialId, err.Error())
+		} else {
+			social.ProfilePic = p
 		}
-		social.ProfilePic = p
 	}
 
 	for i, v := range social.Reels {
@@ -41,8 +42,9 @@ func MoveImagesToS3(socialId string) {
 			p, err := DownloadAndUploadToS3(v.ThumbnailURL, fmt.Sprintf("instagram/%s/reels-", social.ID))
 			if err != nil {
 				log.Println("Error Uploading Reel Pic", socialId, v.ID, err.Error())
+			} else {
+				social.Reels[i].ThumbnailURL = p
 			}
-			social.Reels[i].ThumbnailURL = p
 		}
 	}
 

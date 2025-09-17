@@ -26,7 +26,7 @@ func executeOnAll() {
     SELECT id
     FROM ` + trendlybq.SocialsFullTableName + `
 	WHERE NOT STARTS_WITH(profile_pic, "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
-    LIMIT 10
+    LIMIT 500
 	OFFSET 0
 `)
 
