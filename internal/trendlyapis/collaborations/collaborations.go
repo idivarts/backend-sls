@@ -15,7 +15,11 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
-func StartCollaboration(c *gin.Context) {
+func evaluateCollab(collab *trendlymodels.Collaboration) bool {
+	// Write function to evaluate if the content is good content is not temporary kind of posting
+	return true
+}
+func PostCollaboration(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
 	if userType == "user" {
 		requestToStart(c)
@@ -23,6 +27,44 @@ func StartCollaboration(c *gin.Context) {
 	}
 	collabId := c.Param(("collabId"))
 	updating := (c.Query("update") != "")
+
+	collab := &trendlymodels.Collaboration{}
+	err := collab.Get(collabId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Collab"})
+		return
+	}
+
+	brand := trendlymodels.Brand{}
+	err = brand.Get(collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
+		return
+	}
+
+	if brand.Credits.Collaboration <= 0 {
+		collab.Status = "deleted"
+	}
+
+	if collab.Status == "active" && !evaluateCollab(collab) {
+		collab.Status = "deleted"
+	}
+
+	if !updating && collab.Status != "deleted" {
+		brand.Credits.Collaboration -= 1
+	}
+
+	_, err = collab.Insert(collabId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Inserting Collab"})
+		return
+	}
+
+	_, err = brand.Insert(collab.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Saving Brand"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "updating": updating})
 }
@@ -54,6 +96,10 @@ func StartContract(c *gin.Context) {
 	err = brand.Get(contract.BrandID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching Brand"})
+		return
+	}
+	if brand.Credits.Contract <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient-credits", "message": "Insufficient Credit to Start Contract"})
 		return
 	}
 
@@ -129,6 +175,13 @@ func StartContract(c *gin.Context) {
 	err = streamchat.SendSystemMessage(contract.StreamChannelID, "Congratulations!! The contract has been started!\nYou can find the contract details on the contract menu")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Stream Error"})
+		return
+	}
+
+	brand.Credits.Contract -= 1
+	_, err = brand.Insert(contract.BrandID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating brand Credits"})
 		return
 	}
 

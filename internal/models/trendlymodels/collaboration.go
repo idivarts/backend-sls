@@ -2,6 +2,8 @@ package trendlymodels
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
@@ -66,6 +68,26 @@ func (b *Collaboration) Get(collabId string) error {
 		return err
 	}
 	return err
+}
+
+func (b *Collaboration) Insert(collabId string) (*firestore.WriteResult, error) {
+	bytes, err := json.Marshal(b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal user: %w", err)
+	}
+
+	// Unmarshal into a map
+	var data map[string]interface{}
+	if err := json.Unmarshal(bytes, &data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal to map: %w", err)
+	}
+
+	res, err := firestoredb.Client.Collection("collaborations").Doc(collabId).Set(context.Background(), data, firestore.MergeAll)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, err
 }
 
 func GetCollabIDs(startAfter *interface{}, limit int) ([]string, error) {

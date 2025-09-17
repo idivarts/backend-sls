@@ -49,6 +49,7 @@ provider:
             - "s3:PutObject"
             - "s3:ListBucket"
           Resource: 
+            - arn:aws:s3:::trendly-discovery-bucket
             - arn:aws:s3:::${self:service}-video-uploads
             - arn:aws:s3:::${self:service}-video-uploads/*
             - arn:aws:s3:::${self:service}-image-uploads
@@ -117,6 +118,11 @@ functions:
           enabled: true
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
+    environment:
+      SEND_MESSAGE_QUEUE_ARN: 
+        Fn::GetAtt:
+          - ScrapeImageQueue
+          - QueueName
     package:
       include:
         - 'service-account.json'
@@ -125,6 +131,23 @@ functions:
     timeout: 30
     events:
       - http: ANY /discovery/{proxy+}
+  trendly_discovery_hook:
+    handler: functions/trendly_discovery_hook/main.go
+    environment:
+      S3_BUCKET: trendly-discovery-bucket
+      S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - ScrapeImageQueue
+              - Arn
   trendly_apis:
     handler: functions/trendly_apis/main.go
     package:
@@ -267,6 +290,11 @@ package:
 
 resources:
   Resources:
+    ScrapeImageQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ScrapeImageQueue
+
     StreamMessageDLQ:
       Type: AWS::SQS::Queue
       Properties:

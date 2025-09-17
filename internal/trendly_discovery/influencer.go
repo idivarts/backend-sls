@@ -8,6 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 )
 
 type Range struct {
@@ -316,11 +318,37 @@ func FetchInfluencer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
 	}
 
+	brandId := c.Param("brandId")
+
+	brand := &trendlymodels.Brand{}
+	err := brand.Get(brandId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching brand"})
+		return
+	}
+
+	var appended bool
+	brand.DiscoveredInfluencers, appended = myutil.AppendUnique(brand.DiscoveredInfluencers, influencerId)
+	if appended {
+		if brand.Credits.Discovery <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no-discovery-credits", "message": "No Discovery Credits Available"})
+			return
+		}
+
+		brand.Credits.Discovery -= 1
+		_, err = brand.Insert(brandId)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
+			return
+		}
+	}
+
 	social := &trendlybq.Socials{}
 
-	err := social.Get(influencerId)
+	err = social.Get(influencerId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Cant fetch", "error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Social"})
+		return
 	}
 
 	calculatedValue := CalculatedData{
@@ -344,5 +372,41 @@ func TestCalculations(social *trendlybq.Socials) CalculatedData {
 }
 
 func RequestConnection(c *gin.Context) {
+	influencerId := c.Param("influencerId")
+	if influencerId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
+	}
+
+	brandId := c.Param("brandId")
+
+	brand := &trendlymodels.Brand{}
+	err := brand.Get(brandId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching brand"})
+		return
+	}
+
+	// alreadyConnected := myutil.Includes(brand.ConnectedInfluencers.Connected, influencerId)
+	// if alreadyConnected {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "You are already connected"})
+	// 	return
+	// }
+
+	// var appended bool
+	// brand.ConnectedInfluencers.Requested, appended = myutil.AppendUnique(brand.ConnectedInfluencers.Requested, influencerId)
+	// if appended {
+	// 	if brand.Credits.Connection <= 0 {
+	// 		c.JSON(http.StatusBadRequest, gin.H{"error": "no-connection-credits", "message": "No Connection Credits Available"})
+	// 		return
+	// 	}
+
+	// 	brand.Credits.Connection -= 1
+	// 	_, err = brand.Insert(brandId)
+	// 	if err != nil {
+	// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
+	// 		return
+	// 	}
+	// }
+
 	c.JSON(http.StatusOK, gin.H{"message": "api is functional"})
 }
