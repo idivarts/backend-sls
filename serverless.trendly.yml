@@ -134,7 +134,7 @@ functions:
   trendly_discovery_hook:
     handler: functions/trendly_discovery_hook/main.go
     environment:
-      S3_ARN: arn:aws:s3:::trendly-discovery-bucket
+      S3_BUCKET: trendly-discovery-bucket
       S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com
     package:
       include:
