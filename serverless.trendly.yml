@@ -50,6 +50,7 @@ provider:
             - "s3:ListBucket"
           Resource: 
             - arn:aws:s3:::trendly-discovery-bucket
+            - arn:aws:s3:::trendly-discovery-bucket/*
             - arn:aws:s3:::${self:service}-video-uploads
             - arn:aws:s3:::${self:service}-video-uploads/*
             - arn:aws:s3:::${self:service}-image-uploads
