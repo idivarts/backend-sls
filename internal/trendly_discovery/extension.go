@@ -265,6 +265,7 @@ func AddProfile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
 		return
 	}
+	SendToSqs(data.ID)
 
 	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID})
 }
