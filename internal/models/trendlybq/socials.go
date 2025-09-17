@@ -88,7 +88,7 @@ func (data *Socials) Insert() error {
 }
 
 func (data *Socials) Update() error {
-	sql := "DELETE FROM `" + SocialsFullTableName + "` WHERE id ='" + data.ID + "'"
+	sql := "DELETE FROM " + SocialsFullTableName + " WHERE id ='" + data.ID + "'"
 
 	query := myquery.Client.Query(sql)
 	deleteJob, err := query.Run(context.Background())
