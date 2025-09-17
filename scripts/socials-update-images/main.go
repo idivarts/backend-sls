@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/pkg/myquery"
@@ -47,13 +48,18 @@ func executeOnAll() {
 			log.Println("Error ", err.Error())
 			continue
 		}
-		err := sqshandler.SendToMessageQueue(data.ID, 0)
+		err := sqshandler.SendToMessageQueue(data.ID, int64(i*2))
 		if err != nil {
 			log.Println("Error ", data.ID, err.Error())
 			continue
 		}
 		log.Println("Done ", i, data.ID)
 		i++
+
+		if i%10 == 0 {
+			log.Println("Waiting for 10 seconds")
+			time.Sleep(10 * time.Second)
+		}
 	}
 	log.Println("Done All")
 
