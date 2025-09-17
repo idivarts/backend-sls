@@ -140,7 +140,7 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	data := trendlybq.Socials{
+	data := &trendlybq.Socials{
 		SocialType:        "instagram",
 		Gender:            req.Manual.Gender,
 		Niches:            req.Manual.Niches,
