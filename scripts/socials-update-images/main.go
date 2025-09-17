@@ -25,8 +25,9 @@ func executeOnAll() {
 	q := myquery.Client.Query(`
     SELECT id
     FROM ` + trendlybq.SocialsFullTableName + `
-    LIMIT 400
-	OFFSET 10
+	WHERE NOT STARTS_WITH(profile_pic, "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
+    LIMIT 10
+	OFFSET 0
 `)
 
 	it, err := q.Read(context.Background())
