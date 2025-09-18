@@ -95,6 +95,29 @@ func (data *Socials) InsertToFirestore() error {
 	return err
 }
 
+func (data *Socials) UpdateMinified() error {
+	type MinifiedFSSocials struct {
+		ID             string `db:"id" json:"id" firestore:"id"`
+		SocialType     string `db:"social_type" json:"social_type" firestore:"social_type"`
+		Username       string `db:"username" json:"username" firestore:"username"`
+		AddedBy        string `db:"added_by" json:"added_by" firestore:"added_by"`
+		CreationTime   int64  `db:"creation_time" json:"creation_time" firestore:"creation_time"`
+		LastUpdateTime int64  `db:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+	}
+
+	x := MinifiedFSSocials{
+		ID:             data.ID,
+		SocialType:     data.SocialType,
+		Username:       data.Username,
+		AddedBy:        data.AddedBy,
+		CreationTime:   data.CreationTime,
+		LastUpdateTime: data.LastUpdateTime,
+	}
+
+	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), x)
+	return err
+}
+
 func (data *Socials) UpdateAllImages() error {
 	// Perform a parameterized UPDATE instead of delete+insert.
 	// This focuses on fields that change most frequently: profile_pic and reels (including thumbnail_url in each reel).
