@@ -17,10 +17,11 @@ type Range struct {
 	Max int `json:"max"`
 }
 type CalculatedData struct {
-	Quality         int   `json:"quality"`
-	Trustablity     int   `json:"trustablity"`
-	EstimatedBudget Range `json:"estimatedBudget"`
-	EstimatedReach  Range `json:"estimatedReach"`
+	Quality         int     `json:"quality"`
+	Trustablity     int     `json:"trustablity"`
+	EstimatedBudget Range   `json:"estimatedBudget"`
+	EstimatedReach  Range   `json:"estimatedReach"`
+	CPM             float32 `json:"cpm"`
 }
 
 func calculateTrustablity(social *trendlybq.Socials) int {
@@ -409,6 +410,7 @@ func FetchInfluencer(c *gin.Context) {
 		EstimatedBudget: calculateBudget(social),
 		EstimatedReach:  calculateReach(social),
 	}
+	calculatedValue.CPM = float32(calculatedValue.EstimatedBudget.Max+calculatedValue.EstimatedBudget.Min) * 1000 / float32(calculatedValue.EstimatedReach.Max+calculatedValue.EstimatedReach.Min)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer", "social": social, "analysis": calculatedValue})
 }

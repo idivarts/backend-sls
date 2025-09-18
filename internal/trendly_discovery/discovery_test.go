@@ -19,7 +19,7 @@ func TestDiscovery(t *testing.T) {
 }
 
 func TestCalcualations(t *testing.T) {
-	influencerId := "d85553c5-a2c1-54f0-bb91-679a7b4a921c"
+	influencerId := "95d0838c-a5d2-5849-ba4a-b5ea0d7f67a9"
 
 	social := &trendlybq.Socials{}
 	err := social.Get(influencerId)
@@ -28,6 +28,7 @@ func TestCalcualations(t *testing.T) {
 	}
 
 	calculatedValue := trendlydiscovery.TestCalculations(social)
+	calculatedValue.CPM = float32(calculatedValue.EstimatedBudget.Max+calculatedValue.EstimatedBudget.Min) * 1000 / float32(calculatedValue.EstimatedReach.Max+calculatedValue.EstimatedReach.Min)
 
 	pretty, _ := json.MarshalIndent(calculatedValue, "", "  ")
 	log.Println(string(pretty))
