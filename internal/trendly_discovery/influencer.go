@@ -17,10 +17,11 @@ type Range struct {
 	Max int `json:"max"`
 }
 type CalculatedData struct {
-	Quality         int   `json:"quality"`
-	Trustablity     int   `json:"trustablity"`
-	EstimatedBudget Range `json:"estimatedBudget"`
-	EstimatedReach  Range `json:"estimatedReach"`
+	Quality         int     `json:"quality"`
+	Trustablity     int     `json:"trustablity"`
+	EstimatedBudget Range   `json:"estimatedBudget"`
+	EstimatedReach  Range   `json:"estimatedReach"`
+	CPM             float32 `json:"cpm"`
 }
 
 func calculateTrustablity(social *trendlybq.Socials) int {
@@ -150,11 +151,19 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
 
-	// ------- Followers-based model (₹ per 1k followers baseline by region) -------
-	basePerK := 800.0 // India baseline
-	loc := strings.ToLower(social.Location)
-	if strings.Contains(loc, "united states") || strings.Contains(loc, "usa") || strings.Contains(loc, "us") || strings.Contains(loc, "canada") || strings.Contains(loc, "uk") || strings.Contains(loc, "united kingdom") || strings.Contains(loc, "australia") {
-		basePerK = 2500.0
+	// // ------- Followers-based model (₹ per 1k followers baseline by region) -------
+	// For nano-influencers: you might see CPMs as low as ₹50-₹200 per 1,000 views (depending on how many views actually happen, and engagement).
+	// •	For micro-influencers: maybe ₹150-₹500 per 1,000 views.
+	// •	For mid-to-macro influencers: could be ₹500-₹1,500+ per 1,000 views, especially in desirable niches or when high production or exclusivity is involved.
+	basePerK := 50.0 // India baseline
+	if social.FollowerCount < 10000 {
+		basePerK = 50.0 // India baseline
+	} else if social.FollowerCount < 50000 {
+		basePerK = 80.0 // India baseline
+	} else if social.FollowerCount < 100000 {
+		basePerK = 125.0 // India baseline
+	} else {
+		basePerK = 200.0 // India baseline
 	}
 
 	// Niche premium multipliers
@@ -205,23 +214,25 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	qualityMult := 0.6 + 0.007*quality // maps 0..100 → 0.8..1.3
 	qualityMult = clampFloat(qualityMult, 0.6, 1.3)
 
-	followersBased := (followers / 1000.0) * basePerK * nicheMult * erMult * verMult * trustMult * qualityMult
-	followersMin := followersBased * 0.75
-	followersMax := followersBased * 1.25
+	allMult := nicheMult * erMult * verMult * trustMult * qualityMult * 0.75
+
+	followersBased := (followers / 1000.0) * basePerK * allMult
+	followersMin := followersBased * 0.85
+	followersMax := followersBased * 1.15
 
 	// ------- Views-based model (CPM approach) -------
 	var viewsMin, viewsMax float64
 	if avgViews > 0 {
 		// Choose CPM band based on ER
 		cpmLow := 200.0  // ₹ per 1000 views
-		cpmHigh := 600.0 // ₹ per 1000 views
-		if er >= 0.05 {
-			cpmLow, cpmHigh = 400, 900
-		} else if er < 0.01 {
-			cpmLow, cpmHigh = 150, 400
+		cpmHigh := 300.0 // ₹ per 1000 views
+		if er >= 4 {
+			cpmLow, cpmHigh = 250, 500
+		} else if er < 1 {
+			cpmLow, cpmHigh = 100, 200
 		}
-		viewsMin = (avgViews / 1000.0) * cpmLow * nicheMult * verMult * qualityMult
-		viewsMax = (avgViews / 1000.0) * cpmHigh * nicheMult * verMult * qualityMult
+		viewsMin = (avgViews / 1000.0) * cpmLow * allMult
+		viewsMax = (avgViews / 1000.0) * cpmHigh * allMult
 	} else {
 		// Fallback to followers if views unknown
 		viewsMin, viewsMax = followersMin, followersMax
@@ -230,6 +241,29 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	// Combine (average the two models)
 	minBudget := (followersMin + viewsMin) / 2.0
 	maxBudget := (followersMax + viewsMax) / 2.0
+
+	// ---- Apply hard tier caps so budgets stay within expected ranges ----
+	if _, capMax, ok := budgetTierCaps(social.FollowerCount); ok {
+		// Ensure min/max remain within [capMin, capMax]
+
+		// if minBudget < capMin {
+		// 	minBudget = capMin
+		// }
+		if maxBudget > capMax {
+			maxBudget = capMax
+		}
+		// Guard: if the model produced a narrow band above capMax
+		if minBudget > maxBudget {
+			minBudget = capMax
+			maxBudget = capMax
+		}
+	}
+
+	// Enforced Influencer Tier Caps (INR per Post/Reel)
+	// Nano (1K-10K): ₹1,000 – ₹5,000
+	// Micro (10K-100K): ₹5,000 – ₹50,000
+	// Mid-tier (100K-500K): ₹50,000 – ₹2,00,000
+	// Note: These caps are applied via budgetTierCaps() above and will bound the returned range.
 
 	// Round to nearest ₹50
 	return Range{
@@ -309,6 +343,25 @@ func roundToNearest(x float64, step int) float64 {
 	return math.Round(x/st) * st
 }
 
+// budgetTierCaps returns hard min/max caps (INR) for price ranges by follower tier.
+// If a tier is not covered, ok=false and no cap is applied.
+func budgetTierCaps(followers int64) (min float64, max float64, ok bool) {
+	// Influencer Tier - Approximate Rate per Post / Reel (INR)
+	// Nano (1K-10K)      -> ₹1,000 – ₹5,000
+	// Micro (10K-100K)   -> ₹5,000 – ₹50,000
+	// Mid-tier (100K-500K)-> ₹50,000 – ₹2,00,000
+	switch {
+	case followers >= 1000 && followers < 10000:
+		return 1000, 5000, true
+	case followers >= 10000 && followers < 100000:
+		return 5000, 50000, true
+	case followers >= 100000 && followers < 500000:
+		return 50000, 200000, true
+	default:
+		return 0, 0, false
+	}
+}
+
 // Make sure the the influencers discovery credit is reduced
 // If the influencer is already fetched before, do not reduce the credit
 // Also make sure the influencer is added uniquely to the user's list of influencers
@@ -357,6 +410,7 @@ func FetchInfluencer(c *gin.Context) {
 		EstimatedBudget: calculateBudget(social),
 		EstimatedReach:  calculateReach(social),
 	}
+	calculatedValue.CPM = float32(calculatedValue.EstimatedBudget.Max+calculatedValue.EstimatedBudget.Min) * 1000 / float32(calculatedValue.EstimatedReach.Max+calculatedValue.EstimatedReach.Min)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer", "social": social, "analysis": calculatedValue})
 }
