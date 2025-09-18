@@ -150,11 +150,19 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
 
-	// ------- Followers-based model (₹ per 1k followers baseline by region) -------
-	basePerK := 800.0 // India baseline
-	loc := strings.ToLower(social.Location)
-	if strings.Contains(loc, "united states") || strings.Contains(loc, "usa") || strings.Contains(loc, "us") || strings.Contains(loc, "canada") || strings.Contains(loc, "uk") || strings.Contains(loc, "united kingdom") || strings.Contains(loc, "australia") {
-		basePerK = 2500.0
+	// // ------- Followers-based model (₹ per 1k followers baseline by region) -------
+	// For nano-influencers: you might see CPMs as low as ₹50-₹200 per 1,000 views (depending on how many views actually happen, and engagement).
+	// •	For micro-influencers: maybe ₹150-₹500 per 1,000 views.
+	// •	For mid-to-macro influencers: could be ₹500-₹1,500+ per 1,000 views, especially in desirable niches or when high production or exclusivity is involved.
+	basePerK := 100.0 // India baseline
+	if social.FollowerCount < 10000 {
+		basePerK = 50.0 // India baseline
+	} else if social.FollowerCount < 50000 {
+		basePerK = 80.0 // India baseline
+	} else if social.FollowerCount < 100000 {
+		basePerK = 125.0 // India baseline
+	} else {
+		basePerK = 200.0 // India baseline
 	}
 
 	// Niche premium multipliers
@@ -230,6 +238,11 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	// Combine (average the two models)
 	minBudget := (followersMin + viewsMin) / 2.0
 	maxBudget := (followersMax + viewsMax) / 2.0
+
+	// Influencer Tier - Approximate Rate per Post / Reel (INR)
+	// Nano (1K-10K) - ₹1,000 – ₹5,000
+	// Micro (10K-100K) - ₹5,000 – ₹50,000
+	// Mid-tier (100K-500K) - ₹50,000 – ₹2,00,000
 
 	// Round to nearest ₹50
 	return Range{

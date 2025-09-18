@@ -19,7 +19,7 @@ func TestDiscovery(t *testing.T) {
 }
 
 func TestCalcualations(t *testing.T) {
-	influencerId := "1556f797-e72b-591a-beb0-4c25c7480f16"
+	influencerId := "2f8d408e-19d5-5354-b6f2-b7237a4af4c4"
 
 	social := &trendlybq.Socials{}
 	err := social.Get(influencerId)
