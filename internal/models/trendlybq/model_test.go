@@ -12,7 +12,7 @@ func TestSocialInsert(t *testing.T) {
 		Username:   "test_username",
 	}
 
-	err := data.Insert()
+	err := data.InsertToFirestore()
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -23,10 +23,10 @@ func TestSocialInsert(t *testing.T) {
 func TestSocialGet(t *testing.T) {
 	data := &trendlybq.Socials{}
 
-	err := data.GetInstagram("test_username")
+	err := data.GetInstagramFromFirestore("test_username")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	t.Log("Found:", data)
+	t.Log("Found:", data.LastUpdateTime)
 }

@@ -260,7 +260,7 @@ func AddProfile(c *gin.Context) {
 	// Engagement rate as median of per-reel rates
 	data.EngagementRate = medianFloat32(eRates)
 
-	err = data.Insert()
+	err = data.InsertToFirestore()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
 		return
@@ -278,7 +278,7 @@ func CheckUsername(c *gin.Context) {
 	}
 
 	user := trendlybq.Socials{}
-	err := user.GetInstagram(username)
+	err := user.GetInstagramFromFirestore(username)
 
 	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": err == nil, "lastUpdate": user.LastUpdateTime})
 }
