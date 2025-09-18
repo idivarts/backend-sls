@@ -48,7 +48,7 @@ func MoveImagesToS3(socialId string) {
 		}
 	}
 
-	err = social.Update()
+	err = social.UpdateAllImages()
 	if err != nil {
 		log.Println("Error Updating Social", socialId, err.Error())
 		return

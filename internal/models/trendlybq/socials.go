@@ -87,21 +87,44 @@ func (data *Socials) Insert() error {
 	return nil
 }
 
-func (data *Socials) Update() error {
-	sql := "DELETE FROM " + SocialsFullTableName + " WHERE id ='" + data.ID + "'"
+func (data *Socials) UpdateAllImages() error {
+	// Perform a parameterized UPDATE instead of delete+insert.
+	// This focuses on fields that change most frequently: profile_pic and reels (including thumbnail_url in each reel).
+	// We also bump last_update_time if the caller has set it.
+	if data.ID == "" {
+		// Derive ID if it hasn't been set explicitly.
+		data.ID = data.GetID()
+	}
 
-	query := myquery.Client.Query(sql)
-	deleteJob, err := query.Run(context.Background())
-	status, err := deleteJob.Wait(context.Background())
+	q := myquery.Client.Query(`
+		UPDATE ` + SocialsFullTableName + `
+		SET
+		  profile_pic = @profile_pic,
+		  reels = @reels,
+		  last_update_time = @last_update_time
+		WHERE id = @id
+	`)
+
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "id", Value: data.ID},
+		{Name: "profile_pic", Value: data.ProfilePic},
+		// Reels is a repeated RECORD. Passing the Go slice of `Reel` structs will be mapped to an ARRAY<STRUCT> parameter.
+		{Name: "reels", Value: data.Reels},
+		{Name: "last_update_time", Value: data.LastUpdateTime},
+	}
+
+	job, err := q.Run(context.Background())
 	if err != nil {
-		log.Fatalf("Error while waiting for delete job to finish: %v", err)
+		return err
+	}
+	status, err := job.Wait(context.Background())
+	if err != nil {
 		return err
 	}
 	if status.Err() != nil {
-		log.Fatalf("Delete job failed: %v", status.Err())
 		return status.Err()
 	}
-	return data.Insert()
+	return nil
 }
 
 func (data *Socials) Get(id string) error {

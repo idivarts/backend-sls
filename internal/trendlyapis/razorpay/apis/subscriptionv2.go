@@ -188,6 +188,10 @@ func CreateSubscriptionV2(c *gin.Context) {
 			TrialEnds:       &tEndTime,
 			Status:          myutil.IntPtr(0),
 		}
+		x, b := trendlymodels.PlanCreditsMap[planKey]
+		if b {
+			brand.Credits = x
+		}
 
 		if req.AdminData != nil && req.AdminData.OneTimePayment != nil {
 			brand.Billing.Subscription = nil
