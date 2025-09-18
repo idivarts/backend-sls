@@ -267,7 +267,8 @@ func FormSQL(req InfluencerFilters) string {
   engagements_count AS engagements,
   engagement_rate AS engagementRate
 FROM ` + trendlybq.SocialsFullTableName + `
-WHERE social_type = 'instagram'`
+WHERE social_type = 'instagram'
+AND STARTS_WITH(profile_pic, "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")`
 
 	if len(conds) > 0 {
 		base += "\n  AND " + strings.Join(conds, "\n  AND ")
