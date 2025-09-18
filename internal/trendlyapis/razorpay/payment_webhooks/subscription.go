@@ -108,6 +108,21 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 		break
 	}
 
+	if event.Event == "subscription.charged" {
+		bCredit, b := trendlymodels.PlanCreditsMap[*brand.Billing.PlanKey]
+		if b {
+			mult := 1
+			if *brand.Billing.PlanKey == "yearly" {
+				mult = 12
+			}
+			brand.Credits.Discovery += (bCredit.Discovery * mult)
+			brand.Credits.Collaboration += (bCredit.Collaboration * mult)
+			brand.Credits.Connection += (bCredit.Connection * mult)
+			brand.Credits.Contract += (bCredit.Contract * mult)
+			brand.Credits.Influencer += (bCredit.Influencer * mult)
+		}
+	}
+
 	_, err = brand.Insert(subscription.Notes.BrandID)
 	if err != nil {
 		return err
