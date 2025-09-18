@@ -99,7 +99,9 @@ func (_ Socials) InsertMultiple(socials []Socials) error {
 }
 
 func (data *Socials) InsertToFirestore() error {
-	data.ID = data.GetID()
+	if data.ID == "" {
+		data.ID = data.GetID()
+	}
 	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), data)
 	return err
 }
@@ -112,6 +114,7 @@ func (data *Socials) UpdateMinified() error {
 		AddedBy        string `db:"added_by" json:"added_by" firestore:"added_by"`
 		CreationTime   int64  `db:"creation_time" json:"creation_time" firestore:"creation_time"`
 		LastUpdateTime int64  `db:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+		Exported       bool   `db:"exported" json:"exported" firestore:"exported"`
 	}
 
 	x := MinifiedFSSocials{
@@ -121,6 +124,7 @@ func (data *Socials) UpdateMinified() error {
 		AddedBy:        data.AddedBy,
 		CreationTime:   data.CreationTime,
 		LastUpdateTime: data.LastUpdateTime,
+		Exported:       true,
 	}
 
 	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), x)
@@ -202,7 +206,7 @@ func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 }
 
 func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error) {
-	it := firestoredb.Client.Collection("scrapped-socials").Offset(offset).Limit(limit).Documents(context.Background())
+	it := firestoredb.Client.Collection("scrapped-socials").Where("reel_scrapped_count", ">", 0).Offset(offset).Limit(limit).Documents(context.Background())
 
 	socials := []Socials{}
 	for {

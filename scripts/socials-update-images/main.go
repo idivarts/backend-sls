@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
@@ -10,8 +9,8 @@ import (
 )
 
 func main() {
-	os.Setenv("S3_BUCKET", "trendly-discovery-bucket")
-	os.Setenv("S3_URL", "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
+	// os.Setenv("S3_BUCKET", "trendly-discovery-bucket")
+	// os.Setenv("S3_URL", "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
 
 	executeOnAll()
 }
@@ -29,6 +28,7 @@ func executeOnAll() {
 		socials[i] = *sui.MoveImagesToS3(&v)
 		socials[i].LastUpdateTime = time.Now().UnixMicro()
 
+		socials[i].InsertToFirestore()
 		log.Println("Done Social -", i, socials[i].LastUpdateTime, socials[i].ProfilePic)
 	}
 
@@ -38,9 +38,9 @@ func executeOnAll() {
 		log.Println("Error While Inserting", err.Error())
 		return
 	}
-	// for _, v := range socials {
-	// 	v.UpdateMinified()
-	// }
+	for _, v := range socials {
+		v.UpdateMinified()
+	}
 
 	log.Println("Done All")
 }
