@@ -1,65 +1,46 @@
 package main
 
 import (
-	"context"
 	"log"
-	"os"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
-	"github.com/idivarts/backend-sls/pkg/myquery"
-	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
-	"google.golang.org/api/iterator"
+	"github.com/idivarts/backend-sls/scripts/socials-update-images/sui"
 )
 
 func main() {
-	os.Setenv("SEND_MESSAGE_QUEUE_ARN", "ScrapeImageQueue")
+	// os.Setenv("S3_BUCKET", "trendly-discovery-bucket")
+	// os.Setenv("S3_URL", "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
 
 	executeOnAll()
-	// err := sqshandler.SendToMessageQueue("5ed2ac8d-c4cf-5519-92f1-f93232dbcf16", 0)
-	// if err != nil {
-	// 	log.Println("Error ", err.Error())
-	// }
 }
 
 func executeOnAll() {
-	q := myquery.Client.Query(`
-    SELECT id
-    FROM ` + trendlybq.SocialsFullTableName + `
-	WHERE NOT STARTS_WITH(profile_pic, "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
-    LIMIT 500
-	OFFSET 0
-`)
+	startExecutionTime := time.Now().UnixMicro()
+	log.Println("Start Execution", startExecutionTime)
 
-	it, err := q.Read(context.Background())
+	socials, err := trendlybq.Socials{}.GetPaginatedFromFirestore(0, 700)
 	if err != nil {
 		log.Println("Error ", err.Error())
 		return
 	}
+	for i, v := range socials {
+		socials[i] = *sui.MoveImagesToS3(&v)
+		socials[i].LastUpdateTime = time.Now().UnixMicro()
 
-	i := 0
-	for {
-		data := &trendlybq.Socials{}
-		err = it.Next(data)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Println("Error ", err.Error())
-			continue
-		}
-		err := sqshandler.SendToMessageQueue(data.ID, int64(i*2))
-		if err != nil {
-			log.Println("Error ", data.ID, err.Error())
-			continue
-		}
-		log.Println("Done ", i, data.ID, int64(i*2))
-		i++
-
-		// if i%10 == 0 {
-		// 	log.Println("Waiting for 10 seconds")
-		// 	time.Sleep(10 * time.Second)
-		// }
+		socials[i].InsertToFirestore()
+		log.Println("Done Social -", i, socials[i].LastUpdateTime, socials[i].ProfilePic)
 	}
-	log.Println("Done All")
 
+	log.Println("Total Socials", len(socials), startExecutionTime)
+	err = trendlybq.Socials{}.InsertMultiple(socials)
+	if err != nil {
+		log.Println("Error While Inserting", err.Error())
+		return
+	}
+	for _, v := range socials {
+		v.UpdateMinified()
+	}
+
+	log.Println("Done All")
 }

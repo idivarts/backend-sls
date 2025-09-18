@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myquery"
+	"google.golang.org/api/iterator"
 )
 
 const (
@@ -88,9 +89,45 @@ func (data *Socials) Insert() error {
 	}
 	return nil
 }
+
+func (_ Socials) InsertMultiple(socials []Socials) error {
+	inserter := myquery.Client.Dataset("matches").Table(`socials`).Inserter()
+	if err := inserter.Put(context.Background(), socials); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (data *Socials) InsertToFirestore() error {
-	data.ID = data.GetID()
+	if data.ID == "" {
+		data.ID = data.GetID()
+	}
 	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), data)
+	return err
+}
+
+func (data *Socials) UpdateMinified() error {
+	type MinifiedFSSocials struct {
+		ID             string `db:"id" json:"id" firestore:"id"`
+		SocialType     string `db:"social_type" json:"social_type" firestore:"social_type"`
+		Username       string `db:"username" json:"username" firestore:"username"`
+		AddedBy        string `db:"added_by" json:"added_by" firestore:"added_by"`
+		CreationTime   int64  `db:"creation_time" json:"creation_time" firestore:"creation_time"`
+		LastUpdateTime int64  `db:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+		Exported       bool   `db:"exported" json:"exported" firestore:"exported"`
+	}
+
+	x := MinifiedFSSocials{
+		ID:             data.ID,
+		SocialType:     data.SocialType,
+		Username:       data.Username,
+		AddedBy:        data.AddedBy,
+		CreationTime:   data.CreationTime,
+		LastUpdateTime: data.LastUpdateTime,
+		Exported:       true,
+	}
+
+	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), x)
 	return err
 }
 
@@ -132,6 +169,63 @@ func (data *Socials) UpdateAllImages() error {
 		return status.Err()
 	}
 	return nil
+}
+
+func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsFullTableName + `
+    LIMIT @limit
+	OFFSET @offset
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "limit", Value: limit},
+		{Name: "offset", Value: offset},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		log.Println("Error ", err.Error())
+		return nil, err
+	}
+
+	mySocials := []Socials{}
+	for {
+		data := &Socials{}
+		err = it.Next(data)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println("Error ", err.Error())
+			continue
+		}
+		mySocials = append(mySocials, *data)
+	}
+	return mySocials, nil
+}
+
+func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error) {
+	it := firestoredb.Client.Collection("scrapped-socials").Where("reel_scrapped_count", ">", 0).Offset(offset).Limit(limit).Documents(context.Background())
+
+	socials := []Socials{}
+	for {
+		d, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			continue
+		}
+		social := &Socials{}
+		err = d.DataTo(social)
+		if err != nil {
+			continue
+		}
+		socials = append(socials, *social)
+	}
+
+	return socials, nil
 }
 
 func (data *Socials) Get(id string) error {

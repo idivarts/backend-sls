@@ -119,11 +119,6 @@ functions:
           enabled: true
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
-    environment:
-      SEND_MESSAGE_QUEUE_ARN: 
-        Fn::GetAtt:
-          - ScrapeImageQueue
-          - QueueName
     package:
       include:
         - 'service-account.json'
@@ -132,8 +127,8 @@ functions:
     timeout: 30
     events:
       - http: ANY /discovery/{proxy+}
-  trendly_discovery_hook:
-    handler: functions/trendly_discovery_hook/main.go
+  trendly_discovery_script:
+    handler: scripts/socials-update-images/main.go
     environment:
       S3_BUCKET: trendly-discovery-bucket
       S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com
@@ -142,13 +137,11 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
-    timeout: 30
+    timeout: 900
     events:
-      - sqs:
-          arn:
-            Fn::GetAtt:
-              - ScrapeImageQueue
-              - Arn
+      - schedule:
+          rate: cron(0 12 * * ? *)  # Runs every day at 12:00 PM UTC
+          enabled: true
   trendly_apis:
     handler: functions/trendly_apis/main.go
     package:
@@ -291,11 +284,6 @@ package:
 
 resources:
   Resources:
-    ScrapeImageQueue:
-      Type: AWS::SQS::Queue
-      Properties:
-        QueueName: ScrapeImageQueue
-
     StreamMessageDLQ:
       Type: AWS::SQS::Queue
       Properties:
