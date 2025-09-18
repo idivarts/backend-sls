@@ -89,6 +89,15 @@ func (data *Socials) Insert() error {
 	}
 	return nil
 }
+
+func (_ Socials) InsertMultiple(socials []Socials) error {
+	inserter := myquery.Client.Dataset("matches").Table(`socials`).Inserter()
+	if err := inserter.Put(context.Background(), socials); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (data *Socials) InsertToFirestore() error {
 	data.ID = data.GetID()
 	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), data)
@@ -190,6 +199,29 @@ func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 		mySocials = append(mySocials, *data)
 	}
 	return mySocials, nil
+}
+
+func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error) {
+	it := firestoredb.Client.Collection("scrapped-socials").Offset(offset).Limit(limit).Documents(context.Background())
+
+	socials := []Socials{}
+	for {
+		d, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			continue
+		}
+		social := &Socials{}
+		err = d.DataTo(social)
+		if err != nil {
+			continue
+		}
+		socials = append(socials, *social)
+	}
+
+	return socials, nil
 }
 
 func (data *Socials) Get(id string) error {

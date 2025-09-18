@@ -1,4 +1,4 @@
-package trendly_discovery_sqs
+package sui
 
 import (
 	"errors"
@@ -19,14 +19,8 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 )
 
-func MoveImagesToS3(socialId string) {
-	social := &trendlybq.Socials{}
-
-	err := social.Get(socialId)
-	if err != nil {
-		log.Println("Error Getting Social", socialId, err.Error())
-		return
-	}
+func MoveImagesToS3(social *trendlybq.Socials) *trendlybq.Socials {
+	socialId := social.ID
 
 	if social.ProfilePic != "" {
 		p, err := DownloadAndUploadToS3(social.ProfilePic, fmt.Sprintf("instagram/%s/profile-", social.ID))
@@ -47,13 +41,8 @@ func MoveImagesToS3(socialId string) {
 			}
 		}
 	}
-
-	err = social.UpdateAllImages()
-	if err != nil {
-		log.Println("Error Updating Social", socialId, err.Error())
-		return
-	}
-	log.Println("Success")
+	log.Println("Successfully Uploaded images")
+	return social
 }
 
 // DownloadAndUploadToS3 downloads the image from URL, saves it to /tmp, and uploads to S3.
@@ -61,6 +50,10 @@ func MoveImagesToS3(socialId string) {
 func DownloadAndUploadToS3(url, path string) (string, error) {
 	S3Bucket := os.Getenv("S3_BUCKET") // better than ARN for uploading
 	S3URL := os.Getenv("S3_URL")
+
+	if strings.HasPrefix(url, S3URL) {
+		return url, nil
+	}
 
 	// ---- Step 1: Download the image ----
 	resp, err := http.Get(url)
