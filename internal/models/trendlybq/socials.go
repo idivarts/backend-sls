@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myquery"
+	"google.golang.org/api/iterator"
 )
 
 const (
@@ -132,6 +133,40 @@ func (data *Socials) UpdateAllImages() error {
 		return status.Err()
 	}
 	return nil
+}
+
+func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsFullTableName + `
+    LIMIT @limit
+	OFFSET @offset
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "limit", Value: limit},
+		{Name: "offset", Value: offset},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		log.Println("Error ", err.Error())
+		return nil, err
+	}
+
+	mySocials := []Socials{}
+	for {
+		data := &Socials{}
+		err = it.Next(data)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println("Error ", err.Error())
+			continue
+		}
+		mySocials = append(mySocials, *data)
+	}
+	return mySocials, nil
 }
 
 func (data *Socials) Get(id string) error {
