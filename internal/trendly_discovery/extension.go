@@ -1,6 +1,7 @@
 package trendlydiscovery
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 func medianInt64(xs []int64) float32 {
@@ -265,9 +267,14 @@ func AddProfile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
 		return
 	}
-	// SendToSqs(data.ID)
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID})
+	allDocs, err := firestoredb.Client.Collection("scrapped-socials").Where("reel_scrapped_count", ">", 0).Where("added_by", "==", adderUserId).Documents(context.Background()).GetAll()
+	dLen := 0
+	if err == nil {
+		dLen = len(allDocs)
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID, "count": dLen})
 }
 
 func CheckUsername(c *gin.Context) {
