@@ -1,6 +1,7 @@
 package trendlydiscovery_test
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	trendlydiscovery "github.com/idivarts/backend-sls/internal/trendly_discovery"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 func TestDiscovery(t *testing.T) {
@@ -32,4 +34,12 @@ func TestCalcualations(t *testing.T) {
 
 	pretty, _ := json.MarshalIndent(calculatedValue, "", "  ")
 	log.Println(string(pretty))
+}
+
+func TestGetAllCount(t *testing.T) {
+	allDocs, err := firestoredb.Client.Collection("scrapped-socials").Where("reel_scrapped_count", ">", 0).Where("added_by", "==", "jiko-windows-123").Documents(context.Background()).GetAll()
+	if err != nil {
+		t.Error(err)
+	}
+	log.Println("All Documents", len(allDocs))
 }
