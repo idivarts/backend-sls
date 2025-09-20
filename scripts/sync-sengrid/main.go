@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myemail"
@@ -13,12 +14,24 @@ import (
 )
 
 func main() {
+	// Run as an AWS Lambda handler
+	lambda.Start(handler)
+}
+
+func handler(ctx context.Context) (string, error) {
+	start := time.Now().UnixMicro()
+	log.Println("Lambda invocation start", start)
+
 	log.Println("Syncing Users")
 	syncUsers()
 	log.Println("Syncing Managers")
 	syncManagers()
 	log.Println("Sync Completed")
+
+	log.Println("Lambda invocation end", time.Now().UnixMicro())
+	return "ok", nil
 }
+
 func syncManagers() {
 	iter := firestoredb.Client.Collection("managers").Documents(context.Background())
 	defer iter.Stop()
