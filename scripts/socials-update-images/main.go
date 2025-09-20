@@ -1,18 +1,26 @@
 package main
 
 import (
+	"context"
 	"log"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/scripts/socials-update-images/sui"
 )
 
 func main() {
-	// os.Setenv("S3_BUCKET", "trendly-discovery-bucket")
-	// os.Setenv("S3_URL", "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
+	// Run as an AWS Lambda handler
+	lambda.Start(handler)
+}
 
+func handler(ctx context.Context) (string, error) {
+	start := time.Now().UnixMicro()
+	log.Println("Lambda invocation start", start)
 	executeOnAll()
+	log.Println("Lambda invocation end", time.Now().UnixMicro())
+	return "ok", nil
 }
 
 func executeOnAll() {
