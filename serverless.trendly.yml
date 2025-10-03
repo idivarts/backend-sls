@@ -180,7 +180,7 @@ functions:
         - 'key-secrets.json'
         - 'templates/*'
     timeout: 30
-    provisionedConcurrency: 1  # Adjust this number as per traffic/load
+    # provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /api/matchmaking/{proxy+}
   trendly_influencers_apis:
@@ -201,7 +201,7 @@ functions:
         - 'key-secrets.json'
         - 'templates/*'
     timeout: 30
-    provisionedConcurrency: 1  # Adjust this number as per traffic/load
+    # provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /razorpay/{proxy+}
   trendly_payment_webhooks:
@@ -212,7 +212,7 @@ functions:
         - 'key-secrets.json'
         - 'templates/*'
     timeout: 30
-    provisionedConcurrency: 1  # Adjust this number as per traffic/load
+    # provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /payment_webhooks
   stream_sqs_hook:
@@ -237,7 +237,7 @@ functions:
         - 'key-secrets.json'
         - 'templates/*'
     timeout: 30
-    provisionedConcurrency: 1  # Adjust this number as per traffic/load
+    # provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /instagram
       - http: ANY /instagram/{proxy+}
