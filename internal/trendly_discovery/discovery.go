@@ -176,6 +176,13 @@ func FormSQL(req InfluencerFilters) string {
 		conds = append(conds, fmt.Sprintf("engagement_rate <= %f", *req.ERMax))
 	}
 
+	if req.SelectedLocations != nil && len(req.SelectedLocations) > 0 {
+		if req.DescKeywords == nil {
+			req.DescKeywords = make([]string, 0)
+		}
+		req.DescKeywords = append(req.DescKeywords, req.SelectedLocations...)
+	}
+
 	if len(req.DescKeywords) > 0 {
 		// Match ANY keyword in bio (case-insensitive)
 		ors := make([]string, 0, len(req.DescKeywords))
