@@ -193,9 +193,16 @@ func FormSQL(req InfluencerFilters) string {
 			}
 			ors = append(ors, fmt.Sprintf("LOWER(bio) LIKE '%%%s%%'", strings.ToLower(escapeBQString(kw))))
 		}
+
+		if clause := inStringList("location", req.SelectedLocations); clause != "" {
+			ors = append(ors, clause)
+		}
+
 		if len(ors) > 0 {
 			conds = append(conds, fmt.Sprintf("(%s)", strings.Join(ors, " OR ")))
 		}
+	} else if clause := inStringList("location", req.SelectedLocations); clause != "" {
+		conds = append(conds, clause)
 	}
 
 	if req.Name != nil && strings.TrimSpace(*req.Name) != "" {
@@ -222,9 +229,7 @@ func FormSQL(req InfluencerFilters) string {
 	if clause := inStringList("gender", req.Genders); clause != "" {
 		conds = append(conds, clause)
 	}
-	if clause := inStringList("location", req.SelectedLocations); clause != "" {
-		conds = append(conds, clause)
-	}
+
 	if clause := nichesOverlapClause(req.SelectedNiches); clause != "" {
 		conds = append(conds, clause)
 	}
