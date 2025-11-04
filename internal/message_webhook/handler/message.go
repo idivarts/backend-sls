@@ -12,7 +12,7 @@ import (
 	timehandler "github.com/idivarts/backend-sls/internal/time_handler"
 	delayedsqs "github.com/idivarts/backend-sls/pkg/delayed_sqs"
 	instainterfaces "github.com/idivarts/backend-sls/pkg/interfaces/instaInterfaces"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 )
 
 type IGMessagehandler struct {
@@ -92,28 +92,28 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 		msg.conversationData.LastBotMessageTime < (msg.Entry.Timestamp-120000) {
 		log.Println("Handling Message Send Logic", msg.conversationData.LeadID, msg.conversationData.ThreadID, msg.Message.Text)
 
-		var richContent []openai.ContentRequest = nil
+		var richContent []myopenai.ContentRequest = nil
 
 		if msg.Message.Attachments != nil && len(*msg.Message.Attachments) > 0 {
 			log.Println("Handling Attachments. Setting status and exiting")
 
-			richContent = []openai.ContentRequest{}
+			richContent = []myopenai.ContentRequest{}
 			for _, v := range *msg.Message.Attachments {
 				if v.Type == "image" {
-					f, err := openai.UploadImage(v.Payload.URL)
+					f, err := myopenai.UploadImage(v.Payload.URL)
 					if err != nil {
 						return err
 					}
-					richContent = append(richContent, openai.ContentRequest{
-						Type:      openai.ImageContentType,
-						ImageFile: openai.ImageFile{FileID: f.ID},
+					richContent = append(richContent, myopenai.ContentRequest{
+						Type:      myopenai.ImageContentType,
+						ImageFile: myopenai.ImageFile{FileID: f.ID},
 					})
 				}
 			}
 
 			if msg.Message.Text != "" {
-				richContent = append(richContent, openai.ContentRequest{
-					Type: openai.Text,
+				richContent = append(richContent, myopenai.ContentRequest{
+					Type: myopenai.Text,
 					Text: msg.Message.Text,
 				})
 			}
@@ -124,7 +124,7 @@ func (msg IGMessagehandler) handleMessageThreadOperation() error {
 			return fmt.Errorf("error with webhook data : %s", "Both Message and Rich content is empty")
 		}
 
-		_, err := openai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, richContent, msg.SourceID == msg.LeadID)
+		_, err := myopenai.SendMessage(msg.conversationData.ThreadID, msg.Message.Text, richContent, msg.SourceID == msg.LeadID)
 		if err != nil {
 			return err
 		}

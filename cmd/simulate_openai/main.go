@@ -13,12 +13,12 @@ import (
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 	"github.com/idivarts/backend-sls/internal/models"
 	openaitools "github.com/idivarts/backend-sls/internal/openai/tools"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 )
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
-	thread, err := openai.CreateThread()
+	thread, err := myopenai.CreateThread()
 	if err != nil {
 		return
 	}
@@ -35,7 +35,7 @@ func main() {
 	cData.Insert()
 
 	fMsg := "Hello Debangana, How are you doing?\nI came across your profile. Would you be interested to collab with brands?"
-	openai.SendMessage(thread.ID, fMsg, nil, true)
+	myopenai.SendMessage(thread.ID, fMsg, nil, true)
 	log.Println("\n---------------------\nArjun :", fMsg, "\n---------------------")
 
 	for i := 0; i < 100; i++ {
@@ -45,39 +45,39 @@ func main() {
 			log.Printf("Error %s", err.Error())
 			return
 		}
-		_, err = openai.SendMessage(thread.ID, input, nil, false)
+		_, err = myopenai.SendMessage(thread.ID, input, nil, false)
 		if err != nil {
 			log.Printf("Error %s", err.Error())
 			return
 		}
 
-		run, err := openai.StartRun(thread.ID, openai.ArjunAssistant, "", string(openai.ChangePhaseFn))
+		run, err := myopenai.StartRun(thread.ID, myopenai.ArjunAssistant, "", string(myopenai.ChangePhaseFn))
 		if err != nil {
 			log.Printf("Error %s", err.Error())
 			return
 		}
 		time.Sleep(5 * time.Second)
 		for j := 0; j < 10; j++ {
-			run, err = openai.GetRunStatus(thread.ID, run.ID)
+			run, err = myopenai.GetRunStatus(thread.ID, run.ID)
 			if err != nil {
 				log.Printf("Error %s", err.Error())
 				return
 			}
-			if run.Status == openai.COMPLETED_STATUS {
+			if run.Status == myopenai.COMPLETED_STATUS {
 				break
-			} else if run.Status == openai.REQUIRES_ACTION_STATUS {
+			} else if run.Status == myopenai.REQUIRES_ACTION_STATUS {
 				// log.Println("Requires Action", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].ID, "\n", run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Name, run.RequiredAction.SubmitToolOutputs.ToolCalls[0].Function.Arguments)
 				log.Println("\n-------------------------")
-				toolOutput := []openai.ToolOutput{}
+				toolOutput := []myopenai.ToolOutput{}
 				for _, toolOption := range run.RequiredAction.SubmitToolOutputs.ToolCalls {
-					if toolOption.Function.Name == openai.CanConversationEndFn {
+					if toolOption.Function.Name == myopenai.CanConversationEndFn {
 						t, err := openaitools.CanConversationEnd(toolOption)
 						if err != nil {
 							log.Printf("Error %s", err.Error())
 							return
 						}
 						toolOutput = append(toolOutput, *t)
-					} else if toolOption.Function.Name == openai.ChangePhaseFn {
+					} else if toolOption.Function.Name == myopenai.ChangePhaseFn {
 						t, err := openaitools.ChangePhaseFn(conv, toolOption, &cData)
 						if err != nil {
 							log.Printf("Error %s", err.Error())
@@ -90,7 +90,7 @@ func main() {
 						return
 					}
 				}
-				_, err = openai.SubmitToolOutput(thread.ID, run.ID, toolOutput)
+				_, err = myopenai.SubmitToolOutput(thread.ID, run.ID, toolOutput)
 				if err != nil {
 					log.Printf("Error %s", err.Error())
 					return
@@ -99,7 +99,7 @@ func main() {
 			}
 			time.Sleep(time.Second)
 		}
-		messages, err := openai.GetMessages(thread.ID, 10, run.ID)
+		messages, err := myopenai.GetMessages(thread.ID, 10, run.ID)
 		if err != nil {
 			log.Printf("Error %s", err.Error())
 			return

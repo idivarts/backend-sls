@@ -4,7 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/idivarts/backend-sls/internal/models"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 )
 
 func splitRange(min, max int) (int, int) {
@@ -39,7 +39,7 @@ func CalculateMessageDelay(conv *models.Conversation) (*int, error) {
 	// 	return nil, err
 	// }
 
-	msgs, err := openai.GetMessages(conv.ThreadID, 5, "")
+	msgs, err := myopenai.GetMessages(conv.ThreadID, 5, "")
 	if err != nil {
 		return nil, err
 	}

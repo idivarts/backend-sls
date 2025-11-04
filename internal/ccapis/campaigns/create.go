@@ -10,7 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"google.golang.org/api/iterator"
 )
 
@@ -67,12 +67,12 @@ func createInstruction(campaign *models.Campaign, leadStages map[string]models.L
 	return markdown
 }
 
-func createToolFunctions(collectibles map[string]models.Collectible) []openai.ToolEntry {
+func createToolFunctions(collectibles map[string]models.Collectible) []myopenai.ToolEntry {
 	// Write the logic to create the function for chatGPT
 
-	properties := map[string]openai.VariableProperty{
+	properties := map[string]myopenai.VariableProperty{
 		"phase": {
-			Type:        openai.VT_NUMBER,
+			Type:        myopenai.VT_NUMBER,
 			Enum:        nil,
 			Description: "This is a number identifying the current phase of conversation",
 		},
@@ -80,8 +80,8 @@ func createToolFunctions(collectibles map[string]models.Collectible) []openai.To
 
 	mandatorFields := []string{"phase"}
 	for _, data := range collectibles {
-		properties[data.Name] = openai.VariableProperty{
-			Type:        openai.VariableType(data.Type),
+		properties[data.Name] = myopenai.VariableProperty{
+			Type:        myopenai.VariableType(data.Type),
 			Enum:        nil,
 			Description: data.Description,
 		}
@@ -91,20 +91,20 @@ func createToolFunctions(collectibles map[string]models.Collectible) []openai.To
 		// }
 	}
 
-	changePhaseFn := openai.ToolEntry{
-		Type: openai.TT_FUNCTION,
-		Function: openai.Function{
+	changePhaseFn := myopenai.ToolEntry{
+		Type: myopenai.TT_FUNCTION,
+		Function: myopenai.Function{
 			Name:        "change_phase",
 			Description: "This function is called whenever there is a change in phase or addition/updation of any of the data/information to be collected. The purpose of this function is to send and process any collected information from the chat. This function returns two variables missed_information and missed_phases.\n1. missed_information is an array of string that identifies what all information is yet to be collected from the user before they can end the conversation. The assistant need to make sure that it collects all the information in this.\n2. missed_phases is an array of integer identifying is the chat had to skip any phases of conversation. The assistant need to make sure that they cover all the phase mentioned in this return",
-			Parameters: openai.Parameters{
-				Type:       openai.PT_OBJECT,
+			Parameters: myopenai.Parameters{
+				Type:       myopenai.PT_OBJECT,
 				Properties: properties,
 				Required:   mandatorFields,
 			},
 		},
 	}
 
-	return []openai.ToolEntry{changePhaseFn}
+	return []myopenai.ToolEntry{changePhaseFn}
 }
 
 func CreateOrUpdateCampaign(c *gin.Context) {
@@ -175,7 +175,7 @@ func CreateOrUpdateCampaign(c *gin.Context) {
 	}
 
 	log.Println("CreateOrUpdateCampaign4")
-	assistant := openai.CreateAssistantRequest{
+	assistant := myopenai.CreateAssistantRequest{
 		Model:        "gpt-4o",
 		Name:         campaign.Name,
 		Instructions: createInstruction(campaign, leadStages, collectibles),
@@ -184,7 +184,7 @@ func CreateOrUpdateCampaign(c *gin.Context) {
 
 	log.Println("CreateOrUpdateCampaign5")
 
-	rC, err := openai.CreateAssistant(assistant)
+	rC, err := myopenai.CreateAssistant(assistant)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -193,7 +193,7 @@ func CreateOrUpdateCampaign(c *gin.Context) {
 	// Write logic in openai to either update or create new assistant
 	if campaign.AssistantID != nil {
 		log.Println("CreateOrUpdateCampaign6.1")
-		_, err = openai.DeleteAssistant(*campaign.AssistantID)
+		_, err = myopenai.DeleteAssistant(*campaign.AssistantID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
