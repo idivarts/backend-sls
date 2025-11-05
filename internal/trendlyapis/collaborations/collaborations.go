@@ -80,10 +80,18 @@ func toString(v interface{}) string {
 	}
 }
 
-func TestEvaluateCollab(collab *trendlymodels.Collaboration) bool {
+func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]interface{}) {
 	return evaluateCollab(collab)
 }
-func evaluateCollab(collab *trendlymodels.Collaboration) bool {
+func evaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]interface{}) {
+	// {
+	// 	"id": "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
+	// 	"version": "1",
+	// 	"variables": {
+	// 	  "collaboration_name": "example collaboration_name",
+	// 	  "collaboration_description": "example collaboration_description"
+	// 	}
+	//   }
 
 	// Build prompt variables with "NA" fallbacks when fields are empty/missing.
 	vars := map[string]responses.ResponsePromptVariableUnionParam{
@@ -104,29 +112,31 @@ func evaluateCollab(collab *trendlymodels.Collaboration) bool {
 	})
 	if err != nil {
 		log.Println("Error evaluating collab:", err.Error())
-		return false
+		return false, nil
 	}
 	jsonStr := response.JSON.Output.Raw()
 	mMap := []map[string]interface{}{}
 	err = json.Unmarshal([]byte(jsonStr), &mMap)
 	if err != nil {
 		log.Println("Error parsing evaluation response:", err.Error())
-		return false
+		return false, nil
 	}
 
 	responseStr := mMap[0]["content"].([]interface{})[0].(map[string]interface{})["text"].(string)
+	rMap := map[string]interface{}{}
+	err = json.Unmarshal([]byte(responseStr), &rMap)
+	if err != nil {
+		log.Println("Error parsing evaluation content:", err.Error())
+		return false, nil
+	}
 
-	log.Println("Evaluation Response:", responseStr)
-	// {
-	// 	"id": "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
-	// 	"version": "1",
-	// 	"variables": {
-	// 	  "collaboration_name": "example collaboration_name",
-	// 	  "collaboration_description": "example collaboration_description"
-	// 	}
-	//   }
-	// Write function to evaluate if the content is good content is not temporary kind of posting
-	return true
+	valid := rMap["validCollaboration"].(bool)
+	log.Println("Evaluation Response:", valid)
+	if valid {
+		filters := rMap["filters"].(map[string]interface{})
+		return true, filters
+	}
+	return false, nil
 }
 func PostCollaboration(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
@@ -155,7 +165,9 @@ func PostCollaboration(c *gin.Context) {
 		collab.Status = "deleted"
 	}
 
-	if collab.Status == "active" && !evaluateCollab(collab) {
+	valid, filters := evaluateCollab(collab)
+
+	if collab.Status == "active" && !valid {
 		collab.Status = "deleted"
 	}
 
@@ -175,7 +187,7 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "updating": updating})
+	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters, "updating": updating})
 }
 
 // Starting a collab | Request to start

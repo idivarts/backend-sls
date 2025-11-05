@@ -58,7 +58,7 @@ func TestMultiEmail(t *testing.T) {
 
 func TestEvaluateCollab(t *testing.T) {
 	// t.Log(os.Getwd())
-	b := trendlyCollabs.TestEvaluateCollab(&trendlymodels.Collaboration{
+	b, filters := trendlyCollabs.TestEvaluateCollab(&trendlymodels.Collaboration{
 		Name:        "Trendly Collaboration Funny Reel",
 		Description: "I am looking for someone who can help me promote trendly. Should be able to create funny reels that highlight the features of trendly.",
 		Budget: &trendlymodels.Budget{
@@ -66,5 +66,5 @@ func TestEvaluateCollab(t *testing.T) {
 			Max: myutil.IntPtr(100),
 		},
 	})
-	t.Log("Evaluation Result:", b)
+	t.Log("Evaluation Result:", b, filters)
 }
