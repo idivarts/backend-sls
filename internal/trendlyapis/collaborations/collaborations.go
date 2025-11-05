@@ -81,9 +81,9 @@ func toString(v interface{}) string {
 }
 
 func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]interface{}) {
-	return evaluateCollab(collab)
+	return evaluateCollab(collab, nil)
 }
-func evaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]interface{}) {
+func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Brand) (bool, map[string]interface{}) {
 	// {
 	// 	"id": "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
 	// 	"version": "1",
@@ -93,22 +93,25 @@ func evaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]inter
 	// 	}
 	//   }
 
-	var budget interface{}
+	budget := "Barter"
 	if collab.Budget != nil && *collab.Budget.Max != 0 {
-		budget = collab.Budget
-	} else {
-		budget = "Barter"
+		budget = toString(collab.Budget)
+	}
+
+	brandDetails := "Trendly"
+	if brand != nil {
+		brandDetails = toString(*brand)
 	}
 
 	// Build prompt variables with "NA" fallbacks when fields are empty/missing.
 	vars := map[string]responses.ResponsePromptVariableUnionParam{
 		"collaboration_name":        {OfString: openai.String(toString(collab.Name))},
 		"collaboration_description": {OfString: openai.String(toString(collab.Description))},
-		"budget":                    {OfString: openai.String(toString(budget))},
+		"budget":                    {OfString: openai.String(budget)},
 		"location":                  {OfString: openai.String(toString(collab.Location))},
 		"questions":                 {OfString: openai.String(toString(collab.QuestionsToInfluencers))},
 		"links":                     {OfString: openai.String(toString(collab.ExternalLinks))},
-		"brand_details":             {OfString: openai.String("Trendly")},
+		"brand_details":             {OfString: openai.String(brandDetails)},
 	}
 
 	response, err := myopenai.Client.Responses.New(context.Background(), responses.ResponseNewParams{
@@ -172,7 +175,7 @@ func PostCollaboration(c *gin.Context) {
 		collab.Status = "deleted"
 	}
 
-	valid, filters := evaluateCollab(collab)
+	valid, filters := evaluateCollab(collab, &brand)
 
 	if collab.Status == "active" && !valid {
 		collab.Status = "deleted"
