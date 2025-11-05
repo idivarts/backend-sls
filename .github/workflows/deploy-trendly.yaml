@@ -37,6 +37,7 @@ jobs:
           TRENDLY_KEY_SECRETS_BASE64: ${{ secrets.TRENDLY_KEY_SECRETS }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # This uses the secret stored in GitHub
         run: |
           echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
           echo $TRENDLY_KEY_SECRETS_BASE64 | base64 -d > key-secrets.json
