@@ -26,6 +26,7 @@ type Collaboration struct {
 	ExternalLinks             []interface{}            `firestore:"externalLinks,omitempty" json:"externalLinks,omitempty"`
 	QuestionsToInfluencers    []string                 `firestore:"questionsToInfluencers,omitempty" json:"questionsToInfluencers,omitempty"`
 	Preferences               CollaborationPreferences `firestore:"preferences" json:"preferences"`
+	DiscoverPreferences       *DiscoverPreferences     `firestore:"discoverPreferences,omitempty" json:"discoverPreferences,omitempty"`
 	Status                    string                   `firestore:"status" json:"status"`
 	Applications              interface{}              `firestore:"applications" json:"applications"`
 	Invitations               interface{}              `firestore:"invitations" json:"invitations"`
@@ -55,6 +56,59 @@ type CollaborationPreferences struct {
 	InfluencerNiche    []string `firestore:"influencerNiche" json:"influencerNiche"`
 	InfluencerRelation string   `firestore:"influencerRelation" json:"influencerRelation"`
 	PreferredVideoType string   `firestore:"preferredVideoType" json:"preferredVideoType"`
+}
+
+type DiscoverPreferences struct {
+	// Followers range
+	FollowerMin *int64 `firestore:"followerMin,omitempty" json:"followerMin,omitempty"` // minimum followers
+	FollowerMax *int64 `firestore:"followerMax,omitempty" json:"followerMax,omitempty"` // maximum followers
+
+	// Content/posts count range
+	ContentMin *int `firestore:"contentMin,omitempty" json:"contentMin,omitempty"` // minimum content/posts count
+	ContentMax *int `firestore:"contentMax,omitempty" json:"contentMax,omitempty"` // maximum content/posts count
+
+	// Estimated monthly views range
+	MonthlyViewMin *int64 `firestore:"monthlyViewMin,omitempty" json:"monthlyViewMin,omitempty"`
+	MonthlyViewMax *int64 `firestore:"monthlyViewMax,omitempty" json:"monthlyViewMax,omitempty"`
+
+	// Estimated monthly engagements (likes+comments etc) range
+	MonthlyEngagementMin *int64 `firestore:"monthlyEngagementMin,omitempty" json:"monthlyEngagementMin,omitempty"`
+	MonthlyEngagementMax *int64 `firestore:"monthlyEngagementMax,omitempty" json:"monthlyEngagementMax,omitempty"`
+
+	// Median/average metrics ranges (counts)
+	AvgViewsMin    *int64 `firestore:"avgViewsMin,omitempty" json:"avgViewsMin,omitempty"`
+	AvgViewsMax    *int64 `firestore:"avgViewsMax,omitempty" json:"avgViewsMax,omitempty"`
+	AvgLikesMin    *int64 `firestore:"avgLikesMin,omitempty" json:"avgLikesMin,omitempty"`
+	AvgLikesMax    *int64 `firestore:"avgLikesMax,omitempty" json:"avgLikesMax,omitempty"`
+	AvgCommentsMin *int64 `firestore:"avgCommentsMin,omitempty" json:"avgCommentsMin,omitempty"`
+	AvgCommentsMax *int64 `firestore:"avgCommentsMax,omitempty" json:"avgCommentsMax,omitempty"`
+
+	// Quality/aesthetics slider (0..100)
+	QualityMin *int `firestore:"qualityMin,omitempty" json:"qualityMin,omitempty"`
+	QualityMax *int `firestore:"qualityMax,omitempty" json:"qualityMax,omitempty"`
+
+	// Engagement rate (%)
+	ERMin *float64 `firestore:"erMin,omitempty" json:"erMin,omitempty"` // e.g., 1.5 => 1.5%
+	ERMax *float64 `firestore:"erMax,omitempty" json:"erMax,omitempty"`
+
+	// Text filters
+	DescKeywords []string `firestore:"descKeywords,omitempty" json:"descKeywords,omitempty"` // bio keywords (split client-side or server-side)
+	Name         *string  `firestore:"name,omitempty" json:"name,omitempty"`
+
+	// Flags
+	IsVerified *bool `firestore:"isVerified,omitempty" json:"isVerified,omitempty"`
+	HasContact *bool `firestore:"hasContact,omitempty" json:"hasContact,omitempty"`
+
+	// Multi-selects
+	Genders           []string `firestore:"genders,omitempty" json:"genders,omitempty"`
+	SelectedNiches    []string `firestore:"selectedNiches,omitempty" json:"selectedNiches,omitempty"`
+	SelectedLocations []string `firestore:"selectedLocations,omitempty" json:"selectedLocations,omitempty"`
+
+	// Sorting & pagination
+	Sort          string `firestore:"sort,omitempty" json:"sort,omitempty"`                     // followers | views | engagement | engagement_rate
+	SortDirection string `firestore:"sort_direction,omitempty" json:"sort_direction,omitempty"` // asc | desc (default: desc)
+	Offset        *int   `firestore:"offset,omitempty" json:"offset,omitempty"`
+	Limit         *int   `firestore:"limit,omitempty" json:"limit,omitempty"`
 }
 
 func (b *Collaboration) Get(collabId string) error {
