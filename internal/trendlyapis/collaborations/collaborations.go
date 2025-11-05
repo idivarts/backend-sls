@@ -193,7 +193,7 @@ func PostCollaboration(c *gin.Context) {
 	}
 
 	if valid {
-		collab.DiscoverPreferences = filters
+		collab.Preferences = filters
 	}
 
 	if !updating && collab.Status != "deleted" {

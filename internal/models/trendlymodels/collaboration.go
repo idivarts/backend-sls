@@ -11,28 +11,27 @@ import (
 )
 
 type Collaboration struct {
-	Name                      string                   `firestore:"name" json:"name"`
-	BrandID                   string                   `firestore:"brandId" json:"brandId"`
-	ManagerID                 string                   `firestore:"managerId" json:"managerId"`
-	Attachments               []interface{}            `firestore:"attachments,omitempty" json:"attachments,omitempty"`
-	Description               string                   `firestore:"description,omitempty" json:"description,omitempty"`
-	PromotionType             string                   `firestore:"promotionType" json:"promotionType"`
-	Budget                    *Budget                  `firestore:"budget,omitempty" json:"budget,omitempty"`
-	PreferredContentLanguage  []string                 `firestore:"preferredContentLanguage" json:"preferredContentLanguage"`
-	ContentFormat             []string                 `firestore:"contentFormat" json:"contentFormat"`
-	Platform                  []string                 `firestore:"platform" json:"platform"`
-	NumberOfInfluencersNeeded int                      `firestore:"numberOfInfluencersNeeded" json:"numberOfInfluencersNeeded"`
-	Location                  CollaborationLocation    `firestore:"location" json:"location"`
-	ExternalLinks             []interface{}            `firestore:"externalLinks,omitempty" json:"externalLinks,omitempty"`
-	QuestionsToInfluencers    []string                 `firestore:"questionsToInfluencers,omitempty" json:"questionsToInfluencers,omitempty"`
-	Preferences               CollaborationPreferences `firestore:"preferences" json:"preferences"`
-	DiscoverPreferences       *DiscoverPreferences     `firestore:"discoverPreferences,omitempty" json:"discoverPreferences,omitempty"`
-	Status                    string                   `firestore:"status" json:"status"`
-	Applications              interface{}              `firestore:"applications" json:"applications"`
-	Invitations               interface{}              `firestore:"invitations" json:"invitations"`
-	TimeStamp                 int64                    `firestore:"timeStamp" json:"timeStamp"`
-	ViewsLastHour             *int                     `firestore:"viewsLastHour,omitempty" json:"viewsLastHour,omitempty"`
-	LastReviewedTimeStamp     *int64                   `firestore:"lastReviewedTimeStamp,omitempty" json:"lastReviewedTimeStamp,omitempty"`
+	Name                      string                `firestore:"name" json:"name"`
+	BrandID                   string                `firestore:"brandId" json:"brandId"`
+	ManagerID                 string                `firestore:"managerId" json:"managerId"`
+	Attachments               []interface{}         `firestore:"attachments,omitempty" json:"attachments,omitempty"`
+	Description               string                `firestore:"description,omitempty" json:"description,omitempty"`
+	PromotionType             string                `firestore:"promotionType" json:"promotionType"`
+	Budget                    *Budget               `firestore:"budget,omitempty" json:"budget,omitempty"`
+	PreferredContentLanguage  []string              `firestore:"preferredContentLanguage" json:"preferredContentLanguage"`
+	ContentFormat             []string              `firestore:"contentFormat" json:"contentFormat"`
+	Platform                  []string              `firestore:"platform" json:"platform"`
+	NumberOfInfluencersNeeded int                   `firestore:"numberOfInfluencersNeeded" json:"numberOfInfluencersNeeded"`
+	Location                  CollaborationLocation `firestore:"location" json:"location"`
+	ExternalLinks             []interface{}         `firestore:"externalLinks,omitempty" json:"externalLinks,omitempty"`
+	QuestionsToInfluencers    []string              `firestore:"questionsToInfluencers,omitempty" json:"questionsToInfluencers,omitempty"`
+	Preferences               *DiscoverPreferences  `firestore:"preferences,omitempty" json:"preferences,omitempty"`
+	Status                    string                `firestore:"status" json:"status"`
+	Applications              interface{}           `firestore:"applications" json:"applications"`
+	Invitations               interface{}           `firestore:"invitations" json:"invitations"`
+	TimeStamp                 int64                 `firestore:"timeStamp" json:"timeStamp"`
+	ViewsLastHour             *int                  `firestore:"viewsLastHour,omitempty" json:"viewsLastHour,omitempty"`
+	LastReviewedTimeStamp     *int64                `firestore:"lastReviewedTimeStamp,omitempty" json:"lastReviewedTimeStamp,omitempty"`
 }
 
 type Budget struct {
@@ -49,13 +48,6 @@ type CollaborationLocation struct {
 type LatLong struct {
 	Lat  float64 `firestore:"lat" json:"lat"`
 	Long float64 `firestore:"long" json:"long"`
-}
-
-type CollaborationPreferences struct {
-	TimeCommitment     string   `firestore:"timeCommitment" json:"timeCommitment"`
-	InfluencerNiche    []string `firestore:"influencerNiche" json:"influencerNiche"`
-	InfluencerRelation string   `firestore:"influencerRelation" json:"influencerRelation"`
-	PreferredVideoType string   `firestore:"preferredVideoType" json:"preferredVideoType"`
 }
 
 type DiscoverPreferences struct {
