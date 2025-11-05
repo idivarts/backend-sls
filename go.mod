@@ -108,6 +108,7 @@ require (
 	github.com/go-resty/resty/v2 v2.12.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
+	github.com/openai/openai-go v1.12.0
 	github.com/openai/openai-go/v3 v3.8.1
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	google.golang.org/api v0.232.0

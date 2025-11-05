@@ -8,9 +8,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	trendlyCollabs "github.com/idivarts/backend-sls/internal/trendlyapis/collaborations"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/mytime"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/templates"
 )
 
@@ -52,4 +54,17 @@ func TestMultiEmail(t *testing.T) {
 		return
 	}
 	t.Log("Successful")
+}
+
+func TestEvaluateCollab(t *testing.T) {
+	// t.Log(os.Getwd())
+	b := trendlyCollabs.TestEvaluateCollab(&trendlymodels.Collaboration{
+		Name:        "Trendly Collaboration Funny Reel",
+		Description: "I am looking for someone who can help me promote trendly. Should be able to create funny reels that highlight the features of trendly.",
+		Budget: &trendlymodels.Budget{
+			Min: myutil.IntPtr(0),
+			Max: myutil.IntPtr(100),
+		},
+	})
+	t.Log("Evaluation Result:", b)
 }
