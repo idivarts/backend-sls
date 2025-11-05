@@ -93,11 +93,18 @@ func evaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]inter
 	// 	}
 	//   }
 
+	var budget interface{}
+	if collab.Budget != nil && *collab.Budget.Max != 0 {
+		budget = collab.Budget
+	} else {
+		budget = "Barter"
+	}
+
 	// Build prompt variables with "NA" fallbacks when fields are empty/missing.
 	vars := map[string]responses.ResponsePromptVariableUnionParam{
 		"collaboration_name":        {OfString: openai.String(toString(collab.Name))},
 		"collaboration_description": {OfString: openai.String(toString(collab.Description))},
-		"budget":                    {OfString: openai.String(toString(collab.Budget))},
+		"budget":                    {OfString: openai.String(toString(budget))},
 		"location":                  {OfString: openai.String(toString(collab.Location))},
 		"questions":                 {OfString: openai.String(toString(collab.QuestionsToInfluencers))},
 		"links":                     {OfString: openai.String(toString(collab.ExternalLinks))},
