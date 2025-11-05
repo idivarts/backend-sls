@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myquery"
 	"google.golang.org/api/iterator"
 )
@@ -31,58 +32,7 @@ type InfluencerItem struct {
 // Types are inferred from the intended semantics rather than the TS state strings.
 // Min/Max fields are pointers so omitted filters don't appear in JSON (omitempty).
 // All counts are non-negative. quality is a whole number 0..100. ER fields are percentages (e.g., 1 => 1%).
-type InfluencerFilters struct {
-	// Followers range
-	FollowerMin *int64 `json:"followerMin,omitempty"` // minimum followers
-	FollowerMax *int64 `json:"followerMax,omitempty"` // maximum followers
-
-	// Content/posts count range
-	ContentMin *int `json:"contentMin,omitempty"` // minimum content/posts count
-	ContentMax *int `json:"contentMax,omitempty"` // maximum content/posts count
-
-	// Estimated monthly views range
-	MonthlyViewMin *int64 `json:"monthlyViewMin,omitempty"`
-	MonthlyViewMax *int64 `json:"monthlyViewMax,omitempty"`
-
-	// Estimated monthly engagements (likes+comments etc) range
-	MonthlyEngagementMin *int64 `json:"monthlyEngagementMin,omitempty"`
-	MonthlyEngagementMax *int64 `json:"monthlyEngagementMax,omitempty"`
-
-	// Median/average metrics ranges (counts)
-	AvgViewsMin    *int64 `json:"avgViewsMin,omitempty"`
-	AvgViewsMax    *int64 `json:"avgViewsMax,omitempty"`
-	AvgLikesMin    *int64 `json:"avgLikesMin,omitempty"`
-	AvgLikesMax    *int64 `json:"avgLikesMax,omitempty"`
-	AvgCommentsMin *int64 `json:"avgCommentsMin,omitempty"`
-	AvgCommentsMax *int64 `json:"avgCommentsMax,omitempty"`
-
-	// Quality/aesthetics slider (0..100)
-	QualityMin *int `json:"qualityMin,omitempty"`
-	QualityMax *int `json:"qualityMax,omitempty"`
-
-	// Engagement rate (%)
-	ERMin *float64 `json:"erMin,omitempty"` // e.g., 1.5 => 1.5%
-	ERMax *float64 `json:"erMax,omitempty"`
-
-	// Text filters
-	DescKeywords []string `json:"descKeywords,omitempty"` // bio keywords (split client-side or server-side)
-	Name         *string  `json:"name,omitempty"`
-
-	// Flags
-	IsVerified *bool `json:"isVerified,omitempty"`
-	HasContact *bool `json:"hasContact,omitempty"`
-
-	// Multi-selects
-	Genders           []string `json:"genders,omitempty"`
-	SelectedNiches    []string `json:"selectedNiches,omitempty"`
-	SelectedLocations []string `json:"selectedLocations,omitempty"`
-
-	// Sorting & pagination
-	Sort          string `json:"sort,omitempty"`           // followers | views | engagement | engagement_rate
-	SortDirection string `json:"sort_direction,omitempty"` // asc | desc (default: desc)
-	Offset        *int   `json:"offset,omitempty"`
-	Limit         *int   `json:"limit,omitempty"`
-}
+type InfluencerFilters = trendlymodels.DiscoverPreferences
 
 func escapeBQString(s string) string {
 	// BigQuery escapes single quotes by doubling them

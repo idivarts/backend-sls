@@ -80,10 +80,10 @@ func toString(v interface{}) string {
 	}
 }
 
-func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]interface{}) {
+func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, *trendlymodels.DiscoverPreferences) {
 	return evaluateCollab(collab, nil)
 }
-func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Brand) (bool, map[string]interface{}) {
+func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Brand) (bool, *trendlymodels.DiscoverPreferences) {
 	// {
 	// 	"id": "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
 	// 	"version": "1",
@@ -143,7 +143,18 @@ func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Br
 	valid := rMap["validCollaboration"].(bool)
 	log.Println("Evaluation Response:", valid)
 	if valid {
-		filters := rMap["filters"].(map[string]interface{})
+		filtersMap := rMap["filters"].(map[string]interface{})
+		filters := &trendlymodels.DiscoverPreferences{}
+		b, err := json.Marshal(filtersMap)
+		if err != nil {
+			log.Println("Error marshalling filters:", err.Error())
+			return false, nil
+		}
+		err = json.Unmarshal(b, filters)
+		if err != nil {
+			log.Println("Error unmarshalling filters:", err.Error())
+			return false, nil
+		}
 		return true, filters
 	}
 	return false, nil
@@ -179,6 +190,10 @@ func PostCollaboration(c *gin.Context) {
 
 	if collab.Status == "active" && !valid {
 		collab.Status = "deleted"
+	}
+
+	if valid {
+		collab.Preferences = filters
 	}
 
 	if !updating && collab.Status != "deleted" {
