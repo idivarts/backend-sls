@@ -9,7 +9,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models"
 	"github.com/idivarts/backend-sls/pkg/messenger"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 )
 
 type IMessagesByID struct {
@@ -110,7 +110,7 @@ func SendMessage(c *gin.Context) {
 	}
 
 	if req.SendType == User && req.Message != "" {
-		_, err = openai.SendMessage(cData.ThreadID, req.Message, nil, false)
+		_, err = myopenai.SendMessage(cData.ThreadID, req.Message, nil, false)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

@@ -6,7 +6,7 @@ import (
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 	"github.com/idivarts/backend-sls/internal/models"
 	openaifc "github.com/idivarts/backend-sls/internal/openai/fc"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 )
 
 type ChangePhaseOuput struct {
@@ -14,7 +14,7 @@ type ChangePhaseOuput struct {
 	MissedPhases      []int    `json:"missed_phases"`
 }
 
-func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall, onlySimulate *models.Conversation) (*openai.ToolOutput, error) {
+func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption myopenai.ToolCall, onlySimulate *models.Conversation) (*myopenai.ToolOutput, error) {
 	log.Println("Requires Action:\n", toolOption.Function.Name, toolOption.Function.Arguments)
 	cp := &openaifc.ChangePhase{}
 	err := cp.ParseJson(toolOption.Function.Arguments)
@@ -120,7 +120,7 @@ func ChangePhaseFn(conv *sqsevents.ConversationEvent, toolOption openai.ToolCall
 	// }
 	// oStr := string(b)
 	// log.Println("Output to be send", oStr)
-	return &openai.ToolOutput{
+	return &myopenai.ToolOutput{
 		ToolCallId: toolOption.ID,
 		Output:     "", //oStr,
 	}, nil

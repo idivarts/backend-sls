@@ -1,8 +1,11 @@
-package openai
+package myopenai
 
 import (
 	"log"
 	"os"
+
+	oai "github.com/openai/openai-go/v3" // imported as openai
+	"github.com/openai/openai-go/v3/option"
 )
 
 const (
@@ -21,6 +24,8 @@ const (
 	ArjunAssistant    AssistantID = "asst_JDXM0Tqx60PAdqrANtNvd5PB"
 )
 
+var Client oai.Client
+
 func init() {
 	envValue := os.Getenv("OPENAI_API_KEY")
 
@@ -32,4 +37,7 @@ func init() {
 		apiKey = envValue
 	}
 
+	Client = oai.NewClient(
+		option.WithAPIKey(envValue),
+	)
 }

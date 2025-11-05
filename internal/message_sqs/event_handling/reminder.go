@@ -7,7 +7,7 @@ import (
 
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 	"github.com/idivarts/backend-sls/internal/models"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
@@ -43,7 +43,7 @@ func SendReminder(conv *sqsevents.ConversationEvent) error {
 	}
 	additionalInstruction := fmt.Sprintf("The user has not replied in %s. Remind them gently. This is reminder %d", timeData, (cData.ReminderCount + 1))
 	log.Println("Starting Reminder Run")
-	rObj, err := openai.StartRun(conv.ThreadID, openai.AssistantID(*campaign.AssistantID), additionalInstruction, string(openai.ChangePhaseFn))
+	rObj, err := myopenai.StartRun(conv.ThreadID, myopenai.AssistantID(*campaign.AssistantID), additionalInstruction, string(myopenai.ChangePhaseFn))
 	if err != nil {
 		return err
 	}

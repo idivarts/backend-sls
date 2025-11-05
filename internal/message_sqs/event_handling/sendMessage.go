@@ -11,7 +11,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models"
 	openaitools "github.com/idivarts/backend-sls/internal/openai/tools"
 	"github.com/idivarts/backend-sls/pkg/messenger"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
@@ -62,12 +62,12 @@ func InstaSend(conv *sqsevents.ConversationEvent) error {
 func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 	log.Println("Getting messaged from thread", conv.ThreadID)
 
-	run, err := openai.GetRunStatus(conv.ThreadID, conv.RunID)
+	run, err := myopenai.GetRunStatus(conv.ThreadID, conv.RunID)
 	if err != nil {
 		return err
 	}
-	if run.Status == openai.COMPLETED_STATUS {
-		msgs, err := openai.GetMessages(conv.ThreadID, 10, conv.RunID)
+	if run.Status == myopenai.COMPLETED_STATUS {
+		msgs, err := myopenai.GetMessages(conv.ThreadID, 10, conv.RunID)
 		if err != nil {
 			return err
 		}
@@ -129,16 +129,16 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 		// }
 		// cData.LastMID = mID
 		return nil
-	} else if run.Status == openai.REQUIRES_ACTION_STATUS {
-		toolOutput := []openai.ToolOutput{}
+	} else if run.Status == myopenai.REQUIRES_ACTION_STATUS {
+		toolOutput := []myopenai.ToolOutput{}
 		for _, toolOption := range run.RequiredAction.SubmitToolOutputs.ToolCalls {
-			if toolOption.Function.Name == openai.CanConversationEndFn {
+			if toolOption.Function.Name == myopenai.CanConversationEndFn {
 				t, err := openaitools.CanConversationEnd(toolOption)
 				if err != nil {
 					return err
 				}
 				toolOutput = append(toolOutput, *t)
-			} else if toolOption.Function.Name == openai.ChangePhaseFn {
+			} else if toolOption.Function.Name == myopenai.ChangePhaseFn {
 				t, err := openaitools.ChangePhaseFn(conv, toolOption, nil)
 				if err != nil {
 					return err
@@ -148,13 +148,13 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 				return errors.New("Not implemented function -- " + string(toolOption.Function.Name))
 			}
 		}
-		_, err = openai.SubmitToolOutput(conv.ThreadID, conv.RunID, toolOutput)
+		_, err = myopenai.SubmitToolOutput(conv.ThreadID, conv.RunID, toolOutput)
 		if err != nil {
 			// log.Printf("Error %s", err.Error())
 			return err
 		}
 		// return
-	} else if run.Status == openai.EXPIRED_STATUS {
+	} else if run.Status == myopenai.EXPIRED_STATUS {
 		log.Println("The run is exipired --- Exiting")
 		return nil
 	}

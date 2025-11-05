@@ -8,7 +8,7 @@ import (
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/messenger"
-	"github.com/idivarts/backend-sls/pkg/openai"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"google.golang.org/api/iterator"
 )
 
@@ -46,7 +46,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 		return err
 	}
 
-	thread, err := openai.CreateThread()
+	thread, err := myopenai.CreateThread()
 	if err != nil {
 		return err
 	}
@@ -75,29 +75,29 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 		entry := &messages[i]
 		message := entry.Message
 
-		var richContent []openai.ContentRequest = nil
+		var richContent []myopenai.ContentRequest = nil
 		if entry.Attachments != nil && len(entry.Attachments.Data) > 0 {
 			log.Println("Handling Attachments. Setting status and exiting")
 
-			richContent = []openai.ContentRequest{}
+			richContent = []myopenai.ContentRequest{}
 			for _, v := range entry.Attachments.Data {
 				if v.ImageData != nil {
-					f, err := openai.UploadImage(v.ImageData.URL)
+					f, err := myopenai.UploadImage(v.ImageData.URL)
 					if err != nil {
 						log.Println("File upload error", err.Error())
 						// return nil, err
 					} else {
-						richContent = append(richContent, openai.ContentRequest{
-							Type:      openai.ImageContentType,
-							ImageFile: openai.ImageFile{FileID: f.ID},
+						richContent = append(richContent, myopenai.ContentRequest{
+							Type:      myopenai.ImageContentType,
+							ImageFile: myopenai.ImageFile{FileID: f.ID},
 						})
 					}
 				}
 			}
 
 			if message != "" {
-				richContent = append(richContent, openai.ContentRequest{
-					Type: openai.Text,
+				richContent = append(richContent, myopenai.ContentRequest{
+					Type: myopenai.Text,
 					Text: message,
 				})
 			}
@@ -108,7 +108,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 			message = "[Attached Video/Link/Shares that cant be read by Chat Assistant]"
 		}
 		log.Println("Sending Message", threadId, message, conversation.SourceID == entry.From.ID)
-		_, err = openai.SendMessage(threadId, message, richContent, conversation.SourceID == entry.From.ID)
+		_, err = myopenai.SendMessage(threadId, message, richContent, conversation.SourceID == entry.From.ID)
 		if err != nil {
 			log.Println("Something went wrong while inseting the message", err.Error())
 			// return nil, err

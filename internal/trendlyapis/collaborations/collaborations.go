@@ -1,8 +1,12 @@
 package trendlyCollabs
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -10,14 +14,136 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/responses"
 )
 
-func evaluateCollab(collab *trendlymodels.Collaboration) bool {
-	// Write function to evaluate if the content is good content is not temporary kind of posting
-	return true
+// nzString returns "NA" if s is empty after trimming; otherwise returns s.
+func nzString(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "NA"
+	}
+	return s
+}
+
+// toString converts any value to a compact JSON or string.
+// For zero/empty values it returns "NA".
+func toString(v interface{}) string {
+	if v == nil {
+		return "NA"
+	}
+	switch t := v.(type) {
+	case string:
+		return nzString(t)
+	case *string:
+		if t == nil {
+			return "NA"
+		}
+		return nzString(*t)
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, bool:
+		// Render numbers/bools; treat explicit zero as "NA" for numeric types.
+		switch n := v.(type) {
+		case int:
+			if n == 0 {
+				return "NA"
+			}
+		case int64:
+			if n == 0 {
+				return "NA"
+			}
+		case float64:
+			if n == 0 {
+				return "NA"
+			}
+		case float32:
+			if n == 0 {
+				return "NA"
+			}
+		case uint, uint8, uint16, uint32, uint64:
+			// leave as-is; zero can be meaningful but align with "NA" fallback
+			// convert zero to "NA" for consistency
+			if fmt.Sprintf("%v", n) == "0" {
+				return "NA"
+			}
+		}
+		return fmt.Sprintf("%v", v)
+	default:
+		b, err := json.Marshal(v)
+		if err != nil || len(b) == 0 || string(b) == "null" || string(b) == "[]" || string(b) == "{}" {
+			return "NA"
+		}
+		return string(b)
+	}
+}
+
+func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]interface{}) {
+	return evaluateCollab(collab)
+}
+func evaluateCollab(collab *trendlymodels.Collaboration) (bool, map[string]interface{}) {
+	// {
+	// 	"id": "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
+	// 	"version": "1",
+	// 	"variables": {
+	// 	  "collaboration_name": "example collaboration_name",
+	// 	  "collaboration_description": "example collaboration_description"
+	// 	}
+	//   }
+
+	var budget interface{}
+	if collab.Budget != nil && *collab.Budget.Max != 0 {
+		budget = collab.Budget
+	} else {
+		budget = "Barter"
+	}
+
+	// Build prompt variables with "NA" fallbacks when fields are empty/missing.
+	vars := map[string]responses.ResponsePromptVariableUnionParam{
+		"collaboration_name":        {OfString: openai.String(toString(collab.Name))},
+		"collaboration_description": {OfString: openai.String(toString(collab.Description))},
+		"budget":                    {OfString: openai.String(toString(budget))},
+		"location":                  {OfString: openai.String(toString(collab.Location))},
+		"questions":                 {OfString: openai.String(toString(collab.QuestionsToInfluencers))},
+		"links":                     {OfString: openai.String(toString(collab.ExternalLinks))},
+		"brand_details":             {OfString: openai.String("Trendly")},
+	}
+
+	response, err := myopenai.Client.Responses.New(context.Background(), responses.ResponseNewParams{
+		Prompt: responses.ResponsePromptParam{
+			ID:        "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
+			Variables: vars,
+		},
+	})
+	if err != nil {
+		log.Println("Error evaluating collab:", err.Error())
+		return false, nil
+	}
+	jsonStr := response.JSON.Output.Raw()
+	mMap := []map[string]interface{}{}
+	err = json.Unmarshal([]byte(jsonStr), &mMap)
+	if err != nil {
+		log.Println("Error parsing evaluation response:", err.Error())
+		return false, nil
+	}
+
+	responseStr := mMap[0]["content"].([]interface{})[0].(map[string]interface{})["text"].(string)
+	rMap := map[string]interface{}{}
+	err = json.Unmarshal([]byte(responseStr), &rMap)
+	if err != nil {
+		log.Println("Error parsing evaluation content:", err.Error())
+		return false, nil
+	}
+
+	valid := rMap["validCollaboration"].(bool)
+	log.Println("Evaluation Response:", valid)
+	if valid {
+		filters := rMap["filters"].(map[string]interface{})
+		return true, filters
+	}
+	return false, nil
 }
 func PostCollaboration(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
@@ -46,7 +172,9 @@ func PostCollaboration(c *gin.Context) {
 		collab.Status = "deleted"
 	}
 
-	if collab.Status == "active" && !evaluateCollab(collab) {
+	valid, filters := evaluateCollab(collab)
+
+	if collab.Status == "active" && !valid {
 		collab.Status = "deleted"
 	}
 
@@ -66,7 +194,7 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "updating": updating})
+	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters, "updating": updating})
 }
 
 // Starting a collab | Request to start

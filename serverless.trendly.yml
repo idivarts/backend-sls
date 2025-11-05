@@ -21,6 +21,7 @@ provider:
     STREAM_CLIENT: gg9xameygwse
     STREAM_SECRET: ${env:STREAM_SECRET}
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
+    OPENAI_API_KEY: ${env:OPENAI_API_KEY}
     BRAND_LOGIN_URL: "https://brands.trendly.now/login"
     SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
@@ -140,7 +141,7 @@ functions:
     timeout: 900
     events:
       - schedule:
-          rate: cron(30 21 * * ? *)  # Runs every day at 12:00 PM UTC
+          rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
           enabled: true
   trendly_apis:
     handler: functions/trendly_apis/main.go

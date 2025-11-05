@@ -28,3 +28,4 @@ applications*.csv
 key-secrets*.json
 new-leads.csv
 new-notion-leads.csv
+env.local.sh
