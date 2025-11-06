@@ -215,6 +215,76 @@ func PostCollaboration(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters, "updating": updating})
 }
 
+func CreateCollaborationWithPrompt(c *gin.Context) {
+	var body struct {
+		Prompt string `json:"prompt"`
+		Model  string `json:"model"`
+	}
+	if err := c.BindJSON(&body); err != nil || body.Prompt == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "missing prompt"})
+		return
+	}
+	model := body.Model
+	if model == "" {
+		model = "gpt-4o" // pick any streaming capable chat model
+	}
+
+	// Prepare SSE headers
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Status(http.StatusOK)
+
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		c.AbortWithStatusJSON(500, gin.H{"error": "streaming not supported"})
+		return
+	}
+
+	// Start the OpenAI stream
+	ctx := context.Background()
+	stream := myopenai.Client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(body.Prompt),
+		},
+		Model: openai.ChatModel(model),
+	})
+	defer stream.Close()
+
+	// Optional helper to assemble partial deltas
+	acc := openai.ChatCompletionAccumulator{}
+
+	for stream.Next() {
+		chunk := stream.Current()
+		acc.AddChunk(chunk)
+
+		// Send the raw delta content as SSE
+		if len(chunk.Choices) > 0 {
+			delta := chunk.Choices[0].Delta.Content
+			if delta != "" {
+				// Standard SSE line
+				c.Writer.Write([]byte("data: " + delta + "\n\n"))
+				flusher.Flush()
+			}
+		}
+
+		// You can also detect end of a message or a tool call:
+		// if content, ok := acc.JustFinishedContent(); ok { ... }
+		// if tool, ok := acc.JustFinishedToolCall(); ok { ... }
+	}
+
+	if err := stream.Err(); err != nil {
+		// send a final SSE error event then end
+		c.Writer.Write([]byte("event: error\ndata: " + err.Error() + "\n\n"))
+		flusher.Flush()
+		return
+	}
+
+	// SSE end marker is optional. Many clients just stop on socket close.
+	c.Writer.Write([]byte("data: [DONE]\n\n"))
+	flusher.Flush()
+}
+
 // Starting a collab | Request to start
 func StartContract(c *gin.Context) {
 	userType := middlewares.GetUserType(c)
