@@ -1,12 +1,14 @@
 package trendlydiscovery
 
 import (
+	"log"
 	"math"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
@@ -425,13 +427,27 @@ func TestCalculations(social *trendlybq.Socials) CalculatedData {
 	return calculatedValue
 }
 
-func RequestConnection(c *gin.Context) {
+func InviteInfluencerOnDiscover(c *gin.Context) {
+	var req struct {
+		Influencers    []string `json:"influencers" binding:"required,min=1"`
+		Collaborations []string `json:"collaborations" binding:"required,min=1"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request"})
+		return
+	}
+
 	influencerId := c.Param("influencerId")
 	if influencerId == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
 	}
 
 	brandId := c.Param("brandId")
+	managerId, b := middlewares.GetUserId(c)
+	if !b {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Unauthorized", "error": "unauthorized"})
+		return
+	}
 
 	brand := &trendlymodels.Brand{}
 	err := brand.Get(brandId)
@@ -440,27 +456,45 @@ func RequestConnection(c *gin.Context) {
 		return
 	}
 
-	// alreadyConnected := myutil.Includes(brand.ConnectedInfluencers.Connected, influencerId)
-	// if alreadyConnected {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "You are already connected"})
-	// 	return
-	// }
+	// Verify if enough credits are present
+	if brand.Credits.Connection < (len(req.Influencers) * len(req.Collaborations)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "not-enough-connection-credits", "message": "Not enough connection credits"})
+		return
+	}
 
-	// var appended bool
-	// brand.ConnectedInfluencers.Requested, appended = myutil.AppendUnique(brand.ConnectedInfluencers.Requested, influencerId)
-	// if appended {
-	// 	if brand.Credits.Connection <= 0 {
-	// 		c.JSON(http.StatusBadRequest, gin.H{"error": "no-connection-credits", "message": "No Connection Credits Available"})
-	// 		return
-	// 	}
+	// Send Invitations
+	invites := []trendlymodels.Invitation{}
+	for _, infId := range req.Influencers {
+		for _, collabId := range req.Collaborations {
+			invite := trendlymodels.Invitation{
+				UserID:     infId,
+				IsDiscover: true,
 
-	// 	brand.Credits.Connection -= 1
-	// 	_, err = brand.Insert(brandId)
-	// 	if err != nil {
-	// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
-	// 		return
-	// 	}
-	// }
+				ManagerID:       managerId,
+				CollaborationID: collabId,
+				Status:          "waiting",
+				Message:         "Invited via Discovery",
+				TimeStamp:       time.Now().UnixMilli(),
+			}
+			_, err := invite.Create()
+			if err != nil {
+				log.Println("Error sending invite:", err.Error())
+				continue
+			}
+			invites = append(invites, invite)
+		}
+	}
+
+	creditUtilized := len(invites)
+
+	// Do the calculation of reducing the connection credits here. If invite was already sent before, do not reduce the credit
+	brand.Credits.Connection -= creditUtilized
+
+	_, err = brand.Insert(brandId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "api is functional"})
 }
