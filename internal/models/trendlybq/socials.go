@@ -16,6 +16,25 @@ const (
 	SocialsFullTableName = "`trendly-9ab99.matches.socials`"
 )
 
+type SocialsBreif struct {
+	ID         string `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	SocialType string `db:"social_type" bigquery:"social_type" json:"social_type" firestore:"social_type"`
+
+	Location string `db:"location" bigquery:"location" json:"location" firestore:"location"`
+
+	FollowerCount   int64   `db:"follower_count" bigquery:"follower_count" json:"follower_count" firestore:"follower_count"`
+	ViewsCount      int64   `db:"views_count" bigquery:"views_count" json:"views_count" firestore:"views_count"`                      //views
+	EnagamentsCount int64   `db:"engagement_count" bigquery:"engagements_count" json:"engagement_count" firestore:"engagement_count"` //engagement
+	EngagementRate  float32 `db:"engagement_rate" bigquery:"engagement_rate" json:"engagement_rate" firestore:"engagement_rate"`
+
+	Username   string `db:"username" bigquery:"username" json:"username" firestore:"username"`
+	Name       string `db:"name" bigquery:"name" json:"name" firestore:"name"`
+	Bio        string `db:"bio" bigquery:"bio" json:"bio" firestore:"bio"`
+	ProfilePic string `db:"profile_pic" bigquery:"profile_pic" json:"profile_pic" firestore:"profile_pic"`
+
+	ProfileVerified bool `db:"profile_verified" bigquery:"profile_verified" json:"profile_verified" firestore:"profile_verified"`
+}
+
 type Socials struct {
 	ID         string `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	SocialType string `db:"social_type" bigquery:"social_type" json:"social_type" firestore:"social_type"`
@@ -249,6 +268,38 @@ func (data *Socials) Get(id string) error {
 		return err
 	}
 	return nil
+}
+
+func (_ Socials) GetMultiple(ids []string) ([]SocialsBreif, error) {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsFullTableName + `
+    WHERE id IN UNNEST(@ids)
+    ORDER BY ARRAY_POSITION(@ids, id)
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "ids", Value: ids},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	results := []SocialsBreif{}
+	for {
+		row := &SocialsBreif{}
+		err = it.Next(row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println("Error ", err.Error())
+			continue
+		}
+		results = append(results, *row)
+	}
+	return results, nil
 }
 
 func (data *Socials) GetInstagram(username string) error {

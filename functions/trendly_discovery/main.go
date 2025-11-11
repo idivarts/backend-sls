@@ -23,6 +23,6 @@ func handleUserAPIs() {
 	brandAPIs.POST("/:brandId/influencers", trendlydiscovery.GetInfluencers)
 	brandAPIs.POST("/:brandId/influencers/invite", trendlydiscovery.InviteInfluencerOnDiscover)
 
-	// brandAPIs.GET("/:brandId/influencers/briefs", trendlydiscovery.FetchInfluencer)
+	brandAPIs.GET("/influencers/briefs", trendlydiscovery.FetchMultiInfluencers)
 	brandAPIs.GET("/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
 }
