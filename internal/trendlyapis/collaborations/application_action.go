@@ -42,9 +42,9 @@ func ApplicationAction(c *gin.Context) {
 	}
 
 	if action == "accept" {
-		channelName := collab.Name
+		// channelName := collab.Name
 		res, err := trendlyapis.CreateChannel(managerId, trendlyapis.ICreateChannel{
-			Name:            &channelName,
+			// Name:            &channelName,
 			UserID:          userId,
 			CollaborationID: collabId,
 		})

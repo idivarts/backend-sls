@@ -291,14 +291,16 @@ func CreateChannel(managerId string, req ICreateChannel) (*ChannelReturn, error)
 	}
 
 	contractId := GenerateKey(req.Name)
+	extraData := map[string]interface{}{
+		"collaborationId": req.CollaborationID,
+		"contractId":      contractId,
+	}
+	if req.Name != nil {
+		extraData["name"] = req.Name
+	}
 	res, err := streamchat.Client.CreateChannel(context.Background(), "messaging", contractId, managerId, &stream_chat.ChannelRequest{
-		Members: userIDs,
-		ExtraData: map[string]interface{}{
-			"name":            req.Name,
-			"collaborationId": req.CollaborationID,
-			"contractId":      contractId,
-			// "image": "https://getstream.io/random_svg/?id=chat-1&name=Chat",
-		},
+		Members:   userIDs,
+		ExtraData: extraData,
 	})
 	if err != nil {
 		// c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating channel", "error": err.Error()})

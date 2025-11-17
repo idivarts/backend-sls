@@ -23,6 +23,7 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/influencers/:influencerId/unlock", trendlyCollabs.InfluencerUnlocked)
 	managerApisV1.POST("/influencers/:influencerId/message", trendlyCollabs.SendMessage)
 
+	managerApisV1.POST("/collaborations", trendlyCollabs.CreateCollaborationWithPrompt)
 	managerApisV1.POST("/collaborations/:collabId", trendlyCollabs.PostCollaboration)
 
 	managerApisV1.POST("/collaborations/:collabId/invitations/:userId", trendlyCollabs.SendInvitation)
