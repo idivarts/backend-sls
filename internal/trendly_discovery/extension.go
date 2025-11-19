@@ -13,6 +13,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
 func medianInt64(xs []int64) float32 {
@@ -273,6 +274,8 @@ func AddProfile(c *gin.Context) {
 	if err == nil {
 		dLen = len(allDocs)
 	}
+
+	sqshandler.SendToMessageQueue(data.ID, 0)
 
 	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID, "count": dLen})
 }
