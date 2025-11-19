@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -29,6 +30,7 @@ func uploadImage(socialId string) error {
 	social := &trendlybq.Socials{}
 	err := social.GetByIdFromFirestore(socialId)
 	if err != nil {
+		log.Println("Error in getting social by id:", socialId, " error:", err.Error())
 		return err
 	}
 
