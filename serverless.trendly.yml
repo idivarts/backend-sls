@@ -143,7 +143,7 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
-    timeout: 300
+    timeout: 900
     events:
       - schedule:
           rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
