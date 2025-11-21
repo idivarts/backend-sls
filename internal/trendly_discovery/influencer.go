@@ -460,11 +460,6 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	influencerId := c.Param("influencerId")
-	if influencerId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
-	}
-
 	brandId := c.Param("brandId")
 	managerId, b := middlewares.GetUserId(c)
 	if !b {
@@ -519,5 +514,5 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "api is functional"})
+	c.JSON(http.StatusOK, gin.H{"message": "api is functional", "creditsUsed": creditUtilized, "invitationsSent": invites})
 }
