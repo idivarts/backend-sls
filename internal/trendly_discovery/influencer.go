@@ -1,8 +1,10 @@
 package trendlydiscovery
 
 import (
+	"context"
 	"log"
 	"math"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -11,7 +13,9 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/myquery"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	"google.golang.org/api/iterator"
 )
 
 type Range struct {
@@ -364,6 +368,30 @@ func budgetTierCaps(followers int64) (min float64, max float64, ok bool) {
 	}
 }
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+// mockInvitationMeta returns a random InvitedAt timestamp between now and ~60 days ago
+// and a random invitation status from a fixed set. This is only for mock data.
+func mockInvitationMeta(filter string) (int64, string) {
+	now := time.Now()
+
+	// Random offset up to 60 days back
+	maxHoursBack := 60 * 24              // 60 days
+	hoursBack := rand.Intn(maxHoursBack) // 0 .. maxHoursBack-1
+	randomTime := now.Add(-time.Duration(hoursBack) * time.Hour)
+
+	if filter != "" {
+		return randomTime.UnixMilli(), filter
+	}
+
+	statuses := []string{"pending", "inprogress", "accepted", "declined"}
+	status := statuses[rand.Intn(len(statuses))]
+
+	return randomTime.UnixMilli(), status
+}
+
 // Make sure the the influencers discovery credit is reduced
 // If the influencer is already fetched before, do not reduce the credit
 // Also make sure the influencer is added uniquely to the user's list of influencers
@@ -417,10 +445,10 @@ func FetchInfluencer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer", "social": social, "analysis": calculatedValue})
 }
 
-func FetchMultiInfluencers(c *gin.Context) {
+func FetchInvitedInfluencers(c *gin.Context) {
 	var req struct {
-		Start  int    `json:"start" binding:"required"`
-		Count  int    `json:"count" binding:"required"`
+		Offset int    `json:"offset" binding:"required"`
+		Limit  int    `json:"limit" binding:"required"`
 		Filter string `json:"filter"`
 	}
 	if err := c.BindJSON(&req); err != nil {
@@ -428,15 +456,65 @@ func FetchMultiInfluencers(c *gin.Context) {
 		return
 	}
 
-	// socials, err := trendlybq.Socials{}.GetMultiple(req.InfluencerIds)
-	// if err != nil {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Social"})
-	// 	return
-	// }
+	filter := InfluencerFilters{
+		Offset: &req.Offset,
+		Limit:  &req.Limit,
+	}
+	base := FormSQL(filter)
+	q := myquery.Client.Query(base)
+	it, err := q.Read(context.Background())
+	if err != nil {
+		c.JSON(500, gin.H{"message": "Query failed", "error": err.Error(), "sql": base})
+		return
+	}
+
+	type bqRow struct {
+		UserID         string  `bigquery:"userId"`
+		Fullname       string  `bigquery:"fullname"`
+		Username       string  `bigquery:"username"`
+		URL            string  `bigquery:"url"`
+		Picture        string  `bigquery:"picture"`
+		Followers      int64   `bigquery:"followers"`
+		Views          int64   `bigquery:"views"`
+		Engagements    int64   `bigquery:"engagements"`
+		EngagementRate float64 `bigquery:"engagementRate"`
+	}
+
+	out := make([]InfluencerInviteUnit, 0, 100)
+	for {
+		var r bqRow
+		err := it.Next(&r)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			c.JSON(500, gin.H{"message": "Iteration failed", "error": err.Error(), "sql": base})
+			return
+		}
+		invitedAt, status := mockInvitationMeta(req.Filter)
+		out = append(out, InfluencerInviteUnit{
+			InfluencerItem: InfluencerItem{
+				UserID:         r.UserID,
+				Fullname:       r.Fullname,
+				Username:       r.Username,
+				URL:            r.URL,
+				Picture:        r.Picture,
+				Followers:      r.Followers,
+				Views:          r.Views,
+				Engagements:    r.Engagements,
+				EngagementRate: r.EngagementRate,
+				IsDiscover:     true,
+			},
+			InvitedAt: invitedAt,
+			Status:    status,
+		})
+	}
+
+	log.Println("Data Processed", out)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Fetched influencer",
-		// "socials": socials,
+		"message":     "Fetched influencer",
+		"influencers": out,
 	})
 }
 
