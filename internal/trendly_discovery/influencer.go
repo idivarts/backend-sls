@@ -419,20 +419,25 @@ func FetchInfluencer(c *gin.Context) {
 
 func FetchMultiInfluencers(c *gin.Context) {
 	var req struct {
-		InfluencerIds []string `json:"influencerIds" binding:"required,min=1"`
+		Start  int    `json:"start" binding:"required"`
+		Count  int    `json:"count" binding:"required"`
+		Filter string `json:"filter"`
 	}
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request"})
 		return
 	}
 
-	socials, err := trendlybq.Socials{}.GetMultiple(req.InfluencerIds)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Social"})
-		return
-	}
+	// socials, err := trendlybq.Socials{}.GetMultiple(req.InfluencerIds)
+	// if err != nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Social"})
+	// 	return
+	// }
 
-	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer", "socials": socials})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Fetched influencer",
+		// "socials": socials,
+	})
 }
 
 func TestCalculations(social *trendlybq.Socials) CalculatedData {
@@ -453,11 +458,6 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request"})
 		return
-	}
-
-	influencerId := c.Param("influencerId")
-	if influencerId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
 	}
 
 	brandId := c.Param("brandId")
@@ -514,5 +514,5 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "api is functional"})
+	c.JSON(http.StatusOK, gin.H{"message": "api is functional", "creditsUsed": creditUtilized, "invitationsSent": invites})
 }

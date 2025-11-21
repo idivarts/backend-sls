@@ -120,6 +120,11 @@ functions:
           enabled: true
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
+    environment:
+      SEND_MESSAGE_QUEUE_ARN: 
+        Fn::GetAtt:
+          - DiscoveryMessageQueue
+          - Arn
     package:
       include:
         - 'service-account.json'
@@ -143,6 +148,23 @@ functions:
       - schedule:
           rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
           enabled: true
+  trendly_discovery_upload_image:
+    handler: scripts/socials-update-images/queue-update-image/main.go
+    environment:
+      S3_BUCKET: trendly-discovery-bucket
+      S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 900
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - DiscoveryMessageQueue
+              - Arn
   trendly_apis:
     handler: functions/trendly_apis/main.go
     package:
@@ -285,6 +307,11 @@ package:
 
 resources:
   Resources:
+    DiscoveryMessageQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: DiscoveryMessageQueue
+
     StreamMessageDLQ:
       Type: AWS::SQS::Queue
       Properties:

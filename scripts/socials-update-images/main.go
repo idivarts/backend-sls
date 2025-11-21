@@ -27,11 +27,12 @@ func executeOnAll() {
 	startExecutionTime := time.Now().UnixMicro()
 	log.Println("Start Execution", startExecutionTime)
 
-	socials, err := trendlybq.Socials{}.GetPaginatedFromFirestore(0, 700)
+	socials, err := trendlybq.Socials{}.GetPaginatedFromFirestore(0, 0)
 	if err != nil {
 		log.Println("Error ", err.Error())
 		return
 	}
+
 	for i, v := range socials {
 		socials[i] = *sui.MoveImagesToS3(&v)
 		socials[i].LastUpdateTime = time.Now().UnixMicro()
@@ -49,6 +50,5 @@ func executeOnAll() {
 	for _, v := range socials {
 		v.UpdateMinified()
 	}
-
 	log.Println("Done All")
 }

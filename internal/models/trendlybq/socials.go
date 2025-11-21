@@ -225,7 +225,11 @@ func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 }
 
 func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error) {
-	it := firestoredb.Client.Collection("scrapped-socials").Where("reel_scrapped_count", ">", 0).Offset(offset).Limit(limit).Documents(context.Background())
+	temp := firestoredb.Client.Collection("scrapped-socials").Where("reel_scrapped_count", ">", 0).Offset(offset)
+	if limit > 0 {
+		temp = temp.Limit(limit)
+	}
+	it := temp.Documents(context.Background())
 
 	socials := []Socials{}
 	for {
@@ -245,6 +249,18 @@ func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error)
 	}
 
 	return socials, nil
+}
+func (s *Socials) GetByIdFromFirestore(id string) error {
+	res, err := firestoredb.Client.Collection("scrapped-socials").Doc(id).Get(context.Background())
+	if err != nil {
+		return err
+	}
+	err = res.DataTo(s)
+	if err != nil {
+		return err
+	}
+	return nil
+	// return socials, nil
 }
 
 func (data *Socials) Get(id string) error {
