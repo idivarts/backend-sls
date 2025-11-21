@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"math"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -367,6 +368,30 @@ func budgetTierCaps(followers int64) (min float64, max float64, ok bool) {
 	}
 }
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+// mockInvitationMeta returns a random InvitedAt timestamp between now and ~60 days ago
+// and a random invitation status from a fixed set. This is only for mock data.
+func mockInvitationMeta(filter string) (int64, string) {
+	now := time.Now()
+
+	// Random offset up to 60 days back
+	maxHoursBack := 60 * 24              // 60 days
+	hoursBack := rand.Intn(maxHoursBack) // 0 .. maxHoursBack-1
+	randomTime := now.Add(-time.Duration(hoursBack) * time.Hour)
+
+	if filter != "" {
+		return randomTime.UnixMilli(), filter
+	}
+
+	statuses := []string{"pending", "inprogress", "accepted", "declined"}
+	status := statuses[rand.Intn(len(statuses))]
+
+	return randomTime.UnixMilli(), status
+}
+
 // Make sure the the influencers discovery credit is reduced
 // If the influencer is already fetched before, do not reduce the credit
 // Also make sure the influencer is added uniquely to the user's list of influencers
@@ -466,6 +491,7 @@ func FetchInvitedInfluencers(c *gin.Context) {
 			c.JSON(500, gin.H{"message": "Iteration failed", "error": err.Error(), "sql": base})
 			return
 		}
+		invitedAt, status := mockInvitationMeta(req.Filter)
 		out = append(out, InfluencerInviteUnit{
 			InfluencerItem: InfluencerItem{
 				UserID:         r.UserID,
@@ -479,8 +505,8 @@ func FetchInvitedInfluencers(c *gin.Context) {
 				EngagementRate: r.EngagementRate,
 				IsDiscover:     true,
 			},
-			InvitedAt: time.Now().UnixMilli(),
-			Status:    "waiting",
+			InvitedAt: invitedAt,
+			Status:    status,
 		})
 	}
 
