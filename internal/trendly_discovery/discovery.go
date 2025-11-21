@@ -26,6 +26,13 @@ type InfluencerItem struct {
 	Views          int64   `json:"views,omitempty"`
 	Engagements    int64   `json:"engagements"`
 	EngagementRate float64 `json:"engagementRate"`
+	IsDiscover     bool    `json:"isDiscover"`
+}
+
+type InfluencerInviteUnit struct {
+	InfluencerItem
+	InvitedAt int64  `json:"invitedAt"`
+	Status    string `json:"status"`
 }
 
 // InfluencerFilters represents the filter payload coming from the frontend.
@@ -290,6 +297,7 @@ func GetInfluencers(c *gin.Context) {
 			Views:          r.Views,
 			Engagements:    r.Engagements,
 			EngagementRate: r.EngagementRate,
+			IsDiscover:     true,
 		})
 	}
 

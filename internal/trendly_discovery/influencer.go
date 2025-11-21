@@ -1,6 +1,7 @@
 package trendlydiscovery
 
 import (
+	"context"
 	"log"
 	"math"
 	"net/http"
@@ -11,7 +12,9 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/myquery"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	"google.golang.org/api/iterator"
 )
 
 type Range struct {
@@ -417,10 +420,10 @@ func FetchInfluencer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer", "social": social, "analysis": calculatedValue})
 }
 
-func FetchMultiInfluencers(c *gin.Context) {
+func FetchInvitedInfluencers(c *gin.Context) {
 	var req struct {
-		Start  int    `json:"start" binding:"required"`
-		Count  int    `json:"count" binding:"required"`
+		Offset int    `json:"offset" binding:"required"`
+		Limit  int    `json:"limit" binding:"required"`
 		Filter string `json:"filter"`
 	}
 	if err := c.BindJSON(&req); err != nil {
@@ -428,15 +431,64 @@ func FetchMultiInfluencers(c *gin.Context) {
 		return
 	}
 
-	// socials, err := trendlybq.Socials{}.GetMultiple(req.InfluencerIds)
-	// if err != nil {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Social"})
-	// 	return
-	// }
+	filter := InfluencerFilters{
+		Offset: &req.Offset,
+		Limit:  &req.Limit,
+	}
+	base := FormSQL(filter)
+	q := myquery.Client.Query(base)
+	it, err := q.Read(context.Background())
+	if err != nil {
+		c.JSON(500, gin.H{"message": "Query failed", "error": err.Error(), "sql": base})
+		return
+	}
+
+	type bqRow struct {
+		UserID         string  `bigquery:"userId"`
+		Fullname       string  `bigquery:"fullname"`
+		Username       string  `bigquery:"username"`
+		URL            string  `bigquery:"url"`
+		Picture        string  `bigquery:"picture"`
+		Followers      int64   `bigquery:"followers"`
+		Views          int64   `bigquery:"views"`
+		Engagements    int64   `bigquery:"engagements"`
+		EngagementRate float64 `bigquery:"engagementRate"`
+	}
+
+	out := make([]InfluencerInviteUnit, 0, 100)
+	for {
+		var r bqRow
+		err := it.Next(&r)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			c.JSON(500, gin.H{"message": "Iteration failed", "error": err.Error(), "sql": base})
+			return
+		}
+		out = append(out, InfluencerInviteUnit{
+			InfluencerItem: InfluencerItem{
+				UserID:         r.UserID,
+				Fullname:       r.Fullname,
+				Username:       r.Username,
+				URL:            r.URL,
+				Picture:        r.Picture,
+				Followers:      r.Followers,
+				Views:          r.Views,
+				Engagements:    r.Engagements,
+				EngagementRate: r.EngagementRate,
+				IsDiscover:     true,
+			},
+			InvitedAt: time.Now().UnixMilli(),
+			Status:    "waiting",
+		})
+	}
+
+	log.Println("Data Processed", out)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Fetched influencer",
-		// "socials": socials,
+		"message":     "Fetched influencer",
+		"influencers": out,
 	})
 }
 
