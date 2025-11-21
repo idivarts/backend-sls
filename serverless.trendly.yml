@@ -311,6 +311,7 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: DiscoveryMessageQueue
+        VisibilityTimeout: 900
 
     StreamMessageDLQ:
       Type: AWS::SQS::Queue
