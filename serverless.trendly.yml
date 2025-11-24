@@ -62,7 +62,10 @@ provider:
           Action:
             - "iam:PassRole"
           Resource: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
-
+        - Effect: "Allow"
+          Action:
+            - "sqs:sendmessage"
+          Resource: { "Fn::GetAtt": ["DiscoveryMessageQueue", "Arn"] }
 plugins:
   - serverless-go-plugin
   - serverless-domain-manager
@@ -125,13 +128,6 @@ functions:
         Fn::GetAtt:
           - DiscoveryMessageQueue
           - QueueName
-    iam:
-      role:
-        statements:
-          - Effect: "Allow"
-            Action:
-              - "sqs:sendmessage"
-            Resource: { "Fn::GetAtt": ["DiscoveryMessageQueue", "Arn"] }
     package:
       include:
         - 'service-account.json'
