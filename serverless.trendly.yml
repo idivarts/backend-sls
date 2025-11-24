@@ -124,7 +124,14 @@ functions:
       SEND_MESSAGE_QUEUE_ARN: 
         Fn::GetAtt:
           - DiscoveryMessageQueue
-          - Arn
+          - QueueName
+    iam:
+      role:
+        statements:
+          - Effect: "Allow"
+            Action:
+              - "sqs:sendmessage"
+            Resource: { "Fn::GetAtt": ["DiscoveryMessageQueue", "Arn"] }
     package:
       include:
         - 'service-account.json'
