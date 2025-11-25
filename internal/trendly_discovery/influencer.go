@@ -481,7 +481,7 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		}
 		invitedAt, status := mockInvitationMeta(req.Filter)
 		out = append(out, InfluencerInviteUnit{
-			InfluencerItem: r,
+			InfluencerItem: InfluencerItem{SocialsBreif: r, IsDiscover: true},
 			InvitedAt:      invitedAt,
 			Status:         status,
 		})
