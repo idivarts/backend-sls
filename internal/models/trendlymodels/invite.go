@@ -14,9 +14,14 @@ type Invitation struct {
 
 	CollaborationID string `json:"collaborationId" firestore:"collaborationId"`
 	ManagerID       string `json:"managerId" firestore:"managerId"`
-	Status          string `json:"status" firestore:"status"`
-	TimeStamp       int64  `json:"timeStamp" firestore:"timeStamp"`
-	Message         string `json:"message" firestore:"message"`
+
+	Name       string `json:"name" firestore:"name"`
+	UserHandle string `json:"userHandle" firestore:"userHandle"`
+	ImageURL   string `json:"imageUrl" firestore:"imageUrl"`
+
+	Status    string `json:"status" firestore:"status"`
+	TimeStamp int64  `json:"timeStamp" firestore:"timeStamp"`
+	Message   string `json:"message" firestore:"message"`
 }
 
 func (b *Invitation) Get(collabID, userID string) error {
