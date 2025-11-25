@@ -468,21 +468,9 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		return
 	}
 
-	type bqRow struct {
-		UserID         string  `bigquery:"userId"`
-		Fullname       string  `bigquery:"fullname"`
-		Username       string  `bigquery:"username"`
-		URL            string  `bigquery:"url"`
-		Picture        string  `bigquery:"picture"`
-		Followers      int64   `bigquery:"followers"`
-		Views          int64   `bigquery:"views"`
-		Engagements    int64   `bigquery:"engagements"`
-		EngagementRate float64 `bigquery:"engagementRate"`
-	}
-
 	out := make([]InfluencerInviteUnit, 0, 100)
 	for {
-		var r bqRow
+		var r trendlybq.SocialsBreif
 		err := it.Next(&r)
 		if err == iterator.Done {
 			break
@@ -493,20 +481,9 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		}
 		invitedAt, status := mockInvitationMeta(req.Filter)
 		out = append(out, InfluencerInviteUnit{
-			InfluencerItem: InfluencerItem{
-				UserID:         r.UserID,
-				Fullname:       r.Fullname,
-				Username:       r.Username,
-				URL:            r.URL,
-				Picture:        r.Picture,
-				Followers:      r.Followers,
-				Views:          r.Views,
-				Engagements:    r.Engagements,
-				EngagementRate: r.EngagementRate,
-				IsDiscover:     true,
-			},
-			InvitedAt: invitedAt,
-			Status:    status,
+			InfluencerItem: r,
+			InvitedAt:      invitedAt,
+			Status:         status,
 		})
 	}
 
@@ -581,9 +558,7 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 
 			for _, s := range bqSocials {
 				if s.ID == infId {
-					invite.Name = s.Name
-					invite.UserHandle = s.Username
-					invite.ImageURL = s.ProfilePic
+					invite.SocialProfile = s.ConvertToSocialBreif()
 					break
 				}
 			}

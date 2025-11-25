@@ -5,6 +5,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
+	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
@@ -15,9 +16,7 @@ type Invitation struct {
 	CollaborationID string `json:"collaborationId" firestore:"collaborationId"`
 	ManagerID       string `json:"managerId" firestore:"managerId"`
 
-	Name       string `json:"name" firestore:"name"`
-	UserHandle string `json:"userHandle" firestore:"userHandle"`
-	ImageURL   string `json:"imageUrl" firestore:"imageUrl"`
+	SocialProfile *trendlybq.SocialsBreif `json:"socialProfile,omitempty" firestore:"socialProfile,omitempty"`
 
 	Status    string `json:"status" firestore:"status"`
 	TimeStamp int64  `json:"timeStamp" firestore:"timeStamp"`
