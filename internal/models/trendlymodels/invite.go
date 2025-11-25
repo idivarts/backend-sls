@@ -36,8 +36,16 @@ func (b *Invitation) Get(collabID, userID string) error {
 	return err
 }
 
-func (_ Invitation) GetPaginated(collabID string, offset, limit int) ([]Invitation, error) {
-	res, err := firestoredb.Client.Collection("collaborations-invites").Where("collaborationId", "==", collabID).Offset(offset).Limit(limit).Documents(context.Background()).GetAll()
+func (_ Invitation) GetPaginated(collabID, statusFilter string, offset, limit int) ([]Invitation, error) {
+	q := firestoredb.Client.Collection("collaborations-invites").Where("collaborationId", "==", collabID)
+	if statusFilter != "" {
+		q = q.Where("status", "==", statusFilter)
+	}
+	q = q.Offset(offset)
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	res, err := q.Documents(context.Background()).GetAll()
 	if err != nil {
 		return nil, err
 	}

@@ -453,7 +453,7 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		return
 	}
 
-	invites, err := trendlymodels.Invitation{}.GetPaginated(c.Param("collabId"), req.Offset, req.Limit)
+	invites, err := trendlymodels.Invitation{}.GetPaginated(c.Param("collabId"), req.Filter, req.Offset, req.Limit)
 	if err != nil {
 		c.JSON(500, gin.H{"message": "Error fetching invites", "error": err.Error()})
 		return
