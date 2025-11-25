@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"cloud.google.com/go/firestore"
+	"github.com/google/uuid"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
@@ -31,8 +32,13 @@ func (b *Invitation) Get(collabID, userID string) error {
 	return err
 }
 
-func (b *Invitation) Insert() (*firestore.WriteResult, error) {
-	res, err := firestoredb.Client.Collection("collaborations").Doc(b.CollaborationID).Collection("invitations").Doc(b.UserID).Set(context.Background(), b)
+func (data *Invitation) getID() string {
+	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.CollaborationID+"-"+data.UserID))
+	return ID.String()
+}
+
+func (b *Invitation) Update() (*firestore.WriteResult, error) {
+	res, err := firestoredb.Client.Collection("collaborations-invites").Doc(b.getID()).Set(context.Background(), b)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +51,7 @@ func (b *Invitation) Insert() (*firestore.WriteResult, error) {
 // or (writeResult, created=false) when an existing document was updated.
 func (b *Invitation) Create() (*firestore.WriteResult, error) {
 	ctx := context.Background()
-	doc := firestoredb.Client.Collection("collaborations").Doc(b.CollaborationID).Collection("invitations").Doc(b.UserID)
+	doc := firestoredb.Client.Collection("collaborations-invites").Doc(b.getID())
 
 	// Try to create first; this will fail with AlreadyExists if the doc is present.
 	if res, err := doc.Create(ctx, b); err == nil {
