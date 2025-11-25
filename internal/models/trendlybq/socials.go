@@ -34,6 +34,9 @@ type SocialsBreif struct {
 	Bio string `db:"bio" bigquery:"bio" json:"bio" firestore:"bio"`
 
 	ProfileVerified bool `db:"profile_verified" bigquery:"profile_verified" json:"profile_verified" firestore:"profile_verified"`
+
+	CreationTime   int64 `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
+	LastUpdateTime int64 `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
 }
 
 type Socials struct {
@@ -140,6 +143,8 @@ func (data *Socials) UpdateMinified() error {
 		Location:        data.Location,
 		Bio:             data.Bio,
 		ProfileVerified: data.ProfileVerified,
+		CreationTime:    data.CreationTime,
+		LastUpdateTime:  data.LastUpdateTime,
 	}
 
 	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), x)
