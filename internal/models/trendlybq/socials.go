@@ -129,8 +129,8 @@ func (data *Socials) InsertToFirestore() error {
 	return err
 }
 
-func (data *Socials) UpdateMinified() error {
-	x := SocialsBreif{
+func (data *Socials) ConvertToSocialBreif() SocialsBreif {
+	return SocialsBreif{
 		ID:              data.ID,
 		Name:            data.Name,
 		Username:        data.Username,
@@ -146,6 +146,10 @@ func (data *Socials) UpdateMinified() error {
 		CreationTime:    data.CreationTime,
 		LastUpdateTime:  data.LastUpdateTime,
 	}
+}
+
+func (data *Socials) UpdateMinified() error {
+	x := data.ConvertToSocialBreif()
 
 	_, err := firestoredb.Client.Collection("scrapped-socials").Doc(data.ID).Set(context.Background(), x)
 	return err
