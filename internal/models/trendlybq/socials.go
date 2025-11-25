@@ -286,7 +286,7 @@ func (data *Socials) Get(id string) error {
 	return nil
 }
 
-func (_ Socials) GetMultiple(ids []string) ([]SocialsBreif, error) {
+func (_ Socials) GetMultipleBreifs(ids []string) ([]SocialsBreif, error) {
 	q := myquery.Client.Query(`
     SELECT *
     FROM ` + SocialsFullTableName + `
@@ -305,6 +305,37 @@ func (_ Socials) GetMultiple(ids []string) ([]SocialsBreif, error) {
 	results := []SocialsBreif{}
 	for {
 		row := &SocialsBreif{}
+		err = it.Next(row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println("Error ", err.Error())
+			continue
+		}
+		results = append(results, *row)
+	}
+	return results, nil
+}
+func (_ Socials) GetMultiple(ids []string) ([]Socials, error) {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsFullTableName + `
+    WHERE id IN UNNEST(@ids)
+    ORDER BY ARRAY_POSITION(@ids, id)
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "ids", Value: ids},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	results := []Socials{}
+	for {
+		row := &Socials{}
 		err = it.Next(row)
 		if err == iterator.Done {
 			break
