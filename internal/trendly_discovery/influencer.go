@@ -1,7 +1,6 @@
 package trendlydiscovery
 
 import (
-	"context"
 	"log"
 	"math"
 	"math/rand"
@@ -13,9 +12,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/myquery"
 	"github.com/idivarts/backend-sls/pkg/myutil"
-	"google.golang.org/api/iterator"
 )
 
 type Range struct {
@@ -456,34 +453,25 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		return
 	}
 
-	filter := InfluencerFilters{
-		Offset: &req.Offset,
-		Limit:  &req.Limit,
-	}
-	base := FormSQL(filter)
-	q := myquery.Client.Query(base)
-	it, err := q.Read(context.Background())
+	invites, err := trendlymodels.Invitation{}.GetPaginated(c.Param("collabId"), req.Offset, req.Limit)
 	if err != nil {
-		c.JSON(500, gin.H{"message": "Query failed", "error": err.Error(), "sql": base})
+		c.JSON(500, gin.H{"message": "Error fetching invites", "error": err.Error()})
 		return
 	}
 
-	out := make([]InfluencerInviteUnit, 0, 100)
-	for {
-		var r trendlybq.SocialsBreif
-		err := it.Next(&r)
-		if err == iterator.Done {
-			break
+	out := []InfluencerInviteUnit{}
+	for _, inv := range invites {
+		r := inv.SocialProfile
+		if r == nil {
+			continue
 		}
-		if err != nil {
-			c.JSON(500, gin.H{"message": "Iteration failed", "error": err.Error(), "sql": base})
-			return
-		}
-		invitedAt, status := mockInvitationMeta(req.Filter)
 		out = append(out, InfluencerInviteUnit{
-			InfluencerItem: InfluencerItem{SocialsBreif: r, IsDiscover: true},
-			InvitedAt:      invitedAt,
-			Status:         status,
+			InfluencerItem: InfluencerItem{
+				SocialsBreif: *r,
+				IsDiscover:   true,
+			},
+			InvitedAt: inv.TimeStamp,
+			Status:    inv.Status,
 		})
 	}
 

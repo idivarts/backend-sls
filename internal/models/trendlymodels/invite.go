@@ -36,6 +36,25 @@ func (b *Invitation) Get(collabID, userID string) error {
 	return err
 }
 
+func (_ Invitation) GetPaginated(collabID string, offset, limit int) ([]Invitation, error) {
+	res, err := firestoredb.Client.Collection("collaborations-invites").Where("collaborationId", "==", collabID).Offset(offset).Limit(limit).Documents(context.Background()).GetAll()
+	if err != nil {
+		return nil, err
+	}
+
+	invites := []Invitation{}
+	for _, v := range res {
+		inv := Invitation{}
+		err := v.DataTo(&inv)
+		if err != nil {
+			return nil, err
+		}
+		invites = append(invites, inv)
+	}
+
+	return invites, nil
+}
+
 func (data *Invitation) getID() string {
 	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.CollaborationID+"-"+data.UserID))
 	return ID.String()
