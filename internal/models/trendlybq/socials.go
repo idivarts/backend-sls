@@ -296,7 +296,6 @@ func (_ Socials) GetMultipleBreifs(ids []string) ([]SocialsBreif, error) {
     SELECT *
     FROM ` + SocialsFullTableName + `
     WHERE id IN UNNEST(@ids)
-    ORDER BY ARRAY_POSITION(@ids, id)
 `)
 	q.Parameters = []bigquery.QueryParameter{
 		{Name: "ids", Value: ids},
@@ -327,7 +326,6 @@ func (_ Socials) GetMultiple(ids []string) ([]Socials, error) {
     SELECT *
     FROM ` + SocialsFullTableName + `
     WHERE id IN UNNEST(@ids)
-    ORDER BY ARRAY_POSITION(@ids, id)
 `)
 	q.Parameters = []bigquery.QueryParameter{
 		{Name: "ids", Value: ids},
