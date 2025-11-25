@@ -16,7 +16,10 @@ import (
 // - followers/engagements/views can be large; int64 is used.
 // - engagementRate is expressed as a percentage (e.g., 1.5 for 1.5%).
 // - Field JSON tags mirror the TS property names expected by the app.
-type InfluencerItem = trendlybq.SocialsBreif
+type InfluencerItem struct {
+	trendlybq.SocialsBreif
+	IsDiscover bool `json:"isDiscover,omitempty"`
+}
 
 type InfluencerInviteUnit struct {
 	InfluencerItem
@@ -269,8 +272,7 @@ func GetInfluencers(c *gin.Context) {
 			c.JSON(500, gin.H{"message": "Iteration failed", "error": err.Error(), "sql": base})
 			return
 		}
-		out = append(out, r)
-
+		out = append(out, InfluencerItem{SocialsBreif: r, IsDiscover: true})
 	}
 
 	log.Println("Data Processed", out)
