@@ -558,29 +558,36 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	// bqSocial := trendlybq.Socials{}
-	// bqSocial.GetByIdFromFirestore()
+	bqSocials, err := trendlybq.Socials{}.GetMultiple(req.Influencers)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error gettimg socials"})
+		return
+	}
 
 	// Send Invitations
 	invites := []trendlymodels.Invitation{}
 	for _, infId := range req.Influencers {
 		for _, collabId := range req.Collaborations {
-
 			invite := trendlymodels.Invitation{
 				UserID:     infId,
 				IsDiscover: true,
 
 				CollaborationID: collabId,
 				ManagerID:       managerId,
-
-				Name:       "",
-				UserHandle: "",
-				ImageURL:   "",
-
-				Status:    "waiting",
-				TimeStamp: time.Now().UnixMilli(),
-				Message:   "Invited via Discovery",
+				Status:          "waiting",
+				TimeStamp:       time.Now().UnixMilli(),
+				Message:         "Invited via Discovery",
 			}
+
+			for _, s := range bqSocials {
+				if s.ID == infId {
+					invite.Name = s.Name
+					invite.UserHandle = s.Username
+					invite.ImageURL = s.ProfilePic
+					break
+				}
+			}
+
 			_, err := invite.Create()
 			if err != nil {
 				log.Println("Error sending invite:", err.Error())
