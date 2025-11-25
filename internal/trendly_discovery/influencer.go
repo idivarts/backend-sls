@@ -558,6 +558,12 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
+	bqSocials, err := trendlybq.Socials{}.GetMultiple(req.Influencers)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error gettimg socials"})
+		return
+	}
+
 	// Send Invitations
 	invites := []trendlymodels.Invitation{}
 	for _, infId := range req.Influencers {
@@ -566,12 +572,22 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 				UserID:     infId,
 				IsDiscover: true,
 
-				ManagerID:       managerId,
 				CollaborationID: collabId,
+				ManagerID:       managerId,
 				Status:          "waiting",
-				Message:         "Invited via Discovery",
 				TimeStamp:       time.Now().UnixMilli(),
+				Message:         "Invited via Discovery",
 			}
+
+			for _, s := range bqSocials {
+				if s.ID == infId {
+					invite.Name = s.Name
+					invite.UserHandle = s.Username
+					invite.ImageURL = s.ProfilePic
+					break
+				}
+			}
+
 			_, err := invite.Create()
 			if err != nil {
 				log.Println("Error sending invite:", err.Error())
