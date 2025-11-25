@@ -16,18 +16,7 @@ import (
 // - followers/engagements/views can be large; int64 is used.
 // - engagementRate is expressed as a percentage (e.g., 1.5 for 1.5%).
 // - Field JSON tags mirror the TS property names expected by the app.
-type InfluencerItem struct {
-	UserID         string  `json:"userId"`
-	Fullname       string  `json:"fullname"`
-	Username       string  `json:"username"`
-	URL            string  `json:"url"`
-	Picture        string  `json:"picture"`
-	Followers      int64   `json:"followers"`
-	Views          int64   `json:"views,omitempty"`
-	Engagements    int64   `json:"engagements"`
-	EngagementRate float64 `json:"engagementRate"`
-	IsDiscover     bool    `json:"isDiscover"`
-}
+type InfluencerItem = trendlybq.SocialsBreif
 
 type InfluencerInviteUnit struct {
 	InfluencerItem
@@ -226,15 +215,20 @@ func FormSQL(req InfluencerFilters) string {
 
 	// Assemble SQL
 	base := `SELECT
-  id AS userId,
-  name AS fullname,
+  id,
+  name,
   username,
-  CONCAT('https://instagram.com/', username) AS url,
-  profile_pic AS picture,
-  follower_count AS followers,
-  views_count AS views,
-  engagements_count AS engagements,
-  engagement_rate AS engagementRate
+  profile_pic,
+  follower_count,
+  views_count,
+  engagements_count,
+  engagement_rate,
+  social_type,
+  location,
+  bio,
+  profile_verified,
+  creation_time,
+  last_update_time
 FROM ` + trendlybq.SocialsFullTableName + `
 WHERE social_type = 'instagram'`
 	// AND STARTS_WITH(profile_pic, "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
@@ -264,21 +258,9 @@ func GetInfluencers(c *gin.Context) {
 		return
 	}
 
-	type bqRow struct {
-		UserID         string  `bigquery:"userId"`
-		Fullname       string  `bigquery:"fullname"`
-		Username       string  `bigquery:"username"`
-		URL            string  `bigquery:"url"`
-		Picture        string  `bigquery:"picture"`
-		Followers      int64   `bigquery:"followers"`
-		Views          int64   `bigquery:"views"`
-		Engagements    int64   `bigquery:"engagements"`
-		EngagementRate float64 `bigquery:"engagementRate"`
-	}
-
 	out := make([]InfluencerItem, 0, 100)
 	for {
-		var r bqRow
+		var r trendlybq.SocialsBreif
 		err := it.Next(&r)
 		if err == iterator.Done {
 			break
@@ -287,18 +269,8 @@ func GetInfluencers(c *gin.Context) {
 			c.JSON(500, gin.H{"message": "Iteration failed", "error": err.Error(), "sql": base})
 			return
 		}
-		out = append(out, InfluencerItem{
-			UserID:         r.UserID,
-			Fullname:       r.Fullname,
-			Username:       r.Username,
-			URL:            r.URL,
-			Picture:        r.Picture,
-			Followers:      r.Followers,
-			Views:          r.Views,
-			Engagements:    r.Engagements,
-			EngagementRate: r.EngagementRate,
-			IsDiscover:     true,
-		})
+		out = append(out, r)
+
 	}
 
 	log.Println("Data Processed", out)
