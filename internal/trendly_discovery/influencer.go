@@ -581,9 +581,7 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 
 			for _, s := range bqSocials {
 				if s.ID == infId {
-					invite.Name = s.Name
-					invite.UserHandle = s.Username
-					invite.ImageURL = s.ProfilePic
+					invite.SocialProfile = s.ConvertToSocialBreif()
 					break
 				}
 			}

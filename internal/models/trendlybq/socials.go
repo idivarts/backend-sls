@@ -129,8 +129,8 @@ func (data *Socials) InsertToFirestore() error {
 	return err
 }
 
-func (data *Socials) ConvertToSocialBreif() SocialsBreif {
-	return SocialsBreif{
+func (data *Socials) ConvertToSocialBreif() *SocialsBreif {
+	return &SocialsBreif{
 		ID:              data.ID,
 		Name:            data.Name,
 		Username:        data.Username,
