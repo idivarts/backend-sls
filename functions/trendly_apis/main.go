@@ -17,7 +17,6 @@ func main() {
 
 	commonV1.POST("/chat/auth", trendlyapis.ChatAuth)
 	commonV1.POST("/chat/connect", trendlyapis.ChatConnect)
-	commonV1.POST("/chat/channel", trendlyapis.ChatChannel)
 
 	commonV1.POST("/contracts/:contractId", trendlyCollabs.StartContract)   // if called by influencer - ask, else start the contract
 	commonV1.POST("/contracts/:contractId/end", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
