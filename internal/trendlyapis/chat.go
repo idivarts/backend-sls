@@ -194,30 +194,6 @@ type ICreateChannel struct {
 	CollaborationID string  `json:"collaborationId" binding:"required"`
 }
 
-func ChatChannel(c *gin.Context) {
-	var req ICreateChannel
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid request", "error": err.Error()})
-		return
-	}
-	if middlewares.GetUserType(c) != "manager" {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Only Managers can create new channels"})
-		return
-	}
-	managerId, b := middlewares.GetUserId(c)
-	if !b {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "User not found"})
-		return
-	}
-
-	res, err := CreateChannel(managerId, req)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "Channel Created", "channel": res.Channel, "contractId": res.Contract.StreamChannelID, "contract": res.Contract})
-}
-
 type ChannelReturn struct {
 	Channel  stream_chat.Channel
 	Contract trendlymodels.Contract
@@ -295,9 +271,9 @@ func CreateChannel(managerId string, req ICreateChannel) (*ChannelReturn, error)
 		"collaborationId": req.CollaborationID,
 		"contractId":      contractId,
 	}
-	if req.Name != nil {
-		extraData["name"] = req.Name
-	}
+	// if req.Name != nil {
+	// 	extraData["name"] = req.Name
+	// }
 	res, err := streamchat.Client.CreateChannel(context.Background(), "messaging", contractId, managerId, &stream_chat.ChannelRequest{
 		Members:   userIDs,
 		ExtraData: extraData,

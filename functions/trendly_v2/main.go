@@ -14,7 +14,6 @@ func main() {
 
 	commonV1.POST("/chat/auth", trendlyapis.ChatAuth)
 	commonV1.POST("/chat/connect", trendlyapis.ChatConnect)
-	commonV1.POST("/chat/channel", trendlyapis.ChatChannel)
 
 	commonV1.DELETE("/users/deactivate", trendlyapis.DeativateUser)
 	commonV1.DELETE("/users/delete", trendlyapis.DeleteUser)
