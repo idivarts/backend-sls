@@ -82,10 +82,13 @@ type UserSettings struct {
 }
 
 type BackendData struct {
-	Followers  *int `json:"followers,omitempty" firestore:"followers,omitempty"`
-	Reach      *int `json:"reach,omitempty" firestore:"reach,omitempty"`
-	Engagement *int `json:"engagement,omitempty" firestore:"engagement,omitempty"`
-	Rating     *int `json:"rating,omitempty" firestore:"rating,omitempty"`
+	Followers  *int64 `json:"followers,omitempty" firestore:"followers,omitempty"`
+	Reach      *int64 `json:"reach,omitempty" firestore:"reach,omitempty"`
+	Engagement *int64 `json:"engagement,omitempty" firestore:"engagement,omitempty"`
+	Rating     *int64 `json:"rating,omitempty" firestore:"rating,omitempty"`
+
+	Gender  *string `json:"gender,omitempty" firestore:"gender,omitempty"`
+	Quality *int    `json:"quality,omitempty" firestore:"quality,omitempty"`
 }
 
 type SocialMediaAccount struct {
