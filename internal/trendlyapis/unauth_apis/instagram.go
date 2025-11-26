@@ -127,7 +127,7 @@ func InstagramAuth(ctx *gin.Context) {
 				Preferences: &trendlymodels.UserPreferences{},
 				Settings:    &trendlymodels.UserSettings{},
 				Backend: &trendlymodels.BackendData{
-					Followers: &insta.FollowersCount,
+					Followers: aws.Int64(int64(insta.FollowersCount)),
 				},
 				PushNotificationToken: &trendlymodels.PushNotificationToken{},
 			}

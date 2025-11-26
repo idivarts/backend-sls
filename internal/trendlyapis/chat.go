@@ -75,27 +75,27 @@ func ChatAuth(c *gin.Context) {
 
 			if social.FBProfile != nil {
 				user.Backend = &trendlymodels.BackendData{
-					Followers:  &social.FBProfile.FollowersCount,
-					Reach:      aws.Int(0),
-					Engagement: aws.Int(0),
-					Rating:     aws.Int(5),
+					Followers:  aws.Int64(int64(social.FBProfile.FollowersCount)),
+					Reach:      aws.Int64(0),
+					Engagement: aws.Int64(0),
+					Rating:     aws.Int64(5),
 				}
 			}
 			if social.InstaProfile != nil {
 				user.Backend = &trendlymodels.BackendData{
-					Followers:  &social.InstaProfile.FollowersCount,
-					Reach:      aws.Int(0),
-					Engagement: aws.Int(0),
-					Rating:     aws.Int(5),
+					Followers:  aws.Int64(int64(social.InstaProfile.FollowersCount)),
+					Reach:      aws.Int64(0),
+					Engagement: aws.Int64(0),
+					Rating:     aws.Int64(5),
 				}
 			}
 
 		} else if userObject["backend"] == nil {
 			user.Backend = &trendlymodels.BackendData{
-				Followers:  aws.Int(0),
-				Reach:      aws.Int(0),
-				Engagement: aws.Int(0),
-				Rating:     aws.Int(5),
+				Followers:  aws.Int64(0),
+				Reach:      aws.Int64(0),
+				Engagement: aws.Int64(0),
+				Rating:     aws.Int64(5),
 			}
 		}
 		_, err = user.Insert(userId)

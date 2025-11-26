@@ -12,6 +12,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/messenger"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 )
 
@@ -439,7 +440,72 @@ func FetchInfluencer(c *gin.Context) {
 	}
 	calculatedValue.CPM = float32(calculatedValue.EstimatedBudget.Max+calculatedValue.EstimatedBudget.Min) * 1000 / float32(calculatedValue.EstimatedReach.Max+calculatedValue.EstimatedReach.Min)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer", "social": social, "analysis": calculatedValue})
+	attachments := []trendlymodels.UserAttachment{
+		trendlymodels.UserAttachment{
+			Type:     "image",
+			ImageURL: &social.ProfilePic,
+		},
+	}
+	for i, v := range social.Reels {
+		if i >= 5 {
+			break
+		}
+		attachments = append(attachments, trendlymodels.UserAttachment{
+			Type:     "reel",
+			ImageURL: &v.ThumbnailURL,
+			PlayURL:  &v.URL,
+		})
+	}
+	user := trendlymodels.User{
+		Name:            social.Name,
+		IsChatConnected: false,
+		ProfileImage:    &social.ProfilePic,
+		Location:        &social.Location,
+		IsVerified:      &social.ProfileVerified,
+		Profile: &trendlymodels.UserProfile{
+			Content: &trendlymodels.UserProfileContent{
+				About: &social.Bio,
+			},
+			Category:    social.Niches,
+			Attachments: attachments,
+		},
+		Backend: &trendlymodels.BackendData{
+			Followers:  &social.FollowerCount,
+			Reach:      &social.ViewsCount,
+			Engagement: &social.EnagamentsCount,
+			Gender:     &social.Gender,
+			Quality:    &social.QualityScore,
+		},
+	}
+	pSocial := trendlymodels.Socials{
+		ID:          influencerId,
+		Name:        social.Name,
+		Image:       social.ProfilePic,
+		IsInstagram: social.SocialType == "instagram",
+		UserID:      influencerId,
+		OwnerName:   social.Name,
+		InstaProfile: &messenger.InstagramProfile{
+			InstagramBriefProfile: messenger.InstagramBriefProfile{
+				Name:      social.Name,
+				Username:  social.Username,
+				Biography: social.Bio,
+				ID:        influencerId,
+			},
+			ProfilePictureURL: social.ProfilePic,
+			FollowersCount:    int(social.FollowerCount),
+			FollowsCount:      int(social.FollowingCount),
+			MediaCount:        int(social.ContentCount),
+		},
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer",
+		"social":   social,
+		"analysis": calculatedValue,
+		"influencer": gin.H{
+			"user":   user,
+			"social": pSocial,
+		},
+	})
 }
 
 func FetchInvitedInfluencers(c *gin.Context) {
