@@ -444,8 +444,8 @@ func FetchInfluencer(c *gin.Context) {
 
 func FetchInvitedInfluencers(c *gin.Context) {
 	var req struct {
-		Offset int    `json:"offset" binding:"required"`
-		Limit  int    `json:"limit" binding:"required"`
+		Offset int    `json:"offset"`
+		Limit  int    `json:"limit"`
 		Filter string `json:"filter"`
 	}
 	if err := c.BindJSON(&req); err != nil {
