@@ -37,7 +37,8 @@ func executeOnAll() {
 		socials[i] = *sui.MoveImagesToS3(&v)
 		socials[i].LastUpdateTime = time.Now().UnixMicro()
 
-		socials[i].InsertToFirestore()
+		// Not saving to firestore as thats redundant. We anyway would be remiving all images url from the current export
+		// socials[i].InsertToFirestore()
 		log.Println("Done Social -", i, socials[i].LastUpdateTime, socials[i].ProfilePic)
 	}
 
