@@ -93,7 +93,7 @@ custom:
     prod: ""
   customDomain:
     domainName: be.trendly.now
-    basePath: ${self:custom.basePathMap.${self:custom.stage}}
+    basePath: ${self:custom.basePathMap.${self:provider.stage}}
     stage: ${self:provider.stage}
     certificateName: "be.trendly.now"
     createRoute53Record: true
