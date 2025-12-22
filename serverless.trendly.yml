@@ -326,20 +326,17 @@ resources:
 
   Resources:
     DiscoveryMessageQueue:
-      Condition: IsProd
       Type: AWS::SQS::Queue
       Properties:
         QueueName: DiscoveryMessageQueue-${self:provider.stage}
         VisibilityTimeout: 900
 
     StreamMessageDLQ:
-      Condition: IsProd
       Type: AWS::SQS::Queue
       Properties:
         QueueName: StreamMessageDLQ-${self:provider.stage}
 
     StreamMessageQueue:
-      Condition: IsProd
       Type: AWS::SQS::Queue
       Properties:
         QueueName: StreamMessageQueue-${self:provider.stage}
