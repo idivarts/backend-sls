@@ -3,10 +3,12 @@ frameworkVersion: "3"
 
 provider:
   name: aws
+  stage: ${opt:stage, 'dev'}
   architecture: arm64
   runtime: provided.al2
   versionFunctions: true  # Enables versioning of Lambda functions
   environment:
+    STAGE: ${self:provider.stage}
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
@@ -86,10 +88,13 @@ custom:
     hostedZoneIds: Z02250033690XMWB8LXL7
     enabled: true
     rewriteRecords: false
+  basePathMap:
+    dev: dev
+    prod: ""
   customDomain:
     domainName: be.trendly.now
-    basePath: ""
-    stage: dev
+    basePath: ${self:custom.basePathMap.${self:custom.stage}}
+    stage: ${self:provider.stage}
     certificateName: "be.trendly.now"
     createRoute53Record: true
     createRoute53IPv6Record: true
