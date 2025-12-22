@@ -177,6 +177,16 @@ functions:
             Fn::GetAtt:
               - DiscoveryMessageQueue
               - Arn
+  trendly_contracts:
+    handler: functions/trendly_monetize/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /monetize/{proxy+}
   # trendly_apis:
   #   handler: functions/trendly_apis/main.go
   #   package:
