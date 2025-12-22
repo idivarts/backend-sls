@@ -328,13 +328,11 @@ resources:
         VisibilityTimeout: 900
 
     StreamMessageDLQ:
-      Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
         QueueName: StreamMessageDLQ-${self:provider.stage}
 
     StreamMessageQueue:
-      Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
         QueueName: StreamMessageQueue-${self:provider.stage}
