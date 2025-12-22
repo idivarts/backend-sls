@@ -177,16 +177,16 @@ functions:
             Fn::GetAtt:
               - DiscoveryMessageQueue
               - Arn
-  trendly_apis:
-    handler: functions/trendly_apis/main.go
-    package:
-      include:
-        - 'service-account.json'
-        - 'key-secrets.json'
-        - 'templates/*'
-    timeout: 30
-    events:
-      - http: ANY /api/v1/{proxy+}
+  # trendly_apis:
+  #   handler: functions/trendly_apis/main.go
+  #   package:
+  #     include:
+  #       - 'service-account.json'
+  #       - 'key-secrets.json'
+  #       - 'templates/*'
+  #   timeout: 30
+  #   events:
+  #     - http: ANY /api/v1/{proxy+}
   trendly_v2_apis:
     handler: functions/trendly_v2/main.go
     package:
