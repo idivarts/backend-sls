@@ -322,23 +322,22 @@ resources:
 
   Resources:
     DiscoveryMessageQueue:
-      Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: DiscoveryMessageQueue
+        QueueName: DiscoveryMessageQueue-${self:provider.stage}
         VisibilityTimeout: 900
 
     StreamMessageDLQ:
       Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: StreamMessageDLQ
+        QueueName: StreamMessageDLQ-${self:provider.stage}
 
     StreamMessageQueue:
       Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: StreamMessageQueue
+        QueueName: StreamMessageQueue-${self:provider.stage}
         VisibilityTimeout: 60
         MaximumMessageSize: 262144  # 256 KB
         RedrivePolicy:
