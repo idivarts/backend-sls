@@ -91,10 +91,14 @@ custom:
   basePathMap:
     dev: dev
     prod: ""
+  isProd:
+    dev: false
+    prod: true
   customDomain:
     domainName: be.trendly.now
     basePath: ${self:custom.basePathMap.${self:provider.stage}}
     stage: ${self:provider.stage}
+    apiType: rest
     certificateName: "be.trendly.now"
     createRoute53Record: true
     createRoute53IPv6Record: true
@@ -112,7 +116,7 @@ functions:
     events:
       - schedule:
           rate: cron(0 12 * * ? *)  # Runs every day at 12:00 PM UTC
-          enabled: true
+          enabled: ${self:custom.isProd.${self:provider.stage}}
   matchmaking:
     handler: scripts/matchmaking/main.go
     package:
@@ -125,7 +129,7 @@ functions:
           rate:
             - cron(30 2 * * ? *)   # 8:00 AM IST daily
             - cron(30 14 * * ? *)  # 8:00 PM IST daily
-          enabled: true
+          enabled: ${self:custom.isProd.${self:provider.stage}}
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
     environment:
@@ -155,7 +159,7 @@ functions:
     events:
       - schedule:
           rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
-          enabled: true
+          enabled: ${self:custom.isProd.${self:provider.stage}}
   trendly_discovery_upload_image:
     handler: scripts/socials-update-images/queue-update-image/main.go
     environment:
@@ -314,22 +318,31 @@ package:
   individually: true
 
 resources:
+  Conditions:
+    IsDev:
+      Fn::Equals: ["${sls:stage}", "dev"]
+    IsProd:
+      Fn::Equals: ["${sls:stage}", "prod"]
+
   Resources:
     DiscoveryMessageQueue:
+      Condition: IsProd
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: DiscoveryMessageQueue
+        QueueName: DiscoveryMessageQueue-${self:provider.stage}
         VisibilityTimeout: 900
 
     StreamMessageDLQ:
+      Condition: IsProd
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: StreamMessageDLQ
+        QueueName: StreamMessageDLQ-${self:provider.stage}
 
     StreamMessageQueue:
+      Condition: IsProd
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: StreamMessageQueue
+        QueueName: StreamMessageQueue-${self:provider.stage}
         VisibilityTimeout: 60
         MaximumMessageSize: 262144  # 256 KB
         RedrivePolicy:
@@ -343,6 +356,7 @@ resources:
     # ------------- S3 for Videos -----------------------------------------------------
     # --------------------------------------------------------------------------------------
     VideoUploadBucket:
+      Condition: IsDev
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:service}-video-uploads
@@ -353,6 +367,7 @@ resources:
               AllowedOrigins: ["*"]
 
     CloudFrontDistribution:
+      Condition: IsDev
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -383,6 +398,7 @@ resources:
 
     # CloudFront Origin Access Control (OAC)
     CloudFrontOriginAccessControl:
+      Condition: IsDev
       Type: AWS::CloudFront::OriginAccessControl
       Properties:        
         OriginAccessControlConfig:
@@ -393,6 +409,7 @@ resources:
 
     # S3 Bucket Policy for CloudFront
     VideoS3BucketPolicy:
+      Condition: IsDev
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-video-uploads
@@ -414,6 +431,7 @@ resources:
     # --------------------------------------------------------------------------------------
 
     ImageUploadBucket:
+      Condition: IsDev
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:service}-image-uploads
@@ -424,6 +442,7 @@ resources:
               AllowedOrigins: ["*"]
 
     ImageCFDistribution:
+      Condition: IsDev
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -453,6 +472,7 @@ resources:
 
     # CloudFront Origin Access Control (OAC)
     ImageCFOriginAccessControl:
+      Condition: IsDev
       Type: AWS::CloudFront::OriginAccessControl
       Properties:        
         OriginAccessControlConfig:
@@ -463,6 +483,7 @@ resources:
     
     # S3 Bucket Policy for CloudFront
     ImageS3BucketPolicy:
+      Condition: IsDev
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-image-uploads
@@ -483,6 +504,7 @@ resources:
     # --------------------------------------------------------------------------------------
 
     AttachmentUploadBucket:
+      Condition: IsDev
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:service}-attachment-uploads
@@ -493,6 +515,7 @@ resources:
               AllowedOrigins: ["*"]
 
     AttachmentCFDistribution:
+      Condition: IsDev
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -522,6 +545,7 @@ resources:
 
     # CloudFront Origin Access Control (OAC)
     AttachmentCFOriginAccessControl:
+      Condition: IsDev
       Type: AWS::CloudFront::OriginAccessControl
       Properties:        
         OriginAccessControlConfig:
@@ -532,6 +556,7 @@ resources:
 
     # S3 Bucket Policy for CloudFront
     AttachmentS3BucketPolicy:
+      Condition: IsDev
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-attachment-uploads
