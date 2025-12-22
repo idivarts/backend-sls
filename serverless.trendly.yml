@@ -314,19 +314,28 @@ package:
   individually: true
 
 resources:
+  Conditions:
+    IsDev:
+      Fn::Equals: ["${sls:stage}", "dev"]
+    IsProd:
+      Fn::Equals: ["${sls:stage}", "prod"]
+
   Resources:
     DiscoveryMessageQueue:
+      Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
         QueueName: DiscoveryMessageQueue
         VisibilityTimeout: 900
 
     StreamMessageDLQ:
+      Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
         QueueName: StreamMessageDLQ
 
     StreamMessageQueue:
+      Condition: IsDev
       Type: AWS::SQS::Queue
       Properties:
         QueueName: StreamMessageQueue
@@ -343,6 +352,7 @@ resources:
     # ------------- S3 for Videos -----------------------------------------------------
     # --------------------------------------------------------------------------------------
     VideoUploadBucket:
+      Condition: IsDev
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:service}-video-uploads
@@ -353,6 +363,7 @@ resources:
               AllowedOrigins: ["*"]
 
     CloudFrontDistribution:
+      Condition: IsDev
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -383,6 +394,7 @@ resources:
 
     # CloudFront Origin Access Control (OAC)
     CloudFrontOriginAccessControl:
+      Condition: IsDev
       Type: AWS::CloudFront::OriginAccessControl
       Properties:        
         OriginAccessControlConfig:
@@ -393,6 +405,7 @@ resources:
 
     # S3 Bucket Policy for CloudFront
     VideoS3BucketPolicy:
+      Condition: IsDev
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-video-uploads
@@ -414,6 +427,7 @@ resources:
     # --------------------------------------------------------------------------------------
 
     ImageUploadBucket:
+      Condition: IsDev
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:service}-image-uploads
@@ -424,6 +438,7 @@ resources:
               AllowedOrigins: ["*"]
 
     ImageCFDistribution:
+      Condition: IsDev
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -453,6 +468,7 @@ resources:
 
     # CloudFront Origin Access Control (OAC)
     ImageCFOriginAccessControl:
+      Condition: IsDev
       Type: AWS::CloudFront::OriginAccessControl
       Properties:        
         OriginAccessControlConfig:
@@ -463,6 +479,7 @@ resources:
     
     # S3 Bucket Policy for CloudFront
     ImageS3BucketPolicy:
+      Condition: IsDev
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-image-uploads
@@ -483,6 +500,7 @@ resources:
     # --------------------------------------------------------------------------------------
 
     AttachmentUploadBucket:
+      Condition: IsDev
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:service}-attachment-uploads
@@ -493,6 +511,7 @@ resources:
               AllowedOrigins: ["*"]
 
     AttachmentCFDistribution:
+      Condition: IsDev
       Type: AWS::CloudFront::Distribution
       Properties:
         DistributionConfig:
@@ -522,6 +541,7 @@ resources:
 
     # CloudFront Origin Access Control (OAC)
     AttachmentCFOriginAccessControl:
+      Condition: IsDev
       Type: AWS::CloudFront::OriginAccessControl
       Properties:        
         OriginAccessControlConfig:
@@ -532,6 +552,7 @@ resources:
 
     # S3 Bucket Policy for CloudFront
     AttachmentS3BucketPolicy:
+      Condition: IsDev
       Type: AWS::S3::BucketPolicy
       Properties:
         Bucket: ${self:service}-attachment-uploads
