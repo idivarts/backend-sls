@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - dev
 
 jobs:
   deploy:
@@ -12,6 +13,11 @@ jobs:
     strategy:
       matrix:
         node-version: [20.x]
+
+    env:
+      # Decide env/stage based on branch
+      STAGE: ${{ github.ref == 'refs/heads/master' && 'prod' || 'dev' }}
+    
     steps:
       - uses: actions/checkout@v3
       - name: Use Node.js ${{ matrix.node-version }}
@@ -42,4 +48,4 @@ jobs:
           echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
           echo $TRENDLY_KEY_SECRETS_BASE64 | base64 -d > key-secrets.json
           npm run build:trendly
-          npx sls deploy --config serverless.trendly.yml
+          npx sls deploy --config serverless.trendly.yml --stage ${{ env.STAGE }}
