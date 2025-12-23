@@ -37,7 +37,7 @@ func CreateLinkedAccount(req CreateAccountReq) (map[string]interface{}, map[stri
 			"addresses": map[string]interface{}{
 				"registered": map[string]interface{}{
 					"street1":     req.Address.Street,
-					"street2":     "",
+					"street2":     "-",
 					"city":        req.Address.City,
 					"state":       req.Address.State,
 					"postal_code": req.Address.PostalCode,
@@ -74,7 +74,7 @@ func CreateLinkedAccount(req CreateAccountReq) (map[string]interface{}, map[stri
 	return account, stk, err
 }
 
-func CreataProductConfiguration(accountId string, bank BankReq) (map[string]interface{}, error) {
+func CreataOrUpdateProduct(accountId string, bank BankReq) (map[string]interface{}, error) {
 	prodConf, err := Client.Product.RequestProductConfiguration(accountId, map[string]interface{}{
 		"product_name": "route",
 		"tnc_accepted": true,
