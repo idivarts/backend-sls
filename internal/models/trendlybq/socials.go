@@ -234,25 +234,21 @@ func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error)
 	if limit > 0 {
 		temp = temp.Limit(limit)
 	}
-	it := temp.Documents(context.Background())
-
+	it, err := temp.Documents(context.Background()).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	log.Println("Total Scrapped Socials Docs:", len(it))
 	socials := []Socials{}
-	for {
-		d, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			continue
-		}
+	for _, v := range it {
 		social := &Socials{}
-		err = d.DataTo(social)
+		err = v.DataTo(social)
 		if err != nil {
 			continue
 		}
 		socials = append(socials, *social)
 	}
-
+	log.Println("Total Valid Social Docs:", len(socials))
 	return socials, nil
 }
 func (s *Socials) GetByIdFromFirestore(id string) error {
