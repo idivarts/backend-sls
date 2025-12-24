@@ -73,6 +73,48 @@ func CreateLinkedAccount(req CreateAccountReq) (map[string]interface{}, map[stri
 
 	return account, stk, err
 }
+func UpdateAccountAndStakeHolderAddress(accountId string, stakeholderId string, req CreateAccountReq) (map[string]interface{}, map[string]interface{}, error) {
+	payload := map[string]interface{}{
+		"email":               req.Email,
+		"legal_business_name": req.Name,
+		"profile": map[string]interface{}{
+			"addresses": map[string]interface{}{
+				"registered": map[string]interface{}{
+					"street1":     req.Address.Street,
+					"street2":     "-",
+					"city":        req.Address.City,
+					"state":       req.Address.State,
+					"postal_code": req.Address.PostalCode,
+					"country":     "IN",
+				},
+			},
+		},
+	}
+	account, err := Client.Account.Edit(accountId, payload, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 🔹 Stakeholder payload
+	stakeholderPayload := map[string]interface{}{
+		"addresses": map[string]interface{}{
+			"residential": map[string]interface{}{
+				"street":      req.Address.Street,
+				"city":        req.Address.City,
+				"state":       req.Address.State,
+				"postal_code": req.Address.PostalCode,
+				"country":     "IN",
+			},
+		},
+		"kyc": map[string]interface{}{
+			"pan": req.PAN,
+		},
+	}
+
+	stk, err := Client.Stakeholder.Edit(accountId, stakeholderId, stakeholderPayload, nil)
+
+	return account, stk, err
+}
 
 func CreataOrUpdateProduct(accountId string, bank BankReq) (map[string]interface{}, error) {
 	prodConf, err := Client.Product.RequestProductConfiguration(accountId, map[string]interface{}{
@@ -106,4 +148,9 @@ func FetchLinkedAccount(accountId string) (map[string]interface{}, error) {
 func FetchProductConfiguration(accountId string, prodId string) (map[string]interface{}, error) {
 	product, err := Client.Product.Fetch(accountId, prodId, nil, nil)
 	return product, err
+}
+
+func DeleletAccount(accountId string) (map[string]interface{}, error) {
+	response, err := Client.Account.Delete(accountId, nil, nil)
+	return response, err
 }
