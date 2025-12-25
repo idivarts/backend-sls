@@ -73,7 +73,7 @@ func InstagramAuth(ctx *gin.Context) {
 
 	userId, b := middlewares.GetUserId(ctx)
 	if !b {
-		ctx.JSON(400, gin.H{"error": "User not authenticated"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "User not authenticated"})
 		return
 	}
 
