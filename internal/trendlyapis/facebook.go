@@ -148,6 +148,9 @@ func ConnectInstagram(ctx *gin.Context) {
 	}
 
 	redirect_uri := fmt.Sprintf("%s/%s", constants.INSTAGRAM_REDIRECT, req.RedirectType)
+
+	log.Println("Redirect URI:", redirect_uri)
+
 	accessToken, err := instagram.GetAccessTokenFromCode(req.Code, redirect_uri)
 	if err != nil {
 		ctx.JSON(400, gin.H{"error": err.Error()})
