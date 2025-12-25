@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/idivarts/backend-sls/internal/middlewares"
 	trendlyunauth "github.com/idivarts/backend-sls/internal/trendlyapis/unauth_apis"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
@@ -14,9 +13,6 @@ func main() {
 
 	// From insta server we get redirected here with code -> we inturn we redirect to frontend with code
 	instaApi.GET("/auth/:redirect_type", trendlyunauth.InstagramAuthRedirect)
-
-	// From frontend we call this api with code to complete the auth process and save tokens
-	instaApi.POST("/auth", middlewares.ValidateSessionMiddleware(), trendlyunauth.InstagramAuth)
 
 	// Insta calls this api to deauthorize our app for a user
 	instaApi.GET("/deauth", trendlyunauth.InstagramDeAuth)
