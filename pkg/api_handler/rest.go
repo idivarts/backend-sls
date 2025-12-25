@@ -3,13 +3,13 @@ package apihandler
 import (
 	"context"
 	"log"
-	"os"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/pkg/middlewares"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 )
 
 var ginLambda *ginadapter.GinLambda
@@ -33,7 +33,7 @@ func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 }
 func StartLambda() {
 	ginLambda = ginadapter.New(GinEngine)
-	if os.Getenv("STAGE") == "dev" {
+	if myutil.IsDevEnvironment() {
 		ginLambda.StripBasePath("/dev")
 	}
 	lambda.Start(Handler)

@@ -2,11 +2,12 @@ package constants
 
 import (
 	"fmt"
-	"os"
+
+	"github.com/idivarts/backend-sls/pkg/myutil"
 )
 
 func getStage() string {
-	if os.Getenv("STAGE") == "dev" {
+	if myutil.IsDevEnvironment() {
 		return "/dev"
 	}
 	return ""

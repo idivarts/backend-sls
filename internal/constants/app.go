@@ -1,6 +1,6 @@
 package constants
 
-import "os"
+import "github.com/idivarts/backend-sls/pkg/myutil"
 
 const (
 	TRENDLY_BE          = "https://be.trendly.now"
@@ -12,7 +12,7 @@ const (
 )
 
 func GetCreatorsFronted() string {
-	if os.Getenv("STAGE") == "dev" {
+	if myutil.IsDevEnvironment() {
 		return TRENDLY_DEV_CREATORS_FE
 	}
 	return TRENDLY_CREATORS_FE
