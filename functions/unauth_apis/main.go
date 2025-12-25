@@ -9,7 +9,7 @@ func main() {
 	instaApi := apihandler.GinEngine.Group("/instagram")
 
 	// This is called by frontend. Purpose is to just redirect to insta auth url with needed params
-	instaApi.GET("/", trendlyunauth.InstagramRedirect)
+	instaApi.GET("/redirect", trendlyunauth.InstagramRedirect)
 
 	// From insta server we get redirected here with code -> we inturn we redirect to frontend with code
 	instaApi.GET("/auth/:redirect_type", trendlyunauth.InstagramAuthRedirect)
