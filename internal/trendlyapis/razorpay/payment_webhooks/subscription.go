@@ -72,7 +72,7 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 		defer func() {
 			_, err := payments.CancelSubscription(subscriptionID, false)
 			if err != nil {
-				log.Println("Unable to cancel previous subscription", *brand.Billing.Subscription, err)
+				log.Println("Unable to cancel previous subscription", subscriptionID, err)
 			}
 		}()
 	}
