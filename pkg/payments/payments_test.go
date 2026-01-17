@@ -32,3 +32,19 @@ func TestCreateSubscriptionLink(t *testing.T) {
 	}
 	log.Println("Link", link)
 }
+func TestUpdateSubscription(t *testing.T) {
+	res, err := payments.UpdateSubscription("sub_S4tlcF5imQIVim", "plan_RA4xx2KPqnK1na")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	log.Println("Updated", res)
+}
+func TestCancelSubscription(t *testing.T) {
+	res, err := payments.CancelSubscription("sub_S4tlcF5imQIVim", false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	log.Println("Cancelled", res)
+}

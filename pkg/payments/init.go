@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/idivarts/backend-sls/pkg/myutil"
 	razorpay "github.com/razorpay/razorpay-go"
 )
 
@@ -33,7 +34,11 @@ type KeySecretJson struct {
 }
 
 func loadSecrets() RazorpaySecrets {
-	path := filepath.Join(".", "key-secrets.json")
+	basePath := "."
+	if myutil.IsTest() {
+		basePath = "/Users/rsinha/iDiv/backend-sls/"
+	}
+	path := filepath.Join(basePath, "key-secrets.json")
 	file, err := os.Open(path)
 	if err != nil {
 		log.Printf("could not open key-secrets.json: %v", err)

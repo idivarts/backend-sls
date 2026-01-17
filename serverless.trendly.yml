@@ -91,10 +91,14 @@ custom:
   basePathMap:
     dev: dev
     prod: ""
+  isProd:
+    dev: false
+    prod: true
   customDomain:
     domainName: be.trendly.now
     basePath: ${self:custom.basePathMap.${self:provider.stage}}
     stage: ${self:provider.stage}
+    apiType: rest
     certificateName: "be.trendly.now"
     createRoute53Record: true
     createRoute53IPv6Record: true
@@ -112,7 +116,7 @@ functions:
     events:
       - schedule:
           rate: cron(0 12 * * ? *)  # Runs every day at 12:00 PM UTC
-          enabled: true
+          enabled: ${self:custom.isProd.${self:provider.stage}}
   matchmaking:
     handler: scripts/matchmaking/main.go
     package:
@@ -125,7 +129,7 @@ functions:
           rate:
             - cron(30 2 * * ? *)   # 8:00 AM IST daily
             - cron(30 14 * * ? *)  # 8:00 PM IST daily
-          enabled: true
+          enabled: ${self:custom.isProd.${self:provider.stage}}
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
     environment:
@@ -155,7 +159,7 @@ functions:
     events:
       - schedule:
           rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
-          enabled: true
+          enabled: ${self:custom.isProd.${self:provider.stage}}
   trendly_discovery_upload_image:
     handler: scripts/socials-update-images/queue-update-image/main.go
     environment:
@@ -173,8 +177,8 @@ functions:
             Fn::GetAtt:
               - DiscoveryMessageQueue
               - Arn
-  trendly_apis:
-    handler: functions/trendly_apis/main.go
+  trendly_contracts:
+    handler: functions/trendly_monetize/main.go
     package:
       include:
         - 'service-account.json'
@@ -182,7 +186,17 @@ functions:
         - 'templates/*'
     timeout: 30
     events:
-      - http: ANY /api/v1/{proxy+}
+      - http: ANY /monetize/{proxy+}
+  # trendly_apis:
+  #   handler: functions/trendly_apis/main.go
+  #   package:
+  #     include:
+  #       - 'service-account.json'
+  #       - 'key-secrets.json'
+  #       - 'templates/*'
+  #   timeout: 30
+  #   events:
+  #     - http: ANY /api/v1/{proxy+}
   trendly_v2_apis:
     handler: functions/trendly_v2/main.go
     package:

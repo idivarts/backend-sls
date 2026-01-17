@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -71,10 +72,22 @@ func Handler(c *gin.Context) {
 		return
 	}
 
+	log.Println("Received Event", string(bodyBytes))
+
 	if strings.HasPrefix(event.Event, "subscription") {
-		HandleSubscription(event)
+		err := HandleSubscription(event)
+		if err != nil {
+			log.Println("Error", gin.H{"message": "Subscription payload not processed", "error": err.Error(), "event": event})
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Subscription payload not processed", "error": err.Error(), "event": event})
+			return
+		}
 	} else if strings.HasPrefix(event.Event, "payment_link") {
-		handlePaymentLink(event)
+		err := handlePaymentLink(event)
+		if err != nil {
+			log.Println("Error", gin.H{"message": "Payment Link payload not processed", "error": err.Error(), "event": event})
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Payment Link payload not processed", "error": err.Error(), "event": event})
+			return
+		}
 	}
 
 	// Acknowledge webhook

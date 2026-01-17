@@ -41,3 +41,16 @@ func CancelSubscription(subscriptionId string, cancelAtEnd bool) (map[string]int
 	}
 	return data, nil
 }
+
+func UpdateSubscription(subscriptionId string, planId string) (map[string]interface{}, error) {
+	data := map[string]interface{}{
+		"plan_id":            planId,
+		"schedule_change_at": "now",
+	}
+
+	data, err := Client.Subscription.Update(subscriptionId, data, nil)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
