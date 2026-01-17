@@ -68,10 +68,13 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 
 	if brand.Billing.Subscription != nil && *brand.Billing.Subscription != "" && *brand.Billing.Subscription != subscription.ID {
 		// Cancel the subscription before adding new
-		_, err = payments.CancelSubscription(*brand.Billing.Subscription, (brand.Billing.BillingStatus != nil && *brand.Billing.BillingStatus == "active"))
-		if err != nil {
-			log.Println("Unable to cancel previous subscription", *brand.Billing.Subscription, err)
-		}
+		subscriptionID := *brand.Billing.Subscription
+		defer func() {
+			_, err := payments.CancelSubscription(subscriptionID, false)
+			if err != nil {
+				log.Println("Unable to cancel previous subscription", *brand.Billing.Subscription, err)
+			}
+		}()
 	}
 
 	brand.Billing.Subscription = &subscription.ID
