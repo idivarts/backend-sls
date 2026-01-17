@@ -72,9 +72,17 @@ func Handler(c *gin.Context) {
 	}
 
 	if strings.HasPrefix(event.Event, "subscription") {
-		HandleSubscription(event)
+		err := HandleSubscription(event)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Subscription payload not processed", "error": err.Error(), "event": event})
+			return
+		}
 	} else if strings.HasPrefix(event.Event, "payment_link") {
-		handlePaymentLink(event)
+		err := handlePaymentLink(event)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Payment Link payload not processed", "error": err.Error(), "event": event})
+			return
+		}
 	}
 
 	// Acknowledge webhook
