@@ -111,18 +111,20 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 		break
 	}
 
-	if event.Event == "subscription.charged" {
+	log.Println("Updating Brand Subscription Status to", event.Event, *brand.Billing.BillingStatus, brand.Billing.PlanKey)
+	if event.Event == "subscription.charged" || event.Event == "subscription.authenticated" {
 		bCredit, b := trendlymodels.PlanCreditsMap[*brand.Billing.PlanKey]
 		if b {
 			mult := 1
 			if *brand.Billing.PlanKey == "yearly" {
 				mult = 12
 			}
-			brand.Credits.Discovery += (bCredit.Discovery * mult)
-			brand.Credits.Collaboration += (bCredit.Collaboration * mult)
-			brand.Credits.Connection += (bCredit.Connection * mult)
-			brand.Credits.Contract += (bCredit.Contract * mult)
-			brand.Credits.Influencer += (bCredit.Influencer * mult)
+			// Made it so that there is no stacking of credits on renewals
+			brand.Credits.Discovery = (bCredit.Discovery * mult)
+			brand.Credits.Collaboration = (bCredit.Collaboration * mult)
+			brand.Credits.Connection = (bCredit.Connection * mult)
+			brand.Credits.Contract = (bCredit.Contract * mult)
+			brand.Credits.Influencer = (bCredit.Influencer * mult)
 		}
 	}
 
