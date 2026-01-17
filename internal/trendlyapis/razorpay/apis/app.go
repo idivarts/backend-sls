@@ -10,9 +10,6 @@ var (
 	BUSINESS_PLAN_ID     = "plan_QzPN1kyqCq0ePk"
 	COLLAB_BOOST_AMOUNT  = 799
 	COLLAB_HANDLING_LINK = "https://rzp.io/rzp/A5hU0EUn"
-
-	PLAN_LAST_TIME = 1756237642
-	PLAN_VERSION   = "2"
 )
 
 func init() {
