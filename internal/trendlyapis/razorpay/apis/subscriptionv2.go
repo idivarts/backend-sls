@@ -2,7 +2,6 @@ package razorpayapis
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	paymentwebhooks "github.com/idivarts/backend-sls/internal/trendlyapis/razorpay/payment_webhooks"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments"
@@ -69,22 +67,22 @@ func CreateSubscriptionV2(c *gin.Context) {
 		billingCycle = 5
 	}
 
-	planId := "" //payments.Plans[planKey+":"+planCycle]
+	planId := payments.Plans[planKey+":"+planCycle] //payments.Plans[planKey+":"+planCycle]
 
-	body, err := payments.Client.Plan.All(map[string]interface{}{
-		"from": PLAN_LAST_TIME,
-	}, nil)
-	if plans, ok := body["items"].([]interface{}); ok {
-		for _, item := range plans {
-			var plan paymentwebhooks.PlanEntity
-			b, _ := json.Marshal(item)   // convert map[string]interface{} -> []byte
-			_ = json.Unmarshal(b, &plan) // convert []byte -> struct
-			if plan.Notes.PlanKey == planKey && plan.Notes.PlanCycle == planCycle && plan.Notes.PlanVersion == PLAN_VERSION {
-				planId = plan.ID
-				break
-			}
-		}
-	}
+	// body, err := payments.Client.Plan.All(map[string]interface{}{
+	// 	"from": PLAN_LAST_TIME,
+	// }, nil)
+	// if plans, ok := body["items"].([]interface{}); ok {
+	// 	for _, item := range plans {
+	// 		var plan paymentwebhooks.PlanEntity
+	// 		b, _ := json.Marshal(item)   // convert map[string]interface{} -> []byte
+	// 		_ = json.Unmarshal(b, &plan) // convert []byte -> struct
+	// 		if plan.Notes.PlanKey == planKey && plan.Notes.PlanCycle == planCycle && plan.Notes.PlanVersion == PLAN_VERSION {
+	// 			planId = plan.ID
+	// 			break
+	// 		}
+	// 	}
+	// }
 
 	if planId == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid-plan", "message": "Invalid plan key or cycle"})

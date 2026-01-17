@@ -98,14 +98,14 @@ var (
 		},
 		"growth": BrandCredits{
 			Influencer:    50,
-			Discovery:     1,
-			Connection:    0,
+			Discovery:     50,
+			Connection:    10,
 			Collaboration: 5,
 			Contract:      8,
 		},
 		"pro": BrandCredits{
 			Influencer:    200,
-			Discovery:     50,
+			Discovery:     100,
 			Connection:    20,
 			Collaboration: 100,
 			Contract:      200,
