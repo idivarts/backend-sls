@@ -72,7 +72,7 @@ func Handler(c *gin.Context) {
 		return
 	}
 
-	log.Println("Received Event", event)
+	log.Println("Received Event", string(bodyBytes))
 
 	if strings.HasPrefix(event.Event, "subscription") {
 		err := HandleSubscription(event)
