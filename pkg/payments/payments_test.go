@@ -32,3 +32,11 @@ func TestCreateSubscriptionLink(t *testing.T) {
 	}
 	log.Println("Link", link)
 }
+func TestUpdateSubscription(t *testing.T) {
+	res, err := payments.UpdateSubscription("sub_S4tlcF5imQIVim", "plan_RA4xx2KPqnK1na")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	log.Println("Updated", res)
+}
