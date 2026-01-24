@@ -205,7 +205,7 @@ func PostCollaboration(c *gin.Context) {
 		brand.Credits.Collaboration -= 1
 		brand.PostedCollaborations = append(brand.PostedCollaborations, collabId)
 	}
-	collab.IsPostedOnDev = myutil.IsDevEnvironment()
+	collab.IsLive = !myutil.IsDevEnvironment()
 
 	_, err = collab.Insert(collabId)
 	if err != nil {

@@ -27,7 +27,7 @@ type Collaboration struct {
 	ExternalLinks             []interface{}         `firestore:"externalLinks,omitempty" json:"externalLinks,omitempty"`
 	QuestionsToInfluencers    []string              `firestore:"questionsToInfluencers,omitempty" json:"questionsToInfluencers,omitempty"`
 	Preferences               *DiscoverPreferences  `firestore:"preferences,omitempty" json:"preferences,omitempty"`
-	IsPostedOnDev             bool                  `json:"isPostedOnDev,omitempty" firestore:"isPostedOnDev,omitempty"`
+	IsLive                    bool                  `firestore:"isLive" json:"isLive"`
 	Status                    string                `firestore:"status" json:"status"`
 	Applications              interface{}           `firestore:"applications" json:"applications"`
 	Invitations               interface{}           `firestore:"invitations" json:"invitations"`
@@ -143,9 +143,9 @@ func GetCollabIDs(startAfter *interface{}, limit int) ([]string, error) {
 
 	collection := firestoredb.Client.Collection("collaborations").Where("status", "in", []string{"active", "inactive", "stopped"})
 	if myutil.IsDevEnvironment() {
-		collection = collection.Where("isPostedOnDev", "==", true)
+		collection = collection.Where("isLive", "==", false)
 	} else {
-		collection = collection.Where("isPostedOnDev", "in", []interface{}{false, nil})
+		collection = collection.Where("isLive", "==", true)
 	}
 	collection = collection.OrderBy("timeStamp", firestore.Desc)
 
