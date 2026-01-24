@@ -16,6 +16,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/idivarts/backend-sls/pkg/mytime"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 	"github.com/openai/openai-go/v3"
@@ -166,7 +167,7 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 	collabId := c.Param(("collabId"))
-	updating := (c.Query("update") != "")
+	// updating := (c.Query("update") != "")
 
 	collab := &trendlymodels.Collaboration{}
 	err := collab.Get(collabId)
@@ -189,15 +190,20 @@ func PostCollaboration(c *gin.Context) {
 	valid, filters := evaluateCollab(collab, &brand)
 
 	if collab.Status == "active" && !valid {
-		collab.Status = "deleted"
+		collab.Status = "draft"
 	}
 
 	if valid {
 		collab.Preferences = filters
 	}
 
-	if !updating && collab.Status != "deleted" {
+	if brand.PostedCollaborations == nil {
+		brand.PostedCollaborations = []string{}
+	}
+
+	if collab.Status == "active" && !myutil.Includes(brand.PostedCollaborations, collabId) {
 		brand.Credits.Collaboration -= 1
+		brand.PostedCollaborations = append(brand.PostedCollaborations, collabId)
 	}
 
 	_, err = collab.Insert(collabId)
@@ -212,7 +218,7 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters, "updating": updating})
+	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters}) //, "updating": updating
 }
 
 func CreateCollaborationWithPrompt(c *gin.Context) {
