@@ -25,6 +25,7 @@ type Brand struct {
 	UnlockedInfluencers   []string               `json:"unlockedInfluencers,omitempty" firestore:"unlockedInfluencers,omitempty"`
 	DiscoveredInfluencers []string               `json:"discoveredInfluencers,omitempty" firestore:"discoveredInfluencers,omitempty"`
 	ConnectedInfluencers  BrandInfluencerConnect `json:"connectedInfluencers" firestore:"connectedInfluencers"`
+	PostedCollaborations  []string               `json:"postedCollaborations,omitempty" firestore:"postedCollaborations,omitempty"`
 
 	Credits BrandCredits `json:"credits" firestore:"credits"`
 

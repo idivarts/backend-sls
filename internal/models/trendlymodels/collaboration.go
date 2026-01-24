@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 	"google.golang.org/api/iterator"
 )
 
@@ -26,6 +27,7 @@ type Collaboration struct {
 	ExternalLinks             []interface{}         `firestore:"externalLinks,omitempty" json:"externalLinks,omitempty"`
 	QuestionsToInfluencers    []string              `firestore:"questionsToInfluencers,omitempty" json:"questionsToInfluencers,omitempty"`
 	Preferences               *DiscoverPreferences  `firestore:"preferences,omitempty" json:"preferences,omitempty"`
+	IsLive                    bool                  `firestore:"isLive" json:"isLive"`
 	Status                    string                `firestore:"status" json:"status"`
 	Applications              interface{}           `firestore:"applications" json:"applications"`
 	Invitations               interface{}           `firestore:"invitations" json:"invitations"`
@@ -139,7 +141,14 @@ func (b *Collaboration) Insert(collabId string) (*firestore.WriteResult, error) 
 func GetCollabIDs(startAfter *interface{}, limit int) ([]string, error) {
 	var iter *firestore.DocumentIterator
 
-	collection := firestoredb.Client.Collection("collaborations").Where("status", "in", []string{"active", "stopped"}).OrderBy("timeStamp", firestore.Desc)
+	collection := firestoredb.Client.Collection("collaborations").Where("status", "in", []string{"active", "inactive", "stopped"})
+	if myutil.IsDevEnvironment() {
+		collection = collection.Where("isLive", "==", false)
+	} else {
+		collection = collection.Where("isLive", "==", true)
+	}
+	collection = collection.OrderBy("timeStamp", firestore.Desc)
+
 	if startAfter == nil {
 		iter = collection.Limit(limit).Documents(context.Background())
 	} else {
