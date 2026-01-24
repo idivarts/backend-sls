@@ -189,8 +189,11 @@ func PostCollaboration(c *gin.Context) {
 
 	valid, filters := evaluateCollab(collab, &brand)
 
+	throwError := false
+
 	if collab.Status == "active" && !valid {
 		collab.Status = "draft"
+		throwError = true
 	}
 
 	if valid {
@@ -216,6 +219,12 @@ func PostCollaboration(c *gin.Context) {
 	_, err = brand.Insert(collab.BrandID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Saving Brand"})
+		return
+	}
+
+	if throwError {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "collaboration-payload-not-approved", "message": "The Collaboration posted was not put live as it did not meet our guidelines. Please review the collaboration details and make necessary changes before reposting.",
+			"collabId": collabId, "discoverFilters": filters, "updatedStatus": collab.Status}) //, "updating": updating
 		return
 	}
 
