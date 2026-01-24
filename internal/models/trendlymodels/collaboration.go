@@ -141,7 +141,7 @@ func (b *Collaboration) Insert(collabId string) (*firestore.WriteResult, error) 
 func GetCollabIDs(startAfter *interface{}, limit int) ([]string, error) {
 	var iter *firestore.DocumentIterator
 
-	collection := firestoredb.Client.Collection("collaborations").Where("status", "in", []string{"active", "inactive", "stopped"})
+	collection := firestoredb.Client.Collection("collaborations").Where("status", "in", []string{"active", "stopped"})
 	if myutil.IsDevEnvironment() {
 		collection = collection.Where("isLive", "==", false)
 	} else {
