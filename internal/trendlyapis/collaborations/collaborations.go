@@ -218,7 +218,7 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters}) //, "updating": updating
+	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters, "updatedStatus": collab.Status}) //, "updating": updating
 }
 
 func CreateCollaborationWithPrompt(c *gin.Context) {
