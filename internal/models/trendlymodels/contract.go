@@ -13,6 +13,8 @@ type Contract struct {
 	BrandID         string `json:"brandId" firestore:"brandId"`
 	StreamChannelID string `json:"streamChannelId" firestore:"streamChannelId"`
 	Status          int    `json:"status" firestore:"status"`
+
+	// All Items for storing the monetization related data
 }
 
 func (b *Contract) Get(contractID string) error {
