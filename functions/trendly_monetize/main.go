@@ -21,63 +21,63 @@ func brandAPIs(handler *gin.RouterGroup) {
 	brands := handler.Group("/brands", middlewares.TrendlyMiddleware("brands"))
 
 	// [BRAND] API to create payment order - for pre-payment of contract
-	brands.POST("/contracts/:contractId/order", monetize.Placeholder)
+	brands.POST("/contracts/:contractId/order", monetize.CreateOrder)
 	// [BRAND] API to check the payment status of the order
-	brands.GET("/contracts/:contractId/order", monetize.Placeholder)
+	brands.GET("/contracts/:contractId/order", monetize.GetOrder)
 
 	// [BRAND] API for marking as shipped
-	brands.POST("/contracts/:contractId/shipment", monetize.Placeholder)
+	brands.POST("/contracts/:contractId/shipment", monetize.MarkShipment)
 	// [BRANDS] API for mark as product delivered
-	brands.POST("/contracts/:contractId/shipment/delivered", monetize.Placeholder)
+	brands.POST("/contracts/:contractId/shipment/delivered", monetize.MarkShipmentDelivered)
 
 	// [BRAND] Request for First Video/ Revision
-	brands.POST("/contracts/:contractId/deliverable/request", monetize.Placeholder)
+	brands.POST("/contracts/:contractId/deliverable/request", monetize.RequestDeliverable)
 	// [BRAND] Approve the Video
-	brands.POST("/contracts/:contractId/deliverable/approve", monetize.Placeholder)
+	brands.POST("/contracts/:contractId/deliverable/approve", monetize.ApproveDeliverable)
 
 	// [BRAND] Schedule/Reschedule the release date of the video
-	brands.POST("/contracts/:contractId/posting/schedule", monetize.Placeholder)
+	brands.POST("/contracts/:contractId/posting/schedule", monetize.SchedulePosting)
 }
 
 func influencersAPIs(handler *gin.RouterGroup) {
 	influencer := handler.Group("/influencers", middlewares.TrendlyMiddleware("users"))
 
 	// API for creating/re-submit a Razorpay Route account
-	influencer.POST("/account", monetize.Placeholder)
+	influencer.POST("/account", monetize.CreateAccount)
 
 	// [User Polling] For checking if the account is approved or still in needs clarification
-	influencer.GET("/account", monetize.Placeholder)
+	influencer.GET("/account", monetize.GetAccountStatus)
 
 	// API to update the Bank Account
-	influencer.POST("/account/bank", monetize.Placeholder)
+	influencer.POST("/account/bank", monetize.UpdateBankDetails)
 
 	// API to update the Shipping Address
-	influencer.POST("/account/address", monetize.Placeholder)
+	influencer.POST("/account/address", monetize.UpdateAddress)
 
 	// [USER] API for Requesting brands to ship the product
-	influencer.POST("/contracts/:contractId/shipment/request", monetize.Placeholder)
+	influencer.POST("/contracts/:contractId/shipment/request", monetize.RequestShipment)
 	// [USER] API for mark as product received
-	influencer.POST("/contracts/:contractId/shipment/received", monetize.Placeholder)
+	influencer.POST("/contracts/:contractId/shipment/received", monetize.MarkShipmentReceived)
 
 	// [User] Submit the First Video/ Revision
-	influencer.POST("/contracts/:contractId/deliverable", monetize.Placeholder)
+	influencer.POST("/contracts/:contractId/deliverable", monetize.SendDeliverable)
 	// [USER] Request for Approval
-	influencer.POST("/contracts/:contractId/deliverable/request-approval", monetize.Placeholder)
+	influencer.POST("/contracts/:contractId/deliverable/request-approval", monetize.RequestDeliverableApproval)
 
 	// [USER] Request to (Re)Schedule a release
-	influencer.POST("/contracts/:contractId/posting/request-schedule", monetize.Placeholder)
+	influencer.POST("/contracts/:contractId/posting/request-schedule", monetize.RequestPostSchedule)
 	// [USER] Mark video as Posted
-	influencer.POST("/contracts/:contractId/posting", monetize.Placeholder)
+	influencer.POST("/contracts/:contractId/posting", monetize.MarkPosted)
 }
 
 func webhookHandler(handler *gin.RouterGroup) {
 	webhook := handler.Group("/webhooks")
 
 	// [BRAND Webhook] Listen to check the payment status and mark the collaboration paid
-	webhook.Any("/payments", monetize.Placeholder)
+	webhook.Any("/payments", monetize.PaymentWebhook)
 
 	// Once Payment processed, notify both the agents and close the contract
-	webhook.Any("/tranfer", monetize.Placeholder)
+	webhook.Any("/tranfer", monetize.TransferWebhook)
 
 }
 
