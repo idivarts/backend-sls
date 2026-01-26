@@ -14,6 +14,25 @@ type Contract struct {
 	StreamChannelID string `json:"streamChannelId" firestore:"streamChannelId"`
 	Status          int    `json:"status" firestore:"status"`
 
+	FeedbackFromBrand struct {
+		Ratings        *int          `json:"ratings,omitempty" firestore:"ratings,omitempty"`
+		FeedbackReview *string       `json:"feedbackReview,omitempty" firestore:"feedbackReview,omitempty"`
+		ManagerID      *string       `json:"managerId,omitempty" firestore:"managerId,omitempty"`
+		TimeSubmitted  *int64        `json:"timeSubmitted,omitempty" firestore:"timeSubmitted,omitempty"`
+		PaymentProofs  []interface{} `json:"paymentProofs,omitempty" firestore:"paymentProofs,omitempty"`
+	} `json:"feedbackFromBrand,omitempty" firestore:"feedbackFromBrand,omitempty"`
+
+	FeedbackFromInfluencer struct {
+		Ratings        *int    `json:"ratings,omitempty" firestore:"ratings,omitempty"`
+		FeedbackReview *string `json:"feedbackReview,omitempty" firestore:"feedbackReview,omitempty"`
+		TimeSubmitted  *int64  `json:"timeSubmitted,omitempty" firestore:"timeSubmitted,omitempty"`
+	} `json:"feedbackFromInfluencer,omitempty" firestore:"feedbackFromInfluencer,omitempty"`
+
+	ContractTimestamp struct {
+		StartedOn int64 `json:"startedOn" firestore:"startedOn"`
+		EndedOn   int64 `json:"endedOn" firestore:"endedOn"`
+	} `json:"contractTimestamp" firestore:"contractTimestamp"`
+
 	// All Items for storing the monetization related data
 	Payment struct {
 		OrderID         string   `json:"orderId,omitempty" firestore:"orderId,omitempty"`
