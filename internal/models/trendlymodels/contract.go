@@ -42,23 +42,24 @@ type Contract struct {
 	} `json:"payment" firestore:"payment"`
 
 	Shipment struct {
-		ShipmentID      string   `json:"shipmentId,omitempty" firestore:"shipmentId,omitempty"`
-		Status          string   `json:"status,omitempty" firestore:"status,omitempty"`
-		ShipmentUpdates []string `json:"shipmentUpdates,omitempty" firestore:"shipmentUpdates,omitempty"`
+		TrackingID         string      `json:"trackingId,omitempty" firestore:"trackingId,omitempty"`
+		ShipmentProvider   string      `json:"shipmentProvider,omitempty" firestore:"shipmentProvider,omitempty"`
+		ExpectedDate       int64       `json:"expectedDate,omitempty" firestore:"expectedDate,omitempty"`
+		PackageScreenshots []string    `json:"packageScreenshots,omitempty" firestore:"packageScreenshots,omitempty"`
+		AddressShippedTo   interface{} `json:"addressShippedTo,omitempty" firestore:"addressShippedTo,omitempty"`
+		Status             string      `json:"status,omitempty" firestore:"status,omitempty"`
 	} `json:"shipment" firestore:"shipment"`
 
 	Deliverable struct {
 		DeliverableID    string   `json:"deliverableId,omitempty" firestore:"deliverableId,omitempty"`
 		Status           string   `json:"status,omitempty" firestore:"status,omitempty"`
 		DeliverableLinks []string `json:"deliverableLinks,omitempty" firestore:"deliverableLinks,omitempty"`
-		ApprovalRequests []string `json:"approvalRequests,omitempty" firestore:"approvalRequests,omitempty"`
 	} `json:"deliverable" firestore:"deliverable"`
 
 	Posting struct {
-		ScheduledDate      int64    `json:"scheduledDate,omitempty" firestore:"scheduledDate,omitempty"`
-		Status             string   `json:"status,omitempty" firestore:"status,omitempty"`
-		RescheduleRequests []string `json:"rescheduleRequests,omitempty" firestore:"rescheduleRequests,omitempty"`
-		PostedLinks        []string `json:"postedLinks,omitempty" firestore:"postedLinks,omitempty"`
+		ScheduledDate int64    `json:"scheduledDate,omitempty" firestore:"scheduledDate,omitempty"`
+		Status        string   `json:"status,omitempty" firestore:"status,omitempty"`
+		PostedLinks   []string `json:"postedLinks,omitempty" firestore:"postedLinks,omitempty"`
 	} `json:"posting" firestore:"posting"`
 
 	Analytics struct {
@@ -68,6 +69,13 @@ type Contract struct {
 		Shares      int `json:"shares,omitempty" firestore:"shares,omitempty"`
 		Impressions int `json:"impressions,omitempty" firestore:"impressions,omitempty"`
 	} `json:"analytics" firestore:"analytics"`
+
+	Activity []struct {
+		Type    string      `json:"type,omitempty" firestore:"type,omitempty"`
+		Time    int64       `json:"time,omitempty" firestore:"time,omitempty"`
+		Detail  string      `json:"detail,omitempty" firestore:"detail,omitempty"`
+		Payload interface{} `json:"payload,omitempty" firestore:"payload,omitempty"`
+	} `json:"activity,omitempty" firestore:"activity,omitempty"`
 }
 
 func (b *Contract) Get(contractID string) error {
