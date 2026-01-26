@@ -18,8 +18,6 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	// The real implementation will go here in the future
-
 	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
 }
 

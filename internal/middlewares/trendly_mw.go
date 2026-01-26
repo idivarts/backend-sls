@@ -2,9 +2,11 @@ package middlewares
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
@@ -16,6 +18,22 @@ func GetUserObject(c *gin.Context) map[string]interface{} {
 		return c.MustGet("user").(map[string]interface{})
 	}
 	return c.MustGet("manager").(map[string]interface{})
+}
+
+func GetUserModel(c *gin.Context) trendlymodels.User {
+	userMap := c.MustGet("user").(map[string]interface{})
+	jsonData, _ := json.Marshal(userMap)
+	var user trendlymodels.User
+	json.Unmarshal(jsonData, &user)
+	return user
+}
+
+func GetManagerModel(c *gin.Context) trendlymodels.Manager {
+	managerMap := c.MustGet("manager").(map[string]interface{})
+	jsonData, _ := json.Marshal(managerMap)
+	var manager trendlymodels.Manager
+	json.Unmarshal(jsonData, &manager)
+	return manager
 }
 
 func TrendlyMiddleware(model string) gin.HandlerFunc {
