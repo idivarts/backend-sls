@@ -65,9 +65,15 @@ func GetAccountStatus(c *gin.Context) {
 		return
 	}
 
-	// The real implementation will go here in the future
+	user := middlewares.GetUserModel(c)
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	product, err := payments.GetProduct(user.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to create/update bank details"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"product": product, "message": "This is the product"})
 }
 
 func UpdateBankDetails(c *gin.Context) {
