@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
 func Placeholder(c *gin.Context) {
@@ -16,6 +17,23 @@ func Placeholder(c *gin.Context) {
 	// The real implementation will go here in the future
 
 	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+}
+
+func getInitData(c *gin.Context) (*string, *trendlymodels.Contract, *trendlymodels.Brand, error) {
+	contractId := c.Param("contractId")
+	contract := &trendlymodels.Contract{}
+	err := contract.Get(contractId)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	brandId := contract.BrandID
+	brand := &trendlymodels.Brand{}
+	err = brand.Get(brandId)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return &contractId, contract, brand, nil
 }
 
 func init() {
