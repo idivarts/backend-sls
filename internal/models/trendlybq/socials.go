@@ -269,7 +269,12 @@ func (data *Socials) Get(id string) error {
     SELECT *
     FROM ` + SocialsFullTableName + `
     WHERE id = @id
-    LIMIT 1
+	QUALIFY
+		ROW_NUMBER() OVER (
+			PARTITION BY id
+			ORDER BY last_update_time DESC
+		) = 1
+	LIMIT 1
 `)
 	q.Parameters = []bigquery.QueryParameter{
 		{Name: "id", Value: id},
