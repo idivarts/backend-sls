@@ -19,21 +19,29 @@ func Placeholder(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
 }
 
-func getInitData(c *gin.Context) (*string, *trendlymodels.Contract, *trendlymodels.Brand, error) {
+func initializeData(c *gin.Context) (*struct {
+	ContractID string
+	Contract   *trendlymodels.Contract
+	Brand      *trendlymodels.Brand
+}, error) {
 	contractId := c.Param("contractId")
 	contract := &trendlymodels.Contract{}
 	err := contract.Get(contractId)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	brandId := contract.BrandID
 	brand := &trendlymodels.Brand{}
 	err = brand.Get(brandId)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	return &contractId, contract, brand, nil
+	return &struct {
+		ContractID string
+		Contract   *trendlymodels.Contract
+		Brand      *trendlymodels.Brand
+	}{ContractID: contractId, Contract: contract, Brand: brand}, nil
 }
 
 func init() {
