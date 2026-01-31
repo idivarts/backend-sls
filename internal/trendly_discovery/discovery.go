@@ -233,7 +233,12 @@ func FormSQL(req InfluencerFilters) string {
   creation_time,
   last_update_time
 FROM ` + trendlybq.SocialsFullTableName + `
-WHERE social_type = 'instagram'`
+WHERE social_type = 'instagram'
+QUALIFY
+  ROW_NUMBER() OVER (
+    PARTITION BY id
+    ORDER BY last_update_time DESC
+  ) = 1`
 	// AND STARTS_WITH(profile_pic, "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
 
 	if len(conds) > 0 {

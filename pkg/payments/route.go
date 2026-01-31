@@ -140,6 +140,19 @@ func CreataOrUpdateProduct(accountId string, bank BankReq) (map[string]interface
 	return prod, err
 }
 
+func GetProduct(accountId string) (map[string]interface{}, error) {
+	product, err := Client.Product.RequestProductConfiguration(accountId, map[string]interface{}{
+		"product_name": "route",
+		"tnc_accepted": true,
+	}, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return product, nil
+}
+
 func FetchLinkedAccount(accountId string) (map[string]interface{}, error) {
 	account, err := Client.Account.Fetch(accountId, nil, nil)
 	return account, err
