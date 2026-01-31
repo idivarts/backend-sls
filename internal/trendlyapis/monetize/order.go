@@ -12,11 +12,13 @@ func CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
 		return
 	}
-	_, err := initializeData(c)
+	data, err := initializeData(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
 		return
 	}
+
+	data.Contract.Payment.Status = "created"
 
 	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
 }

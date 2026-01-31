@@ -34,48 +34,55 @@ type Contract struct {
 	} `json:"contractTimestamp" firestore:"contractTimestamp"`
 
 	// All Items for storing the monetization related data
-	Payment struct {
-		OrderID         string   `json:"orderId,omitempty" firestore:"orderId,omitempty"`
-		Status          string   `json:"status,omitempty" firestore:"status,omitempty"`
-		PaymentID       string   `json:"paymentId,omitempty" firestore:"paymentId,omitempty"`
-		PaymentWebhooks []string `json:"paymentWebhooks,omitempty" firestore:"paymentWebhooks,omitempty"`
-	} `json:"payment" firestore:"payment"`
+	Payment *Payment `json:"payment,omitempty" firestore:"payment,omitempty"`
 
-	Shipment struct {
-		TrackingID         string      `json:"trackingId,omitempty" firestore:"trackingId,omitempty"`
-		ShipmentProvider   string      `json:"shipmentProvider,omitempty" firestore:"shipmentProvider,omitempty"`
-		ExpectedDate       int64       `json:"expectedDate,omitempty" firestore:"expectedDate,omitempty"`
-		PackageScreenshots []string    `json:"packageScreenshots,omitempty" firestore:"packageScreenshots,omitempty"`
-		AddressShippedTo   interface{} `json:"addressShippedTo,omitempty" firestore:"addressShippedTo,omitempty"`
-		Status             string      `json:"status,omitempty" firestore:"status,omitempty"`
-	} `json:"shipment" firestore:"shipment"`
+	Shipment *Shipment `json:"shipment,omitempty" firestore:"shipment,omitempty"`
 
-	Deliverable struct {
-		DeliverableID    string   `json:"deliverableId,omitempty" firestore:"deliverableId,omitempty"`
-		Status           string   `json:"status,omitempty" firestore:"status,omitempty"`
-		DeliverableLinks []string `json:"deliverableLinks,omitempty" firestore:"deliverableLinks,omitempty"`
-	} `json:"deliverable" firestore:"deliverable"`
+	Deliverable *Deliverable `json:"deliverable,omitempty" firestore:"deliverable,omitempty"`
 
-	Posting struct {
-		ScheduledDate int64    `json:"scheduledDate,omitempty" firestore:"scheduledDate,omitempty"`
-		Status        string   `json:"status,omitempty" firestore:"status,omitempty"`
-		PostedLinks   []string `json:"postedLinks,omitempty" firestore:"postedLinks,omitempty"`
-	} `json:"posting" firestore:"posting"`
+	Posting *Posting `json:"posting,omitempty" firestore:"posting,omitempty"`
 
-	Analytics struct {
-		Views       int `json:"views,omitempty" firestore:"views,omitempty"`
-		Likes       int `json:"likes,omitempty" firestore:"likes,omitempty"`
-		Comments    int `json:"comments,omitempty" firestore:"comments,omitempty"`
-		Shares      int `json:"shares,omitempty" firestore:"shares,omitempty"`
-		Impressions int `json:"impressions,omitempty" firestore:"impressions,omitempty"`
-	} `json:"analytics" firestore:"analytics"`
+	Analytics *Analytics `json:"analytics,omitempty" firestore:"analytics,omitempty"`
 
-	Activity []struct {
-		Type    string      `json:"type,omitempty" firestore:"type,omitempty"`
-		Time    int64       `json:"time,omitempty" firestore:"time,omitempty"`
-		Detail  string      `json:"detail,omitempty" firestore:"detail,omitempty"`
-		Payload interface{} `json:"payload,omitempty" firestore:"payload,omitempty"`
-	} `json:"activity,omitempty" firestore:"activity,omitempty"`
+	Activity []Activity `json:"activity,omitempty" firestore:"activity,omitempty"`
+}
+
+type Payment struct {
+	OrderID         string   `json:"orderId,omitempty" firestore:"orderId,omitempty"`
+	Status          string   `json:"status,omitempty" firestore:"status,omitempty"`
+	PaymentID       string   `json:"paymentId,omitempty" firestore:"paymentId,omitempty"`
+	PaymentWebhooks []string `json:"paymentWebhooks,omitempty" firestore:"paymentWebhooks,omitempty"`
+}
+type Shipment struct {
+	TrackingID         string      `json:"trackingId,omitempty" firestore:"trackingId,omitempty"`
+	ShipmentProvider   string      `json:"shipmentProvider,omitempty" firestore:"shipmentProvider,omitempty"`
+	ExpectedDate       int64       `json:"expectedDate,omitempty" firestore:"expectedDate,omitempty"`
+	PackageScreenshots []string    `json:"packageScreenshots,omitempty" firestore:"packageScreenshots,omitempty"`
+	AddressShippedTo   interface{} `json:"addressShippedTo,omitempty" firestore:"addressShippedTo,omitempty"`
+	Status             string      `json:"status,omitempty" firestore:"status,omitempty"`
+}
+type Deliverable struct {
+	DeliverableID    string   `json:"deliverableId,omitempty" firestore:"deliverableId,omitempty"`
+	Status           string   `json:"status,omitempty" firestore:"status,omitempty"`
+	DeliverableLinks []string `json:"deliverableLinks,omitempty" firestore:"deliverableLinks,omitempty"`
+}
+type Posting struct {
+	ScheduledDate int64    `json:"scheduledDate,omitempty" firestore:"scheduledDate,omitempty"`
+	Status        string   `json:"status,omitempty" firestore:"status,omitempty"`
+	PostedLinks   []string `json:"postedLinks,omitempty" firestore:"postedLinks,omitempty"`
+}
+type Analytics struct {
+	Views       int `json:"views,omitempty" firestore:"views,omitempty"`
+	Likes       int `json:"likes,omitempty" firestore:"likes,omitempty"`
+	Comments    int `json:"comments,omitempty" firestore:"comments,omitempty"`
+	Shares      int `json:"shares,omitempty" firestore:"shares,omitempty"`
+	Impressions int `json:"impressions,omitempty" firestore:"impressions,omitempty"`
+}
+type Activity struct {
+	Type    string      `json:"type,omitempty" firestore:"type,omitempty"`
+	Time    int64       `json:"time,omitempty" firestore:"time,omitempty"`
+	Detail  string      `json:"detail,omitempty" firestore:"detail,omitempty"`
+	Payload interface{} `json:"payload,omitempty" firestore:"payload,omitempty"`
 }
 
 func (b *Contract) Get(contractID string) error {
