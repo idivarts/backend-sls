@@ -21,6 +21,8 @@ type User struct {
 	EmailVerified         *bool                  `json:"emailVerified,omitempty" firestore:"emailVerified,omitempty"`
 	PhoneVerified         *bool                  `json:"phoneVerified,omitempty" firestore:"phoneVerified,omitempty"`
 	IsVerified            *bool                  `json:"isVerified,omitempty" firestore:"isVerified,omitempty"`
+	IsKYCDone             bool                   `json:"isKYCDone" firestore:"isKYCDone"`
+	KYC                   *KYC                   `json:"kyc,omitempty" firestore:"kyc,omitempty"`
 	Profile               *UserProfile           `json:"profile,omitempty" firestore:"profile,omitempty"`
 	Backend               *BackendData           `json:"backend,omitempty" firestore:"backend,omitempty"`
 	PushNotificationToken *PushNotificationToken `json:"pushNotificationToken,omitempty" firestore:"pushNotificationToken,omitempty"`
@@ -79,6 +81,38 @@ type UserSettings struct {
 	ProfileVisibility *string `json:"profileVisibility,omitempty" firestore:"profileVisibility,omitempty"`
 	PushNotification  *bool   `json:"pushNotification,omitempty" firestore:"pushNotification,omitempty"`
 	Theme             *string `json:"theme,omitempty" firestore:"theme,omitempty"`
+}
+
+type KYC struct {
+	AccountID     string `json:"accountId" firestore:"accountId"`
+	StakeHolderID string `json:"stakeHolderId" firestore:"stakeHolderId"`
+	ProductID     string `json:"productId" firestore:"productId"`
+
+	Status    string  `json:"status" firestore:"status"`
+	Reason    *string `json:"reason,omitempty" firestore:"reason,omitempty"`
+	UpdatedAt *int64  `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
+
+	PANDetails     *PANDetails     `json:"panDetails,omitempty" firestore:"panDetails,omitempty"`
+	CurrentAddress *CurrentAddress `json:"currentAddress,omitempty" firestore:"currentAddress,omitempty"`
+	BankDetails    *BankDetails    `json:"bankDetails,omitempty" firestore:"bankDetails,omitempty"`
+}
+
+type PANDetails struct {
+	PANNumber    string `json:"panNumber" firestore:"panNumber"`
+	NameAsPerPAN string `json:"nameAsPerPAN" firestore:"nameAsPerPAN"`
+}
+
+type CurrentAddress struct {
+	Street     string `json:"street" firestore:"street"`
+	City       string `json:"city" firestore:"city"`
+	State      string `json:"state" firestore:"state"`
+	PostalCode string `json:"postalCode" firestore:"postalCode"`
+}
+
+type BankDetails struct {
+	AccountNumber   string `json:"accountNumber" firestore:"accountNumber"`
+	IFSC            string `json:"ifsc" firestore:"ifsc"`
+	BeneficiaryName string `json:"beneficiaryName" firestore:"beneficiaryName"`
 }
 
 type BackendData struct {
