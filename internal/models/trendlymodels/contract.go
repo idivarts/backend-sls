@@ -2,7 +2,10 @@ package trendlymodels
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
+	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
@@ -94,6 +97,23 @@ func (b *Contract) Get(contractID string) error {
 	if err != nil {
 		return err
 	}
+	return err
+}
+
+func (c *Contract) Update(contractID string) error {
+	// Marshal the struct to JSON
+	bytes, err := json.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("failed to marshal user: %w", err)
+	}
+
+	// Unmarshal into a map
+	var data map[string]interface{}
+	if err := json.Unmarshal(bytes, &data); err != nil {
+		return fmt.Errorf("failed to unmarshal to map: %w", err)
+	}
+	_, err = firestoredb.Client.Collection("contracts").Doc(contractID).Set(context.Background(), data, firestore.MergeAll)
+
 	return err
 }
 

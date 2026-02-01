@@ -45,9 +45,13 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	data.Contract.Payment = &trendlymodels.Payment{
-		OrderID:   order["id"].(string),
-		Status:    "",
-		PaymentID: "",
+		OrderID: order["id"].(string),
+		Status:  "waiting_for_payment",
+	}
+	err = data.Contract.Update(data.ContractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update Contract with Order details"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
