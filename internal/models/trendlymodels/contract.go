@@ -48,10 +48,9 @@ type Contract struct {
 }
 
 type Payment struct {
-	OrderID         string   `json:"orderId,omitempty" firestore:"orderId,omitempty"`
-	Status          string   `json:"status,omitempty" firestore:"status,omitempty"`
-	PaymentID       string   `json:"paymentId,omitempty" firestore:"paymentId,omitempty"`
-	PaymentWebhooks []string `json:"paymentWebhooks,omitempty" firestore:"paymentWebhooks,omitempty"`
+	OrderID   string `json:"orderId,omitempty" firestore:"orderId,omitempty"`
+	Status    string `json:"status,omitempty" firestore:"status,omitempty"`
+	PaymentID string `json:"paymentId,omitempty" firestore:"paymentId,omitempty"`
 }
 type Shipment struct {
 	TrackingID         string      `json:"trackingId,omitempty" firestore:"trackingId,omitempty"`
