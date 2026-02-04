@@ -15,5 +15,15 @@
         "scripts": true,
         "src": true,
         "templates": true,
+        "Makefile": true,
+        ".gitignore": true,
+        "go.mod": true,
+        "go.sum": true,
+        "*.md": true,
+        "*.json": true,
+        "*.csv": true,
+        "*.sh": true,
+        "serverless.cc.yml": true,
+        "serverless-*.yml": true
     }
 }
