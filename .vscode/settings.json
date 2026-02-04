@@ -24,6 +24,15 @@
         "*.csv": true,
         "*.sh": true,
         "serverless.cc.yml": true,
-        "serverless-*.yml": true
+        "serverless-*.yml": true,
+        "functions/cc_apis": true,
+        "functions/message_sqs": true,
+        "functions/message_webhook": true,
+        "functions/process_video": true,
+        "functions/razorpay": true,
+        "functions/s3": true,
+        "functions/stream_sqs_hook": true,
+        "functions/unauth_apis": true,
+        "functions/websocket": true
     }
 }
