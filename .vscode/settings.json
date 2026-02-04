@@ -1,0 +1,19 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/.serverless": true,
+        "cmd": true,
+        "configs": true,
+        "dynamo_data": true,
+        "tests": true,
+        "vendor": true,
+        "prompts": true,
+        "n8n": true,
+        "scripts": true,
+        "src": true,
+        "templates": true,
+    }
+}
