@@ -23,4 +23,5 @@ const (
 	SubjectInfluencerInvite           = "You’ve received a new collab idea on Trendly 💡"
 	SubjectInfluencerInviteAccepted   = "Your collab invite was accepted! Start chatting now 🎉"
 	SubjectInfluencerInviteRejected   = "Your invite wasn’t accepted—but don’t stop creating ✨"
+	SubjectCollaborationTakedown      = "Important: Your collaboration has been taken down"
 )

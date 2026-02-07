@@ -223,6 +223,18 @@ func PostCollaboration(c *gin.Context) {
 	}
 
 	if throwError {
+		// Send email to manager
+		manager := trendlymodels.Manager{}
+		err = manager.Get(collab.ManagerID)
+		if err == nil {
+			data := map[string]interface{}{
+				"ManagerName": manager.Name,
+				"CollabTitle": collab.Name,
+				"DraftLink":   fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, collabId),
+			}
+			_ = myemail.SendCustomHTMLEmail(manager.Email, templates.CollaborationTakedown, templates.SubjectCollaborationTakedown, data)
+		}
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "collaboration-payload-not-approved", "message": "The Collaboration posted was not put live as it did not meet our guidelines. Please review the collaboration details and make necessary changes before reposting.",
 			"collabId": collabId, "discoverFilters": filters, "updatedStatus": collab.Status}) //, "updating": updating
 		return

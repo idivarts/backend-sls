@@ -26,4 +26,5 @@ const (
 	InfluencerInvite                  myemail.TemplatePath = "templates/influencer_invite.html"
 	InfluencerInviteAccepted          myemail.TemplatePath = "templates/influencer_accepted.html"
 	InfluencerInviteRejected          myemail.TemplatePath = "templates/influencer_rejected.html"
+	CollaborationTakedown             myemail.TemplatePath = "templates/collaboration_takedown.html"
 )
