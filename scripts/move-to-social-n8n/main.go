@@ -44,7 +44,7 @@ func main() {
 		totalMigrated += len(oldSocials)
 		log.Printf("Migrated %d records so far", totalMigrated)
 
-		if len(oldSocials) < limit || true {
+		if len(oldSocials) < limit {
 			break
 		}
 		offset += limit
@@ -83,18 +83,16 @@ func translate(old trendlybq.Socials) trendlybq.SocialsN8N {
 	}
 
 	for _, r := range old.Reels {
-		new.LatestReels = append(new.LatestReels, trendlybq.Post{
-			SinglePost: trendlybq.SinglePost{
-				ID:             r.ID,
-				DisplayURL:     r.ThumbnailURL,
-				URL:            r.URL,
-				Caption:        r.Caption,
-				IsPinned:       r.Pinned,
-				VideoViewCount: r.ViewsCount,
-				LikesCount:     r.LikesCount,
-				CommentsCount:  r.CommentsCount,
-				Type:           "video",
-			},
+		new.LatestReels = append(new.LatestReels, trendlybq.SinglePost{
+			ID:             r.ID,
+			DisplayURL:     r.ThumbnailURL,
+			URL:            r.URL,
+			Caption:        r.Caption,
+			IsPinned:       r.Pinned,
+			VideoViewCount: r.ViewsCount,
+			LikesCount:     r.LikesCount,
+			CommentsCount:  r.CommentsCount,
+			Type:           "video",
 		})
 	}
 

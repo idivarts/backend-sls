@@ -175,7 +175,7 @@ func AddProfile(c *gin.Context) {
 
 		EngagementRate: 0,
 
-		LatestReels: []trendlybq.Post{},
+		LatestReels: []trendlybq.SinglePost{},
 		Links:       []trendlybq.SocialLink{},
 	}
 
@@ -201,17 +201,15 @@ func AddProfile(c *gin.Context) {
 		if len(parts) >= 2 {
 			id = parts[len(parts)-2]
 		}
-		data.LatestReels = append(data.LatestReels, trendlybq.Post{
-			SinglePost: trendlybq.SinglePost{
-				ID:             id,
-				DisplayURL:     reel.Thumbnail,
-				URL:            reel.URL,
-				Caption:        "",
-				IsPinned:       reel.Pinned,
-				VideoViewCount: bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil && *reel.Views.Value > 0},
-				LikesCount:     bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil && *reel.Overlays.Likes.Value > 0},
-				CommentsCount:  bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil && *reel.Overlays.Comments.Value > 0},
-			},
+		data.LatestReels = append(data.LatestReels, trendlybq.SinglePost{
+			ID:             id,
+			DisplayURL:     reel.Thumbnail,
+			URL:            reel.URL,
+			Caption:        "",
+			IsPinned:       reel.Pinned,
+			VideoViewCount: bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil && *reel.Views.Value > 0},
+			LikesCount:     bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil && *reel.Overlays.Likes.Value > 0},
+			CommentsCount:  bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil && *reel.Overlays.Comments.Value > 0},
 		})
 
 		var views, likes, comments int64

@@ -123,7 +123,7 @@ type SocialsN8N struct {
 	ExternalURL string       `db:"external_url" bigquery:"external_url" json:"external_url" firestore:"external_url"`
 	Links       []SocialLink `db:"links" bigquery:"links" json:"links" firestore:"links"`
 	LatestPosts []Post       `db:"latest_posts" bigquery:"latest_posts" json:"latest_posts" firestore:"latest_posts"`
-	LatestReels []Post       `db:"latest_reels" bigquery:"latest_reels" json:"latest_reels" firestore:"latest_reels"`
+	LatestReels []SinglePost `db:"latest_reels" bigquery:"latest_reels" json:"latest_reels" firestore:"latest_reels"`
 
 	// Metadata
 	AddedBy        string `db:"added_by" bigquery:"added_by" json:"added_by" firestore:"added_by"`
