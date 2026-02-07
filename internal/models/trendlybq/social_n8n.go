@@ -211,6 +211,7 @@ func (data *SocialsN8N) ConvertToSocialBreif() *SocialsBreif {
 		Location:        data.Location,
 		Bio:             data.Bio,
 		ProfileVerified: data.ProfileVerified,
+		AddedBy:         data.AddedBy,
 		CreationTime:    data.CreationTime,
 		LastUpdateTime:  data.LastUpdateTime,
 	}
