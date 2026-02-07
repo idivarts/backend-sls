@@ -29,7 +29,7 @@
         "functions/message_sqs": true,
         "functions/message_webhook": true,
         "functions/process_video": true,
-        "functions/razorpay": true,
+        "functions/razorpay": false,
         "functions/s3": true,
         "functions/stream_sqs_hook": true,
         "functions/unauth_apis": true,
