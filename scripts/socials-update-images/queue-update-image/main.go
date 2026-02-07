@@ -27,7 +27,7 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 }
 
 func uploadImage(socialId string) error {
-	social := &trendlybq.Socials{}
+	social := &trendlybq.SocialsN8N{}
 	err := social.GetByIdFromFirestore(socialId)
 	if err != nil {
 		log.Println("Error in getting social by id:", socialId, " error:", err.Error())

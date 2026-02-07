@@ -28,7 +28,7 @@ type CalculatedData struct {
 	CPM             float32 `json:"cpm"`
 }
 
-func calculateTrustablity(social *trendlybq.Socials) int {
+func calculateTrustablity(social *trendlybq.SocialsN8N) int {
 	// Weights
 	wEngagement := 0.30
 	wRatios := 0.25
@@ -127,20 +127,13 @@ func calculateTrustablity(social *trendlybq.Socials) int {
 
 	// 5) Misc signals (0–100)
 	miscScore := 100.0
-	// following/follower ratio penalty
+	// Following/follower ratio penalty
 	ffr := safeDiv(float64(social.FollowingCount), math.Max(followers, 1))
 	if ffr > 1.0 {
 		miscScore -= 30
 	} else if ffr > 0.5 {
 		miscScore -= 20
 	} else if ffr > 0.2 {
-		miscScore -= 10
-	}
-	// Missing UI buttons suggests odd setup
-	if !social.HasFollowButton {
-		miscScore -= 10
-	}
-	if !social.HasMessageButton {
 		miscScore -= 10
 	}
 	miscScore = clampFloat(miscScore, 0, 100)
@@ -150,7 +143,7 @@ func calculateTrustablity(social *trendlybq.Socials) int {
 	return clampInt(int(math.Round(total)), 0, 100)
 }
 
-func calculateBudget(social *trendlybq.Socials) Range {
+func calculateBudget(social *trendlybq.SocialsN8N) Range {
 	followers := float64(social.FollowerCount)
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
@@ -276,7 +269,7 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	}
 }
 
-func calculateReach(social *trendlybq.Socials) Range {
+func calculateReach(social *trendlybq.SocialsN8N) Range {
 	followers := float64(social.FollowerCount)
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
@@ -424,7 +417,7 @@ func FetchInfluencer(c *gin.Context) {
 		}
 	}
 
-	social := &trendlybq.Socials{}
+	social := &trendlybq.SocialsN8N{}
 
 	err = social.Get(influencerId)
 	if err != nil {
@@ -446,13 +439,13 @@ func FetchInfluencer(c *gin.Context) {
 			ImageURL: &social.ProfilePic,
 		},
 	}
-	for i, v := range social.Reels {
+	for i, v := range social.LatestReels {
 		if i >= 5 {
 			break
 		}
 		attachments = append(attachments, trendlymodels.UserAttachment{
 			Type:     "reel",
-			ImageURL: &v.ThumbnailURL,
+			ImageURL: &v.DisplayURL,
 			PlayURL:  &v.URL,
 		})
 	}
@@ -472,7 +465,7 @@ func FetchInfluencer(c *gin.Context) {
 		Backend: &trendlymodels.BackendData{
 			Followers:  &social.FollowerCount,
 			Reach:      &social.ViewsCount,
-			Engagement: &social.EnagamentsCount,
+			Engagement: &social.EngagementCount,
 			Gender:     &social.Gender,
 			Quality:    &social.QualityScore,
 		},
@@ -549,7 +542,7 @@ func FetchInvitedInfluencers(c *gin.Context) {
 	})
 }
 
-func TestCalculations(social *trendlybq.Socials) CalculatedData {
+func TestCalculations(social *trendlybq.SocialsN8N) CalculatedData {
 	calculatedValue := CalculatedData{
 		Quality:         social.QualityScore,
 		Trustablity:     calculateTrustablity(social),
@@ -589,7 +582,7 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	bqSocials, err := trendlybq.Socials{}.GetMultiple(req.Influencers)
+	bqSocials, err := trendlybq.SocialsN8N{}.GetMultiple(req.Influencers)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error gettimg socials"})
 		return

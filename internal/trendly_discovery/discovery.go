@@ -86,10 +86,10 @@ func FormSQL(req InfluencerFilters) string {
 	}
 
 	if req.MonthlyEngagementMin != nil {
-		conds = append(conds, fmt.Sprintf("engagements_count >= %d", *req.MonthlyEngagementMin))
+		conds = append(conds, fmt.Sprintf("engagement_count >= %d", *req.MonthlyEngagementMin))
 	}
 	if req.MonthlyEngagementMax != nil {
-		conds = append(conds, fmt.Sprintf("engagements_count <= %d", *req.MonthlyEngagementMax))
+		conds = append(conds, fmt.Sprintf("engagement_count <= %d", *req.MonthlyEngagementMax))
 	}
 
 	if req.AvgViewsMin != nil {
@@ -187,8 +187,8 @@ func FormSQL(req InfluencerFilters) string {
 	sortMap := map[string]string{
 		"followers":       "follower_count",
 		"views":           "views_count",
-		"engagement":      "engagements_count",
-		"engagements":     "engagements_count",
+		"engagement":      "engagement_count",
+		"engagements":     "engagement_count",
 		"engagement_rate": "engagement_rate",
 		"er":              "engagement_rate",
 	}
@@ -224,7 +224,7 @@ func FormSQL(req InfluencerFilters) string {
   profile_pic,
   follower_count,
   views_count,
-  engagements_count,
+  engagement_count,
   engagement_rate,
   social_type,
   location,
@@ -232,7 +232,7 @@ func FormSQL(req InfluencerFilters) string {
   profile_verified,
   creation_time,
   last_update_time
-FROM ` + trendlybq.SocialsFullTableName + `
+FROM ` + trendlybq.SocialsN8NFullTableName + `
 WHERE social_type = 'instagram'
 QUALIFY
   ROW_NUMBER() OVER (

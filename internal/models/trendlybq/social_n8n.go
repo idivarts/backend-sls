@@ -39,11 +39,11 @@ type SocialsBreif struct {
 	Name     string `db:"name" bigquery:"name" json:"name" firestore:"name"`
 	Username string `db:"username" bigquery:"username" json:"username" firestore:"username"`
 
-	ProfilePic      string  `db:"profile_pic" bigquery:"profile_pic" json:"profile_pic" firestore:"profile_pic"`
-	FollowerCount   int64   `db:"follower_count" bigquery:"follower_count" json:"follower_count" firestore:"follower_count"`
-	ViewsCount      int64   `db:"views_count" bigquery:"views_count" json:"views_count" firestore:"views_count"`                      //views
-	EnagamentsCount int64   `db:"engagement_count" bigquery:"engagements_count" json:"engagement_count" firestore:"engagement_count"` //engagement
-	EngagementRate  float32 `db:"engagement_rate" bigquery:"engagement_rate" json:"engagement_rate" firestore:"engagement_rate"`
+	ProfilePic     string  `db:"profile_pic" bigquery:"profile_pic" json:"profile_pic" firestore:"profile_pic"`
+	FollowerCount  int64   `db:"follower_count" bigquery:"follower_count" json:"follower_count" firestore:"follower_count"`
+	ViewsCount     int64   `db:"views_count" bigquery:"views_count" json:"views_count" firestore:"views_count"`                     //views
+	EnagamentCount int64   `db:"engagement_count" bigquery:"engagement_count" json:"engagement_count" firestore:"engagement_count"` //engagement
+	EngagementRate float32 `db:"engagement_rate" bigquery:"engagement_rate" json:"engagement_rate" firestore:"engagement_rate"`
 
 	SocialType string `db:"social_type" bigquery:"social_type" json:"social_type" firestore:"social_type"`
 
@@ -172,7 +172,7 @@ func (data *SocialsN8N) ConvertToSocialBreif() *SocialsBreif {
 		ProfilePic:      data.ProfilePic,
 		FollowerCount:   data.FollowerCount,
 		ViewsCount:      data.ViewsCount,
-		EnagamentsCount: data.EngagementCount,
+		EnagamentCount:  data.EngagementCount,
 		EngagementRate:  data.EngagementRate,
 		SocialType:      data.SocialType,
 		Location:        data.Location,

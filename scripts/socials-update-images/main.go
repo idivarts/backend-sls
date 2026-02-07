@@ -27,7 +27,7 @@ func executeOnAll() {
 	startExecutionTime := time.Now().UnixMicro()
 	log.Println("Start Execution", startExecutionTime)
 
-	socials, err := trendlybq.Socials{}.GetPaginatedFromFirestore(0, 0)
+	socials, err := trendlybq.SocialsN8N{}.GetPaginatedFromFirestore(0, 0)
 	if err != nil {
 		log.Println("Error ", err.Error())
 		return
@@ -43,7 +43,7 @@ func executeOnAll() {
 	}
 
 	log.Println("Total Socials", len(socials), startExecutionTime)
-	err = trendlybq.Socials{}.InsertMultiple(socials)
+	err = trendlybq.SocialsN8N{}.InsertMultiple(socials)
 	if err != nil {
 		log.Println("Error While Inserting", err.Error())
 		return

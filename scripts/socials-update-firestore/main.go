@@ -14,7 +14,7 @@ func main() {
 }
 
 func executeOnAll() {
-	socials, err := trendlybq.Socials{}.GetPaginated(0, 700)
+	socials, err := trendlybq.SocialsN8N{}.GetPaginated(0, 700)
 	if err != nil {
 		log.Println("Error", err)
 		return

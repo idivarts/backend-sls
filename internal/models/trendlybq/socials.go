@@ -114,7 +114,7 @@ func (data *Socials) ConvertToSocialBreif() *SocialsBreif {
 		ProfilePic:      data.ProfilePic,
 		FollowerCount:   data.FollowerCount,
 		ViewsCount:      data.ViewsCount,
-		EnagamentsCount: data.EnagamentsCount,
+		EnagamentCount:  data.EnagamentsCount,
 		EngagementRate:  data.EngagementRate,
 		SocialType:      data.SocialType,
 		Location:        data.Location,

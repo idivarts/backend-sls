@@ -136,38 +136,38 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	checkData := trendlybq.Socials{}
+	checkData := trendlybq.SocialsN8N{}
 	err := checkData.GetInstagram(req.About.Username)
 	if err == nil {
 		c.JSON(http.StatusConflict, gin.H{"message": "Profile already exists", "id": checkData.ID})
 		return
 	}
 
-	data := &trendlybq.Socials{
-		SocialType:        "instagram",
-		Gender:            req.Manual.Gender,
-		Niches:            req.Manual.Niches,
-		Location:          req.Manual.Location,
-		FollowerCount:     *req.Stats.Followers.Value,
-		ContentCount:      *req.Stats.Posts.Value,
-		FollowingCount:    *req.Stats.Following.Value,
-		Username:          req.About.Username,
-		Name:              req.About.FullName,
-		Bio:               req.About.Bio,
-		Category:          req.About.Category,
-		ProfilePic:        req.About.ProfilePic,
-		ProfileVerified:   req.About.IsVerified,
-		HasContacts:       len(req.About.Links) > 0,
-		HasFollowButton:   req.About.Actions.HasFollowButton,
-		HasMessageButton:  req.About.Actions.HasMessageButton,
-		ReelScrappedCount: len(req.Reels.Items),
-		QualityScore:      req.Manual.AestheticsScore,
-		CreationTime:      time.Now().UnixMicro(), // TODO: set actual creation time
-		LastUpdateTime:    time.Now().UnixMicro(),
-		AddedBy:           adderUserId,
+	data := &trendlybq.SocialsN8N{
+		SocialType:      "instagram",
+		Gender:          req.Manual.Gender,
+		Niches:          req.Manual.Niches,
+		Location:        req.Manual.Location,
+		FollowerCount:   *req.Stats.Followers.Value,
+		ContentCount:    *req.Stats.Posts.Value,
+		FollowingCount:  *req.Stats.Following.Value,
+		Username:        req.About.Username,
+		Name:            req.About.FullName,
+		Bio:             req.About.Bio,
+		Category:        req.About.Category,
+		ProfilePic:      req.About.ProfilePic,
+		ProfileVerified: req.About.IsVerified,
+		HasContacts:     len(req.About.Links) > 0,
+		// HasFollowButton:   req.About.Actions.HasFollowButton,
+		// HasMessageButton:  req.About.Actions.HasMessageButton,
+		// ReelScrappedCount: len(req.Reels.Items),
+		QualityScore:   req.Manual.AestheticsScore,
+		CreationTime:   time.Now().UnixMicro(), // TODO: set actual creation time
+		LastUpdateTime: time.Now().UnixMicro(),
+		AddedBy:        adderUserId,
 
 		ViewsCount:      0,
-		EnagamentsCount: 0,
+		EngagementCount: 0,
 
 		AverageViews:    0,
 		AverageLikes:    0,
@@ -175,14 +175,14 @@ func AddProfile(c *gin.Context) {
 
 		EngagementRate: 0,
 
-		Reels: []trendlybq.Reel{},
-		Links: []trendlybq.Link{},
+		LatestReels: []trendlybq.Post{},
+		Links:       []trendlybq.SocialLink{},
 	}
 
 	for _, link := range req.About.Links {
-		data.Links = append(data.Links, trendlybq.Link{
-			URL:  link.URL,
-			Text: link.Text,
+		data.Links = append(data.Links, trendlybq.SocialLink{
+			URL:   link.URL,
+			Title: link.Text,
 		})
 	}
 
@@ -201,15 +201,15 @@ func AddProfile(c *gin.Context) {
 		if len(parts) >= 2 {
 			id = parts[len(parts)-2]
 		}
-		data.Reels = append(data.Reels, trendlybq.Reel{
-			ID:            id,
-			ThumbnailURL:  reel.Thumbnail,
-			URL:           reel.URL,
-			Caption:       "",
-			Pinned:        reel.Pinned,
-			ViewsCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil && *reel.Views.Value > 0},
-			LikesCount:    bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil && *reel.Overlays.Likes.Value > 0},
-			CommentsCount: bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil && *reel.Overlays.Comments.Value > 0},
+		data.LatestReels = append(data.LatestReels, trendlybq.Post{
+			ID:             id,
+			DisplayURL:     reel.Thumbnail,
+			URL:            reel.URL,
+			Caption:        "",
+			IsPinned:       reel.Pinned,
+			VideoViewCount: bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil && *reel.Views.Value > 0},
+			LikesCount:     bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil && *reel.Overlays.Likes.Value > 0},
+			CommentsCount:  bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil && *reel.Overlays.Comments.Value > 0},
 		})
 
 		var views, likes, comments int64
@@ -217,7 +217,7 @@ func AddProfile(c *gin.Context) {
 		if reel.Views.Value != nil {
 			views = *reel.Views.Value
 			if views > 0 {
-				data.Reels[len(data.Reels)-1].ViewsCount.Int64 = views
+				data.LatestReels[len(data.LatestReels)-1].VideoViewCount.Int64 = views
 				viewsList = append(viewsList, views)
 			}
 			if !reel.Pinned {
@@ -227,21 +227,21 @@ func AddProfile(c *gin.Context) {
 		if reel.Overlays.Likes.Value != nil {
 			likes = *reel.Overlays.Likes.Value
 			if likes > 0 {
-				data.Reels[len(data.Reels)-1].LikesCount.Int64 = likes
+				data.LatestReels[len(data.LatestReels)-1].LikesCount.Int64 = likes
 				likesList = append(likesList, likes)
 			}
 			if !reel.Pinned {
-				data.EnagamentsCount += likes
+				data.EngagementCount += likes
 			}
 		}
 		if reel.Overlays.Comments.Value != nil {
 			comments = *reel.Overlays.Comments.Value
 			if comments > 0 {
-				data.Reels[len(data.Reels)-1].CommentsCount.Int64 = comments
+				data.LatestReels[len(data.LatestReels)-1].CommentsCount.Int64 = comments
 				commentsList = append(commentsList, comments)
 			}
 			if !reel.Pinned {
-				data.EnagamentsCount += comments
+				data.EngagementCount += comments
 			}
 		}
 
@@ -269,7 +269,7 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	allDocs, err := firestoredb.Client.Collection("scrapped-socials").Where("reel_scrapped_count", ">", 0).Where("added_by", "==", adderUserId).Documents(context.Background()).GetAll()
+	allDocs, err := firestoredb.Client.Collection("scrapped-socials-n8n").Where("added_by", "==", adderUserId).Documents(context.Background()).GetAll()
 	dLen := 0
 	if err == nil {
 		dLen = len(allDocs)
@@ -287,7 +287,7 @@ func CheckUsername(c *gin.Context) {
 		return
 	}
 
-	user := trendlybq.Socials{}
+	user := trendlybq.SocialsN8N{}
 	err := user.GetInstagramFromFirestore(username)
 
 	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": err == nil, "lastUpdate": user.LastUpdateTime})
