@@ -63,7 +63,7 @@ type SocialLink struct {
 	LinkType string `db:"link_type" bigquery:"link_type" json:"link_type" firestore:"link_type"`
 }
 
-type Post struct {
+type ChildPost struct {
 	ID             string             `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	Type           string             `db:"type" bigquery:"type" json:"type" firestore:"type"`
 	ShortCode      string             `db:"short_code" bigquery:"short_code" json:"short_code" firestore:"short_code"`
@@ -80,7 +80,11 @@ type Post struct {
 	LocationName   string             `db:"location_name" bigquery:"location_name" json:"location_name" firestore:"location_name"`
 	LocationID     string             `db:"location_id" bigquery:"location_id" json:"location_id" firestore:"location_id"`
 	IsPinned       bool               `db:"is_pinned" bigquery:"is_pinned" json:"is_pinned" firestore:"is_pinned"`
-	ChildPosts     []Post             `db:"child_posts" bigquery:"child_posts" json:"child_posts" firestore:"child_posts"`
+}
+
+type Post struct {
+	ChildPost
+	ChildPosts []ChildPost `db:"child_posts" bigquery:"child_posts" json:"child_posts" firestore:"child_posts"`
 }
 
 type SocialsN8N struct {

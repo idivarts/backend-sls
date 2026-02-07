@@ -84,15 +84,17 @@ func translate(old trendlybq.Socials) trendlybq.SocialsN8N {
 
 	for _, r := range old.Reels {
 		new.LatestReels = append(new.LatestReels, trendlybq.Post{
-			ID:             r.ID,
-			DisplayURL:     r.ThumbnailURL,
-			URL:            r.URL,
-			Caption:        r.Caption,
-			IsPinned:       r.Pinned,
-			VideoViewCount: r.ViewsCount,
-			LikesCount:     r.LikesCount,
-			CommentsCount:  r.CommentsCount,
-			Type:           "video",
+			ChildPost: trendlybq.ChildPost{
+				ID:             r.ID,
+				DisplayURL:     r.ThumbnailURL,
+				URL:            r.URL,
+				Caption:        r.Caption,
+				IsPinned:       r.Pinned,
+				VideoViewCount: r.ViewsCount,
+				LikesCount:     r.LikesCount,
+				CommentsCount:  r.CommentsCount,
+				Type:           "video",
+			},
 		})
 	}
 
