@@ -23,3 +23,12 @@ func CreateOrder(amountInRs int, notes map[string]interface{}) (map[string]inter
 
 	return order, nil
 }
+
+func FetchOrder(orderID string) (map[string]interface{}, error) {
+	order, err := Client.Order.Fetch(orderID, nil, nil)
+	if err != nil {
+		log.Println("Error fetching order:", err)
+		return nil, err
+	}
+	return order, nil
+}

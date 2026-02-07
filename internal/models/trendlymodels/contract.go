@@ -54,6 +54,8 @@ type Payment struct {
 	OrderID   string `json:"orderId,omitempty" firestore:"orderId,omitempty"`
 	Status    string `json:"status,omitempty" firestore:"status,omitempty"`
 	PaymentID string `json:"paymentId,omitempty" firestore:"paymentId,omitempty"`
+	ShortURL  string `json:"shortUrl,omitempty" firestore:"shortUrl,omitempty"`
+	Amount    int    `json:"amount,omitempty" firestore:"amount,omitempty"`
 }
 type Shipment struct {
 	TrackingID         string      `json:"trackingId,omitempty" firestore:"trackingId,omitempty"`

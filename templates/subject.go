@@ -24,4 +24,5 @@ const (
 	SubjectInfluencerInviteAccepted   = "Your collab invite was accepted! Start chatting now 🎉"
 	SubjectInfluencerInviteRejected   = "Your invite wasn’t accepted—but don’t stop creating ✨"
 	SubjectCollaborationTakedown      = "Important: Your collaboration has been taken down"
+	SubjectPaymentOrderCreated        = "A payment order has been created for your collaboration"
 )
