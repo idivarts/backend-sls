@@ -33,12 +33,15 @@ func main() {
 			log.Fatalf("Failed to insert to BigQuery: %v", err)
 		}
 
+		log.Printf("Inserted %d records to BigQuery", len(newSocials))
+
 		// Push to Firestore (Minimized)
 		for _, v := range newSocials {
 			err = v.UpdateMinified()
 			if err != nil {
 				log.Printf("Failed to update Firestore for %s: %v", v.ID, err)
 			}
+			log.Printf("Updated Firestore for %s", v.ID)
 		}
 
 		totalMigrated += len(oldSocials)
