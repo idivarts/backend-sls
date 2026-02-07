@@ -105,6 +105,11 @@ func AddProfile(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID, "count": dLen})
 }
 
+func LoadAllProfiles(c *gin.Context) {
+	//Example URL to test this - https://api.apify.com/v2/datasets/1vX9FW3yaOzkrFeBT/items
+
+}
+
 // func calculateFunctionLater(){
 // 	eRates := []float32{}
 // 	viewsList := []int64{}
