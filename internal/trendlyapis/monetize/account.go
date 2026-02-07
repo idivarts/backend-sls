@@ -117,13 +117,69 @@ func UpdateBankDetails(c *gin.Context) {
 }
 
 func UpdateAddress(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
+	var req payments.AddressReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
 		return
 	}
 
-	// The real implementation will go here in the future
+	userId, _ := middlewares.GetUserId(c)
+	user := middlewares.GetUserModel(c)
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	if user.KYC == nil || user.KYC.AccountID == "" || user.KYC.StakeHolderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Razorpay account or stakeholder not found for this user"})
+		return
+	}
+
+	// 1. Prepare data for Razorpay Update
+	pan := ""
+	if user.KYC.PANDetails != nil {
+		pan = user.KYC.PANDetails.PANNumber
+	}
+
+	email := ""
+	if user.Email != nil {
+		email = *user.Email
+	}
+
+	phone := ""
+	if user.PhoneNumber != nil {
+		phone = *user.PhoneNumber
+	}
+
+	updateReq := payments.CreateAccountReq{
+		Name:    user.Name,
+		Email:   email,
+		Phone:   phone,
+		UserId:  userId,
+		Address: req,
+		PAN:     pan,
+	}
+
+	// 2. Sync with Razorpay
+	account, stakeholder, err := payments.UpdateAccountAndStakeHolderAddress(user.KYC.AccountID, user.KYC.StakeHolderID, updateReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update address in Razorpay"})
+		return
+	}
+
+	// 3. Update user.KYC.CurrentAddress in Firestore
+	user.KYC.CurrentAddress = &trendlymodels.CurrentAddress{
+		Street:     req.Street,
+		City:       req.City,
+		State:      req.State,
+		PostalCode: req.PostalCode,
+	}
+
+	_, err = user.Insert(userId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update user records"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Address updated successfully",
+		"account":     account,
+		"stakeholder": stakeholder,
+	})
 }
