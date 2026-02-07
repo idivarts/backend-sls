@@ -1,8 +1,19 @@
 package trendlybq
 
 import (
+	"context"
+	"errors"
+	"log"
+
 	"cloud.google.com/go/bigquery"
 	"github.com/google/uuid"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/myquery"
+	"google.golang.org/api/iterator"
+)
+
+const (
+	SocialsN8NFullTableName = "`trendly-9ab99.matches.socials-n8n`"
 )
 
 type SocialsScrapePending struct {
@@ -124,4 +135,296 @@ type SocialsN8N struct {
 func (data *SocialsN8N) GetID() string {
 	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.SocialType+data.Username))
 	return ID.String()
+}
+
+func (data *SocialsN8N) Insert() error {
+	data.ID = data.GetID()
+	inserter := myquery.Client.Dataset("matches").Table(`socials-n8n`).Inserter()
+	if err := inserter.Put(context.Background(), []*SocialsN8N{
+		data,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (_ SocialsN8N) InsertMultiple(socials []SocialsN8N) error {
+	inserter := myquery.Client.Dataset("matches").Table(`socials-n8n`).Inserter()
+	if err := inserter.Put(context.Background(), socials); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (data *SocialsN8N) InsertToFirestore() error {
+	if data.ID == "" {
+		data.ID = data.GetID()
+	}
+	_, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(data.ID).Set(context.Background(), data)
+	return err
+}
+
+func (data *SocialsN8N) ConvertToSocialBreif() *SocialsBreif {
+	return &SocialsBreif{
+		ID:              data.ID,
+		Name:            data.Name,
+		Username:        data.Username,
+		ProfilePic:      data.ProfilePic,
+		FollowerCount:   data.FollowerCount,
+		ViewsCount:      data.ViewsCount,
+		EnagamentsCount: data.EngagementCount,
+		EngagementRate:  data.EngagementRate,
+		SocialType:      data.SocialType,
+		Location:        data.Location,
+		Bio:             data.Bio,
+		ProfileVerified: data.ProfileVerified,
+		CreationTime:    data.CreationTime,
+		LastUpdateTime:  data.LastUpdateTime,
+	}
+}
+
+func (data *SocialsN8N) UpdateMinified() error {
+	x := data.ConvertToSocialBreif()
+
+	_, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(data.ID).Set(context.Background(), x)
+	return err
+}
+
+func (data *SocialsN8N) UpdateAllImages() error {
+	if data.ID == "" {
+		data.ID = data.GetID()
+	}
+
+	q := myquery.Client.Query(`
+		UPDATE ` + SocialsN8NFullTableName + `
+		SET
+		  profile_pic = @profile_pic,
+		  latest_posts = @latest_posts,
+		  latest_reels = @latest_reels,
+		  last_update_time = @last_update_time
+		WHERE id = @id
+	`)
+
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "id", Value: data.ID},
+		{Name: "profile_pic", Value: data.ProfilePic},
+		{Name: "latest_posts", Value: data.LatestPosts},
+		{Name: "latest_reels", Value: data.LatestReels},
+		{Name: "last_update_time", Value: data.LastUpdateTime},
+	}
+
+	job, err := q.Run(context.Background())
+	if err != nil {
+		return err
+	}
+	status, err := job.Wait(context.Background())
+	if err != nil {
+		return err
+	}
+	if status.Err() != nil {
+		return status.Err()
+	}
+	return nil
+}
+
+func (_ SocialsN8N) GetPaginated(offset, limit int) ([]SocialsN8N, error) {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsN8NFullTableName + `
+    LIMIT @limit
+	OFFSET @offset
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "limit", Value: limit},
+		{Name: "offset", Value: offset},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		log.Println("Error ", err.Error())
+		return nil, err
+	}
+
+	results := []SocialsN8N{}
+	for {
+		data := &SocialsN8N{}
+		err = it.Next(data)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println("Error ", err.Error())
+			continue
+		}
+		results = append(results, *data)
+	}
+	return results, nil
+}
+
+func (_ SocialsN8N) GetPaginatedFromFirestore(offset, limit int) ([]SocialsN8N, error) {
+	temp := firestoredb.Client.Collection("scrapped-socials-n8n").Offset(offset)
+	if limit > 0 {
+		temp = temp.Limit(limit)
+	}
+	it, err := temp.Documents(context.Background()).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	results := []SocialsN8N{}
+	for _, v := range it {
+		social := &SocialsN8N{}
+		err = v.DataTo(social)
+		if err != nil {
+			continue
+		}
+		results = append(results, *social)
+	}
+	return results, nil
+}
+
+func (s *SocialsN8N) GetByIdFromFirestore(id string) error {
+	res, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(id).Get(context.Background())
+	if err != nil {
+		return err
+	}
+	err = res.DataTo(s)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (data *SocialsN8N) Get(id string) error {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsN8NFullTableName + `
+    WHERE id = @id
+    LIMIT 1
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "id", Value: id},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = it.Next(data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (_ SocialsN8N) GetMultipleBreifs(ids []string) ([]SocialsBreif, error) {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsN8NFullTableName + `
+    WHERE id IN UNNEST(@ids)
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "ids", Value: ids},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	results := []SocialsBreif{}
+	for {
+		row := &SocialsBreif{}
+		err = it.Next(row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println("Error ", err.Error())
+			continue
+		}
+		results = append(results, *row)
+	}
+	return results, nil
+}
+
+func (_ SocialsN8N) GetMultiple(ids []string) ([]SocialsN8N, error) {
+	q := myquery.Client.Query(`
+    SELECT *
+    FROM ` + SocialsN8NFullTableName + `
+    WHERE id IN UNNEST(@ids)
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "ids", Value: ids},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	results := []SocialsN8N{}
+	for {
+		row := &SocialsN8N{}
+		err = it.Next(row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Println("Error ", err.Error())
+			continue
+		}
+		results = append(results, *row)
+	}
+	return results, nil
+}
+
+func (data *SocialsN8N) GetInstagram(username string) error {
+	data.Username = username
+	data.SocialType = "instagram"
+	id := data.GetID()
+
+	q := myquery.Client.Query(`
+	SELECT *
+	FROM ` + SocialsN8NFullTableName + `
+	WHERE id = @id
+	LIMIT 1
+`)
+	q.Parameters = []bigquery.QueryParameter{
+		{Name: "id", Value: id},
+	}
+
+	it, err := q.Read(context.Background())
+	if err != nil {
+		return err
+	}
+
+	err = it.Next(data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (data *SocialsN8N) GetInstagramFromFirestore(username string) error {
+	data.Username = username
+	data.SocialType = "instagram"
+	id := data.GetID()
+
+	d, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(id).Get(context.Background())
+	if err != nil {
+		return err
+	}
+
+	if !d.Exists() {
+		return errors.New("document-doesnt-exists")
+	}
+
+	err = d.DataTo(data)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
