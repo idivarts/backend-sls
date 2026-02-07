@@ -69,10 +69,11 @@ type Shipment struct {
 	ReceivedNotes      string      `json:"receivedNotes,omitempty" firestore:"receivedNotes,omitempty"`
 }
 type Deliverable struct {
-	DeliverableID    string   `json:"deliverableId,omitempty" firestore:"deliverableId,omitempty"`
 	Status           string   `json:"status,omitempty" firestore:"status,omitempty"`
 	DeliverableLinks []string `json:"deliverableLinks,omitempty" firestore:"deliverableLinks,omitempty"`
 	Notes            string   `json:"notes,omitempty" firestore:"notes,omitempty"`
+	RevisionCount    int      `json:"revisionCount,omitempty" firestore:"revisionCount,omitempty"`
+	RevisionNotes    []string `json:"revisionNotes,omitempty" firestore:"revisionNotes,omitempty"`
 }
 type Posting struct {
 	ScheduledDate int64    `json:"scheduledDate,omitempty" firestore:"scheduledDate,omitempty"`

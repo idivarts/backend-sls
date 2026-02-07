@@ -34,6 +34,8 @@ func brandAPIs(handler *gin.RouterGroup) {
 	brands.POST("/contracts/:contractId/deliverable/request", monetize.RequestDeliverable)
 	// [BRAND] Approve the Video
 	brands.POST("/contracts/:contractId/deliverable/approve", monetize.ApproveDeliverable)
+	// [BRAND] Request for Change
+	brands.POST("/contracts/:contractId/deliverable/revision", monetize.RequestDeliverableChange)
 
 	// [BRAND] Schedule/Reschedule the release date of the video
 	brands.POST("/contracts/:contractId/posting/schedule", monetize.SchedulePosting)

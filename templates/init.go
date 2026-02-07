@@ -35,4 +35,5 @@ const (
 	ShipmentReceivedForInfluencer     myemail.TemplatePath = "templates/shipment_received_influencer.html"
 	DeliverableRequested              myemail.TemplatePath = "templates/deliverable_requested.html"
 	DeliverableSent                   myemail.TemplatePath = "templates/deliverable_sent.html"
+	DeliverableRevisionRequested      myemail.TemplatePath = "templates/deliverable_revision.html"
 )
