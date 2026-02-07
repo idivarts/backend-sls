@@ -46,13 +46,13 @@ type SocialsBreif struct {
 	LastUpdateTime int64 `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
 }
 
-type SocialLinkV2 struct {
+type SocialLink struct {
 	Title    string `db:"title" bigquery:"title" json:"title" firestore:"title"`
 	URL      string `db:"url" bigquery:"url" json:"url" firestore:"url"`
 	LinkType string `db:"link_type" bigquery:"link_type" json:"link_type" firestore:"link_type"`
 }
 
-type PostV2 struct {
+type Post struct {
 	ID             string             `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	Type           string             `db:"type" bigquery:"type" json:"type" firestore:"type"`
 	ShortCode      string             `db:"short_code" bigquery:"short_code" json:"short_code" firestore:"short_code"`
@@ -69,10 +69,10 @@ type PostV2 struct {
 	LocationName   string             `db:"location_name" bigquery:"location_name" json:"location_name" firestore:"location_name"`
 	LocationID     string             `db:"location_id" bigquery:"location_id" json:"location_id" firestore:"location_id"`
 	IsPinned       bool               `db:"is_pinned" bigquery:"is_pinned" json:"is_pinned" firestore:"is_pinned"`
-	ChildPosts     []PostV2           `db:"child_posts" bigquery:"child_posts" json:"child_posts" firestore:"child_posts"`
+	ChildPosts     []Post             `db:"child_posts" bigquery:"child_posts" json:"child_posts" firestore:"child_posts"`
 }
 
-type SocialsV2 struct {
+type N8NSocials struct {
 	ID    string `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	State int    `db:"state" bigquery:"state" json:"state" firestore:"state"`
 
@@ -105,10 +105,10 @@ type SocialsV2 struct {
 	QualityScore int      `db:"quality_score" bigquery:"quality_score" json:"quality_score" firestore:"quality_score"`
 
 	// Scraper specific fields
-	ExternalURL string         `db:"external_url" bigquery:"external_url" json:"external_url" firestore:"external_url"`
-	Links       []SocialLinkV2 `db:"links" bigquery:"links" json:"links" firestore:"links"`
-	LatestPosts []PostV2       `db:"latest_posts" bigquery:"latest_posts" json:"latest_posts" firestore:"latest_posts"`
-	LatestReels []PostV2       `db:"latest_reels" bigquery:"latest_reels" json:"latest_reels" firestore:"latest_reels"`
+	ExternalURL string       `db:"external_url" bigquery:"external_url" json:"external_url" firestore:"external_url"`
+	Links       []SocialLink `db:"links" bigquery:"links" json:"links" firestore:"links"`
+	LatestPosts []Post       `db:"latest_posts" bigquery:"latest_posts" json:"latest_posts" firestore:"latest_posts"`
+	LatestReels []Post       `db:"latest_reels" bigquery:"latest_reels" json:"latest_reels" firestore:"latest_reels"`
 
 	// Metadata
 	AddedBy        string `db:"added_by" bigquery:"added_by" json:"added_by" firestore:"added_by"`
@@ -121,7 +121,7 @@ type SocialsV2 struct {
 	HasContacts        bool `db:"has_contacts" bigquery:"has_contacts" json:"has_contacts" firestore:"has_contacts"`
 }
 
-func (data *SocialsV2) GetID() string {
+func (data *N8NSocials) GetID() string {
 	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.SocialType+data.Username))
 	return ID.String()
 }
