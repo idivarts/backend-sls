@@ -36,4 +36,5 @@ const (
 	DeliverableRequested              myemail.TemplatePath = "templates/deliverable_requested.html"
 	DeliverableSent                   myemail.TemplatePath = "templates/deliverable_sent.html"
 	DeliverableRevisionRequested      myemail.TemplatePath = "templates/deliverable_revision.html"
+	DeliverableApproved               myemail.TemplatePath = "templates/deliverable_approved.html"
 )

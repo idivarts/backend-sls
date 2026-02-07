@@ -33,4 +33,5 @@ const (
 	SubjectDeliverableRequested          = "Action Required: Brand is waiting for your deliverable 📽️"
 	SubjectDeliverableSent               = "New Deliverable Received! Review the video now 📽️"
 	SubjectDeliverableRevisionRequested  = "Revision Requested: Brand has shared feedback for changes 📽️"
+	SubjectDeliverableApproved           = "Excellent news! Your deliverable has been approved 🎉"
 )

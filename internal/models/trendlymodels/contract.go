@@ -76,9 +76,10 @@ type Deliverable struct {
 	RevisionNotes    []string `json:"revisionNotes,omitempty" firestore:"revisionNotes,omitempty"`
 }
 type Posting struct {
-	ScheduledDate int64    `json:"scheduledDate,omitempty" firestore:"scheduledDate,omitempty"`
-	Status        string   `json:"status,omitempty" firestore:"status,omitempty"`
-	PostedLinks   []string `json:"postedLinks,omitempty" firestore:"postedLinks,omitempty"`
+	ScheduledDate   int64    `json:"scheduledDate,omitempty" firestore:"scheduledDate,omitempty"`
+	Status          string   `json:"status,omitempty" firestore:"status,omitempty"`
+	PostedLinks     []string `json:"postedLinks,omitempty" firestore:"postedLinks,omitempty"`
+	PostingScenario string   `json:"postingScenario,omitempty" firestore:"postingScenario,omitempty"`
 }
 type Analytics struct {
 	Views       int `json:"views,omitempty" firestore:"views,omitempty"`

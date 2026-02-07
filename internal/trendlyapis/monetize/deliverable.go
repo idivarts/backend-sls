@@ -78,16 +78,127 @@ func RequestDeliverable(c *gin.Context) {
 	})
 }
 
+type ApproveDeliverableReq struct {
+	PostingScenario int   `json:"postingScenario" binding:"required"` // 1, 2, or 3
+	ScheduledDate   int64 `json:"scheduledDate"`                      // Required for scenario 1 & 2
+}
+
 func ApproveDeliverable(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
+	var req ApproveDeliverableReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
 		return
 	}
 
-	// The real implementation will go here in the future
+	data, err := initializeData(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	scenarioText := ""
+	switch req.PostingScenario {
+	case 1:
+		scenarioText = "Influencer Will Post"
+		data.Contract.Status = 8 // Post Scheduled
+		if req.ScheduledDate == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Scheduled date is required for this scenario"})
+			return
+		}
+	case 2:
+		scenarioText = "Influencer and Brand Collab Post"
+		data.Contract.Status = 8 // Post Scheduled
+		if req.ScheduledDate == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Scheduled date is required for this scenario"})
+			return
+		}
+	case 3:
+		scenarioText = "Brand will use video independently"
+		data.Contract.Status = 9 // Post Done
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid posting scenario"})
+		return
+	}
+
+	// 1. Update Contract Posting and Status
+	if data.Contract.Posting == nil {
+		data.Contract.Posting = &trendlymodels.Posting{}
+	}
+	data.Contract.Posting.PostingScenario = scenarioText
+	data.Contract.Posting.ScheduledDate = req.ScheduledDate
+	data.Contract.Posting.Status = "approved"
+
+	err = data.Contract.Update(data.ContractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return
+	}
+
+	// 2. Fetch Influencer for notification
+	influencer := &trendlymodels.User{}
+	err = influencer.Get(data.Contract.UserID)
+	if err != nil {
+		log.Printf("Failed to get influencer: %v", err)
+	}
+
+	collab := &trendlymodels.Collaboration{}
+	err = collab.Get(data.Contract.CollaborationID)
+	collabName := "Your Collaboration"
+	if err == nil {
+		collabName = collab.Name
+	}
+
+	// 3. Notify Influencer (Push & Email)
+	scheduledDateStr := ""
+	if req.ScheduledDate > 0 {
+		scheduledDateStr = time.UnixMilli(req.ScheduledDate).Format("Jan 02, 2006")
+	}
+
+	notif := &trendlymodels.Notification{
+		Title:       "Deliverable Approved! 🎉",
+		Description: fmt.Sprintf("%s has approved your video for %s. Posting Scenario: %s", data.Brand.Name, collabName, scenarioText),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "deliverable-approved",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, data.Contract.UserID)
+	if err != nil {
+		log.Printf("Failed to send push notification: %v", err)
+	}
+
+	if influencer.Email != nil {
+		emailData := map[string]interface{}{
+			"InfluencerName":      influencer.Name,
+			"BrandName":           data.Brand.Name,
+			"CollabTitle":         collabName,
+			"PostingScenario":     scenarioText,
+			"ScheduledDate":       scheduledDateStr,
+			"IsInfluencerPosting": req.PostingScenario == 1 || req.PostingScenario == 2,
+			"ContractLink":        fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+		}
+		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.DeliverableApproved, templates.SubjectDeliverableApproved, emailData)
+		if err != nil {
+			log.Printf("Failed to send deliverable approved email: %v", err)
+		}
+	}
+
+	// 4. Send Stream System Message
+	streamMessage := fmt.Sprintf("🎉 **Deliverable Approved!**\n\n%s has approved the content! ✨\n\n**Posting Scenario:** %s", data.Brand.Name, scenarioText)
+	if scheduledDateStr != "" {
+		streamMessage += fmt.Sprintf("\n**Scheduled Date:** %s", scheduledDateStr)
+	}
+	err = streamchat.SendSystemMessage(data.Contract.StreamChannelID, streamMessage)
+	if err != nil {
+		log.Printf("Failed to send stream message: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Deliverable approved and posting scheduled successfully",
+	})
 }
 
 type DeliverableChangeReq struct {
