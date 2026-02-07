@@ -41,10 +41,8 @@ func CreateAccount(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to create account"})
 		return
 	}
-	accountId := account["id"].(string)
-	stakeholderId := stakeholder["id"].(string)
 
-	product, err := payments.CreataOrUpdateProduct(accountId, req.Bank)
+	product, err := payments.CreataOrUpdateProduct(account.ID, req.Bank)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to create/update bank details"})
 		return
@@ -52,8 +50,8 @@ func CreateAccount(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Account and Bank Details created successfully",
-		"accountId":     accountId,
-		"stakeholderId": stakeholderId,
+		"accountId":     account.ID,
+		"stakeholderId": stakeholder.ID,
 		"product":       product,
 	})
 }
@@ -69,11 +67,11 @@ func GetAccountStatus(c *gin.Context) {
 
 	product, err := payments.GetProduct(user.Name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to create/update bank details"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to fetch account status"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"product": product, "message": "This is the product"})
+	c.JSON(http.StatusOK, gin.H{"product": product, "message": "Account status fetched successfully"})
 }
 
 func UpdateBankDetails(c *gin.Context) {
