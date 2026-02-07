@@ -231,6 +231,11 @@ func (_ SocialsN8N) GetPaginated(offset, limit int) ([]SocialsN8N, error) {
 	q := myquery.Client.Query(`
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
+	QUALIFY
+		ROW_NUMBER() OVER (
+			PARTITION BY id
+			ORDER BY last_update_time DESC
+		) = 1
     LIMIT @limit
 	OFFSET @offset
 `)
@@ -322,6 +327,11 @@ func (_ SocialsN8N) GetMultipleBreifs(ids []string) ([]SocialsBreif, error) {
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
     WHERE id IN UNNEST(@ids)
+	QUALIFY
+		ROW_NUMBER() OVER (
+			PARTITION BY id
+			ORDER BY last_update_time DESC
+		) = 1
 `)
 	q.Parameters = []bigquery.QueryParameter{
 		{Name: "ids", Value: ids},
@@ -353,6 +363,11 @@ func (_ SocialsN8N) GetMultiple(ids []string) ([]SocialsN8N, error) {
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
     WHERE id IN UNNEST(@ids)
+	QUALIFY
+		ROW_NUMBER() OVER (
+			PARTITION BY id
+			ORDER BY last_update_time DESC
+		) = 1
 `)
 	q.Parameters = []bigquery.QueryParameter{
 		{Name: "ids", Value: ids},

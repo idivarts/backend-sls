@@ -176,6 +176,11 @@ func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 	q := myquery.Client.Query(`
     SELECT *
     FROM ` + SocialsFullTableName + `
+	QUALIFY
+		ROW_NUMBER() OVER (
+			PARTITION BY id
+			ORDER BY last_update_time DESC
+		) = 1
     LIMIT @limit
 	OFFSET @offset
 `)
