@@ -10,6 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/n8n"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
@@ -106,8 +107,22 @@ func AddProfile(c *gin.Context) {
 }
 
 func LoadAllProfiles(c *gin.Context) {
-	//Example URL to test this - https://api.apify.com/v2/datasets/1vX9FW3yaOzkrFeBT/items
+	var req struct {
+		OutputUrl string `json:"outputUrl" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Input", "error": err.Error()})
+		return
+	}
 
+	influencerList, err := n8n.GetInfluencerList(req.OutputUrl)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Failed to get influencer list", "error": err.Error()})
+		return
+	}
+
+	isPending := trendlybq.IsPendingScanExists()
+	c.JSON(http.StatusOK, gin.H{"message": "Influencer list received", "count": len(influencerList), "isPending": isPending})
 }
 
 // func calculateFunctionLater(){

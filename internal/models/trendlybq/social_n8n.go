@@ -477,3 +477,10 @@ func (data *SocialsN8N) GetInstagramFromFirestore(username string) error {
 
 	return nil
 }
+func IsPendingScanExists() bool {
+	snap, err := firestoredb.Client.Collection("scrapped-socials-n8n").Where("state", "==", 0).Limit(1).Documents(context.Background()).Next()
+	if err != nil {
+		return false
+	}
+	return snap != nil
+}
