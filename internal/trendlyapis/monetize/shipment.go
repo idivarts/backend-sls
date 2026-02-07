@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/mytime"
@@ -124,15 +125,65 @@ func MarkShipmentDelivered(c *gin.Context) {
 }
 
 func RequestShipment(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
+	data, err := initializeData(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
 		return
 	}
 
-	// The real implementation will go here in the future
+	// 1. Fetch Influencer (Sender)
+	influencer := &trendlymodels.User{}
+	err = influencer.Get(data.Contract.UserID)
+	if err != nil {
+		log.Printf("Failed to get influencer: %v", err)
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	collab := &trendlymodels.Collaboration{}
+	err = collab.Get(data.Contract.CollaborationID)
+	collabName := "Your Collaboration"
+	if err == nil {
+		collabName = collab.Name
+	}
+
+	// 2. Send Push Notification to Brand
+	notif := &trendlymodels.Notification{
+		Title:       "Shipment Requested 📦",
+		Description: fmt.Sprintf("%s is waiting for the shipment for %s", influencer.Name, collabName),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "shipment-request",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	_, brandEmails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, data.Contract.BrandID)
+	if err != nil {
+		log.Printf("Failed to insert notification: %v", err)
+	}
+
+	// 3. Send Email to Brand members
+	if len(brandEmails) > 0 {
+		emailData := map[string]interface{}{
+			"BrandMemberName": data.Brand.Name,
+			"InfluencerName":  influencer.Name,
+			"CollabTitle":     collabName,
+			"ShipmentLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID), // Example link, might need adjustment if constants available
+		}
+		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.ShipmentRequested, templates.SubjectShipmentRequested, emailData)
+		if err != nil {
+			log.Printf("Failed to send shipment request email: %v", err)
+		}
+	}
+
+	// 4. Send Stream System Message
+	streamMessage := fmt.Sprintf("📢 **Update:** We've notified %s that you're waiting for the shipment for '**%s**'.\n\nWe'll keep you posted once they update the tracking details!", data.Brand.Name, collabName)
+	err = streamchat.SendSystemMessage(data.Contract.StreamChannelID, streamMessage)
+	if err != nil {
+		log.Printf("Failed to send stream message: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Brand notified successfully for shipment"})
 }
 
 func MarkShipmentReceived(c *gin.Context) {

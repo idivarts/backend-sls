@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Shipment Reminder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #d32f2f;
+        }
+
+        .info-box {
+            background-color: #fff9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #d32f2f;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+
+        .button {
+            background-color: #2e7d32;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>📦 Shipment Reminder</h2>
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p><strong>{{.InfluencerName}}</strong> has sent a reminder regarding the shipment for the collaboration
+            "<strong>{{.CollabTitle}}</strong>".</p>
+
+        <div class="info-box">
+            <p>The influencer is ready to start working on the content but is waiting to receive the product(s).</p>
+        </div>
+
+        <p>Please update the shipment details once the product has been shipped to keep the influencer updated.</p>
+
+        <a href="{{.ShipmentLink}}" class="button">Update Shipment Details</a>
+
+        <div class="footer">
+            You're receiving this email because you're part of a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

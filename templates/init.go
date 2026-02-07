@@ -29,4 +29,5 @@ const (
 	CollaborationTakedown             myemail.TemplatePath = "templates/collaboration_takedown.html"
 	PaymentOrderCreated               myemail.TemplatePath = "templates/payment_order_created.html"
 	ShipmentMarked                    myemail.TemplatePath = "templates/shipment_marked.html"
+	ShipmentRequested                 myemail.TemplatePath = "templates/shipment_request.html"
 )
