@@ -80,6 +80,9 @@ type Posting struct {
 	Status          string   `json:"status,omitempty" firestore:"status,omitempty"`
 	PostedLinks     []string `json:"postedLinks,omitempty" firestore:"postedLinks,omitempty"`
 	PostingScenario string   `json:"postingScenario,omitempty" firestore:"postingScenario,omitempty"`
+	ProofScreenshot string   `json:"proofScreenshot,omitempty" firestore:"proofScreenshot,omitempty"`
+	PostURL         string   `json:"postUrl,omitempty" firestore:"postUrl,omitempty"`
+	Notes           string   `json:"notes,omitempty" firestore:"notes,omitempty"`
 }
 type Analytics struct {
 	Views       int `json:"views,omitempty" firestore:"views,omitempty"`

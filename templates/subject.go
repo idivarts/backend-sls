@@ -36,4 +36,6 @@ const (
 	SubjectDeliverableApproved           = "Excellent news! Your deliverable has been approved 🎉"
 	SubjectPostRescheduleRequested       = "Reschedule Requested: Influencer has suggested a change in posting date 🗓️"
 	SubjectPostRescheduledByBrand        = "Update: Your posting date has been rescheduled 🗓️"
+	SubjectPostMarkedLiveForBrand        = "It's LIVE! 🚀 Content has been posted for your review"
+	SubjectPostMarkedLiveForInfluencer   = "Congratulations! 🎉 Your post is live"
 )

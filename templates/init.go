@@ -39,4 +39,6 @@ const (
 	DeliverableApproved               myemail.TemplatePath = "templates/deliverable_approved.html"
 	PostRescheduleRequest             myemail.TemplatePath = "templates/post_reschedule_request.html"
 	PostRescheduledInfluencer         myemail.TemplatePath = "templates/post_rescheduled_influencer.html"
+	PostMarkedLiveBrand               myemail.TemplatePath = "templates/post_marked_live_brand.html"
+	PostMarkedLiveInfluencer          myemail.TemplatePath = "templates/post_marked_live_influencer.html"
 )
