@@ -34,9 +34,8 @@ func CreateOrder(c *gin.Context) {
 	if data.Contract.Payment != nil && data.Contract.Payment.OrderID != "" {
 		existingOrder, err := payments.FetchOrder(data.Contract.Payment.OrderID)
 		if err == nil {
-			status := existingOrder["status"].(string)
 			// Statuses: created, attempted, paid
-			if status == "created" || status == "attempted" {
+			if existingOrder.Status == "created" || existingOrder.Status == "attempted" {
 				orderID = data.Contract.Payment.OrderID
 				shortURL = data.Contract.Payment.ShortURL
 				reuseOrder = true
@@ -75,7 +74,7 @@ func CreateOrder(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Failed to Create Order"})
 			return
 		}
-		orderID = order["id"].(string)
+		orderID = order.ID
 
 		// 4. Create a Payment Link for the email
 		customerEmail := ""
