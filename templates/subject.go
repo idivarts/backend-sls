@@ -34,4 +34,5 @@ const (
 	SubjectDeliverableSent               = "New Deliverable Received! Review the video now 📽️"
 	SubjectDeliverableRevisionRequested  = "Revision Requested: Brand has shared feedback for changes 📽️"
 	SubjectDeliverableApproved           = "Excellent news! Your deliverable has been approved 🎉"
+	SubjectPostRescheduleRequested       = "Reschedule Requested: Influencer has suggested a change in posting date 🗓️"
 )
