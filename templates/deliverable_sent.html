@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Deliverable Received</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #2e7d32;
+        }
+
+        .info-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+
+        .button {
+            background-color: #2e7d32;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>📽️ Content Ready for Review!</h2>
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p>Exciting news! <strong>{{.InfluencerName}}</strong> has submitted the deliverable for the collaboration
+            "<strong>{{.CollabTitle}}</strong>".</p>
+
+        <div class="info-box">
+            <p>The content is now ready for your review. Please check it and provide feedback or approval to move
+                forward.</p>
+            {{if .Notes}}
+            <p><strong>Notes from Influencer:</strong> {{.Notes}}</p>
+            {{end}}
+        </div>
+
+        <p>You can view the video and provide your feedback via the link below.</p>
+
+        <a href="{{.ReviewLink}}" class="button">Review Deliverable</a>
+
+        <div class="footer">
+            You're receiving this email because you're part of a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

@@ -31,4 +31,5 @@ const (
 	SubjectShipmentReceivedForBrand      = "Product Received! Influencer is ready to create 📽️"
 	SubjectShipmentReceivedForInfluencer = "Package Received! Time to create some magic ✨"
 	SubjectDeliverableRequested          = "Action Required: Brand is waiting for your deliverable 📽️"
+	SubjectDeliverableSent               = "New Deliverable Received! Review the video now 📽️"
 )
