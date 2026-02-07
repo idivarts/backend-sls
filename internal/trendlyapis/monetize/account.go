@@ -115,21 +115,59 @@ func CreateAccount(c *gin.Context) {
 }
 
 func GetAccountStatus(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
-		return
-	}
-
 	user := middlewares.GetUserModel(c)
 
-	product, err := payments.GetProduct(user.Name)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to fetch account status"})
+	// 1. Check if the user has even started the process
+	if user.KYC == nil || user.KYC.AccountID == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "Account onboarding has not been started.",
+			"kycStatus": "not_started",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"product": product, "message": "Account status fetched successfully"})
+	// 2. Fetch comprehensive details from Razorpay
+	// This helps developers debug and users understand verification bottlenecks
+	account, err := payments.FetchLinkedAccount(user.KYC.AccountID)
+	if err != nil {
+		log.Printf("Error fetching Razorpay account (%s): %v", user.KYC.AccountID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to fetch account status from Razorpay"})
+		return
+	}
+
+	product, err := payments.GetProduct(user.KYC.AccountID)
+	if err != nil {
+		log.Printf("Warning: Failed to fetch product status for %s: %v", user.KYC.AccountID, err)
+	}
+
+	var stakeholder *payments.RPStakeholder
+	if user.KYC.StakeHolderID != "" {
+		stakeholder, err = payments.FetchStakeholder(user.KYC.AccountID, user.KYC.StakeHolderID)
+		if err != nil {
+			log.Printf("Warning: Failed to fetch stakeholder status for %s: %v", user.KYC.StakeHolderID, err)
+		}
+	}
+
+	// 3. Keep Firestore status in sync with Razorpay (Self-healing)
+	if account.Status != "" && account.Status != user.KYC.Status {
+		log.Printf("Syncing KYC status for user %s: Razorpay(%s) vs Firestore(%s)", user.Name, account.Status, user.KYC.Status)
+		user.KYC.Status = account.Status
+
+		userId, _ := middlewares.GetUserId(c)
+		_, updateErr := user.Insert(userId)
+		if updateErr != nil {
+			log.Printf("Failed to sync KYC status to Firestore: %v", updateErr)
+		}
+	}
+
+	// 4. Return detailed response
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Account status fetched successfully",
+		"account":     account,
+		"stakeholder": stakeholder,
+		"product":     product,
+		"kycStatus":   user.KYC.Status,
+	})
 }
 
 func UpdateBankDetails(c *gin.Context) {

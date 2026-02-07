@@ -291,6 +291,20 @@ func FetchProductConfiguration(accountId string, prodId string) (*RPProduct, err
 	return product, nil
 }
 
+func FetchStakeholder(accountId string, stakeholderId string) (*RPStakeholder, error) {
+	stkMap, err := Client.Stakeholder.Fetch(accountId, stakeholderId, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	stk := &RPStakeholder{}
+	if err := structFromMap(stkMap, stk); err != nil {
+		return nil, err
+	}
+
+	return stk, nil
+}
+
 func DeleteAccount(accountId string) (map[string]interface{}, error) {
 	response, err := Client.Account.Delete(accountId, nil, nil)
 	return response, err
