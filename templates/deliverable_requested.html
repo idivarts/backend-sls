@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Deliverable Requested</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #d32f2f;
+        }
+
+        .info-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #d32f2f;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+
+        .button {
+            background-color: #2e7d32;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>📽️ Bring your ideas to life!</h2>
+        <p>Hi <strong>{{.InfluencerName}}</strong>,</p>
+
+        <p><strong>{{.BrandName}}</strong> is excited to see the content for "<strong>{{.CollabTitle}}</strong>" and has
+            requested the deliverable.</p>
+
+        <div class="info-box">
+            <p>Please share when you plan to submit the video and your expected timeline. Communication is key to a
+                great partnership!</p>
+        </div>
+
+        <p>You can upload your deliverable or update your timeline via the link below.</p>
+
+        <a href="{{.DeliverableLink}}" class="button">Go to Contract</a>
+
+        <div class="footer">
+            You're receiving this email because you're part of a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>
