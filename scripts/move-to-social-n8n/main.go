@@ -22,10 +22,14 @@ func main() {
 			break
 		}
 
+		log.Printf("Fetched %d records from Socials", len(oldSocials))
+
 		var newSocials []trendlybq.SocialsN8N
 		for _, old := range oldSocials {
 			newSocials = append(newSocials, translate(old))
 		}
+
+		log.Printf("Translated %d records to SocialsN8N", len(newSocials))
 
 		// Push to BigQuery
 		err = trendlybq.SocialsN8N{}.InsertMultiple(newSocials)
