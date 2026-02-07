@@ -44,7 +44,7 @@ func main() {
 		totalMigrated += len(oldSocials)
 		log.Printf("Migrated %d records so far", totalMigrated)
 
-		if len(oldSocials) < limit {
+		if len(oldSocials) < limit || true {
 			break
 		}
 		offset += limit
