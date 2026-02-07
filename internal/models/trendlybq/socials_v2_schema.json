@@ -1,0 +1,522 @@
+[
+    {
+        "name": "id",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "state",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "username",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "name",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "bio",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "profile_pic",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "profile_pic_hd",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "category",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "social_type",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "profile_verified",
+        "type": "BOOLEAN",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "follower_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "following_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "content_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "views_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "engagement_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "engagement_rate",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "average_views",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "average_likes",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "average_comments",
+        "type": "FLOAT",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "gender",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "niches",
+        "type": "STRING",
+        "mode": "REPEATED"
+    },
+    {
+        "name": "location",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "quality_score",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "external_url",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "links",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "fields": [
+            {
+                "name": "title",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "url",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "link_type",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            }
+        ]
+    },
+    {
+        "name": "latest_posts",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "fields": [
+            {
+                "name": "id",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "type",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "short_code",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "caption",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "url",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "display_url",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_url",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "likes_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "comments_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_view_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_play_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_duration",
+                "type": "FLOAT",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "timestamp",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "location_name",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "location_id",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "is_pinned",
+                "type": "BOOLEAN",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "child_posts",
+                "type": "RECORD",
+                "mode": "REPEATED",
+                "fields": [
+                    {
+                        "name": "id",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "type",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "short_code",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "caption",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "url",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "display_url",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_url",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "likes_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "comments_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_view_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_play_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_duration",
+                        "type": "FLOAT",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "timestamp",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "location_name",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "location_id",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "is_pinned",
+                        "type": "BOOLEAN",
+                        "mode": "NULLABLE"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "latest_reels",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "fields": [
+            {
+                "name": "id",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "type",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "short_code",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "caption",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "url",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "display_url",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_url",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "likes_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "comments_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_view_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_play_count",
+                "type": "INTEGER",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "video_duration",
+                "type": "FLOAT",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "timestamp",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "location_name",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "location_id",
+                "type": "STRING",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "is_pinned",
+                "type": "BOOLEAN",
+                "mode": "NULLABLE"
+            },
+            {
+                "name": "child_posts",
+                "type": "RECORD",
+                "mode": "REPEATED",
+                "fields": [
+                    {
+                        "name": "id",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "type",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "short_code",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "caption",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "url",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "display_url",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_url",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "likes_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "comments_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_view_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_play_count",
+                        "type": "INTEGER",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "video_duration",
+                        "type": "FLOAT",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "timestamp",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "location_name",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "location_id",
+                        "type": "STRING",
+                        "mode": "NULLABLE"
+                    },
+                    {
+                        "name": "is_pinned",
+                        "type": "BOOLEAN",
+                        "mode": "NULLABLE"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "added_by",
+        "type": "STRING",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "creation_time",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "last_update_time",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "is_business_account",
+        "type": "BOOLEAN",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "highlight_reel_count",
+        "type": "INTEGER",
+        "mode": "NULLABLE"
+    },
+    {
+        "name": "has_contacts",
+        "type": "BOOLEAN",
+        "mode": "NULLABLE"
+    }
+]
