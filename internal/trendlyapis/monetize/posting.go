@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SchedulePosting(c *gin.Context) {
+func ReSchedulePosting(c *gin.Context) {
 	var req struct{}
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
@@ -30,7 +30,7 @@ func MarkPosted(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
 }
 
-func RequestPostSchedule(c *gin.Context) {
+func RequestPostReSchedule(c *gin.Context) {
 	var req struct{}
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})

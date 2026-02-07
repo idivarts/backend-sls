@@ -38,7 +38,7 @@ func brandAPIs(handler *gin.RouterGroup) {
 	brands.POST("/contracts/:contractId/deliverable/revision", monetize.RequestDeliverableChange)
 
 	// [BRAND] Schedule/Reschedule the release date of the video
-	brands.POST("/contracts/:contractId/posting/schedule", monetize.SchedulePosting)
+	brands.POST("/contracts/:contractId/posting/reschedule", monetize.ReSchedulePosting)
 }
 
 func influencersAPIs(handler *gin.RouterGroup) {
@@ -67,7 +67,7 @@ func influencersAPIs(handler *gin.RouterGroup) {
 	influencer.POST("/contracts/:contractId/deliverable/request-approval", monetize.RequestDeliverableApproval)
 
 	// [USER] Request to (Re)Schedule a release
-	influencer.POST("/contracts/:contractId/posting/request-schedule", monetize.RequestPostSchedule)
+	influencer.POST("/contracts/:contractId/posting/request-reschedule", monetize.RequestPostReSchedule)
 	// [USER] Mark video as Posted
 	influencer.POST("/contracts/:contractId/posting", monetize.MarkPosted)
 }
