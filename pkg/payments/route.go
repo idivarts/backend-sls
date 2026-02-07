@@ -291,7 +291,7 @@ func FetchProductConfiguration(accountId string, prodId string) (*RPProduct, err
 	return product, nil
 }
 
-func DeleletAccount(accountId string) (map[string]interface{}, error) {
+func DeleteAccount(accountId string) (map[string]interface{}, error) {
 	response, err := Client.Account.Delete(accountId, nil, nil)
 	return response, err
 }

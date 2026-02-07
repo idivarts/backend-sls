@@ -1,6 +1,7 @@
 package monetize
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,13 +12,14 @@ import (
 
 func CreateAccount(c *gin.Context) {
 	var req struct {
-		Name    string              `json:"name" binding:"required"`
-		PAN     string              `json:"pan" binding:"required"`
-		Address payments.AddressReq `json:"address" binding:"required"`
-		Bank    payments.BankReq    `json:"bank" binding:"required"`
+		Name            string              `json:"name" binding:"required"`
+		PAN             string              `json:"pan" binding:"required"`
+		Address         payments.AddressReq `json:"address" binding:"required"`
+		Bank            payments.BankReq    `json:"bank" binding:"required"`
+		ReCreateAccount bool                `json:"reCreateAccount"`
 	}
 
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
 		return
 	}
@@ -29,7 +31,32 @@ func CreateAccount(c *gin.Context) {
 	}
 	user := middlewares.GetUserModel(c)
 
-	// The real implementation will go here in the future
+	// 1. Handle Re-creation logic (Start Fresh)
+	if req.ReCreateAccount && user.KYC != nil && user.KYC.AccountID != "" {
+		log.Printf("Re-creating account for user %s. Deleting old account: %s", userId, user.KYC.AccountID)
+
+		// Attempt to delete old account in Razorpay (Best effort)
+		_, err := payments.DeleteAccount(user.KYC.AccountID)
+		if err != nil {
+			log.Printf("Warning: Failed to delete old Razorpay account %s: %v", user.KYC.AccountID, err)
+		}
+
+		// Reset KYC records in internal state
+		user.KYC.AccountID = ""
+		user.KYC.StakeHolderID = ""
+		user.KYC.ProductID = ""
+		user.KYC.Status = "not_started"
+		user.KYC.Reason = nil
+
+		// Persist the reset before continuing
+		_, err = user.Insert(userId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to reset KYC records for re-creation"})
+			return
+		}
+	}
+
+	// 2. Create Linked Account
 	account, stakeholder, err := payments.CreateLinkedAccount(payments.CreateAccountReq{
 		UserId:  userId,
 		Name:    req.Name,
@@ -43,10 +70,40 @@ func CreateAccount(c *gin.Context) {
 		return
 	}
 
+	// 3. Create/Update Product
 	product, err := payments.CreataOrUpdateProduct(account.ID, req.Bank)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to create/update bank details"})
 		return
+	}
+
+	// 4. Update user model with new credentials
+	if user.KYC == nil {
+		user.KYC = &trendlymodels.KYC{}
+	}
+	user.KYC.AccountID = account.ID
+	user.KYC.StakeHolderID = stakeholder.ID
+	user.KYC.ProductID = product.ID
+	user.KYC.Status = "in_progress" // Or based on Razorpay status
+	user.KYC.BankDetails = &trendlymodels.BankDetails{
+		AccountNumber:   req.Bank.AccountNumber,
+		IFSC:            req.Bank.IFSC,
+		BeneficiaryName: req.Bank.BenificiaryName,
+	}
+	user.KYC.PANDetails = &trendlymodels.PANDetails{
+		PANNumber:    req.PAN,
+		NameAsPerPAN: req.Name,
+	}
+	user.KYC.CurrentAddress = &trendlymodels.CurrentAddress{
+		Street:     req.Address.Street,
+		City:       req.Address.City,
+		State:      req.Address.State,
+		PostalCode: req.Address.PostalCode,
+	}
+
+	_, err = user.Insert(userId)
+	if err != nil {
+		log.Printf("Failed to update user KYC records after creation: %v", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
