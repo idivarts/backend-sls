@@ -72,7 +72,7 @@ type Post struct {
 	ChildPosts     []Post             `db:"child_posts" bigquery:"child_posts" json:"child_posts" firestore:"child_posts"`
 }
 
-type N8NSocials struct {
+type SocialsN8N struct {
 	ID    string `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	State int    `db:"state" bigquery:"state" json:"state" firestore:"state"`
 
@@ -121,7 +121,7 @@ type N8NSocials struct {
 	HasContacts        bool `db:"has_contacts" bigquery:"has_contacts" json:"has_contacts" firestore:"has_contacts"`
 }
 
-func (data *N8NSocials) GetID() string {
+func (data *SocialsN8N) GetID() string {
 	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.SocialType+data.Username))
 	return ID.String()
 }
