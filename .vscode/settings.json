@@ -14,7 +14,7 @@
         "n8n": true,
         "scripts": true,
         "src": true,
-        "templates": true,
+        "templates": false,
         "Makefile": true,
         ".gitignore": true,
         "go.mod": true,
