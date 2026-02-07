@@ -79,7 +79,7 @@ func webhookHandler(handler *gin.RouterGroup) {
 	webhook.Any("/payments", monetize.PaymentWebhook)
 
 	// Once Payment processed, notify both the agents and close the contract
-	webhook.Any("/tranfer", monetize.TransferWebhook)
+	webhook.Any("/transfer", monetize.TransferWebhook)
 
 }
 
