@@ -37,7 +37,7 @@ func uploadImage(socialId string) error {
 	social = sui.MoveImagesToS3(social)
 	social.LastUpdateTime = time.Now().UnixMicro()
 
-	social.InsertToFirestore()
+	social.InsertToFirestore(true)
 
 	return nil
 }

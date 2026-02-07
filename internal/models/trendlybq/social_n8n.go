@@ -173,11 +173,15 @@ func (data *SocialsScrapePending) InsertToFirestore() error {
 	return err
 }
 
-func (data *SocialsN8N) InsertToFirestore() error {
+func (data *SocialsN8N) InsertToFirestore(isImagesOnS3 bool) error {
 	if data.ID == "" {
 		data.ID = data.GetID()
 	}
-	data.State = 2
+	if isImagesOnS3 {
+		data.State = 3
+	} else {
+		data.State = 2
+	}
 	_, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(data.ID).Set(context.Background(), data)
 	return err
 }

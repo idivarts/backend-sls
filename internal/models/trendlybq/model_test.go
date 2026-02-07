@@ -22,7 +22,7 @@ func TestInsertToFirestore(t *testing.T) {
 		Username:   "test",
 		SocialType: "instagram",
 	}
-	err := data.InsertToFirestore()
+	err := data.InsertToFirestore(false)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -35,7 +35,7 @@ func TestSocialInsert(t *testing.T) {
 		Username:   "test_username",
 	}
 
-	err := data.InsertToFirestore()
+	err := data.InsertToFirestore(false)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

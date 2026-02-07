@@ -20,7 +20,7 @@ func executeOnAll() {
 		return
 	}
 	for i, v := range socials {
-		err = v.InsertToFirestore()
+		err = v.InsertToFirestore(false)
 		if err != nil {
 			log.Println("-------> Error in inserting to firebase", i, v.ID)
 			continue
