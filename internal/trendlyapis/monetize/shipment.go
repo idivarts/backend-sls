@@ -272,14 +272,117 @@ func RequestShipment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Brand notified successfully for shipment"})
 }
 
+type ShipmentReceivedReq struct {
+	PhotoURL string `json:"photoUrl" binding:"required"`
+	Notes    string `json:"notes"`
+}
+
 func MarkShipmentReceived(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
+	var req ShipmentReceivedReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
 		return
 	}
 
-	// The real implementation will go here in the future
+	data, err := initializeData(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	// 1. Update Contract Status and Shipment Info
+	if data.Contract.Shipment == nil {
+		data.Contract.Shipment = &trendlymodels.Shipment{}
+	}
+	data.Contract.Shipment.Status = "received"
+	data.Contract.Shipment.ReceivedNotes = req.Notes
+	if req.PhotoURL != "" {
+		data.Contract.Shipment.PackageScreenshots = append(data.Contract.Shipment.PackageScreenshots, req.PhotoURL)
+	}
+	data.Contract.Status = 6 // Marking as Received
+
+	err = data.Contract.Update(data.ContractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return
+	}
+
+	// 2. Fetch Influencer for details
+	influencer := &trendlymodels.User{}
+	err = influencer.Get(data.Contract.UserID)
+	if err != nil {
+		log.Printf("Failed to get influencer: %v", err)
+	}
+
+	collab := &trendlymodels.Collaboration{}
+	err = collab.Get(data.Contract.CollaborationID)
+	collabName := "Your Collaboration"
+	if err == nil {
+		collabName = collab.Name
+	}
+
+	// 3. Notify Brand (Push & Email)
+	notifToBrand := &trendlymodels.Notification{
+		Title:       "Product Received! ✅",
+		Description: fmt.Sprintf("%s has received the product for %s and is ready to start!", influencer.Name, collabName),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "shipment-received",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	_, brandEmails, err := notifToBrand.Insert(trendlymodels.BRAND_COLLECTION, data.Contract.BrandID)
+	if err == nil && len(brandEmails) > 0 {
+		emailDataBrand := map[string]interface{}{
+			"BrandMemberName": data.Brand.Name,
+			"InfluencerName":  influencer.Name,
+			"CollabTitle":     collabName,
+			"PhotoURL":        req.PhotoURL,
+			"Notes":           req.Notes,
+		}
+		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.ShipmentReceivedForBrand, templates.SubjectShipmentReceivedForBrand, emailDataBrand)
+		if err != nil {
+			log.Printf("Failed to send shipment received email to brand: %v", err)
+		}
+	}
+
+	// 4. Notify Influencer (Push & Email)
+	notifToInfluencer := &trendlymodels.Notification{
+		Title:       "Package Received! ✨",
+		Description: "Great! Now let's start with the video. Be proactive and communicate your timeline with the brand.",
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "shipment-received-confirmation",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	_, _, err = notifToInfluencer.Insert(trendlymodels.USER_COLLECTION, data.Contract.UserID)
+	if err == nil && influencer.Email != nil {
+		emailDataInfluencer := map[string]interface{}{
+			"InfluencerName":  influencer.Name,
+			"BrandName":       data.Brand.Name,
+			"CollabTitle":     collabName,
+			"DeliverableLink": fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+		}
+		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.ShipmentReceivedForInfluencer, templates.SubjectShipmentReceivedForInfluencer, emailDataInfluencer)
+		if err != nil {
+			log.Printf("Failed to send shipment received email to influencer: %v", err)
+		}
+	}
+
+	// 5. Send Stream System Message
+	streamMessage := fmt.Sprintf("✅ **Product Received!**\n\n%s has confirmed receiving the package. They are now moving onto the content creation phase! 📽️", influencer.Name)
+	if req.Notes != "" {
+		streamMessage += fmt.Sprintf("\n\n**Notes from Creator:** %s", req.Notes)
+	}
+	err = streamchat.SendSystemMessage(data.Contract.StreamChannelID, streamMessage)
+	if err != nil {
+		log.Printf("Failed to send stream message: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Shipment receipt confirmed successfully"})
 }

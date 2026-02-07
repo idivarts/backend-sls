@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Product Received - Let's Start!</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #2e7d32;
+        }
+
+        .info-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+
+        .button {
+            background-color: #2e7d32;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>✨ Package Received! Time to create some magic.</h2>
+        <p>Hi <strong>{{.InfluencerName}}</strong>,</p>
+
+        <p>Congratulations on receiving the product for the collaboration "<strong>{{.CollabTitle}}</strong>" with
+            <strong>{{.BrandName}}</strong>!</p>
+
+        <div class="info-box">
+            <p>Now that you have the product, it's time to start working on your video. Be proactive and communicate
+                your timeline with the brand to ensure a smooth collaboration.</p>
+        </div>
+
+        <p>We're excited to see what you create!</p>
+
+        <a href="{{.DeliverableLink}}" class="button">Submit Deliverable</a>
+
+        <div class="footer">
+            You're receiving this email because you're part of a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

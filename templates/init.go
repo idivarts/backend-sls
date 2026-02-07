@@ -31,4 +31,6 @@ const (
 	ShipmentMarked                    myemail.TemplatePath = "templates/shipment_marked.html"
 	ShipmentRequested                 myemail.TemplatePath = "templates/shipment_request.html"
 	ShipmentDelivered                 myemail.TemplatePath = "templates/shipment_delivered.html"
+	ShipmentReceivedForBrand          myemail.TemplatePath = "templates/shipment_received_brand.html"
+	ShipmentReceivedForInfluencer     myemail.TemplatePath = "templates/shipment_received_influencer.html"
 )

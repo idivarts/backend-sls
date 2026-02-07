@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Product Received</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #2e7d32;
+        }
+
+        .info-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+
+        .screenshot-box {
+            margin-top: 15px;
+        }
+
+        .screenshot-img {
+            max-width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>✅ Product Received!</h2>
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p><strong>{{.InfluencerName}}</strong> has confirmed receiving the product for the collaboration
+            "<strong>{{.CollabTitle}}</strong>".</p>
+
+        <div class="info-box">
+            <p>The influencer is now all set to start working on the deliverables!</p>
+            {{if .Notes}}
+            <p><strong>Notes from Influencer:</strong> {{.Notes}}</p>
+            {{end}}
+        </div>
+
+        {{if .PhotoURL}}
+        <div class="screenshot-box">
+            <p><strong>Receipt Photo:</strong></p>
+            <img src="{{.PhotoURL}}" alt="Receipt Photo" class="screenshot-img">
+        </div>
+        {{end}}
+
+        <p>We'll notify you once they submit the deliverables for your review.</p>
+
+        <div class="footer">
+            You're receiving this email because you're part of a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

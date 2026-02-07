@@ -66,6 +66,7 @@ type Shipment struct {
 	AddressShippedTo   interface{} `json:"addressShippedTo,omitempty" firestore:"addressShippedTo,omitempty"`
 	Status             string      `json:"status,omitempty" firestore:"status,omitempty"`
 	Notes              string      `json:"notes,omitempty" firestore:"notes,omitempty"`
+	ReceivedNotes      string      `json:"receivedNotes,omitempty" firestore:"receivedNotes,omitempty"`
 }
 type Deliverable struct {
 	DeliverableID    string   `json:"deliverableId,omitempty" firestore:"deliverableId,omitempty"`
