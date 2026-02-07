@@ -142,13 +142,26 @@ func CreateOrder(c *gin.Context) {
 }
 
 func GetOrder(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
+	data, err := initializeData(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
 		return
 	}
 
-	// The real implementation will go here in the future
+	if data.Contract.Payment == nil || data.Contract.Payment.OrderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No order found", "message": "No payment order has been created for this contract yet"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	order, err := payments.FetchOrder(data.Contract.Payment.OrderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to fetch order details from Razorpay"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Order found",
+		"order":   order,
+		"payment": data.Contract.Payment,
+	})
 }
