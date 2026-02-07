@@ -28,4 +28,5 @@ const (
 	InfluencerInviteRejected          myemail.TemplatePath = "templates/influencer_rejected.html"
 	CollaborationTakedown             myemail.TemplatePath = "templates/collaboration_takedown.html"
 	PaymentOrderCreated               myemail.TemplatePath = "templates/payment_order_created.html"
+	ShipmentMarked                    myemail.TemplatePath = "templates/shipment_marked.html"
 )
