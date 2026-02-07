@@ -20,7 +20,8 @@ type SocialsScrapePending struct {
 	ID    string `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	State int    `db:"state" bigquery:"state" json:"state" firestore:"state"`
 
-	Username string `db:"username" bigquery:"username" json:"username" firestore:"username"`
+	Username   string `db:"username" bigquery:"username" json:"username" firestore:"username"`
+	SocialType string `db:"social_type" bigquery:"social_type" json:"social_type" firestore:"social_type"`
 
 	// Existing fields from V1 worth preserving
 	Gender       string   `db:"gender" bigquery:"gender" json:"gender" firestore:"gender"`
@@ -28,8 +29,9 @@ type SocialsScrapePending struct {
 	Location     string   `db:"location" bigquery:"location" json:"location" firestore:"location"`
 	QualityScore int      `db:"quality_score" bigquery:"quality_score" json:"quality_score" firestore:"quality_score"`
 
-	CreationTime   int64 `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
-	LastUpdateTime int64 `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+	AddedBy        string `db:"added_by" bigquery:"added_by" json:"added_by" firestore:"added_by"`
+	CreationTime   int64  `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
+	LastUpdateTime int64  `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
 }
 
 type SocialsBreif struct {
@@ -53,8 +55,9 @@ type SocialsBreif struct {
 
 	ProfileVerified bool `db:"profile_verified" bigquery:"profile_verified" json:"profile_verified" firestore:"profile_verified"`
 
-	CreationTime   int64 `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
-	LastUpdateTime int64 `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+	AddedBy        string `db:"added_by" bigquery:"added_by" json:"added_by" firestore:"added_by"`
+	CreationTime   int64  `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
+	LastUpdateTime int64  `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
 }
 
 type SocialLink struct {
@@ -160,10 +163,21 @@ func (_ SocialsN8N) InsertMultiple(socials []SocialsN8N) error {
 	return nil
 }
 
+func (data *SocialsScrapePending) InsertToFirestore() error {
+	if data.ID == "" {
+		ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.SocialType+data.Username))
+		data.ID = ID.String()
+	}
+	data.State = 0
+	_, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(data.ID).Set(context.Background(), data)
+	return err
+}
+
 func (data *SocialsN8N) InsertToFirestore() error {
 	if data.ID == "" {
 		data.ID = data.GetID()
 	}
+	data.State = 2
 	_, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(data.ID).Set(context.Background(), data)
 	return err
 }
@@ -171,6 +185,7 @@ func (data *SocialsN8N) InsertToFirestore() error {
 func (data *SocialsN8N) ConvertToSocialBreif() *SocialsBreif {
 	return &SocialsBreif{
 		ID:              data.ID,
+		State:           1,
 		Name:            data.Name,
 		Username:        data.Username,
 		ProfilePic:      data.ProfilePic,
