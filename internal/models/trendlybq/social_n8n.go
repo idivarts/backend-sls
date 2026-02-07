@@ -63,7 +63,7 @@ type SocialLink struct {
 	LinkType string `db:"link_type" bigquery:"link_type" json:"link_type" firestore:"link_type"`
 }
 
-type ChildPost struct {
+type SinglePost struct {
 	ID             string             `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	Type           string             `db:"type" bigquery:"type" json:"type" firestore:"type"`
 	ShortCode      string             `db:"short_code" bigquery:"short_code" json:"short_code" firestore:"short_code"`
@@ -83,8 +83,8 @@ type ChildPost struct {
 }
 
 type Post struct {
-	ChildPost
-	ChildPosts []ChildPost `db:"child_posts" bigquery:"child_posts" json:"child_posts" firestore:"child_posts"`
+	SinglePost
+	ChildPosts []SinglePost `db:"child_posts" bigquery:"child_posts" json:"child_posts" firestore:"child_posts"`
 }
 
 type SocialsN8N struct {

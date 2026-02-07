@@ -202,7 +202,7 @@ func AddProfile(c *gin.Context) {
 			id = parts[len(parts)-2]
 		}
 		data.LatestReels = append(data.LatestReels, trendlybq.Post{
-			ChildPost: trendlybq.ChildPost{
+			SinglePost: trendlybq.SinglePost{
 				ID:             id,
 				DisplayURL:     reel.Thumbnail,
 				URL:            reel.URL,
