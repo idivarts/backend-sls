@@ -5,6 +5,47 @@ import (
 	"github.com/google/uuid"
 )
 
+type SocialsScrapePending struct {
+	ID    string `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	State int    `db:"state" bigquery:"state" json:"state" firestore:"state"`
+
+	Username string `db:"username" bigquery:"username" json:"username" firestore:"username"`
+
+	// Existing fields from V1 worth preserving
+	Gender       string   `db:"gender" bigquery:"gender" json:"gender" firestore:"gender"`
+	Niches       []string `db:"niches" bigquery:"niches" json:"niches" firestore:"niches"`
+	Location     string   `db:"location" bigquery:"location" json:"location" firestore:"location"`
+	QualityScore int      `db:"quality_score" bigquery:"quality_score" json:"quality_score" firestore:"quality_score"`
+
+	CreationTime   int64 `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
+	LastUpdateTime int64 `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+}
+
+type SocialsBreif struct {
+	ID    string `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	State int    `db:"state" bigquery:"state" json:"state" firestore:"state"`
+
+	Name     string `db:"name" bigquery:"name" json:"name" firestore:"name"`
+	Username string `db:"username" bigquery:"username" json:"username" firestore:"username"`
+
+	ProfilePic      string  `db:"profile_pic" bigquery:"profile_pic" json:"profile_pic" firestore:"profile_pic"`
+	FollowerCount   int64   `db:"follower_count" bigquery:"follower_count" json:"follower_count" firestore:"follower_count"`
+	ViewsCount      int64   `db:"views_count" bigquery:"views_count" json:"views_count" firestore:"views_count"`                      //views
+	EnagamentsCount int64   `db:"engagement_count" bigquery:"engagements_count" json:"engagement_count" firestore:"engagement_count"` //engagement
+	EngagementRate  float32 `db:"engagement_rate" bigquery:"engagement_rate" json:"engagement_rate" firestore:"engagement_rate"`
+
+	SocialType string `db:"social_type" bigquery:"social_type" json:"social_type" firestore:"social_type"`
+
+	Location string `db:"location" bigquery:"location" json:"location" firestore:"location"`
+
+	Bio string `db:"bio" bigquery:"bio" json:"bio" firestore:"bio"`
+
+	ProfileVerified bool `db:"profile_verified" bigquery:"profile_verified" json:"profile_verified" firestore:"profile_verified"`
+
+	CreationTime   int64 `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
+	LastUpdateTime int64 `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+}
+
 type SocialLinkV2 struct {
 	Title    string `db:"title" bigquery:"title" json:"title" firestore:"title"`
 	URL      string `db:"url" bigquery:"url" json:"url" firestore:"url"`
@@ -32,7 +73,9 @@ type PostV2 struct {
 }
 
 type SocialsV2 struct {
-	ID           string `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	ID    string `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	State int    `db:"state" bigquery:"state" json:"state" firestore:"state"`
+
 	Username     string `db:"username" bigquery:"username" json:"username" firestore:"username"`
 	Name         string `db:"name" bigquery:"name" json:"name" firestore:"name"`
 	Bio          string `db:"bio" bigquery:"bio" json:"bio" firestore:"bio"`
