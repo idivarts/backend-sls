@@ -14,16 +14,93 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
+type ReScheduleReq struct {
+	NewScheduledDate int64 `json:"newScheduledDate" binding:"required"`
+}
+
 func ReSchedulePosting(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
+	var req ReScheduleReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
 		return
 	}
 
-	// The real implementation will go here in the future
+	data, err := initializeData(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
+		return
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	// 1. Update Contract Posting Schedule
+	if data.Contract.Posting == nil {
+		data.Contract.Posting = &trendlymodels.Posting{}
+	}
+	data.Contract.Posting.ScheduledDate = req.NewScheduledDate
+	data.Contract.Posting.Status = "rescheduled"
+
+	err = data.Contract.Update(data.ContractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return
+	}
+
+	// 2. Fetch Influencer for notification
+	influencer := &trendlymodels.User{}
+	err = influencer.Get(data.Contract.UserID)
+	if err != nil {
+		log.Printf("Failed to get influencer: %v", err)
+	}
+
+	collab := &trendlymodels.Collaboration{}
+	err = collab.Get(data.Contract.CollaborationID)
+	collabName := "Your Collaboration"
+	if err == nil {
+		collabName = collab.Name
+	}
+
+	// 3. Notify Influencer (Push & Email)
+	newDateStr := time.UnixMilli(req.NewScheduledDate).Format("Jan 02, 2006")
+
+	notif := &trendlymodels.Notification{
+		Title:       "Posting Rescheduled! 🗓️",
+		Description: fmt.Sprintf("%s has rescheduled the posting date for %s to %s.", data.Brand.Name, collabName, newDateStr),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "post-rescheduled",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, data.Contract.UserID)
+	if err != nil {
+		log.Printf("Failed to send push notification: %v", err)
+	}
+
+	if influencer.Email != nil {
+		emailData := map[string]interface{}{
+			"InfluencerName": influencer.Name,
+			"BrandName":      data.Brand.Name,
+			"CollabTitle":    collabName,
+			"NewDate":        newDateStr,
+			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+		}
+		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.PostRescheduledInfluencer, templates.SubjectPostRescheduledByBrand, emailData)
+		if err != nil {
+			log.Printf("Failed to send reschedule email to influencer: %v", err)
+		}
+	}
+
+	// 4. Send Stream System Message
+	streamMessage := fmt.Sprintf("🗓️ **Posting Rescheduled!**\n\n%s has updated the posting date to **%s**.", data.Brand.Name, newDateStr)
+	err = streamchat.SendSystemMessage(data.Contract.StreamChannelID, streamMessage)
+	if err != nil {
+		log.Printf("Failed to send stream message: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Posting rescheduled successfully",
+	})
 }
 
 func MarkPosted(c *gin.Context) {

@@ -35,4 +35,5 @@ const (
 	SubjectDeliverableRevisionRequested  = "Revision Requested: Brand has shared feedback for changes 📽️"
 	SubjectDeliverableApproved           = "Excellent news! Your deliverable has been approved 🎉"
 	SubjectPostRescheduleRequested       = "Reschedule Requested: Influencer has suggested a change in posting date 🗓️"
+	SubjectPostRescheduledByBrand        = "Update: Your posting date has been rescheduled 🗓️"
 )
