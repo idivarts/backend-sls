@@ -186,6 +186,16 @@ func (data *SocialsN8N) InsertToFirestore(isImagesOnS3 bool) error {
 	return err
 }
 
+func (data *SocialsBreif) UpdateToFirestore(needsRescrapping bool) error {
+	if needsRescrapping {
+		data.State = 0
+	} else {
+		data.State = 1
+	}
+	_, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(data.ID).Set(context.Background(), data)
+	return err
+}
+
 func (data *SocialsN8N) ConvertToSocialBreif() *SocialsBreif {
 	return &SocialsBreif{
 		ID:              data.ID,
