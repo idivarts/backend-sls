@@ -57,6 +57,7 @@ type Payment struct {
 	ShortURL  string `json:"shortUrl,omitempty" firestore:"shortUrl,omitempty"`
 	Amount    int    `json:"amount,omitempty" firestore:"amount,omitempty"`
 }
+
 type Shipment struct {
 	TrackingID         string      `json:"trackingId,omitempty" firestore:"trackingId,omitempty"`
 	ShipmentProvider   string      `json:"shipmentProvider,omitempty" firestore:"shipmentProvider,omitempty"`
@@ -64,6 +65,7 @@ type Shipment struct {
 	PackageScreenshots []string    `json:"packageScreenshots,omitempty" firestore:"packageScreenshots,omitempty"`
 	AddressShippedTo   interface{} `json:"addressShippedTo,omitempty" firestore:"addressShippedTo,omitempty"`
 	Status             string      `json:"status,omitempty" firestore:"status,omitempty"`
+	Notes              string      `json:"notes,omitempty" firestore:"notes,omitempty"`
 }
 type Deliverable struct {
 	DeliverableID    string   `json:"deliverableId,omitempty" firestore:"deliverableId,omitempty"`

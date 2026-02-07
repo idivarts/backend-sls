@@ -27,4 +27,5 @@ const (
 	SubjectPaymentOrderCreated        = "A payment order has been created for your collaboration"
 	SubjectShipmentMarked             = "Your package is on its way! 📦"
 	SubjectShipmentRequested          = "📦 Influencer is waiting for shipment"
+	SubjectShipmentDelivered          = "Great news! Your package has been delivered 🏠"
 )

@@ -30,4 +30,5 @@ const (
 	PaymentOrderCreated               myemail.TemplatePath = "templates/payment_order_created.html"
 	ShipmentMarked                    myemail.TemplatePath = "templates/shipment_marked.html"
 	ShipmentRequested                 myemail.TemplatePath = "templates/shipment_request.html"
+	ShipmentDelivered                 myemail.TemplatePath = "templates/shipment_delivered.html"
 )
