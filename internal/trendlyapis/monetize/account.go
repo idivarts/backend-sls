@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/payments"
 )
 
@@ -75,15 +76,44 @@ func GetAccountStatus(c *gin.Context) {
 }
 
 func UpdateBankDetails(c *gin.Context) {
-	var req struct{}
-	if err := c.ShouldBind(&req); err != nil {
+	var req payments.BankReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
 		return
 	}
 
-	// The real implementation will go here in the future
+	userId, _ := middlewares.GetUserId(c)
+	user := middlewares.GetUserModel(c)
 
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for Trendly Monetize APIs."})
+	if user.KYC == nil || user.KYC.AccountID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Razorpay account not found for this user"})
+		return
+	}
+
+	// 1. Update Bank Details in Razorpay Product
+	product, err := payments.CreataOrUpdateProduct(user.KYC.AccountID, req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update bank details in Razorpay"})
+		return
+	}
+
+	// 2. Update user.KYC.BankDetails in Firestore
+	user.KYC.BankDetails = &trendlymodels.BankDetails{
+		AccountNumber:   req.AccountNumber,
+		IFSC:            req.IFSC,
+		BeneficiaryName: req.BenificiaryName,
+	}
+
+	_, err = user.Insert(userId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update user records"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Bank details updated successfully",
+		"product": product,
+	})
 }
 
 func UpdateAddress(c *gin.Context) {
