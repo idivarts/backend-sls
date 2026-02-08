@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Posting Date Updated</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #2e7d32;
+        }
+
+        .info-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+
+        .button {
+            background-color: #2e7d32;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>🗓️ Posting Date Updated</h2>
+        <p>Hi <strong>{{.InfluencerName}}</strong>,</p>
+
+        <p>Your posting date for the collaboration "<strong>{{.CollabTitle}}</strong>" has been rescheduled by
+            <strong>{{.BrandName}}</strong>.</p>
+
+        <div class="info-box">
+            <p><strong>New Posting Date:</strong> {{.NewDate}}</p>
+        </div>
+
+        <p>Please make sure to update your schedule and ensure the content is posted on the new date.</p>
+
+        <a href="{{.ContractLink}}" class="button">View Contract Details</a>
+
+        <div class="footer">
+            You're receiving this email because you're part of a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>
