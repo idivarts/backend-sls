@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	socials, err := trendlybq.Socials{}.GetPaginated(1001, 10000)
+	socials, err := trendlybq.SocialsN8N{}.GetPaginated(1001, 10000)
 	if err != nil {
 		panic(err)
 	}

@@ -16,6 +16,7 @@ func handleUserAPIs() {
 	discoveryApi := apihandler.GinEngine.Group("/discovery", middlewares.TrendlyExtension())
 
 	discoveryApi.POST("/extension", trendlydiscovery.AddProfile)
+	discoveryApi.POST("/extension/load", trendlydiscovery.LoadAllProfiles)
 	discoveryApi.GET("/extension", trendlydiscovery.CheckUsername)
 
 	brandAPIs := apihandler.GinEngine.Group("/discovery/brands", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))

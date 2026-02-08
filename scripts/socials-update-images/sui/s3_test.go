@@ -1,13 +1,11 @@
 package sui_test
 
 import (
-	"context"
 	"log"
 	"os"
 	"testing"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
-	"github.com/idivarts/backend-sls/pkg/myquery"
 )
 
 func TestUpload(t *testing.T) {
@@ -22,21 +20,21 @@ func TestUpload(t *testing.T) {
 	// MoveImagesToS3("46067716-b467-5199-a0e0-d6c4e1b37143")
 }
 
-func TestDeleteOldData(t *testing.T) {
-	sql := "DELETE FROM " + trendlybq.SocialsFullTableName + " WHERE last_update_time<1758222410855465"
+func TestUpdateQuery(t *testing.T) {
+	sql := "DELETE FROM " + trendlybq.SocialsN8NFullTableName + " WHERE last_update_time<1758222410855465"
+	log.Println(sql)
+}
 
-	query := myquery.Client.Query(sql)
-
-	j, err := query.Run(context.Background())
+func TestGetFirestoreAll(t *testing.T) {
+	socials, err := trendlybq.SocialsN8N{}.GetPaginatedFromFirestore(0, 700)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
-
-	t.Log("Job Id", j.ID())
+	log.Println("Total Socials", len(socials))
 }
 
 func TestRemoveDataFromFirebase(t *testing.T) {
-	socials, err := trendlybq.Socials{}.GetPaginatedFromFirestore(0, 700)
+	socials, err := trendlybq.SocialsN8N{}.GetPaginatedFromFirestore(0, 700)
 	if err != nil {
 		t.Fatal(err)
 	}

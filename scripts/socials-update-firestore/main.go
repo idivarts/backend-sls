@@ -14,13 +14,13 @@ func main() {
 }
 
 func executeOnAll() {
-	socials, err := trendlybq.Socials{}.GetPaginated(0, 700)
+	socials, err := trendlybq.SocialsN8N{}.GetPaginated(0, 700)
 	if err != nil {
 		log.Println("Error", err)
 		return
 	}
 	for i, v := range socials {
-		err = v.InsertToFirestore()
+		err = v.InsertToFirestore(false)
 		if err != nil {
 			log.Println("-------> Error in inserting to firebase", i, v.ID)
 			continue

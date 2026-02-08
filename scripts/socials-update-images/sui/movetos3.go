@@ -19,7 +19,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 )
 
-func MoveImagesToS3(social *trendlybq.Socials) *trendlybq.Socials {
+func MoveImagesToS3(social *trendlybq.SocialsN8N) *trendlybq.SocialsN8N {
 	socialId := social.ID
 
 	if social.ProfilePic != "" {
@@ -31,13 +31,13 @@ func MoveImagesToS3(social *trendlybq.Socials) *trendlybq.Socials {
 		}
 	}
 
-	for i, v := range social.Reels {
-		if v.ThumbnailURL != "" {
-			p, err := DownloadAndUploadToS3(v.ThumbnailURL, fmt.Sprintf("instagram/%s/reels-", social.ID))
+	for i, v := range social.LatestReels {
+		if v.DisplayURL != "" {
+			p, err := DownloadAndUploadToS3(v.DisplayURL, fmt.Sprintf("instagram/%s/reels-", social.ID))
 			if err != nil {
 				log.Println("Error Uploading Reel Pic", socialId, v.ID, err.Error())
 			} else {
-				social.Reels[i].ThumbnailURL = p
+				social.LatestReels[i].DisplayURL = p
 			}
 		}
 	}

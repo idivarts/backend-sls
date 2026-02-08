@@ -23,7 +23,7 @@ func TestDiscovery(t *testing.T) {
 func TestCalcualations(t *testing.T) {
 	influencerId := "95d0838c-a5d2-5849-ba4a-b5ea0d7f67a9"
 
-	social := &trendlybq.Socials{}
+	social := &trendlybq.SocialsN8N{}
 	err := social.Get(influencerId)
 	if err != nil {
 		t.Error(err)
