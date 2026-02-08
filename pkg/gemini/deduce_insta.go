@@ -15,8 +15,8 @@ type EnrichmentResult struct {
 	Quality  int      `json:"quality"`
 }
 
-func EnrichInfluencer(ctx context.Context, influencerInfo string) (*EnrichmentResult, error) {
-	model := Client.GenerativeModel("gemini-1.5-flash")
+func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
+	model := Client.GenerativeModel("gemini-3-flash-preview")
 	model.ResponseMIMEType = "application/json"
 
 	model.SystemInstruction = genai.NewUserContent(genai.Text(
@@ -36,7 +36,7 @@ func EnrichInfluencer(ctx context.Context, influencerInfo string) (*EnrichmentRe
 		
 		Return ONLY a JSON object matching the EnrichmentResult schema.`))
 
-	resp, err := model.GenerateContent(ctx, genai.Text(influencerInfo))
+	resp, err := model.GenerateContent(context.Background(), genai.Text(influencerInfo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}
