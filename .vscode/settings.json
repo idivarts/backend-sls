@@ -12,7 +12,7 @@
         "vendor": true,
         "prompts": true,
         "n8n": true,
-        "scripts": true,
+        "scripts": false,
         "src": true,
         "templates": false,
         "Makefile": true,

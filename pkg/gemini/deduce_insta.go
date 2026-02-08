@@ -34,6 +34,15 @@ func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
 		  5: Excellent
 		  (Determine based on Bio quality, Post caption depth, and Engagement consistency)
 		
+		"""{ts}
+		interface EnrichmentResult {
+			gender: string
+			location: string
+			niches: string[]
+			quality: int
+		}
+		"""
+		
 		Return ONLY a JSON object matching the EnrichmentResult schema.`))
 
 	resp, err := model.GenerateContent(context.Background(), genai.Text(influencerInfo))
