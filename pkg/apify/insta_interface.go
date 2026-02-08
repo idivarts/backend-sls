@@ -77,7 +77,18 @@ type InstagramTaggedUsers struct {
 	Username      string `json:"username"`
 }
 
+type InstagramReelData struct {
+	AudioUrl       string             `json:"audioUrl"`
+	FirstComment   string             `json:"firstComment"`
+	InputUrl       string             `json:"inputUrl"`
+	LatestComments []InstagramComment `json:"latestComments"`
+	OwnerFullName  string             `json:"ownerFullName"`
+	VideoDuration  float64            `json:"videoDuration"`
+	VideoPlayCount float64            `json:"videoPlayCount"`
+}
+
 type InstagramPosts struct {
+	InstagramReelData
 	Alt                string                 `json:"alt"`
 	Caption            string                 `json:"caption"`
 	ChildPosts         []InstagramPosts       `json:"childPosts"`
@@ -105,6 +116,25 @@ type InstagramPosts struct {
 	Url                string                 `json:"url"`
 	VideoUrl           string                 `json:"videoUrl"`
 	VideoViewCount     float64                `json:"videoViewCount"`
+}
+
+type InstagramComment struct {
+	Id                 string                `json:"id"`
+	Text               string                `json:"text"`
+	OwnerUsername      string                `json:"ownerUsername"`
+	OwnerProfilePicUrl string                `json:"ownerProfilePicUrl"`
+	Timestamp          string                `json:"timestamp"`
+	RepliesCount       float64               `json:"repliesCount"`
+	Replies            []InstagramComment    `json:"replies"`
+	LikesCount         float64               `json:"likesCount"`
+	Owner              InstagramCommentOwner `json:"owner"`
+}
+
+type InstagramCommentOwner struct {
+	Id            string `json:"id"`
+	IsVerified    bool   `json:"is_verified"`
+	ProfilePicUrl string `json:"profile_pic_url"`
+	Username      string `json:"username"`
 }
 
 type InstagramMusicInfo struct {
