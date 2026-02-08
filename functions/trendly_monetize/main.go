@@ -34,9 +34,11 @@ func brandAPIs(handler *gin.RouterGroup) {
 	brands.POST("/contracts/:contractId/deliverable/request", monetize.RequestDeliverable)
 	// [BRAND] Approve the Video
 	brands.POST("/contracts/:contractId/deliverable/approve", monetize.ApproveDeliverable)
+	// [BRAND] Request for Change
+	brands.POST("/contracts/:contractId/deliverable/revision", monetize.RequestDeliverableChange)
 
 	// [BRAND] Schedule/Reschedule the release date of the video
-	brands.POST("/contracts/:contractId/posting/schedule", monetize.SchedulePosting)
+	brands.POST("/contracts/:contractId/posting/reschedule", monetize.ReSchedulePosting)
 }
 
 func influencersAPIs(handler *gin.RouterGroup) {
@@ -65,7 +67,7 @@ func influencersAPIs(handler *gin.RouterGroup) {
 	influencer.POST("/contracts/:contractId/deliverable/request-approval", monetize.RequestDeliverableApproval)
 
 	// [USER] Request to (Re)Schedule a release
-	influencer.POST("/contracts/:contractId/posting/request-schedule", monetize.RequestPostSchedule)
+	influencer.POST("/contracts/:contractId/posting/request-reschedule", monetize.RequestPostReSchedule)
 	// [USER] Mark video as Posted
 	influencer.POST("/contracts/:contractId/posting", monetize.MarkPosted)
 }
@@ -77,7 +79,7 @@ func webhookHandler(handler *gin.RouterGroup) {
 	webhook.Any("/payments", monetize.PaymentWebhook)
 
 	// Once Payment processed, notify both the agents and close the contract
-	webhook.Any("/tranfer", monetize.TransferWebhook)
+	webhook.Any("/transfer", monetize.TransferWebhook)
 
 }
 
