@@ -41,11 +41,11 @@ type SocialsBreif struct {
 	Name     string `db:"name" bigquery:"name" json:"name" firestore:"name"`
 	Username string `db:"username" bigquery:"username" json:"username" firestore:"username"`
 
-	ProfilePic     string  `db:"profile_pic" bigquery:"profile_pic" json:"profile_pic" firestore:"profile_pic"`
-	FollowerCount  int64   `db:"follower_count" bigquery:"follower_count" json:"follower_count" firestore:"follower_count"`
-	ViewsCount     int64   `db:"views_count" bigquery:"views_count" json:"views_count" firestore:"views_count"`                     //views
-	EnagamentCount int64   `db:"engagement_count" bigquery:"engagement_count" json:"engagement_count" firestore:"engagement_count"` //engagement
-	EngagementRate float32 `db:"engagement_rate" bigquery:"engagement_rate" json:"engagement_rate" firestore:"engagement_rate"`
+	ProfilePic      string  `db:"profile_pic" bigquery:"profile_pic" json:"profile_pic" firestore:"profile_pic"`
+	FollowerCount   int64   `db:"follower_count" bigquery:"follower_count" json:"follower_count" firestore:"follower_count"`
+	ViewsCount      int64   `db:"views_count" bigquery:"views_count" json:"views_count" firestore:"views_count"`                     //views
+	EngagementCount int64   `db:"engagement_count" bigquery:"engagement_count" json:"engagement_count" firestore:"engagement_count"` //engagement
+	EngagementRate  float32 `db:"engagement_rate" bigquery:"engagement_rate" json:"engagement_rate" firestore:"engagement_rate"`
 
 	SocialType string `db:"social_type" bigquery:"social_type" json:"social_type" firestore:"social_type"`
 
@@ -159,31 +159,27 @@ type SocialsN8N struct {
 	Location     string   `db:"location" bigquery:"location" json:"location" firestore:"location"`
 	QualityScore int      `db:"quality_score" bigquery:"quality_score" json:"quality_score" firestore:"quality_score"`
 
-	// Scraper specific fields
-	ExternalURL string       `db:"external_url" bigquery:"external_url" json:"external_url" firestore:"external_url"`
-	Links       []SocialLink `db:"links" bigquery:"links" json:"links" firestore:"links"`
-	LatestPosts []Post       `db:"latest_posts" bigquery:"latest_posts" json:"latest_posts" firestore:"latest_posts"`
-	LatestReels []SinglePost `db:"latest_reels" bigquery:"latest_reels" json:"latest_reels" firestore:"latest_reels"`
-
 	// Metadata
 	AddedBy        string `db:"added_by" bigquery:"added_by" json:"added_by" firestore:"added_by"`
 	CreationTime   int64  `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
 	LastUpdateTime int64  `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
 
+	// Content Data
+	LatestPosts      []Post       `db:"latest_posts" bigquery:"latest_posts" json:"latest_posts" firestore:"latest_posts"`
+	LatestReels      []SinglePost `db:"latest_reels" bigquery:"latest_reels" json:"latest_reels" firestore:"latest_reels"`
+	LatestIgtvVideos []SinglePost `db:"latest_igtv_videos" bigquery:"latest_igtv_videos" json:"latest_igtv_videos" firestore:"latest_igtv_videos"`
+
+	// Scraper specific fields
+	ExternalURL string       `db:"external_url" bigquery:"external_url" json:"external_url" firestore:"external_url"`
+	Links       []SocialLink `db:"links" bigquery:"links" json:"links" firestore:"links"`
+
 	// Optional/Future use
-	IsBusinessAccount  bool `db:"is_business_account" bigquery:"is_business_account" json:"is_business_account" firestore:"is_business_account"`
-	HighlightReelCount int  `db:"highlight_reel_count" bigquery:"highlight_reel_count" json:"highlight_reel_count" firestore:"highlight_reel_count"`
-	HasContacts        bool `db:"has_contacts" bigquery:"has_contacts" json:"has_contacts" firestore:"has_contacts"`
+	HasContacts bool `db:"has_contacts" bigquery:"has_contacts" json:"has_contacts" firestore:"has_contacts"`
+	HasChannel  bool `db:"has_channel" bigquery:"has_channel" json:"has_channel" firestore:"has_channel"`
 
 	// Enhanced Profile fields
-	Fbid                string       `db:"fbid" bigquery:"fbid" json:"fbid" firestore:"fbid"`
-	HasChannel          bool         `db:"has_channel" bigquery:"has_channel" json:"has_channel" firestore:"has_channel"`
-	IgtvVideoCount      int64        `db:"igtv_video_count" bigquery:"igtv_video_count" json:"igtv_video_count" firestore:"igtv_video_count"`
-	IsRestrictedProfile bool         `db:"is_restricted_profile" bigquery:"is_restricted_profile" json:"is_restricted_profile" firestore:"is_restricted_profile"`
-	JoinedRecently      bool         `db:"joined_recently" bigquery:"joined_recently" json:"joined_recently" firestore:"joined_recently"`
-	IsPrivate           bool         `db:"is_private" bigquery:"is_private" json:"is_private" firestore:"is_private"`
-	LatestIgtvVideos    []SinglePost `db:"latest_igtv_videos" bigquery:"latest_igtv_videos" json:"latest_igtv_videos" firestore:"latest_igtv_videos"`
-	RelatedProfiles     []TaggedUser `db:"related_profiles" bigquery:"related_profiles" json:"related_profiles" firestore:"related_profiles"`
+	ExternalId      string       `db:"external_id" bigquery:"external_id" json:"external_id" firestore:"external_id"`
+	RelatedProfiles []TaggedUser `db:"related_profiles" bigquery:"related_profiles" json:"related_profiles" firestore:"related_profiles"`
 }
 
 func (data *SocialsN8N) GetID() string {
@@ -252,7 +248,7 @@ func (data *SocialsN8N) ConvertToSocialBreif() *SocialsBreif {
 		ProfilePic:      data.ProfilePic,
 		FollowerCount:   data.FollowerCount,
 		ViewsCount:      data.ViewsCount,
-		EnagamentCount:  data.EngagementCount,
+		EngagementCount: data.EngagementCount,
 		EngagementRate:  data.EngagementRate,
 		SocialType:      data.SocialType,
 		Location:        data.Location,
