@@ -1,6 +1,6 @@
 package apify
 
-type IntagramInfluencer struct {
+type InstagramInfluencer struct {
 	Biography            string                     `json:"biography"`
 	BusinessCategoryName string                     `json:"businessCategoryName"`
 	Error                string                     `json:"error"`

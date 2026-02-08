@@ -8,7 +8,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/apify"
 )
 
-func GetInfluencerList(fileUrl string) ([]apify.IntagramInfluencer, error) {
+func GetInfluencerList(fileUrl string) ([]apify.InstagramInfluencer, error) {
 	resp, err := http.Get(fileUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download file: %w", err)
@@ -19,7 +19,7 @@ func GetInfluencerList(fileUrl string) ([]apify.IntagramInfluencer, error) {
 		return nil, fmt.Errorf("bad status code: %d", resp.StatusCode)
 	}
 
-	var influencerList []apify.IntagramInfluencer
+	var influencerList []apify.InstagramInfluencer
 	err = json.NewDecoder(resp.Body).Decode(&influencerList)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse json: %w", err)
