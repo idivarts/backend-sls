@@ -66,6 +66,31 @@ type SocialLink struct {
 	LinkType string `db:"link_type" bigquery:"link_type" json:"link_type" firestore:"link_type"`
 }
 
+type MusicInfo struct {
+	ArtistName        string `db:"artist_name" bigquery:"artist_name" json:"artist_name" firestore:"artist_name"`
+	SongName          string `db:"song_name" bigquery:"song_name" json:"song_name" firestore:"song_name"`
+	UsesOriginalAudio bool   `db:"uses_original_audio" bigquery:"uses_original_audio" json:"uses_original_audio" firestore:"uses_original_audio"`
+	AudioID           string `db:"audio_id" bigquery:"audio_id" json:"audio_id" firestore:"audio_id"`
+}
+
+type TaggedUser struct {
+	FullName      string `db:"full_name" bigquery:"full_name" json:"full_name" firestore:"full_name"`
+	ID            string `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	IsPrivate     bool   `db:"is_private" bigquery:"is_private" json:"is_private" firestore:"is_private"`
+	IsVerified    bool   `db:"is_verified" bigquery:"is_verified" json:"is_verified" firestore:"is_verified"`
+	ProfilePicURL string `db:"profile_pic_url" bigquery:"profile_pic_url" json:"profile_pic_url" firestore:"profile_pic_url"`
+	Username      string `db:"username" bigquery:"username" json:"username" firestore:"username"`
+}
+
+type Comment struct {
+	ID                 string  `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	Text               string  `db:"text" bigquery:"text" json:"text" firestore:"text"`
+	OwnerUsername      string  `db:"owner_username" bigquery:"owner_username" json:"owner_username" firestore:"owner_username"`
+	OwnerProfilePicURL string  `db:"owner_profile_pic_url" bigquery:"owner_profile_pic_url" json:"owner_profile_pic_url" firestore:"owner_profile_pic_url"`
+	Timestamp          string  `db:"timestamp" bigquery:"timestamp" json:"timestamp" firestore:"timestamp"`
+	LikesCount         float64 `db:"likes_count" bigquery:"likes_count" json:"likes_count" firestore:"likes_count"`
+}
+
 type SinglePost struct {
 	ID             string             `db:"id" bigquery:"id" json:"id" firestore:"id"`
 	Type           string             `db:"type" bigquery:"type" json:"type" firestore:"type"`
@@ -83,6 +108,18 @@ type SinglePost struct {
 	LocationName   string             `db:"location_name" bigquery:"location_name" json:"location_name" firestore:"location_name"`
 	LocationID     string             `db:"location_id" bigquery:"location_id" json:"location_id" firestore:"location_id"`
 	IsPinned       bool               `db:"is_pinned" bigquery:"is_pinned" json:"is_pinned" firestore:"is_pinned"`
+
+	// Enhanced fields
+	Alt                string       `db:"alt" bigquery:"alt" json:"alt" firestore:"alt"`
+	Images             []string     `db:"images" bigquery:"images" json:"images" firestore:"images"`
+	IsCommentsDisabled bool         `db:"is_comments_disabled" bigquery:"is_comments_disabled" json:"is_comments_disabled" firestore:"is_comments_disabled"`
+	AudioURL           string       `db:"audio_url" bigquery:"audio_url" json:"audio_url" firestore:"audio_url"`
+	MusicInfo          MusicInfo    `db:"music_info" bigquery:"music_info" json:"music_info" firestore:"music_info"`
+	Hashtags           []string     `db:"hashtags" bigquery:"hashtags" json:"hashtags" firestore:"hashtags"`
+	Mentions           []string     `db:"mentions" bigquery:"mentions" json:"mentions" firestore:"mentions"`
+	TaggedUsers        []TaggedUser `db:"tagged_users" bigquery:"tagged_users" json:"tagged_users" firestore:"tagged_users"`
+	FirstComment       string       `db:"first_comment" bigquery:"first_comment" json:"first_comment" firestore:"first_comment"`
+	LatestComments     []Comment    `db:"latest_comments" bigquery:"latest_comments" json:"latest_comments" firestore:"latest_comments"`
 }
 
 type Post struct {
@@ -137,6 +174,16 @@ type SocialsN8N struct {
 	IsBusinessAccount  bool `db:"is_business_account" bigquery:"is_business_account" json:"is_business_account" firestore:"is_business_account"`
 	HighlightReelCount int  `db:"highlight_reel_count" bigquery:"highlight_reel_count" json:"highlight_reel_count" firestore:"highlight_reel_count"`
 	HasContacts        bool `db:"has_contacts" bigquery:"has_contacts" json:"has_contacts" firestore:"has_contacts"`
+
+	// Enhanced Profile fields
+	Fbid                string       `db:"fbid" bigquery:"fbid" json:"fbid" firestore:"fbid"`
+	HasChannel          bool         `db:"has_channel" bigquery:"has_channel" json:"has_channel" firestore:"has_channel"`
+	IgtvVideoCount      int64        `db:"igtv_video_count" bigquery:"igtv_video_count" json:"igtv_video_count" firestore:"igtv_video_count"`
+	IsRestrictedProfile bool         `db:"is_restricted_profile" bigquery:"is_restricted_profile" json:"is_restricted_profile" firestore:"is_restricted_profile"`
+	JoinedRecently      bool         `db:"joined_recently" bigquery:"joined_recently" json:"joined_recently" firestore:"joined_recently"`
+	IsPrivate           bool         `db:"is_private" bigquery:"is_private" json:"is_private" firestore:"is_private"`
+	LatestIgtvVideos    []SinglePost `db:"latest_igtv_videos" bigquery:"latest_igtv_videos" json:"latest_igtv_videos" firestore:"latest_igtv_videos"`
+	RelatedProfiles     []TaggedUser `db:"related_profiles" bigquery:"related_profiles" json:"related_profiles" firestore:"related_profiles"`
 }
 
 func (data *SocialsN8N) GetID() string {
