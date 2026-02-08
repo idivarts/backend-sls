@@ -56,7 +56,7 @@ func GetInstagram(usernames []string) ([]InstagramInfluencer, error) {
 	return results, nil
 }
 
-func GetInstagramReels(usernames []string) ([]InstagramPosts, error) {
+func GetInstagramReels(usernames []string) ([]InstagramInfluencer, error) {
 	urls := make([]string, len(usernames))
 	for i, username := range usernames {
 		urls[i] = fmt.Sprintf("https://www.instagram.com/%s/", username)
@@ -100,5 +100,26 @@ func GetInstagramReels(usernames []string) ([]InstagramPosts, error) {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return results, nil
+	influencerMap := make(map[string]*InstagramInfluencer)
+	for _, username := range usernames {
+		influencerMap[username] = &InstagramInfluencer{
+			Username:    username,
+			LatestPosts: []InstagramPosts{},
+		}
+	}
+
+	for _, post := range results {
+		if influencer, ok := influencerMap[post.OwnerUsername]; ok {
+			influencer.LatestPosts = append(influencer.LatestPosts, post)
+		}
+	}
+
+	returnResults := make([]InstagramInfluencer, 0, len(usernames))
+	for _, username := range usernames {
+		if influencer, ok := influencerMap[username]; ok {
+			returnResults = append(returnResults, *influencer)
+		}
+	}
+
+	return returnResults, nil
 }
