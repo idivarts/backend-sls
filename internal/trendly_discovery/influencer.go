@@ -98,7 +98,7 @@ func calculateTrustablity(social *trendlybq.SocialsN8N) int {
 	if social.ProfileVerified {
 		verificationScore += 35
 	}
-	if social.HasContacts {
+	if len(social.Links) > 0 {
 		verificationScore += 35
 	}
 	verificationScore = clampFloat(verificationScore, 0, 100)

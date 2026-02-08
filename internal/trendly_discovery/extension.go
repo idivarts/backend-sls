@@ -79,9 +79,7 @@ func AddProfile(c *gin.Context) {
 		SocialType: "instagram",
 		Username:   req.Username,
 
-		Gender:       req.Manual.Gender,
 		Niches:       req.Manual.Niches,
-		Location:     req.Manual.Location,
 		QualityScore: req.Manual.AestheticsScore,
 
 		CreationTime:   time.Now().UnixMicro(), // TODO: set actual creation time
