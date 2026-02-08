@@ -124,3 +124,12 @@ type InstagramRelatedProfiles struct {
 	ProfilePicUrl string `json:"profile_pic_url"`
 	Username      string `json:"username"`
 }
+
+type InstagramScraperInput struct {
+	DirectUrls    []string `json:"directUrls"`
+	ResultsType   string   `json:"resultsType"`
+	ResultsLimit  int      `json:"resultsLimit"`
+	SearchType    string   `json:"searchType"`
+	SearchLimit   int      `json:"searchLimit"`
+	AddParentData bool     `json:"addParentData"`
+}
