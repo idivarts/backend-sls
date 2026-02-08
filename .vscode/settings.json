@@ -20,7 +20,7 @@
         "go.mod": true,
         "go.sum": true,
         "*.md": true,
-        "*.json": true,
+        "*.json": false,
         "*.csv": true,
         "*.sh": true,
         "serverless.cc.yml": true,
