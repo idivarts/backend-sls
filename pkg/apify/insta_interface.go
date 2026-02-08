@@ -129,7 +129,7 @@ type InstagramScraperInput struct {
 	DirectUrls    []string `json:"directUrls"`
 	ResultsType   string   `json:"resultsType"`
 	ResultsLimit  int      `json:"resultsLimit"`
-	SearchType    string   `json:"searchType"`
-	SearchLimit   int      `json:"searchLimit"`
 	AddParentData bool     `json:"addParentData"`
+	SearchType    string   `json:"searchType,omitempty"`
+	SearchLimit   int      `json:"searchLimit,omitempty"`
 }

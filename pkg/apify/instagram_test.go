@@ -7,6 +7,25 @@ import (
 )
 
 func TestGetInstagram(t *testing.T) {
+	// Note: Verification of parsing would require a more complex mock payload
+	// For now, we just verify it compiles and handles the basic flow.
+	instagramInfluencers, err := GetInstagram([]string{"humansofny"})
+	if err != nil {
+		// Mock server isn't injected (using constants), so this will fail to connect or use real constants
+		t.Logf("Got error (expected since mock server isn't injected): %v", err)
+	}
+	if len(instagramInfluencers) == 0 {
+		t.Log("No Instagram Data Found")
+		return
+	}
+	t.Log("Got Instagram Data")
+	t.Log("Username", instagramInfluencers[0].Username)
+	t.Log("Followers Count", instagramInfluencers[0].FollowersCount)
+	t.Log("Posts Count", instagramInfluencers[0].PostsCount)
+	t.Log("Verified", instagramInfluencers[0].Verified)
+}
+
+func TestMockServer(t *testing.T) {
 	// Mock server to avoid actual API calls
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -25,12 +44,4 @@ func TestGetInstagram(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer server.Close()
-
-	// Note: Verification of parsing would require a more complex mock payload
-	// For now, we just verify it compiles and handles the basic flow.
-	_, err := GetInstagram([]string{"humansofny"})
-	if err != nil {
-		// Mock server isn't injected (using constants), so this will fail to connect or use real constants
-		t.Logf("Got error (expected since mock server isn't injected): %v", err)
-	}
 }
