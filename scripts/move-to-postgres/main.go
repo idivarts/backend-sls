@@ -10,7 +10,83 @@ import (
 )
 
 func main() {
-	offset := 2500
+	// transferAllData()
+	checkAndInsertMissingData()
+}
+
+func checkAndInsertMissingData() {
+	offset := 0
+	limit := 500
+	totalMigrated := 0
+
+	for {
+		log.Printf("Fetching batch: offset=%d, limit=%d", offset, limit)
+		oldSocials, err := trendlybq.Socials{}.GetPaginated(offset, limit)
+		if err != nil {
+			log.Fatalf("Failed to fetch Socials: %v", err)
+		}
+
+		if len(oldSocials) == 0 {
+			break
+		}
+
+		log.Printf("Fetched %d records from Socials %s", len(oldSocials), oldSocials[0].Username)
+
+		ids := []string{}
+		for _, old := range oldSocials {
+			ids = append(ids, old.ID)
+		}
+
+		// Push to PostGres
+		newSocials, err := trendlyrdb.Socials{}.GetMultiple(ids)
+		if err != nil {
+			log.Fatalf("Failed to insert to PostGres: %v", err)
+		}
+		log.Printf("Fetched %d records from PostGres %s", len(newSocials), newSocials[0].Username)
+
+		var missingSocials []trendlyrdb.Socials
+		var missingInstaPosts []trendlyrdb.InstagramPost
+
+		for _, oldSocial := range oldSocials {
+			found := false
+			for _, v := range newSocials {
+				if v.Username == oldSocial.Username {
+					found = true
+					break
+				}
+			}
+			if !found {
+				log.Println("User Not Found", oldSocial.Username, oldSocial.ID)
+				social, posts := translate(oldSocial)
+				missingSocials = append(missingSocials, social)
+				missingInstaPosts = append(missingInstaPosts, posts...)
+			}
+		}
+		log.Printf("Missing Socials: %d  | Missing Insta Posts: %d", len(missingSocials), len(missingInstaPosts))
+
+		err = trendlyrdb.Socials{}.InsertMultiple(missingSocials)
+		if err != nil {
+			log.Fatalf("Failed to insert to PostGres: %v", err)
+		}
+		log.Printf("Inserted %d socials to PostGres", len(missingSocials))
+
+		err = trendlyrdb.InstagramPost{}.InsertMultiple(missingInstaPosts)
+		if err != nil {
+			log.Fatalf("Failed to insert to PostGres: %v", err)
+		}
+		log.Printf("Inserted %d posts to PostGres", len(missingInstaPosts))
+
+		if len(oldSocials) < limit {
+			break
+		}
+		offset += limit
+	}
+
+	log.Printf("Migration complete. Total records: %d", totalMigrated)
+}
+
+func transferAllData() {
+	offset := 0
 	limit := 500
 	totalMigrated := 0
 
