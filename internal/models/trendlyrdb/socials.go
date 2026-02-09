@@ -142,3 +142,9 @@ func (data *Socials) Update(updates map[string]interface{}) error {
 func (data *Socials) Delete() error {
 	return rdb.GormDB.Delete(data).Error
 }
+
+func (Socials) Count() (int64, error) {
+	var count int64
+	err := rdb.GormDB.Model(&Socials{}).Count(&count).Error
+	return count, err
+}
