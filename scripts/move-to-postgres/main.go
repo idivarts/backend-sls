@@ -96,7 +96,6 @@ func translate(old trendlybq.Socials) (trendlyrdb.Socials, []trendlyrdb.Instagra
 	instaPosts := []trendlyrdb.InstagramPost{}
 	for _, r := range old.Reels {
 		instaPosts = append(instaPosts, trendlyrdb.InstagramPost{
-			ID:                 r.ID,
 			SocialID:           new.ID,
 			DisplayURL:         r.ThumbnailURL,
 			URL:                r.URL,
@@ -104,7 +103,7 @@ func translate(old trendlybq.Socials) (trendlyrdb.Socials, []trendlyrdb.Instagra
 			IsPinned:           r.Pinned,
 			Type:               "video",
 			PostLocation:       "reels",
-			ShortCode:          "",
+			ShortCode:          r.ID,
 			VideoURL:           r.URL,
 			LikesCount:         r.LikesCount.Int64,
 			CommentsCount:      r.CommentsCount.Int64,
