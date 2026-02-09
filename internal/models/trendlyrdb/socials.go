@@ -38,8 +38,8 @@ type Socials struct {
 	AverageLikes    float32 `gorm:"type:real;default:0.0" db:"average_likes" json:"average_likes"`
 	AverageComments float32 `gorm:"type:real;default:0.0" db:"average_comments" json:"average_comments"`
 
-	// JSONB field for links
-	Links pq.StringArray `gorm:"type:jsonb;serializer:json" db:"links" json:"links"`
+	// JSONB field for links - array of Link objects
+	Links []Links `gorm:"type:jsonb;serializer:json" db:"links" json:"links"`
 
 	// AI-Deduced Fields
 	Gender   string         `gorm:"type:varchar(50)" db:"gender" json:"gender"`
