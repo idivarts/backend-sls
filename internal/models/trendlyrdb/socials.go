@@ -110,11 +110,6 @@ func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 	q := myquery.Client.Query(`
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
-	QUALIFY
-		ROW_NUMBER() OVER (
-			PARTITION BY id
-			ORDER BY last_update_time DESC
-		) = 1
     LIMIT @limit
 	OFFSET @offset
 `)
@@ -206,11 +201,6 @@ func (_ Socials) GetMultiple(ids []string) ([]Socials, error) {
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
     WHERE id IN UNNEST(@ids)
-	QUALIFY
-		ROW_NUMBER() OVER (
-			PARTITION BY id
-			ORDER BY last_update_time DESC
-		) = 1
 `)
 	q.Parameters = []bigquery.QueryParameter{
 		{Name: "ids", Value: ids},
