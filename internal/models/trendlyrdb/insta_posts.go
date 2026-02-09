@@ -14,7 +14,7 @@ const (
 
 type InstagramPost struct {
 	ID       string `gorm:"primaryKey;type:varchar(255)" db:"id" json:"id"`
-	SocialID string `gorm:"type:varchar(36);not null;index" db:"social_id" json:"social_id"` // foreign key
+	SocialID string `gorm:"type:varchar(255);not null;index" db:"social_id" json:"social_id"` // foreign key
 
 	PostLocation   string  `gorm:"type:varchar(255)" db:"post_location" json:"post_location"`
 	Type           string  `gorm:"type:varchar(50);index" db:"type" json:"type"`
