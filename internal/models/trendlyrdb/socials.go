@@ -7,6 +7,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/rdb"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -79,7 +80,7 @@ func (data *Socials) Insert() error {
 	data.ID = data.GetID()
 
 	// Use GORM's Clauses for upsert (ON CONFLICT DO UPDATE)
-	return rdb.GormDB.Save(data).Error
+	return rdb.GormDB.Clauses(clause.OnConflict{UpdateAll: true}).Create(data).Error
 }
 
 // InsertMultiple bulk inserts or updates multiple social profiles
@@ -90,7 +91,7 @@ func (_ Socials) InsertMultiple(socials []Socials) error {
 	}
 
 	// Use GORM's CreateInBatches for efficient bulk insert
-	return rdb.GormDB.CreateInBatches(socials, 100).Error
+	return rdb.GormDB.Clauses(clause.OnConflict{UpdateAll: true}).CreateInBatches(socials, 100).Error
 }
 
 // GetPaginated retrieves paginated social profiles
