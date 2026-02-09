@@ -16,28 +16,6 @@ const (
 	SocialsN8NFullTableName = "`socials`"
 )
 
-type Links struct {
-	Title    string `db:"title" json:"title"`
-	URL      string `db:"url" json:"url"`
-	LinkType string `db:"link_type" json:"link_type"`
-}
-
-type MusicInfo struct {
-	ArtistName        string `db:"artist_name" json:"artist_name"`
-	SongName          string `db:"song_name" json:"song_name"`
-	UsesOriginalAudio bool   `db:"uses_original_audio" json:"uses_original_audio"`
-	AudioID           string `db:"audio_id" json:"audio_id"`
-}
-
-type User struct {
-	FullName      string `db:"full_name" json:"full_name"`
-	ID            string `db:"id" json:"id"`
-	IsPrivate     bool   `db:"is_private" json:"is_private"`
-	IsVerified    bool   `db:"is_verified" json:"is_verified"`
-	ProfilePicURL string `db:"profile_pic_url" json:"profile_pic_url"`
-	Username      string `db:"username" json:"username"`
-}
-
 type SocialsN8N struct {
 	ID string `db:"id" json:"id"`
 
@@ -85,6 +63,12 @@ type SocialsN8N struct {
 
 	// Enhanced Profile fields
 	ExternalId string `db:"external_id" json:"external_id"`
+}
+
+type Links struct {
+	Title    string `db:"title" json:"title"`
+	URL      string `db:"url" json:"url"`
+	LinkType string `db:"link_type" json:"link_type"`
 }
 
 // // Content Data

@@ -4,15 +4,6 @@ const (
 	InstagramPostsTableName = "`instagram_posts`"
 )
 
-type Comment struct {
-	ID                 string  `db:"id" json:"id"`
-	Text               string  `db:"text" json:"text"`
-	OwnerUsername      string  `db:"owner_username" json:"owner_username"`
-	OwnerProfilePicURL string  `db:"owner_profile_pic_url" json:"owner_profile_pic_url"`
-	Timestamp          string  `db:"timestamp" json:"timestamp"`
-	LikesCount         float64 `db:"likes_count" json:"likes_count"`
-}
-
 type InstagramPost struct {
 	ID       string `db:"id" json:"id"`
 	SocialID string `db:"social_id" json:"social_id"` //foreign key
@@ -46,4 +37,27 @@ type InstagramPost struct {
 	FirstComment       string          `db:"first_comment" json:"first_comment"`
 	LatestComments     []Comment       `db:"latest_comments" json:"latest_comments"`
 	ChildPosts         []InstagramPost `db:"child_posts,omitempty" json:"child_posts,omitempty"`
+}
+
+type Comment struct {
+	ID                 string  `db:"id" json:"id"`
+	Text               string  `db:"text" json:"text"`
+	OwnerUsername      string  `db:"owner_username" json:"owner_username"`
+	OwnerProfilePicURL string  `db:"owner_profile_pic_url" json:"owner_profile_pic_url"`
+	Timestamp          string  `db:"timestamp" json:"timestamp"`
+	LikesCount         float64 `db:"likes_count" json:"likes_count"`
+}
+type MusicInfo struct {
+	ArtistName        string `db:"artist_name" json:"artist_name"`
+	SongName          string `db:"song_name" json:"song_name"`
+	UsesOriginalAudio bool   `db:"uses_original_audio" json:"uses_original_audio"`
+	AudioID           string `db:"audio_id" json:"audio_id"`
+}
+type User struct {
+	FullName      string `db:"full_name" json:"full_name"`
+	ID            string `db:"id" json:"id"`
+	IsPrivate     bool   `db:"is_private" json:"is_private"`
+	IsVerified    bool   `db:"is_verified" json:"is_verified"`
+	ProfilePicURL string `db:"profile_pic_url" json:"profile_pic_url"`
+	Username      string `db:"username" json:"username"`
 }
