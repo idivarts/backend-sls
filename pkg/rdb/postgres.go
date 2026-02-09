@@ -10,6 +10,9 @@ import (
 
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type KeySecretJson struct {
@@ -23,6 +26,7 @@ type KeySecretJson struct {
 }
 
 var DB *sql.DB
+var GormDB *gorm.DB
 
 func init() {
 	basePath := "."
@@ -42,7 +46,6 @@ func init() {
 		log.Printf("could not decode key-secrets.json: %v", err)
 		return
 	}
-	// log.Println("Database", secrets.Database)
 
 	dbUser := secrets.RDB.User
 	dbPass := secrets.RDB.Password
@@ -67,14 +70,21 @@ func init() {
 	}
 
 	// Construct the PostgreSQL DSN (Data Source Name)
-	// Format: host=<host> port=<port> user=<user> password=<password> dbname=<dbname> sslmode=disable
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s",
 		dbHost, dbPort, dbUser, dbPass, dbName)
 
-	// Open the database connection
-	DB, err = sql.Open("postgres", dsn)
+	// Initialize GORM
+	GormDB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 	if err != nil {
-		log.Fatalf("Failed to connect to Postgres: %v", err)
+		log.Fatalf("Failed to connect to Postgres with GORM: %v", err)
+	}
+
+	// Get underlying sql.DB for compatibility
+	DB, err = GormDB.DB()
+	if err != nil {
+		log.Fatalf("Failed to get underlying sql.DB: %v", err)
 	}
 
 	// Verify the connection
@@ -82,5 +92,5 @@ func init() {
 		log.Fatalf("Failed to ping Postgres: %v", err)
 	}
 
-	log.Println("Successfully connected to Postgres")
+	log.Println("Successfully connected to Postgres with GORM")
 }
