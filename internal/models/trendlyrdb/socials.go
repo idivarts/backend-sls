@@ -80,7 +80,7 @@ func (data *Socials) Insert() error {
 	data.ID = data.GetID()
 
 	// Use GORM's Clauses for upsert (ON CONFLICT DO UPDATE)
-	return rdb.GormDB.Clauses(clause.OnConflict{UpdateAll: true}).Create(data).Error
+	return rdb.GormDB.Save(data).Error
 }
 
 // InsertMultiple bulk inserts or updates multiple social profiles

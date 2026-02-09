@@ -6,6 +6,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/rdb"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -84,7 +85,7 @@ func (data *InstagramPost) Insert() error {
 
 // InsertMultiple bulk inserts or updates multiple Instagram posts
 func (_ InstagramPost) InsertMultiple(posts []InstagramPost) error {
-	return rdb.GormDB.CreateInBatches(posts, 100).Error
+	return rdb.GormDB.Clauses(clause.OnConflict{UpdateAll: true}).CreateInBatches(posts, 100).Error
 }
 
 // Get retrieves a single Instagram post by ID
