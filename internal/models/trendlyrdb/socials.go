@@ -1,19 +1,18 @@
 package trendlyrdb
 
 import (
-	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
 
-	"cloud.google.com/go/bigquery"
 	"github.com/google/uuid"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/myquery"
-	"google.golang.org/api/iterator"
+	"github.com/idivarts/backend-sls/pkg/rdb"
+	"github.com/lib/pq"
 )
 
 const (
-	SocialsN8NFullTableName = "`socials`"
+	SocialsTableName = "socials"
 )
 
 type Socials struct {
@@ -83,149 +82,251 @@ func (data *Socials) GetID() string {
 
 func (data *Socials) Insert() error {
 	data.ID = data.GetID()
-	inserter := myquery.Client.Dataset("matches").Table(`socials-n8n`).Inserter()
-	if err := inserter.Put(context.Background(), []*Socials{
-		data,
-	}); err != nil {
+
+	// Marshal Links to JSONB
+	linksJSON, err := json.Marshal(data.Links)
+	if err != nil {
 		return err
 	}
-	return nil
-}
 
-func (_ Socials) InsertMultiple(socials []Socials) error {
-	inserter := myquery.Client.Dataset("matches").Table(`socials-n8n`).Inserter()
-	if err := inserter.Put(context.Background(), socials); err != nil {
-		return err
-	}
-	return nil
-}
+	query := `
+		INSERT INTO socials (
+			id, username, name, bio, profile_pic, profile_pic_hd, category,
+			social_type, profile_verified, follower_count, following_count, content_count,
+			views_count, engagement_count, engagement_rate, average_views, average_likes, average_comments,
+			links, gender, location, niches, quality_score,
+			added_by, creation_time, last_update_time, external_id
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+			$19, $20, $21, $22, $23, $24, $25, $26, $27
+		)
+		ON CONFLICT (id) DO UPDATE SET
+			username = EXCLUDED.username,
+			name = EXCLUDED.name,
+			bio = EXCLUDED.bio,
+			profile_pic = EXCLUDED.profile_pic,
+			profile_pic_hd = EXCLUDED.profile_pic_hd,
+			category = EXCLUDED.category,
+			social_type = EXCLUDED.social_type,
+			profile_verified = EXCLUDED.profile_verified,
+			follower_count = EXCLUDED.follower_count,
+			following_count = EXCLUDED.following_count,
+			content_count = EXCLUDED.content_count,
+			views_count = EXCLUDED.views_count,
+			engagement_count = EXCLUDED.engagement_count,
+			engagement_rate = EXCLUDED.engagement_rate,
+			average_views = EXCLUDED.average_views,
+			average_likes = EXCLUDED.average_likes,
+			average_comments = EXCLUDED.average_comments,
+			links = EXCLUDED.links,
+			gender = EXCLUDED.gender,
+			location = EXCLUDED.location,
+			niches = EXCLUDED.niches,
+			quality_score = EXCLUDED.quality_score,
+			added_by = EXCLUDED.added_by,
+			last_update_time = EXCLUDED.last_update_time,
+			external_id = EXCLUDED.external_id
+	`
 
-func (data *Socials) InsertToFirestore(isImagesOnS3 bool) error {
-	if data.ID == "" {
-		data.ID = data.GetID()
-	}
-	_, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(data.ID).Set(context.Background(), data)
+	_, err = rdb.DB.Exec(query,
+		data.ID, data.Username, data.Name, data.Bio, data.ProfilePic, data.ProfilePicHD, data.Category,
+		data.SocialType, data.ProfileVerified, data.FollowerCount, data.FollowingCount, data.ContentCount,
+		data.ViewsCount, data.EngagementCount, data.EngagementRate, data.AverageViews, data.AverageLikes, data.AverageComments,
+		linksJSON, data.Gender, data.Location, pq.Array(data.Niches), data.QualityScore,
+		data.AddedBy, data.CreationTime, data.LastUpdateTime, data.ExternalId,
+	)
+
 	return err
 }
 
+func (_ Socials) InsertMultiple(socials []Socials) error {
+	// Use a transaction for bulk insert
+	tx, err := rdb.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO socials (
+			id, username, name, bio, profile_pic, profile_pic_hd, category,
+			social_type, profile_verified, follower_count, following_count, content_count,
+			views_count, engagement_count, engagement_rate, average_views, average_likes, average_comments,
+			links, gender, location, niches, quality_score,
+			added_by, creation_time, last_update_time, external_id
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+			$19, $20, $21, $22, $23, $24, $25, $26, $27
+		)
+		ON CONFLICT (id) DO UPDATE SET
+			username = EXCLUDED.username,
+			last_update_time = EXCLUDED.last_update_time
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, social := range socials {
+		social.ID = social.GetID()
+		linksJSON, err := json.Marshal(social.Links)
+		if err != nil {
+			return err
+		}
+
+		_, err = stmt.Exec(
+			social.ID, social.Username, social.Name, social.Bio, social.ProfilePic, social.ProfilePicHD, social.Category,
+			social.SocialType, social.ProfileVerified, social.FollowerCount, social.FollowingCount, social.ContentCount,
+			social.ViewsCount, social.EngagementCount, social.EngagementRate, social.AverageViews, social.AverageLikes, social.AverageComments,
+			linksJSON, social.Gender, social.Location, pq.Array(social.Niches), social.QualityScore,
+			social.AddedBy, social.CreationTime, social.LastUpdateTime, social.ExternalId,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
-	q := myquery.Client.Query(`
-    SELECT *
-    FROM ` + SocialsN8NFullTableName + `
-    LIMIT @limit
-	OFFSET @offset
-`)
-	q.Parameters = []bigquery.QueryParameter{
-		{Name: "limit", Value: limit},
-		{Name: "offset", Value: offset},
+	query := `
+		SELECT id, username, name, bio, profile_pic, profile_pic_hd, category,
+			social_type, profile_verified, follower_count, following_count, content_count,
+			views_count, engagement_count, engagement_rate, average_views, average_likes, average_comments,
+			links, gender, location, niches, quality_score,
+			added_by, creation_time, last_update_time, external_id
+		FROM socials
+		ORDER BY last_update_time DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := rdb.DB.Query(query, limit, offset)
+	if err != nil {
+		log.Println("Error:", err.Error())
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := []Socials{}
+	for rows.Next() {
+		var data Socials
+		var linksJSON []byte
+
+		err = rows.Scan(
+			&data.ID, &data.Username, &data.Name, &data.Bio, &data.ProfilePic, &data.ProfilePicHD, &data.Category,
+			&data.SocialType, &data.ProfileVerified, &data.FollowerCount, &data.FollowingCount, &data.ContentCount,
+			&data.ViewsCount, &data.EngagementCount, &data.EngagementRate, &data.AverageViews, &data.AverageLikes, &data.AverageComments,
+			&linksJSON, &data.Gender, &data.Location, pq.Array(&data.Niches), &data.QualityScore,
+			&data.AddedBy, &data.CreationTime, &data.LastUpdateTime, &data.ExternalId,
+		)
+		if err != nil {
+			log.Println("Error scanning row:", err.Error())
+			continue
+		}
+
+		// Unmarshal JSONB links
+		if len(linksJSON) > 0 {
+			if err := json.Unmarshal(linksJSON, &data.Links); err != nil {
+				log.Println("Error unmarshaling links:", err.Error())
+			}
+		}
+
+		results = append(results, data)
 	}
 
-	it, err := q.Read(context.Background())
-	if err != nil {
-		log.Println("Error ", err.Error())
+	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
-	results := []Socials{}
-	for {
-		data := &Socials{}
-		err = it.Next(data)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Println("Error ", err.Error())
-			continue
-		}
-		results = append(results, *data)
-	}
 	return results, nil
-}
-
-func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error) {
-	temp := firestoredb.Client.Collection("scrapped-socials-n8n").Offset(offset)
-	if limit > 0 {
-		temp = temp.Limit(limit)
-	}
-	it, err := temp.Documents(context.Background()).GetAll()
-	if err != nil {
-		return nil, err
-	}
-	results := []Socials{}
-	for _, v := range it {
-		social := &Socials{}
-		err = v.DataTo(social)
-		if err != nil {
-			continue
-		}
-		results = append(results, *social)
-	}
-	return results, nil
-}
-
-func (s *Socials) GetByIdFromFirestore(id string) error {
-	res, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(id).Get(context.Background())
-	if err != nil {
-		return err
-	}
-	err = res.DataTo(s)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (data *Socials) Get(id string) error {
-	q := myquery.Client.Query(`
-    SELECT *
-    FROM ` + SocialsN8NFullTableName + `
-    WHERE id = @id
-    LIMIT 1
-`)
-	q.Parameters = []bigquery.QueryParameter{
-		{Name: "id", Value: id},
-	}
+	query := `
+		SELECT id, username, name, bio, profile_pic, profile_pic_hd, category,
+			social_type, profile_verified, follower_count, following_count, content_count,
+			views_count, engagement_count, engagement_rate, average_views, average_likes, average_comments,
+			links, gender, location, niches, quality_score,
+			added_by, creation_time, last_update_time, external_id
+		FROM socials
+		WHERE id = $1
+		LIMIT 1
+	`
 
-	it, err := q.Read(context.Background())
+	var linksJSON []byte
+	err := rdb.DB.QueryRow(query, id).Scan(
+		&data.ID, &data.Username, &data.Name, &data.Bio, &data.ProfilePic, &data.ProfilePicHD, &data.Category,
+		&data.SocialType, &data.ProfileVerified, &data.FollowerCount, &data.FollowingCount, &data.ContentCount,
+		&data.ViewsCount, &data.EngagementCount, &data.EngagementRate, &data.AverageViews, &data.AverageLikes, &data.AverageComments,
+		&linksJSON, &data.Gender, &data.Location, pq.Array(&data.Niches), &data.QualityScore,
+		&data.AddedBy, &data.CreationTime, &data.LastUpdateTime, &data.ExternalId,
+	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.New("social not found")
+		}
 		return err
 	}
 
-	err = it.Next(data)
-	if err != nil {
-		return err
+	// Unmarshal JSONB links
+	if len(linksJSON) > 0 {
+		if err := json.Unmarshal(linksJSON, &data.Links); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
 func (_ Socials) GetMultiple(ids []string) ([]Socials, error) {
-	q := myquery.Client.Query(`
-    SELECT *
-    FROM ` + SocialsN8NFullTableName + `
-    WHERE id IN UNNEST(@ids)
-`)
-	q.Parameters = []bigquery.QueryParameter{
-		{Name: "ids", Value: ids},
-	}
+	query := `
+		SELECT id, username, name, bio, profile_pic, profile_pic_hd, category,
+			social_type, profile_verified, follower_count, following_count, content_count,
+			views_count, engagement_count, engagement_rate, average_views, average_likes, average_comments,
+			links, gender, location, niches, quality_score,
+			added_by, creation_time, last_update_time, external_id
+		FROM socials
+		WHERE id = ANY($1)
+	`
 
-	it, err := q.Read(context.Background())
+	rows, err := rdb.DB.Query(query, pq.Array(ids))
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	results := []Socials{}
-	for {
-		row := &Socials{}
-		err = it.Next(row)
-		if err == iterator.Done {
-			break
-		}
+	for rows.Next() {
+		var data Socials
+		var linksJSON []byte
+
+		err = rows.Scan(
+			&data.ID, &data.Username, &data.Name, &data.Bio, &data.ProfilePic, &data.ProfilePicHD, &data.Category,
+			&data.SocialType, &data.ProfileVerified, &data.FollowerCount, &data.FollowingCount, &data.ContentCount,
+			&data.ViewsCount, &data.EngagementCount, &data.EngagementRate, &data.AverageViews, &data.AverageLikes, &data.AverageComments,
+			&linksJSON, &data.Gender, &data.Location, pq.Array(&data.Niches), &data.QualityScore,
+			&data.AddedBy, &data.CreationTime, &data.LastUpdateTime, &data.ExternalId,
+		)
 		if err != nil {
-			log.Println("Error ", err.Error())
+			log.Println("Error scanning row:", err.Error())
 			continue
 		}
-		results = append(results, *row)
+
+		// Unmarshal JSONB links
+		if len(linksJSON) > 0 {
+			if err := json.Unmarshal(linksJSON, &data.Links); err != nil {
+				log.Println("Error unmarshaling links:", err.Error())
+			}
+		}
+
+		results = append(results, data)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return results, nil
 }
 
@@ -234,54 +335,5 @@ func (data *Socials) GetInstagram(username string) error {
 	data.SocialType = "instagram"
 	id := data.GetID()
 
-	q := myquery.Client.Query(`
-	SELECT *
-	FROM ` + SocialsN8NFullTableName + `
-	WHERE id = @id
-	LIMIT 1
-`)
-	q.Parameters = []bigquery.QueryParameter{
-		{Name: "id", Value: id},
-	}
-
-	it, err := q.Read(context.Background())
-	if err != nil {
-		return err
-	}
-
-	err = it.Next(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (data *Socials) GetInstagramFromFirestore(username string) error {
-	data.Username = username
-	data.SocialType = "instagram"
-	id := data.GetID()
-
-	d, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(id).Get(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if !d.Exists() {
-		return errors.New("document-doesnt-exists")
-	}
-
-	err = d.DataTo(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-func IsPendingScanExists() bool {
-	snap, err := firestoredb.Client.Collection("scrapped-socials-n8n").Where("state", "==", 0).Limit(1).Documents(context.Background()).Next()
-	if err != nil {
-		return false
-	}
-	return snap != nil
+	return data.Get(id)
 }
