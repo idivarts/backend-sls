@@ -14,12 +14,12 @@ const (
 )
 
 type InstagramPost struct {
-	ID       string `gorm:"primaryKey;type:varchar(255)" db:"id" json:"id"`
+	ID       string `gorm:"type:varchar(255)" db:"id" json:"id"`
 	SocialID string `gorm:"type:varchar(255);not null;index" db:"social_id" json:"social_id"` // foreign key
 
 	PostLocation   string  `gorm:"type:varchar(255)" db:"post_location" json:"post_location"`
 	Type           string  `gorm:"type:varchar(50);index" db:"type" json:"type"`
-	ShortCode      string  `gorm:"type:varchar(50);index" db:"short_code" json:"short_code"`
+	ShortCode      string  `gorm:"primaryKey;type:varchar(50);index" db:"short_code" json:"short_code"`
 	Caption        string  `gorm:"type:text" db:"caption" json:"caption"`
 	URL            string  `gorm:"type:text" db:"url" json:"url"`
 	DisplayURL     string  `gorm:"type:text" db:"display_url" json:"display_url"`
