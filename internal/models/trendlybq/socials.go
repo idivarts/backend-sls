@@ -181,6 +181,7 @@ func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 			PARTITION BY id
 			ORDER BY last_update_time DESC
 		) = 1
+	ORDER BY last_update_time DESC
     LIMIT @limit
 	OFFSET @offset
 `)
