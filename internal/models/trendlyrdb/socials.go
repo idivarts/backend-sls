@@ -16,7 +16,7 @@ const (
 	SocialsN8NFullTableName = "`socials`"
 )
 
-type SocialsN8N struct {
+type Socials struct {
 	ID string `db:"id" json:"id"`
 
 	Username     string `db:"username" json:"username"`
@@ -76,15 +76,15 @@ type Links struct {
 // LatestReels      []SinglePost `db:"latest_reels" bigquery:"latest_reels" json:"latest_reels" firestore:"latest_reels"`
 // LatestIgtvVideos []SinglePost `db:"latest_igtv_videos" bigquery:"latest_igtv_videos" json:"latest_igtv_videos" firestore:"latest_igtv_videos"`
 
-func (data *SocialsN8N) GetID() string {
+func (data *Socials) GetID() string {
 	ID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(data.SocialType+data.Username))
 	return ID.String()
 }
 
-func (data *SocialsN8N) Insert() error {
+func (data *Socials) Insert() error {
 	data.ID = data.GetID()
 	inserter := myquery.Client.Dataset("matches").Table(`socials-n8n`).Inserter()
-	if err := inserter.Put(context.Background(), []*SocialsN8N{
+	if err := inserter.Put(context.Background(), []*Socials{
 		data,
 	}); err != nil {
 		return err
@@ -92,7 +92,7 @@ func (data *SocialsN8N) Insert() error {
 	return nil
 }
 
-func (_ SocialsN8N) InsertMultiple(socials []SocialsN8N) error {
+func (_ Socials) InsertMultiple(socials []Socials) error {
 	inserter := myquery.Client.Dataset("matches").Table(`socials-n8n`).Inserter()
 	if err := inserter.Put(context.Background(), socials); err != nil {
 		return err
@@ -100,7 +100,7 @@ func (_ SocialsN8N) InsertMultiple(socials []SocialsN8N) error {
 	return nil
 }
 
-func (data *SocialsN8N) InsertToFirestore(isImagesOnS3 bool) error {
+func (data *Socials) InsertToFirestore(isImagesOnS3 bool) error {
 	if data.ID == "" {
 		data.ID = data.GetID()
 	}
@@ -108,7 +108,7 @@ func (data *SocialsN8N) InsertToFirestore(isImagesOnS3 bool) error {
 	return err
 }
 
-func (_ SocialsN8N) GetPaginated(offset, limit int) ([]SocialsN8N, error) {
+func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 	q := myquery.Client.Query(`
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
@@ -131,9 +131,9 @@ func (_ SocialsN8N) GetPaginated(offset, limit int) ([]SocialsN8N, error) {
 		return nil, err
 	}
 
-	results := []SocialsN8N{}
+	results := []Socials{}
 	for {
-		data := &SocialsN8N{}
+		data := &Socials{}
 		err = it.Next(data)
 		if err == iterator.Done {
 			break
@@ -147,7 +147,7 @@ func (_ SocialsN8N) GetPaginated(offset, limit int) ([]SocialsN8N, error) {
 	return results, nil
 }
 
-func (_ SocialsN8N) GetPaginatedFromFirestore(offset, limit int) ([]SocialsN8N, error) {
+func (_ Socials) GetPaginatedFromFirestore(offset, limit int) ([]Socials, error) {
 	temp := firestoredb.Client.Collection("scrapped-socials-n8n").Offset(offset)
 	if limit > 0 {
 		temp = temp.Limit(limit)
@@ -156,9 +156,9 @@ func (_ SocialsN8N) GetPaginatedFromFirestore(offset, limit int) ([]SocialsN8N, 
 	if err != nil {
 		return nil, err
 	}
-	results := []SocialsN8N{}
+	results := []Socials{}
 	for _, v := range it {
-		social := &SocialsN8N{}
+		social := &Socials{}
 		err = v.DataTo(social)
 		if err != nil {
 			continue
@@ -168,7 +168,7 @@ func (_ SocialsN8N) GetPaginatedFromFirestore(offset, limit int) ([]SocialsN8N, 
 	return results, nil
 }
 
-func (s *SocialsN8N) GetByIdFromFirestore(id string) error {
+func (s *Socials) GetByIdFromFirestore(id string) error {
 	res, err := firestoredb.Client.Collection("scrapped-socials-n8n").Doc(id).Get(context.Background())
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func (s *SocialsN8N) GetByIdFromFirestore(id string) error {
 	return nil
 }
 
-func (data *SocialsN8N) Get(id string) error {
+func (data *Socials) Get(id string) error {
 	q := myquery.Client.Query(`
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
@@ -203,7 +203,7 @@ func (data *SocialsN8N) Get(id string) error {
 	return nil
 }
 
-func (_ SocialsN8N) GetMultiple(ids []string) ([]SocialsN8N, error) {
+func (_ Socials) GetMultiple(ids []string) ([]Socials, error) {
 	q := myquery.Client.Query(`
     SELECT *
     FROM ` + SocialsN8NFullTableName + `
@@ -223,9 +223,9 @@ func (_ SocialsN8N) GetMultiple(ids []string) ([]SocialsN8N, error) {
 		return nil, err
 	}
 
-	results := []SocialsN8N{}
+	results := []Socials{}
 	for {
-		row := &SocialsN8N{}
+		row := &Socials{}
 		err = it.Next(row)
 		if err == iterator.Done {
 			break
@@ -239,7 +239,7 @@ func (_ SocialsN8N) GetMultiple(ids []string) ([]SocialsN8N, error) {
 	return results, nil
 }
 
-func (data *SocialsN8N) GetInstagram(username string) error {
+func (data *Socials) GetInstagram(username string) error {
 	data.Username = username
 	data.SocialType = "instagram"
 	id := data.GetID()
@@ -267,7 +267,7 @@ func (data *SocialsN8N) GetInstagram(username string) error {
 	return nil
 }
 
-func (data *SocialsN8N) GetInstagramFromFirestore(username string) error {
+func (data *Socials) GetInstagramFromFirestore(username string) error {
 	data.Username = username
 	data.SocialType = "instagram"
 	id := data.GetID()
