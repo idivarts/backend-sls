@@ -15,7 +15,7 @@ func main() {
 }
 
 func checkAndInsertMissingData() {
-	offset := 0
+	offset := 6000
 	limit := 500
 	totalMigrated := 0
 
@@ -56,7 +56,7 @@ func checkAndInsertMissingData() {
 				}
 			}
 			if !found {
-				log.Println("User Not Found", oldSocial.Username, oldSocial.ID)
+				// log.Println("User Not Found", oldSocial.Username, oldSocial.ID)
 				social, posts := translate(oldSocial)
 				missingSocials = append(missingSocials, social)
 				missingInstaPosts = append(missingInstaPosts, posts...)
