@@ -75,7 +75,7 @@ func init() {
 
 	// Initialize GORM
 	GormDB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to Postgres with GORM: %v", err)
