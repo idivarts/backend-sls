@@ -51,6 +51,8 @@ type Socials struct {
 	// Not needed - We will deduce this from bio and posts' location
 	Location string `db:"location" json:"location"`
 
+	// Optional - We will deduce this from posts, hashtags and bio
+	Niches []string `db:"niches" json:"niches"`
 	// Optional - Need not be integer - Average (60) - Good (75) - Very Good (90) - Excellent (100)
 	QualityScore int `db:"quality_score" json:"quality_score"`
 
