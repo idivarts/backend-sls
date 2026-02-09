@@ -17,74 +17,74 @@ const (
 )
 
 type Links struct {
-	Title    string `db:"title" bigquery:"title" json:"title" firestore:"title"`
-	URL      string `db:"url" bigquery:"url" json:"url" firestore:"url"`
-	LinkType string `db:"link_type" bigquery:"link_type" json:"link_type" firestore:"link_type"`
+	Title    string `db:"title" json:"title"`
+	URL      string `db:"url" json:"url"`
+	LinkType string `db:"link_type" json:"link_type"`
 }
 
 type MusicInfo struct {
-	ArtistName        string `db:"artist_name" bigquery:"artist_name" json:"artist_name" firestore:"artist_name"`
-	SongName          string `db:"song_name" bigquery:"song_name" json:"song_name" firestore:"song_name"`
-	UsesOriginalAudio bool   `db:"uses_original_audio" bigquery:"uses_original_audio" json:"uses_original_audio" firestore:"uses_original_audio"`
-	AudioID           string `db:"audio_id" bigquery:"audio_id" json:"audio_id" firestore:"audio_id"`
+	ArtistName        string `db:"artist_name" json:"artist_name"`
+	SongName          string `db:"song_name" json:"song_name"`
+	UsesOriginalAudio bool   `db:"uses_original_audio" json:"uses_original_audio"`
+	AudioID           string `db:"audio_id" json:"audio_id"`
 }
 
 type User struct {
-	FullName      string `db:"full_name" bigquery:"full_name" json:"full_name" firestore:"full_name"`
-	ID            string `db:"id" bigquery:"id" json:"id" firestore:"id"`
-	IsPrivate     bool   `db:"is_private" bigquery:"is_private" json:"is_private" firestore:"is_private"`
-	IsVerified    bool   `db:"is_verified" bigquery:"is_verified" json:"is_verified" firestore:"is_verified"`
-	ProfilePicURL string `db:"profile_pic_url" bigquery:"profile_pic_url" json:"profile_pic_url" firestore:"profile_pic_url"`
-	Username      string `db:"username" bigquery:"username" json:"username" firestore:"username"`
+	FullName      string `db:"full_name" json:"full_name"`
+	ID            string `db:"id" json:"id"`
+	IsPrivate     bool   `db:"is_private" json:"is_private"`
+	IsVerified    bool   `db:"is_verified" json:"is_verified"`
+	ProfilePicURL string `db:"profile_pic_url" json:"profile_pic_url"`
+	Username      string `db:"username" json:"username"`
 }
 
 type SocialsN8N struct {
-	ID string `db:"id" bigquery:"id" json:"id" firestore:"id"`
+	ID string `db:"id" json:"id"`
 
-	Username     string `db:"username" bigquery:"username" json:"username" firestore:"username"`
-	Name         string `db:"name" bigquery:"name" json:"name" firestore:"name"`
-	Bio          string `db:"bio" bigquery:"bio" json:"bio" firestore:"bio"`
-	ProfilePic   string `db:"profile_pic" bigquery:"profile_pic" json:"profile_pic" firestore:"profile_pic"`
-	ProfilePicHD string `db:"profile_pic_hd" bigquery:"profile_pic_hd" json:"profile_pic_hd" firestore:"profile_pic_hd"`
-	Category     string `db:"category" bigquery:"category" json:"category" firestore:"category"`
+	Username     string `db:"username" json:"username"`
+	Name         string `db:"name" json:"name"`
+	Bio          string `db:"bio" json:"bio"`
+	ProfilePic   string `db:"profile_pic" json:"profile_pic"`
+	ProfilePicHD string `db:"profile_pic_hd" json:"profile_pic_hd"`
+	Category     string `db:"category" json:"category"`
 
-	SocialType      string `db:"social_type" bigquery:"social_type" json:"social_type" firestore:"social_type"`
-	ProfileVerified bool   `db:"profile_verified" bigquery:"profile_verified" json:"profile_verified" firestore:"profile_verified"`
+	SocialType      string `db:"social_type" json:"social_type"`
+	ProfileVerified bool   `db:"profile_verified" json:"profile_verified"`
 
-	FollowerCount  int64 `db:"follower_count" bigquery:"follower_count" json:"follower_count" firestore:"follower_count"`
-	FollowingCount int64 `db:"following_count" bigquery:"following_count" json:"following_count" firestore:"following_count"`
-	ContentCount   int64 `db:"content_count" bigquery:"content_count" json:"content_count" firestore:"content_count"`
+	FollowerCount  int64 `db:"follower_count" json:"follower_count"`
+	FollowingCount int64 `db:"following_count" json:"following_count"`
+	ContentCount   int64 `db:"content_count" json:"content_count"`
 
 	// Analytics/Metrics (preserved from V1)
-	ViewsCount      int64   `db:"views_count" bigquery:"views_count" json:"views_count" firestore:"views_count"`
-	EngagementCount int64   `db:"engagement_count" bigquery:"engagement_count" json:"engagement_count" firestore:"engagement_count"`
-	EngagementRate  float32 `db:"engagement_rate" bigquery:"engagement_rate" json:"engagement_rate" firestore:"engagement_rate"`
-	AverageViews    float32 `db:"average_views" bigquery:"average_views" json:"average_views" firestore:"average_views"`
-	AverageLikes    float32 `db:"average_likes" bigquery:"average_likes" json:"average_likes" firestore:"average_likes"`
-	AverageComments float32 `db:"average_comments" bigquery:"average_comments" json:"average_comments" firestore:"average_comments"`
+	ViewsCount      int64   `db:"views_count" json:"views_count"`
+	EngagementCount int64   `db:"engagement_count" json:"engagement_count"`
+	EngagementRate  float32 `db:"engagement_rate" json:"engagement_rate"`
+	AverageViews    float32 `db:"average_views" json:"average_views"`
+	AverageLikes    float32 `db:"average_likes" json:"average_likes"`
+	AverageComments float32 `db:"average_comments" json:"average_comments"`
 
 	// Scraper specific fields
-	Links []Links `db:"links" bigquery:"links" json:"links" firestore:"links"`
+	Links []Links `db:"links" json:"links"`
 
 	// Existing fields from V1 worth preserving - We used to input it in past. But now thinking of calculating it using AI
 
 	// Not needed - We will deduce the full name, username, and bio (pronouns in bio)
-	Gender string `db:"gender" bigquery:"gender" json:"gender" firestore:"gender"`
+	Gender string `db:"gender" json:"gender"`
 	// Not needed - We will deduce this from bio and posts' location
-	Location string `db:"location" bigquery:"location" json:"location" firestore:"location"`
+	Location string `db:"location" json:"location"`
 
 	// Optional - We will deduce this from posts, hashtags and bio
-	Niches []string `db:"niches" bigquery:"niches" json:"niches" firestore:"niches"`
+	Niches []string `db:"niches" json:"niches"`
 	// Optional - Need not be integer - Average (60) - Good (75) - Very Good (90) - Excellent (100)
-	QualityScore int `db:"quality_score" bigquery:"quality_score" json:"quality_score" firestore:"quality_score"`
+	QualityScore int `db:"quality_score" json:"quality_score"`
 
 	// Metadata
-	AddedBy        string `db:"added_by" bigquery:"added_by" json:"added_by" firestore:"added_by"`
-	CreationTime   int64  `db:"creation_time" bigquery:"creation_time" json:"creation_time" firestore:"creation_time"`
-	LastUpdateTime int64  `db:"last_update_time" bigquery:"last_update_time" json:"last_update_time" firestore:"last_update_time"`
+	AddedBy        string `db:"added_by" json:"added_by"`
+	CreationTime   int64  `db:"creation_time" json:"creation_time"`
+	LastUpdateTime int64  `db:"last_update_time" json:"last_update_time"`
 
 	// Enhanced Profile fields
-	ExternalId string `db:"external_id" bigquery:"external_id" json:"external_id" firestore:"external_id"`
+	ExternalId string `db:"external_id" json:"external_id"`
 }
 
 // // Content Data
