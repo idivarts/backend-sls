@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	offset := 0
+	offset := 2500
 	limit := 500
 	totalMigrated := 0
 
