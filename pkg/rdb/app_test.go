@@ -7,8 +7,8 @@ import (
 	"github.com/idivarts/backend-sls/pkg/rdb"
 )
 
-func TestInitMySQL(t *testing.T) {
-	r, err := rdb.DB.Exec("show tables")
+func TestInitPostgres(t *testing.T) {
+	r, err := rdb.DB.Exec("select * from socials")
 	if err != nil {
 		t.Error(err)
 	}

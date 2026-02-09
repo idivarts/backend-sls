@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	_ "github.com/lib/pq"
 )
 
 type KeySecretJson struct {
@@ -60,26 +60,27 @@ func init() {
 		dbHost = "localhost"
 	}
 	if dbPort == 0 {
-		dbPort = 3306
+		dbPort = 5432 // PostgreSQL default port
 	}
 	if dbName == "" {
 		dbName = "mydatabase"
 	}
 
-	// Construct the DSN (Data Source Name)
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
-		dbUser, dbPass, dbHost, dbPort, dbName)
+	// Construct the PostgreSQL DSN (Data Source Name)
+	// Format: host=<host> port=<port> user=<user> password=<password> dbname=<dbname> sslmode=disable
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s",
+		dbHost, dbPort, dbUser, dbPass, dbName)
 
 	// Open the database connection
-	DB, err = sql.Open("mysql", dsn)
+	DB, err = sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to MySQL: %v", err)
+		log.Fatalf("Failed to connect to Postgres: %v", err)
 	}
 
 	// Verify the connection
 	if err = DB.Ping(); err != nil {
-		log.Fatalf("Failed to ping MySQL: %v", err)
+		log.Fatalf("Failed to ping Postgres: %v", err)
 	}
 
-	log.Println("Successfully connected to MySQL")
+	log.Println("Successfully connected to Postgres")
 }
