@@ -124,3 +124,25 @@ CREATE TABLE `instagram_posts` (
 
 -- Add unique constraint on short_code if needed
 -- ALTER TABLE `instagram_posts` ADD UNIQUE KEY `unique_short_code` (`short_code`);
+
+-- ============================================================================
+-- Social Niches Junction Table
+-- ============================================================================
+
+CREATE TABLE `social_niches` (
+    -- Composite Primary Key
+    `social_id` VARCHAR(36) NOT NULL COMMENT 'References socials.id',
+    `niche` VARCHAR(100) NOT NULL COMMENT 'Niche category (e.g., fashion, tech, fitness)',
+    
+    PRIMARY KEY (`social_id`, `niche`),
+    
+    -- Indexes
+    INDEX `idx_niche` (`niche`),
+    
+    -- Foreign Key Constraint
+    CONSTRAINT `fk_social_niches_social_id` 
+        FOREIGN KEY (`social_id`) 
+        REFERENCES `socials`(`id`) 
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Junction table for social profiles and their niches (many-to-many relationship)';
