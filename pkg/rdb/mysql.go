@@ -13,13 +13,13 @@ import (
 )
 
 type KeySecretJson struct {
-	Database struct {
+	RDB struct {
 		User     string `json:"user"`
 		Password string `json:"password"`
 		Host     string `json:"host"`
 		Port     int    `json:"port"`
 		Database string `json:"database"`
-	} `json:"database"`
+	} `json:"rdb"`
 }
 
 var DB *sql.DB
@@ -44,11 +44,11 @@ func init() {
 	}
 	// log.Println("Database", secrets.Database)
 
-	dbUser := secrets.Database.User
-	dbPass := secrets.Database.Password
-	dbHost := secrets.Database.Host
-	dbPort := secrets.Database.Port
-	dbName := secrets.Database.Database
+	dbUser := secrets.RDB.User
+	dbPass := secrets.RDB.Password
+	dbHost := secrets.RDB.Host
+	dbPort := secrets.RDB.Port
+	dbName := secrets.RDB.Database
 
 	if dbUser == "" {
 		dbUser = "root"
