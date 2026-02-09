@@ -22,3 +22,19 @@ func AutoMigrate(models ...interface{}) error {
 	log.Println("Auto-migration completed successfully")
 	return nil
 }
+
+func Create(model interface{}) error {
+	if GormDB == nil {
+		return gorm.ErrInvalidDB
+	}
+
+	log.Println("Running create...")
+	err := GormDB.Create(model).Error
+	if err != nil {
+		log.Printf("Create failed: %v", err)
+		return err
+	}
+
+	log.Println("Create completed successfully")
+	return nil
+}
