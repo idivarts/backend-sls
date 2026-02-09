@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
+	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 )
@@ -96,6 +98,7 @@ func translate(old trendlybq.Socials) (trendlyrdb.Socials, []trendlyrdb.Instagra
 	instaPosts := []trendlyrdb.InstagramPost{}
 	for _, r := range old.Reels {
 		instaPosts = append(instaPosts, trendlyrdb.InstagramPost{
+			ID:                 fmt.Sprintf("%s-%s", r.ID, uuid.New().String()),
 			SocialID:           new.ID,
 			DisplayURL:         r.ThumbnailURL,
 			URL:                r.URL,
