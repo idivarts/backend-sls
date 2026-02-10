@@ -12,37 +12,93 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 )
 
-func MoveImagesToS3(social *trendlybq.SocialsN8N) *trendlybq.SocialsN8N {
-	socialId := social.ID
+// s3Task represents a single download-and-upload job.
+type s3Task struct {
+	url       string
+	prefix    string
+	setResult func(string)
+}
 
+// maxS3Concurrency caps parallel S3 uploads to avoid exhausting file
+// descriptors, memory, or overwhelming the upstream CDN / S3 rate limits.
+// 10 is a safe default for Lambda-sized environments.
+const maxS3Concurrency = 10
+
+// MoveImagesToS3 downloads all image URLs found in the social profile and its
+// posts, re-uploads them to S3, and rewrites the URLs in-place.
+// Downloads run concurrently (up to maxS3Concurrency at a time).
+func MoveImagesToS3(social *trendlyrdb.Socials, posts []trendlyrdb.InstagramPost) (*trendlyrdb.Socials, []trendlyrdb.InstagramPost) {
+	var tasks []s3Task
+
+	// --- Social profile images ---
 	if social.ProfilePic != "" {
-		p, err := DownloadAndUploadToS3(social.ProfilePic, fmt.Sprintf("instagram/%s/profile-", social.ID))
-		if err != nil {
-			log.Println("Error Uploading Profile Pic", socialId, err.Error())
-		} else {
-			social.ProfilePic = p
-		}
+		tasks = append(tasks, s3Task{
+			url:       social.ProfilePic,
+			prefix:    fmt.Sprintf("instagram/%s/profile-", social.ID),
+			setResult: func(url string) { social.ProfilePic = url },
+		})
+	}
+	if social.ProfilePicHD != "" {
+		tasks = append(tasks, s3Task{
+			url:       social.ProfilePicHD,
+			prefix:    fmt.Sprintf("instagram/%s/profile-hd-", social.ID),
+			setResult: func(url string) { social.ProfilePicHD = url },
+		})
 	}
 
-	for i, v := range social.LatestReels {
-		if v.DisplayURL != "" {
-			p, err := DownloadAndUploadToS3(v.DisplayURL, fmt.Sprintf("instagram/%s/reels-", social.ID))
-			if err != nil {
-				log.Println("Error Uploading Reel Pic", socialId, v.ID, err.Error())
-			} else {
-				social.LatestReels[i].DisplayURL = p
+	// --- Post images ---
+	for i := range posts {
+		idx := i // capture for closure
+		if posts[idx].DisplayURL != "" {
+			tasks = append(tasks, s3Task{
+				url:       posts[idx].DisplayURL,
+				prefix:    fmt.Sprintf("instagram/%s/posts-", social.ID),
+				setResult: func(url string) { posts[idx].DisplayURL = url },
+			})
+		}
+		for j := range posts[idx].Images {
+			jj := j // capture for closure
+			if posts[idx].Images[jj] != "" {
+				tasks = append(tasks, s3Task{
+					url:       posts[idx].Images[jj],
+					prefix:    fmt.Sprintf("instagram/%s/posts-", social.ID),
+					setResult: func(url string) { posts[idx].Images[jj] = url },
+				})
 			}
 		}
 	}
-	log.Println("Successfully Uploaded images")
-	return social
+
+	// --- Execute concurrently with a semaphore ---
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxS3Concurrency)
+
+	for _, task := range tasks {
+		wg.Add(1)
+		go func(t s3Task) {
+			defer wg.Done()
+			sem <- struct{}{}        // acquire slot
+			defer func() { <-sem }() // release slot
+
+			p, err := DownloadAndUploadToS3(t.url, t.prefix)
+			if err != nil {
+				log.Println("Error uploading to S3:", t.url, err.Error())
+				return
+			}
+			t.setResult(p)
+		}(task)
+	}
+
+	wg.Wait()
+	log.Println("Successfully uploaded all images to S3")
+	return social, posts
 }
 
 // DownloadAndUploadToS3 downloads the image from URL, saves it to /tmp, and uploads to S3.
