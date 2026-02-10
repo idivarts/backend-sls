@@ -1,66 +1,21 @@
 package trendlydiscovery
 
 import (
+	"encoding/json"
 	"net/http"
-	"sort"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
+	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
+	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
 )
 
-func medianInt64(xs []int64) float32 {
-	if len(xs) == 0 {
-		return 0
-	}
-	sort.Slice(xs, func(i, j int) bool { return xs[i] < xs[j] })
-	n := len(xs)
-	if n%2 == 1 {
-		return float32(xs[n/2])
-	}
-	a := xs[n/2-1]
-	b := xs[n/2]
-	return float32(a+b) / 2
-}
-
-func medianFloat32(xs []float32) float32 {
-	if len(xs) == 0 {
-		return 0
-	}
-	sort.Slice(xs, func(i, j int) bool { return xs[i] < xs[j] })
-	n := len(xs)
-	if n%2 == 1 {
-		return xs[n/2]
-	}
-	a := xs[n/2-1]
-	b := xs[n/2]
-	return (a + b) / 2
-}
-
-// ScrapedProfile represents the payload coming from your scraper.
-type ScrapedProfile struct {
-	Username string `json:"username" binding:"required"`
-	Manual   Manual `json:"manual"`
-}
-
-type Manual struct {
-	Gender          string   `json:"gender"`
-	Niches          []string `json:"niches"`
-	Location        string   `json:"location"`
-	AestheticsScore int      `json:"aestheticsScore" binding:"gte=0,lte=100"`
-}
-
 func AddInstaProfile(c *gin.Context) {
-	var req ScrapedProfile
+	var req sui.ScrapedSocial
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Input", "error": err.Error()})
 		return
 	}
-
-	// adderUserId, b := middlewares.GetUserId(c)
-	// if !b {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "User not authenticated", "error": "UserId not found"})
-	// 	return
-	// }
 
 	checkData := trendlyrdb.Socials{}
 	err := checkData.GetInstagram(req.Username)
@@ -69,112 +24,20 @@ func AddInstaProfile(c *gin.Context) {
 		return
 	}
 
-	// now := time.Now().UnixMicro()
-	// data := &trendlyrdb.Socials{
-	// 	SocialType: "instagram",
-	// 	Username:   req.Username,
+	b, err := json.Marshal(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to marshal request", "error": err.Error()})
+		return
+	}
+	err = sqshandler.SendToMessageQueue(string(b), 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to send to queue", "error": err.Error()})
+		return
+	}
 
-	// 	Niches:       req.Manual.Niches,
-	// 	QualityScore: req.Manual.AestheticsScore,
-
-	// 	CreationTime:   now,
-	// 	LastUpdateTime: now,
-	// 	AddedBy:        adderUserId,
-	// }
-
-	// err = data.InsertPending()
-	// if err != nil {
-	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
-	// 	return
-	// }
-
-	// pendingCount, _ := trendlyrdb.Socials{}.CountPendingByUser(adderUserId)
-
-	// sqshandler.SendToMessageQueue(data.ID, 0)
-
-	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received"}) // "id":    data.ID,
-	// "count": pendingCount,
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received"})
 
 }
-
-// func calculateFunctionLater(){
-// 	eRates := []float32{}
-// 	viewsList := []int64{}
-// 	likesList := []int64{}
-// 	commentsList := []int64{}
-
-// 	totalLikes := int64(0)
-// 	totalViews := int64(0)
-// 	totalComments := int64(0)
-
-// 	for index, reel := range req.Reels.Items {
-// 		parts := strings.Split(reel.URL, "/")
-// 		id := "reelindex" + strconv.Itoa(index)
-// 		if len(parts) >= 2 {
-// 			id = parts[len(parts)-2]
-// 		}
-// 		data.LatestReels = append(data.LatestReels, trendlybq.SinglePost{
-// 			ID:             id,
-// 			DisplayURL:     reel.Thumbnail,
-// 			URL:            reel.URL,
-// 			Caption:        "",
-// 			IsPinned:       reel.Pinned,
-// 			VideoViewCount: bigquery.NullInt64{Int64: 0, Valid: reel.Views.Value != nil && *reel.Views.Value > 0},
-// 			LikesCount:     bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Likes.Value != nil && *reel.Overlays.Likes.Value > 0},
-// 			CommentsCount:  bigquery.NullInt64{Int64: 0, Valid: reel.Overlays.Comments.Value != nil && *reel.Overlays.Comments.Value > 0},
-// 		})
-
-// 		var views, likes, comments int64
-
-// 		if reel.Views.Value != nil {
-// 			views = *reel.Views.Value
-// 			if views > 0 {
-// 				data.LatestReels[len(data.LatestReels)-1].VideoViewCount.Int64 = views
-// 				viewsList = append(viewsList, views)
-// 			}
-// 			if !reel.Pinned {
-// 				data.ViewsCount += views
-// 			}
-// 		}
-// 		if reel.Overlays.Likes.Value != nil {
-// 			likes = *reel.Overlays.Likes.Value
-// 			if likes > 0 {
-// 				data.LatestReels[len(data.LatestReels)-1].LikesCount.Int64 = likes
-// 				likesList = append(likesList, likes)
-// 			}
-// 			if !reel.Pinned {
-// 				data.EngagementCount += likes
-// 			}
-// 		}
-// 		if reel.Overlays.Comments.Value != nil {
-// 			comments = *reel.Overlays.Comments.Value
-// 			if comments > 0 {
-// 				data.LatestReels[len(data.LatestReels)-1].CommentsCount.Int64 = comments
-// 				commentsList = append(commentsList, comments)
-// 			}
-// 			if !reel.Pinned {
-// 				data.EngagementCount += comments
-// 			}
-// 		}
-
-// 		// Per-reel engagement rate for median calculation (treat missing likes/comments as 0)
-// 		if views > 0 {
-// 			eRates = append(eRates, float32(likes+comments)*100/float32(views))
-// 		}
-
-// 		totalLikes += likes
-// 		totalComments += comments
-// 		totalViews += views
-// 	}
-
-// 	// Use median for the three "averages"
-// 	data.AverageViews = medianInt64(viewsList)
-// 	data.AverageLikes = medianInt64(likesList)
-// 	data.AverageComments = medianInt64(commentsList)
-
-// 	// Engagement rate as median of per-reel rates
-// 	data.EngagementRate = medianFloat32(eRates)
-// }
 
 func CheckInstaUsername(c *gin.Context) {
 	username := c.Query("username")

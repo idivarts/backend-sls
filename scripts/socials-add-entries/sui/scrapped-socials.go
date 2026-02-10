@@ -1,0 +1,11 @@
+package sui
+
+// ScrapedSocial represents the payload coming from your scraper.
+type ScrapedSocial struct {
+	SocialType string `json:"socialType" binding:"required"`
+	Username   string `json:"username" binding:"required"`
+	Manual     struct {
+		Niches       []string `json:"niches"`
+		QualityScore int      `json:"qualityScore" binding:"gte=0,lte=5"`
+	} `json:"manual"`
+}
