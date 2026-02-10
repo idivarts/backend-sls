@@ -114,7 +114,7 @@ func (data *Socials) ConvertToSocialBreif() *SocialsBreif {
 		ProfilePic:      data.ProfilePic,
 		FollowerCount:   data.FollowerCount,
 		ViewsCount:      data.ViewsCount,
-		EnagamentCount:  data.EnagamentsCount,
+		EngagementCount: data.EnagamentsCount,
 		EngagementRate:  data.EngagementRate,
 		SocialType:      data.SocialType,
 		Location:        data.Location,
@@ -181,6 +181,7 @@ func (_ Socials) GetPaginated(offset, limit int) ([]Socials, error) {
 			PARTITION BY id
 			ORDER BY last_update_time DESC
 		) = 1
+	ORDER BY last_update_time DESC
     LIMIT @limit
 	OFFSET @offset
 `)

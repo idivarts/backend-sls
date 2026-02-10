@@ -86,7 +86,6 @@ func translate(old trendlybq.Socials) trendlybq.SocialsN8N {
 		AddedBy:         old.AddedBy,
 		CreationTime:    old.CreationTime,
 		LastUpdateTime:  old.LastUpdateTime,
-		HasContacts:     old.HasContacts,
 	}
 
 	for _, r := range old.Reels {

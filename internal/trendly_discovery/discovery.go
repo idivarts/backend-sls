@@ -1,23 +1,20 @@
 package trendlydiscovery
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/myquery"
-	"google.golang.org/api/iterator"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
+	"github.com/idivarts/backend-sls/pkg/rdb"
 )
 
 // - followers/engagements/views can be large; int64 is used.
 // - engagementRate is expressed as a percentage (e.g., 1.5 for 1.5%).
 // - Field JSON tags mirror the TS property names expected by the app.
 type InfluencerItem struct {
-	trendlybq.SocialsBreif
+	trendlyrdb.Socials
 	IsDiscover bool `json:"isDiscover,omitempty"`
 }
 
@@ -33,96 +30,95 @@ type InfluencerInviteUnit struct {
 // All counts are non-negative. quality is a whole number 0..100. ER fields are percentages (e.g., 1 => 1%).
 type InfluencerFilters = trendlymodels.DiscoverPreferences
 
-func escapeBQString(s string) string {
-	// BigQuery escapes single quotes by doubling them
-	return strings.ReplaceAll(s, "'", "''")
+// func GetInfluencers(c *gin.Context, req InfluencerFilters) {
+func GetInfluencers(c *gin.Context) {
+	var req InfluencerFilters
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"message": "Invalid Input", "error": err.Error()})
+		return
+	}
+
+	socials, err := queryInfluencersFromRDB(req)
+	if err != nil {
+		c.JSON(500, gin.H{"message": "Query failed", "error": err.Error()})
+		return
+	}
+
+	out := make([]InfluencerItem, 0, len(socials))
+	for _, s := range socials {
+		brief := convertSocialsToBreif(s)
+		out = append(out, InfluencerItem{Socials: *brief, IsDiscover: true})
+	}
+
+	log.Println("Data Processed", out)
+	c.JSON(200, gin.H{"message": "Success", "data": out})
 }
 
-func inStringList(col string, vals []string) string {
-	if len(vals) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(vals))
-	for _, v := range vals {
-		parts = append(parts, fmt.Sprintf("'%s'", escapeBQString(v)))
-	}
-	return fmt.Sprintf("%s IN (%s)", col, strings.Join(parts, ","))
-}
-
-func nichesOverlapClause(vals []string) string {
-	if len(vals) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(vals))
-	for _, v := range vals {
-		parts = append(parts, fmt.Sprintf("'%s'", escapeBQString(v)))
-	}
-	return fmt.Sprintf("ARRAY_LENGTH(ARRAY(SELECT 1 FROM UNNEST(niches) n WHERE n IN (%s))) > 0", strings.Join(parts, ","))
-}
-
-func FormSQL(req InfluencerFilters) string {
-	// Build dynamic WHERE clauses
-	conds := []string{}
+// queryInfluencersFromRDB builds a GORM query over the Postgres-backed
+// socials table, applying the same filters that were previously used
+// in the BigQuery-based FormSQL function.
+func queryInfluencersFromRDB(req InfluencerFilters) ([]trendlyrdb.Socials, error) {
+	db := rdb.GormDB.Model(&trendlyrdb.Socials{}).Where("social_type = ?", "instagram")
 
 	if req.FollowerMin != nil {
-		conds = append(conds, fmt.Sprintf("follower_count >= %d", *req.FollowerMin))
+		db = db.Where("follower_count >= ?", *req.FollowerMin)
 	}
 	if req.FollowerMax != nil {
-		conds = append(conds, fmt.Sprintf("follower_count <= %d", *req.FollowerMax))
+		db = db.Where("follower_count <= ?", *req.FollowerMax)
 	}
 
 	if req.ContentMin != nil {
-		conds = append(conds, fmt.Sprintf("content_count >= %d", *req.ContentMin))
+		db = db.Where("content_count >= ?", *req.ContentMin)
 	}
 	if req.ContentMax != nil {
-		conds = append(conds, fmt.Sprintf("content_count <= %d", *req.ContentMax))
+		db = db.Where("content_count <= ?", *req.ContentMax)
 	}
 
 	if req.MonthlyViewMin != nil {
-		conds = append(conds, fmt.Sprintf("views_count >= %d", *req.MonthlyViewMin))
+		db = db.Where("views_count >= ?", *req.MonthlyViewMin)
 	}
 	if req.MonthlyViewMax != nil {
-		conds = append(conds, fmt.Sprintf("views_count <= %d", *req.MonthlyViewMax))
+		db = db.Where("views_count <= ?", *req.MonthlyViewMax)
 	}
 
 	if req.MonthlyEngagementMin != nil {
-		conds = append(conds, fmt.Sprintf("engagement_count >= %d", *req.MonthlyEngagementMin))
+		db = db.Where("engagement_count >= ?", *req.MonthlyEngagementMin)
 	}
 	if req.MonthlyEngagementMax != nil {
-		conds = append(conds, fmt.Sprintf("engagement_count <= %d", *req.MonthlyEngagementMax))
+		db = db.Where("engagement_count <= ?", *req.MonthlyEngagementMax)
 	}
 
 	if req.AvgViewsMin != nil {
-		conds = append(conds, fmt.Sprintf("average_views >= %d", *req.AvgViewsMin))
+		db = db.Where("average_views >= ?", *req.AvgViewsMin)
 	}
 	if req.AvgViewsMax != nil {
-		conds = append(conds, fmt.Sprintf("average_views <= %d", *req.AvgViewsMax))
+		db = db.Where("average_views <= ?", *req.AvgViewsMax)
 	}
 	if req.AvgLikesMin != nil {
-		conds = append(conds, fmt.Sprintf("average_likes >= %d", *req.AvgLikesMin))
+		db = db.Where("average_likes >= ?", *req.AvgLikesMin)
 	}
 	if req.AvgLikesMax != nil {
-		conds = append(conds, fmt.Sprintf("average_likes <= %d", *req.AvgLikesMax))
+		db = db.Where("average_likes <= ?", *req.AvgLikesMax)
 	}
 	if req.AvgCommentsMin != nil {
-		conds = append(conds, fmt.Sprintf("average_comments >= %d", *req.AvgCommentsMin))
+		db = db.Where("average_comments >= ?", *req.AvgCommentsMin)
 	}
 	if req.AvgCommentsMax != nil {
-		conds = append(conds, fmt.Sprintf("average_comments <= %d", *req.AvgCommentsMax))
+		db = db.Where("average_comments <= ?", *req.AvgCommentsMax)
 	}
 
 	if req.QualityMin != nil {
-		conds = append(conds, fmt.Sprintf("quality_score >= %d", *req.QualityMin))
+		db = db.Where("quality_score >= ?", *req.QualityMin)
 	}
 	if req.QualityMax != nil {
-		conds = append(conds, fmt.Sprintf("quality_score <= %d", *req.QualityMax))
+		db = db.Where("quality_score <= ?", *req.QualityMax)
 	}
 
 	if req.ERMin != nil {
-		conds = append(conds, fmt.Sprintf("engagement_rate >= %f", *req.ERMin))
+		db = db.Where("engagement_rate >= ?", *req.ERMin)
 	}
 	if req.ERMax != nil {
-		conds = append(conds, fmt.Sprintf("engagement_rate <= %f", *req.ERMax))
+		db = db.Where("engagement_rate <= ?", *req.ERMax)
 	}
 
 	if req.SelectedLocations != nil && len(req.SelectedLocations) > 0 {
@@ -133,57 +129,44 @@ func FormSQL(req InfluencerFilters) string {
 	}
 
 	if len(req.DescKeywords) > 0 {
-		// Match ANY keyword in bio (case-insensitive)
 		ors := make([]string, 0, len(req.DescKeywords))
+		args := make([]interface{}, 0, len(req.DescKeywords))
 		for _, kw := range req.DescKeywords {
 			kw = strings.TrimSpace(kw)
 			if kw == "" {
 				continue
 			}
-			ors = append(ors, fmt.Sprintf("LOWER(bio) LIKE '%%%s%%'", strings.ToLower(escapeBQString(kw))))
+			ors = append(ors, "LOWER(bio) LIKE ?")
+			args = append(args, "%"+strings.ToLower(kw)+"%")
 		}
-
-		if clause := inStringList("location", req.SelectedLocations); clause != "" {
-			ors = append(ors, clause)
-		}
-
 		if len(ors) > 0 {
-			conds = append(conds, fmt.Sprintf("(%s)", strings.Join(ors, " OR ")))
+			db = db.Where("("+strings.Join(ors, " OR ")+")", args...)
 		}
-	} else if clause := inStringList("location", req.SelectedLocations); clause != "" {
-		conds = append(conds, clause)
+	} else if len(req.SelectedLocations) > 0 {
+		db = db.Where("location IN ?", req.SelectedLocations)
 	}
 
 	if req.Name != nil && strings.TrimSpace(*req.Name) != "" {
-		nm := strings.ToLower(escapeBQString(strings.TrimSpace(*req.Name)))
-		conds = append(conds, fmt.Sprintf("(LOWER(name) LIKE '%%%s%%' OR LOWER(username) LIKE '%%%s%%')", nm, nm))
+		nm := strings.ToLower(strings.TrimSpace(*req.Name))
+		db = db.Where("(LOWER(name) LIKE ? OR LOWER(username) LIKE ?)", "%"+nm+"%", "%"+nm+"%")
 	}
 
 	if req.IsVerified != nil {
-		if *req.IsVerified {
-			conds = append(conds, "profile_verified = TRUE")
-		} else {
-			conds = append(conds, "profile_verified = FALSE")
-		}
+		db = db.Where("profile_verified = ?", *req.IsVerified)
 	}
 
 	if req.HasContact != nil {
-		if *req.HasContact {
-			conds = append(conds, "has_contacts = TRUE")
-		} else {
-			conds = append(conds, "has_contacts = FALSE")
-		}
+		db = db.Where("has_contacts = ?", *req.HasContact)
 	}
 
-	if clause := inStringList("gender", req.Genders); clause != "" {
-		conds = append(conds, clause)
+	if len(req.Genders) > 0 {
+		db = db.Where("gender IN ?", req.Genders)
 	}
 
-	if clause := nichesOverlapClause(req.SelectedNiches); clause != "" {
-		conds = append(conds, clause)
+	if len(req.SelectedNiches) > 0 {
+		db = db.Where("niches && ?", req.SelectedNiches)
 	}
 
-	// Resolve sorting & pagination (safe defaults + whitelist)
 	sortMap := map[string]string{
 		"followers":       "follower_count",
 		"views":           "views_count",
@@ -200,7 +183,7 @@ func FormSQL(req InfluencerFilters) string {
 	if dir != "asc" {
 		dir = "desc"
 	}
-	// pagination defaults
+
 	limit := 15
 	if req.Limit != nil {
 		limit = *req.Limit
@@ -216,70 +199,11 @@ func FormSQL(req InfluencerFilters) string {
 		offset = *req.Offset
 	}
 
-	// Assemble SQL
-	base := `SELECT
-  id,
-  name,
-  username,
-  profile_pic,
-  follower_count,
-  views_count,
-  engagement_count,
-  engagement_rate,
-  social_type,
-  location,
-  bio,
-  profile_verified,
-  creation_time,
-  last_update_time
-FROM ` + trendlybq.SocialsN8NFullTableName + `
-WHERE social_type = 'instagram'
-QUALIFY
-  ROW_NUMBER() OVER (
-    PARTITION BY id
-    ORDER BY last_update_time DESC
-  ) = 1`
-	// AND STARTS_WITH(profile_pic, "https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com")
+	db = db.Order(sortCol + " " + dir).Limit(limit).Offset(offset)
 
-	if len(conds) > 0 {
-		base += "\n  AND " + strings.Join(conds, "\n  AND ")
+	var results []trendlyrdb.Socials
+	if err := db.Find(&results).Error; err != nil {
+		return nil, err
 	}
-
-	// Ordering & pagination
-	base += fmt.Sprintf("\nORDER BY %s %s\nLIMIT %d OFFSET %d", sortCol, strings.ToUpper(dir), limit, offset)
-	return base
-}
-
-// func GetInfluencers(c *gin.Context, req InfluencerFilters) {
-func GetInfluencers(c *gin.Context) {
-	var req InfluencerFilters
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"message": "Invalid Input", "error": err.Error()})
-		return
-	}
-
-	base := FormSQL(req)
-	q := myquery.Client.Query(base)
-	it, err := q.Read(context.Background())
-	if err != nil {
-		c.JSON(500, gin.H{"message": "Query failed", "error": err.Error(), "sql": base})
-		return
-	}
-
-	out := make([]InfluencerItem, 0, 100)
-	for {
-		var r trendlybq.SocialsBreif
-		err := it.Next(&r)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			c.JSON(500, gin.H{"message": "Iteration failed", "error": err.Error(), "sql": base})
-			return
-		}
-		out = append(out, InfluencerItem{SocialsBreif: r, IsDiscover: true})
-	}
-
-	log.Println("Data Processed", out)
-	c.JSON(200, gin.H{"message": "Success", "data": out})
+	return results, nil
 }

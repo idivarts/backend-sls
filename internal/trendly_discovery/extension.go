@@ -1,17 +1,11 @@
 package trendlydiscovery
 
 import (
-	"context"
 	"net/http"
 	"sort"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/idivarts/backend-sls/internal/middlewares"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/n8n"
-	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 )
 
 func medianInt64(xs []int64) float32 {
@@ -55,74 +49,52 @@ type Manual struct {
 	AestheticsScore int      `json:"aestheticsScore" binding:"gte=0,lte=100"`
 }
 
-func AddProfile(c *gin.Context) {
+func AddInstaProfile(c *gin.Context) {
 	var req ScrapedProfile
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Input", "error": err.Error()})
 		return
 	}
 
-	adderUserId, b := middlewares.GetUserId(c)
-	if !b {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "User not authenticated", "error": "UserId not found"})
-		return
-	}
+	// adderUserId, b := middlewares.GetUserId(c)
+	// if !b {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "User not authenticated", "error": "UserId not found"})
+	// 	return
+	// }
 
-	checkData := trendlybq.SocialsN8N{}
+	checkData := trendlyrdb.Socials{}
 	err := checkData.GetInstagram(req.Username)
 	if err == nil {
 		c.JSON(http.StatusConflict, gin.H{"message": "Profile already exists", "id": checkData.ID})
 		return
 	}
 
-	data := &trendlybq.SocialsScrapePending{
-		SocialType: "instagram",
-		Username:   req.Username,
+	// now := time.Now().UnixMicro()
+	// data := &trendlyrdb.Socials{
+	// 	SocialType: "instagram",
+	// 	Username:   req.Username,
 
-		Gender:       req.Manual.Gender,
-		Niches:       req.Manual.Niches,
-		Location:     req.Manual.Location,
-		QualityScore: req.Manual.AestheticsScore,
+	// 	Niches:       req.Manual.Niches,
+	// 	QualityScore: req.Manual.AestheticsScore,
 
-		CreationTime:   time.Now().UnixMicro(), // TODO: set actual creation time
-		LastUpdateTime: time.Now().UnixMicro(),
-		AddedBy:        adderUserId,
-	}
+	// 	CreationTime:   now,
+	// 	LastUpdateTime: now,
+	// 	AddedBy:        adderUserId,
+	// }
 
-	err = data.InsertToFirestore()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
-		return
-	}
+	// err = data.InsertPending()
+	// if err != nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
+	// 	return
+	// }
 
-	allDocs, err := firestoredb.Client.Collection("scrapped-socials-n8n").Where("state", "==", 0).Where("added_by", "==", adderUserId).Documents(context.Background()).GetAll()
-	dLen := 0
-	if err == nil {
-		dLen = len(allDocs)
-	}
+	// pendingCount, _ := trendlyrdb.Socials{}.CountPendingByUser(adderUserId)
 
-	sqshandler.SendToMessageQueue(data.ID, 0)
+	// sqshandler.SendToMessageQueue(data.ID, 0)
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID, "count": dLen})
-}
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received"}) // "id":    data.ID,
+	// "count": pendingCount,
 
-func LoadAllProfiles(c *gin.Context) {
-	var req struct {
-		OutputUrl string `json:"outputUrl" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Input", "error": err.Error()})
-		return
-	}
-
-	influencerList, err := n8n.GetInfluencerList(req.OutputUrl)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Failed to get influencer list", "error": err.Error()})
-		return
-	}
-
-	isPending := trendlybq.IsPendingScanExists()
-	c.JSON(http.StatusOK, gin.H{"message": "Influencer list received", "count": len(influencerList), "isPending": isPending})
 }
 
 // func calculateFunctionLater(){
@@ -204,15 +176,20 @@ func LoadAllProfiles(c *gin.Context) {
 // 	data.EngagementRate = medianFloat32(eRates)
 // }
 
-func CheckUsername(c *gin.Context) {
+func CheckInstaUsername(c *gin.Context) {
 	username := c.Query("username")
 	if username == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Username is required"})
 		return
 	}
 
-	user := trendlybq.SocialsN8N{}
-	err := user.GetInstagramFromFirestore(username)
+	user := trendlyrdb.Socials{}
+	err := user.GetInstagram(username)
+	exists := err == nil
+	var lastUpdate int64
+	if exists {
+		lastUpdate = user.LastUpdateTime
+	}
 
-	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": err == nil, "lastUpdate": user.LastUpdateTime})
+	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": exists, "lastUpdate": lastUpdate})
 }
