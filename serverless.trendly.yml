@@ -161,7 +161,7 @@ functions:
   #         rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
   #         enabled: ${self:custom.isProd.${self:provider.stage}}
   trendly_discovery_upload:
-    handler: scripts/socials-update-images/main.go
+    handler: scripts/socials-add-entries/main.go
     environment:
       S3_BUCKET: trendly-discovery-bucket
       S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com

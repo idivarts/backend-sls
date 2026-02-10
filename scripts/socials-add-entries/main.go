@@ -7,7 +7,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
-	"github.com/idivarts/backend-sls/scripts/socials-update-images/sui"
+	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
 )
 
 func main() {
