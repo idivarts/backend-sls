@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	"github.com/idivarts/backend-sls/pkg/messenger"
@@ -529,8 +528,8 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		}
 		out = append(out, InfluencerInviteUnit{
 			InfluencerItem: InfluencerItem{
-				SocialsBreif: *r,
-				IsDiscover:   true,
+				Socials:    *r,
+				IsDiscover: true,
 			},
 			InvitedAt: inv.TimeStamp,
 			Status:    inv.Status,
@@ -642,26 +641,6 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 // convertSocialsToBreif converts an RDB Socials record into the brief
 // structure previously derived from SocialsN8N, so existing Firestore
 // invitations and API responses remain compatible.
-func convertSocialsToBreif(s trendlyrdb.Socials) *trendlybq.SocialsBreif {
-	return &trendlybq.SocialsBreif{
-		ID:              s.ID,
-		State:           1,
-		Name:            s.Name,
-		Username:        s.Username,
-		Bio:             s.Bio,
-		ProfileVerified: s.ProfileVerified,
-		ProfilePic:      s.ProfilePic,
-		Gender:          s.Gender,
-		Location:        s.Location,
-		FollowerCount:   s.FollowerCount,
-		ViewsCount:      s.ViewsCount,
-		EngagementCount: s.EngagementCount,
-		EngagementRate:  s.EngagementRate,
-		SocialType:      s.SocialType,
-		Niches:          []string(s.Niches),
-		QualityScore:    s.QualityScore,
-		AddedBy:         s.AddedBy,
-		CreationTime:    s.CreationTime,
-		LastUpdateTime:  s.LastUpdateTime,
-	}
+func convertSocialsToBreif(s trendlyrdb.Socials) *trendlyrdb.Socials {
+	return &s
 }

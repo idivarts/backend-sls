@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	"github.com/idivarts/backend-sls/pkg/rdb"
@@ -15,7 +14,7 @@ import (
 // - engagementRate is expressed as a percentage (e.g., 1.5 for 1.5%).
 // - Field JSON tags mirror the TS property names expected by the app.
 type InfluencerItem struct {
-	trendlybq.SocialsBreif
+	trendlyrdb.Socials
 	IsDiscover bool `json:"isDiscover,omitempty"`
 }
 
@@ -48,7 +47,7 @@ func GetInfluencers(c *gin.Context) {
 	out := make([]InfluencerItem, 0, len(socials))
 	for _, s := range socials {
 		brief := convertSocialsToBreif(s)
-		out = append(out, InfluencerItem{SocialsBreif: *brief, IsDiscover: true})
+		out = append(out, InfluencerItem{Socials: *brief, IsDiscover: true})
 	}
 
 	log.Println("Data Processed", out)

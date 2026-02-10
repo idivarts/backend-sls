@@ -3,13 +3,9 @@ package trendlydiscovery
 import (
 	"net/http"
 	"sort"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
-	"github.com/idivarts/backend-sls/pkg/n8n"
-	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
 func medianInt64(xs []int64) float32 {
@@ -53,18 +49,18 @@ type Manual struct {
 	AestheticsScore int      `json:"aestheticsScore" binding:"gte=0,lte=100"`
 }
 
-func AddProfile(c *gin.Context) {
+func AddInstaProfile(c *gin.Context) {
 	var req ScrapedProfile
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Input", "error": err.Error()})
 		return
 	}
 
-	adderUserId, b := middlewares.GetUserId(c)
-	if !b {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "User not authenticated", "error": "UserId not found"})
-		return
-	}
+	// adderUserId, b := middlewares.GetUserId(c)
+	// if !b {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "User not authenticated", "error": "UserId not found"})
+	// 	return
+	// }
 
 	checkData := trendlyrdb.Socials{}
 	err := checkData.GetInstagram(req.Username)
@@ -73,49 +69,32 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	now := time.Now().UnixMicro()
-	data := &trendlyrdb.Socials{
-		SocialType: "instagram",
-		Username:   req.Username,
+	// now := time.Now().UnixMicro()
+	// data := &trendlyrdb.Socials{
+	// 	SocialType: "instagram",
+	// 	Username:   req.Username,
 
-		Niches:       req.Manual.Niches,
-		QualityScore: req.Manual.AestheticsScore,
+	// 	Niches:       req.Manual.Niches,
+	// 	QualityScore: req.Manual.AestheticsScore,
 
-		CreationTime:   now,
-		LastUpdateTime: now,
-		AddedBy:        adderUserId,
-	}
+	// 	CreationTime:   now,
+	// 	LastUpdateTime: now,
+	// 	AddedBy:        adderUserId,
+	// }
 
-	err = data.InsertPending()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
-		return
-	}
+	// err = data.InsertPending()
+	// if err != nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
+	// 	return
+	// }
 
-	pendingCount, _ := trendlyrdb.Socials{}.CountPendingByUser(adderUserId)
+	// pendingCount, _ := trendlyrdb.Socials{}.CountPendingByUser(adderUserId)
 
-	sqshandler.SendToMessageQueue(data.ID, 0)
+	// sqshandler.SendToMessageQueue(data.ID, 0)
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID, "count": pendingCount})
-}
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received"}) // "id":    data.ID,
+	// "count": pendingCount,
 
-func LoadAllProfiles(c *gin.Context) {
-	var req struct {
-		OutputUrl string `json:"outputUrl" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid Input", "error": err.Error()})
-		return
-	}
-
-	influencerList, err := n8n.GetInfluencerList(req.OutputUrl)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Failed to get influencer list", "error": err.Error()})
-		return
-	}
-
-	isPending := trendlyrdb.IsPendingScanExists()
-	c.JSON(http.StatusOK, gin.H{"message": "Influencer list received", "count": len(influencerList), "isPending": isPending})
 }
 
 // func calculateFunctionLater(){
@@ -197,7 +176,7 @@ func LoadAllProfiles(c *gin.Context) {
 // 	data.EngagementRate = medianFloat32(eRates)
 // }
 
-func CheckUsername(c *gin.Context) {
+func CheckInstaUsername(c *gin.Context) {
 	username := c.Query("username")
 	if username == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Username is required"})
