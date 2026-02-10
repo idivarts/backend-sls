@@ -88,8 +88,7 @@ CREATE INDEX idx_socials_links ON socials USING GIN(links);
 -- ============================================================================
 
 CREATE TABLE instagram_posts (
-    -- Primary Key
-    id VARCHAR(255) PRIMARY KEY,
+    id VARCHAR(255),
     
     -- Foreign Key
     social_id VARCHAR(36) NOT NULL REFERENCES socials(id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -97,6 +96,8 @@ CREATE TABLE instagram_posts (
     -- Basic Post Information
     post_location VARCHAR(255),
     type VARCHAR(50),
+    
+    -- Primary Key
     short_code VARCHAR(50),
     caption TEXT,
     url TEXT,

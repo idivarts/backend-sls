@@ -1,6 +1,7 @@
 package trendlyrdb
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/idivarts/backend-sls/pkg/rdb"
@@ -45,7 +46,7 @@ type InstagramPost struct {
 	TaggedUsers        []User          `gorm:"type:jsonb;serializer:json" db:"tagged_users" json:"tagged_users"`
 	FirstComment       string          `gorm:"type:text" db:"first_comment" json:"first_comment"`
 	LatestComments     []Comment       `gorm:"type:jsonb;serializer:json" db:"latest_comments" json:"latest_comments"`
-	ChildPosts         []InstagramPost `gorm:"type:jsonb;serializer:json" db:"child_posts" json:"child_posts,omitempty"`
+	ChildPosts         json.RawMessage `gorm:"type:jsonb" db:"child_posts" json:"child_posts,omitempty"`
 }
 
 type Comment struct {
