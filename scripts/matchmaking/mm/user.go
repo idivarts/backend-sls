@@ -9,7 +9,6 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myutil"
-	"google.golang.org/api/iterator"
 )
 
 func guessGender(name string) string {
@@ -26,33 +25,29 @@ func guessAllGenders(name []string) []string {
 
 // SyncUsers This will be used to sync users
 func SyncUsers(iterative bool) error {
-	iter := firestoredb.Client.Collection("users").Documents(context.Background())
-	defer iter.Stop()
-
+	docs, err := firestoredb.Client.Collection("users").Documents(context.Background()).GetAll()
+	if err != nil {
+		return err
+	}
+	log.Println("Got all docs", len(docs))
 	total := 0
 	data := []trendlyrdb.Influencers{}
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			panic(err.Error())
-		}
+	for i, doc := range docs {
 		if iterative && time.Since(doc.UpdateTime) > 16*time.Hour {
 			continue
 		}
 		total++
 
-		log.Println("Creating Doc", doc.Ref.ID)
+		log.Println("Creating Doc", i, "/", len(docs), doc.Ref.ID)
 		user := &trendlymodels.User{}
 		err = doc.DataTo(user)
 		if err != nil {
-			panic(err.Error())
+			log.Println("Error In Parsing", doc.Ref.ID)
+			continue
 		}
 
 		if user.PrimarySocial != nil {
-			socialData, err := firestoredb.Client.Collection("users").Doc(doc.Ref.ID).Collection("socials").Doc(*user.PrimarySocial).Get(context.Background())
+			socialData, err := doc.Ref.Collection("socials").Doc(*user.PrimarySocial).Get(context.Background())
 			if err != nil {
 				log.Println("Error fetching social", doc.Ref.ID)
 				continue
@@ -135,7 +130,7 @@ func SyncUsers(iterative bool) error {
 	}
 	log.Println("Total vs Valid", total, len(data))
 	log.Println("Upserting", len(data))
-	err := trendlyrdb.Influencers{}.InsertMultiple(data)
+	err = trendlyrdb.Influencers{}.InsertMultiple(data)
 	if err != nil {
 		log.Fatalf("Failed to upsert influencers: %v", err)
 		return err
