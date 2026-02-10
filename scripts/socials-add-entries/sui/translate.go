@@ -35,8 +35,8 @@ func TranslateInstagram(ig apify.InstagramInfluencer, req ScrapedSocial) (*trend
 		LastUpdateTime:  now,
 		ExternalId:      ig.Id,
 	}
-
-	socialID := social.GetID()
+	social.ID = social.GetID()
+	socialID := social.ID
 
 	// --- Build Posts ---
 	posts := make([]trendlyrdb.InstagramPost, 0, len(ig.LatestPosts))
