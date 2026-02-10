@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
+	"github.com/idivarts/backend-sls/pkg/apify"
 	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
 )
 
@@ -39,17 +42,39 @@ func evaluateInput(socialData string) error {
 func evaluateInstagram(req sui.ScrapedSocial) error {
 	log.Println("Evaluating instagram", req)
 
-	// social := &trendlyrdb.Socials{}
-	// err := social.GetByIdFromFirestore(socialId)
-	// if err != nil {
-	// 	log.Println("Error in getting social by id:", socialId, " error:", err.Error())
-	// 	return err
-	// }
+	// -> Calling api to scrape data
+	instagramData, err := apify.GetInstagram([]string{req.Username})
+	if err != nil {
+		return err
+	}
+	log.Println("Instagram data", instagramData)
 
-	// social = sui.MoveImagesToS3(social)
-	// social.LastUpdateTime = time.Now().UnixMicro()
+	if len(instagramData) == 0 {
+		return errors.New("no instagram data found")
+	}
+	instagram := instagramData[0]
+	if instagram.Username != req.Username {
+		return errors.New("instagram username mismatch")
+	}
 
-	// social.InsertToFirestore(true)
+	social, posts := sui.TranslateInstagram(instagram, req)
+
+	err = social.Insert()
+	if err != nil {
+		return err
+	}
+	err = trendlyrdb.InstagramPost{}.InsertMultiple(posts)
+	if err != nil {
+		return err
+	}
+
+	// -> Download all the images
+
+	// -> Send Raw for estimations (with Bias input which were sent manually)
+
+	// -> Translate the data in Socials Data
+
+	// -> Save translated data in mysql instantly
 
 	return nil
 }
