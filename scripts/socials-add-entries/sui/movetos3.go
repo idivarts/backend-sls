@@ -15,9 +15,9 @@ import (
 	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
+	"github.com/idivarts/backend-sls/pkg/mys3"
 )
 
 // s3Task represents a single download-and-upload job.
@@ -146,13 +146,6 @@ func DownloadAndUploadToS3(url, path string) (string, error) {
 		return "", err
 	}
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-
-	// Create an SQS service client
-	client := s3.New(sess)
-
 	// Generate object key
 	// Derive a stable filename using the URL's path-based extension (ignoring query params).
 	// Fallback to Content-Type from the response headers if the URL has no extension.
@@ -173,6 +166,8 @@ func DownloadAndUploadToS3(url, path string) (string, error) {
 	key := path + filename
 
 	ct := resp.Header.Get("Content-Type")
+
+	client := mys3.Client
 
 	_, err = client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(S3Bucket),
