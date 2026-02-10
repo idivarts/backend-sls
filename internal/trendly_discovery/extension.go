@@ -1,16 +1,13 @@
 package trendlydiscovery
 
 import (
-	"context"
 	"net/http"
 	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/n8n"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
@@ -76,33 +73,30 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	data := &trendlybq.SocialsScrapePending{
+	now := time.Now().UnixMicro()
+	data := &trendlyrdb.Socials{
 		SocialType: "instagram",
 		Username:   req.Username,
 
 		Niches:       req.Manual.Niches,
 		QualityScore: req.Manual.AestheticsScore,
 
-		CreationTime:   time.Now().UnixMicro(), // TODO: set actual creation time
-		LastUpdateTime: time.Now().UnixMicro(),
+		CreationTime:   now,
+		LastUpdateTime: now,
 		AddedBy:        adderUserId,
 	}
 
-	err = data.InsertToFirestore()
+	err = data.InsertPending()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Data Insert Error", "error": err.Error()})
 		return
 	}
 
-	allDocs, err := firestoredb.Client.Collection("scrapped-socials-n8n").Where("state", "==", 0).Where("added_by", "==", adderUserId).Documents(context.Background()).GetAll()
-	dLen := 0
-	if err == nil {
-		dLen = len(allDocs)
-	}
+	pendingCount, _ := trendlyrdb.Socials{}.CountPendingByUser(adderUserId)
 
 	sqshandler.SendToMessageQueue(data.ID, 0)
 
-	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID, "count": dLen})
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received", "id": data.ID, "count": pendingCount})
 }
 
 func LoadAllProfiles(c *gin.Context) {
@@ -120,7 +114,7 @@ func LoadAllProfiles(c *gin.Context) {
 		return
 	}
 
-	isPending := trendlybq.IsPendingScanExists()
+	isPending := trendlyrdb.IsPendingScanExists()
 	c.JSON(http.StatusOK, gin.H{"message": "Influencer list received", "count": len(influencerList), "isPending": isPending})
 }
 

@@ -15,7 +15,8 @@ const (
 )
 
 type Socials struct {
-	ID string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
+	ID    string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
+	State int    `gorm:"type:integer;default:0" db:"state" json:"state"`
 
 	Username     string `gorm:"type:varchar(255);not null" db:"username" json:"username"`
 	Name         string `gorm:"type:varchar(255)" db:"name" json:"name"`
@@ -148,4 +149,35 @@ func (Socials) Count() (int64, error) {
 	var count int64
 	err := rdb.GormDB.Model(&Socials{}).Count(&count).Error
 	return count, err
+}
+
+// InsertPending inserts a social profile with state=0 (pending scrape).
+// If the record already exists it will be updated.
+func (data *Socials) InsertPending() error {
+	data.ID = data.GetID()
+	data.State = 0
+	return rdb.GormDB.Clauses(clause.OnConflict{UpdateAll: true}).Create(data).Error
+}
+
+// CountPendingByUser returns how many socials with state=0 belong to a given user.
+func (Socials) CountPendingByUser(addedBy string) (int64, error) {
+	var count int64
+	err := rdb.GormDB.Model(&Socials{}).
+		Where("state = ? AND added_by = ?", 0, addedBy).
+		Count(&count).Error
+	return count, err
+}
+
+// IsPendingScanExists returns true when at least one social record
+// with state=0 (pending scrape) exists in the database.
+func IsPendingScanExists() bool {
+	var count int64
+	err := rdb.GormDB.Model(&Socials{}).
+		Where("state = ?", 0).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false
+	}
+	return count > 0
 }
