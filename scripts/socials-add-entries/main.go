@@ -103,5 +103,7 @@ func evaluateInstagram(req sui.ScrapedSocial) error {
 		return err
 	}
 
+	log.Println("Instagram data saved successfully", social.ID)
+
 	return nil
 }
