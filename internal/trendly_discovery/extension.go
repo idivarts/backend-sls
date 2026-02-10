@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/n8n"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
@@ -68,7 +69,7 @@ func AddProfile(c *gin.Context) {
 		return
 	}
 
-	checkData := trendlybq.SocialsN8N{}
+	checkData := trendlyrdb.Socials{}
 	err := checkData.GetInstagram(req.Username)
 	if err == nil {
 		c.JSON(http.StatusConflict, gin.H{"message": "Profile already exists", "id": checkData.ID})
@@ -209,8 +210,13 @@ func CheckUsername(c *gin.Context) {
 		return
 	}
 
-	user := trendlybq.SocialsN8N{}
-	err := user.GetInstagramFromFirestore(username)
+	user := trendlyrdb.Socials{}
+	err := user.GetInstagram(username)
+	exists := err == nil
+	var lastUpdate int64
+	if exists {
+		lastUpdate = user.LastUpdateTime
+	}
 
-	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": err == nil, "lastUpdate": user.LastUpdateTime})
+	c.JSON(http.StatusAccepted, gin.H{"username": username, "exists": exists, "lastUpdate": lastUpdate})
 }

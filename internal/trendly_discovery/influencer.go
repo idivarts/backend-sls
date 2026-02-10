@@ -12,6 +12,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	"github.com/idivarts/backend-sls/pkg/messenger"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 )
@@ -28,7 +29,7 @@ type CalculatedData struct {
 	CPM             float32 `json:"cpm"`
 }
 
-func calculateTrustablity(social *trendlybq.SocialsN8N) int {
+func calculateTrustablity(social *trendlyrdb.Socials) int {
 	// Weights
 	wEngagement := 0.30
 	wRatios := 0.25
@@ -143,7 +144,7 @@ func calculateTrustablity(social *trendlybq.SocialsN8N) int {
 	return clampInt(int(math.Round(total)), 0, 100)
 }
 
-func calculateBudget(social *trendlybq.SocialsN8N) Range {
+func calculateBudget(social *trendlyrdb.Socials) Range {
 	followers := float64(social.FollowerCount)
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
@@ -269,7 +270,7 @@ func calculateBudget(social *trendlybq.SocialsN8N) Range {
 	}
 }
 
-func calculateReach(social *trendlybq.SocialsN8N) Range {
+func calculateReach(social *trendlyrdb.Socials) Range {
 	followers := float64(social.FollowerCount)
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
@@ -417,7 +418,7 @@ func FetchInfluencer(c *gin.Context) {
 		}
 	}
 
-	social := &trendlybq.SocialsN8N{}
+	social := &trendlyrdb.Socials{}
 
 	err = social.Get(influencerId)
 	if err != nil {
@@ -439,15 +440,17 @@ func FetchInfluencer(c *gin.Context) {
 			ImageURL: &social.ProfilePic,
 		},
 	}
-	for i, v := range social.LatestReels {
-		if i >= 5 {
-			break
+	// Fetch latest Instagram posts from RDB to build reel attachments
+	posts, err := trendlyrdb.InstagramPost{}.GetBySocialID(influencerId, 5)
+	if err == nil {
+		for _, v := range posts {
+			v := v
+			attachments = append(attachments, trendlymodels.UserAttachment{
+				Type:     "reel",
+				ImageURL: &v.DisplayURL,
+				PlayURL:  &v.URL,
+			})
 		}
-		attachments = append(attachments, trendlymodels.UserAttachment{
-			Type:     "reel",
-			ImageURL: &v.DisplayURL,
-			PlayURL:  &v.URL,
-		})
 	}
 	user := trendlymodels.User{
 		Name:            social.Name,
@@ -542,7 +545,7 @@ func FetchInvitedInfluencers(c *gin.Context) {
 	})
 }
 
-func TestCalculations(social *trendlybq.SocialsN8N) CalculatedData {
+func TestCalculations(social *trendlyrdb.Socials) CalculatedData {
 	calculatedValue := CalculatedData{
 		Quality:         social.QualityScore,
 		Trustablity:     calculateTrustablity(social),
@@ -582,10 +585,16 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	bqSocials, err := trendlybq.SocialsN8N{}.GetMultiple(req.Influencers)
+	rdbSocials, err := trendlyrdb.Socials{}.GetMultiple(req.Influencers)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error gettimg socials"})
 		return
+	}
+
+	// Build a map for quick lookup by ID
+	socialMap := make(map[string]trendlyrdb.Socials, len(rdbSocials))
+	for _, s := range rdbSocials {
+		socialMap[s.ID] = s
 	}
 
 	// Send Invitations
@@ -603,11 +612,8 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 				Message:         "Invited via Discovery",
 			}
 
-			for _, s := range bqSocials {
-				if s.ID == infId {
-					invite.SocialProfile = s.ConvertToSocialBreif()
-					break
-				}
+			if s, ok := socialMap[infId]; ok {
+				invite.SocialProfile = convertSocialsToBreif(s)
 			}
 
 			_, err := invite.Create()
@@ -631,4 +637,31 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "api is functional", "creditsUsed": creditUtilized, "invitationsSent": invites})
+}
+
+// convertSocialsToBreif converts an RDB Socials record into the brief
+// structure previously derived from SocialsN8N, so existing Firestore
+// invitations and API responses remain compatible.
+func convertSocialsToBreif(s trendlyrdb.Socials) *trendlybq.SocialsBreif {
+	return &trendlybq.SocialsBreif{
+		ID:              s.ID,
+		State:           1,
+		Name:            s.Name,
+		Username:        s.Username,
+		Bio:             s.Bio,
+		ProfileVerified: s.ProfileVerified,
+		ProfilePic:      s.ProfilePic,
+		Gender:          s.Gender,
+		Location:        s.Location,
+		FollowerCount:   s.FollowerCount,
+		ViewsCount:      s.ViewsCount,
+		EngagementCount: s.EngagementCount,
+		EngagementRate:  s.EngagementRate,
+		SocialType:      s.SocialType,
+		Niches:          []string(s.Niches),
+		QualityScore:    s.QualityScore,
+		AddedBy:         s.AddedBy,
+		CreationTime:    s.CreationTime,
+		LastUpdateTime:  s.LastUpdateTime,
+	}
 }

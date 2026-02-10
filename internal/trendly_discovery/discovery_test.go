@@ -6,24 +6,23 @@ import (
 	"log"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	trendlydiscovery "github.com/idivarts/backend-sls/internal/trendly_discovery"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 func TestDiscovery(t *testing.T) {
-	sql := trendlydiscovery.FormSQL(trendlydiscovery.InfluencerFilters{
-		FollowerMin: aws.Int64(7000),
-		Name:        aws.String("Saks"),
-	})
-	log.Println(sql)
+	// sql := trendlydiscovery.FormSQL(trendlydiscovery.InfluencerFilters{
+	// 	FollowerMin: aws.Int64(7000),
+	// 	Name:        aws.String("Saks"),
+	// })
+	// log.Println(sql)
 }
 
 func TestCalcualations(t *testing.T) {
 	influencerId := "95d0838c-a5d2-5849-ba4a-b5ea0d7f67a9"
 
-	social := &trendlybq.SocialsN8N{}
+	social := &trendlyrdb.Socials{}
 	err := social.Get(influencerId)
 	if err != nil {
 		t.Error(err)
