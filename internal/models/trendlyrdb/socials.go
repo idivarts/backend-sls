@@ -16,7 +16,7 @@ const (
 
 type Socials struct {
 	ID    string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
-	State int    `gorm:"type:integer;default:0" db:"state" json:"state"`
+	State int    `gorm:"type:integer;default:1" db:"state" json:"state"`
 
 	Username     string `gorm:"type:varchar(255);not null" db:"username" json:"username"`
 	Name         string `gorm:"type:varchar(255)" db:"name" json:"name"`
