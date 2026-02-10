@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	"github.com/idivarts/backend-sls/pkg/apify"
+	"github.com/idivarts/backend-sls/pkg/gemini"
 	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
 )
 
@@ -52,13 +53,47 @@ func evaluateInstagram(req sui.ScrapedSocial) error {
 	if len(instagramData) == 0 {
 		return errors.New("no instagram data found")
 	}
-	instagram := instagramData[0]
-	if instagram.Username != req.Username {
+	instagramRaw := instagramData[0]
+	if instagramRaw.Username != req.Username {
 		return errors.New("instagram username mismatch")
 	}
 
-	social, posts := sui.TranslateInstagram(instagram, req)
+	social, posts := sui.TranslateInstagram(instagramRaw, req)
 
+	// -> Download all the images
+	social, posts = sui.MoveImagesToS3(social, posts)
+
+	// -> Send Raw for estimations (with Bias input which were sent manually)
+	enrichPayload := map[string]interface{}{
+		"profile": instagramRaw,
+	}
+	if len(req.Manual.Niches) > 0 || req.Manual.QualityScore > 0 {
+		bias := map[string]interface{}{}
+		if len(req.Manual.Niches) > 0 {
+			bias["suggestedNiches"] = req.Manual.Niches
+		}
+		if req.Manual.QualityScore > 0 {
+			bias["suggestedQualityScore"] = req.Manual.QualityScore
+		}
+		enrichPayload["bias"] = bias
+	}
+
+	enrichJSON, err := json.Marshal(enrichPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal enrichment payload: %w", err)
+	}
+
+	enriched, err := gemini.EnrichInfluencer(string(enrichJSON))
+	if err != nil {
+		log.Println("Enrichment failed, continuing without AI fields:", err)
+	} else {
+		social.Gender = enriched.Gender
+		social.Location = enriched.Location
+		social.Niches = enriched.Niches
+		social.QualityScore = enriched.Quality
+	}
+
+	// -> Save updated data in mysql
 	err = social.Insert()
 	if err != nil {
 		return err
@@ -67,14 +102,6 @@ func evaluateInstagram(req sui.ScrapedSocial) error {
 	if err != nil {
 		return err
 	}
-
-	// -> Download all the images
-
-	// -> Send Raw for estimations (with Bias input which were sent manually)
-
-	// -> Translate the data in Socials Data
-
-	// -> Save translated data in mysql instantly
 
 	return nil
 }
