@@ -26,4 +26,5 @@ func handleUserAPIs() {
 
 	brandAPIs.GET("/:brandId/influencers/:influencerId", trendlydiscovery.FetchInfluencer)
 	brandAPIs.POST("/:brandId/influencers/:influencerId", trendlydiscovery.UpdateInfluencer)
+	brandAPIs.POST("/:brandId/influencers/:influencerId/refresh", trendlydiscovery.RefreshInfluencer)
 }

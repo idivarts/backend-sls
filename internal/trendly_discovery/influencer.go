@@ -1,6 +1,7 @@
 package trendlydiscovery
 
 import (
+	"encoding/json"
 	"log"
 	"math"
 	"math/rand"
@@ -14,6 +15,8 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	"github.com/idivarts/backend-sls/pkg/messenger"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
+	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
 )
 
 type Range struct {
@@ -666,6 +669,45 @@ type UpdateInfluencerRequest struct {
 	AverageComments *float32            `json:"average_comments"`
 	Links           *[]trendlyrdb.Links `json:"links"`
 	ExternalId      *string             `json:"external_id"`
+}
+
+func RefreshInfluencer(c *gin.Context) {
+	influencerId := c.Param("influencerId")
+	if influencerId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
+		return
+	}
+
+	manager := middlewares.GetManagerModel(c)
+	if !manager.IsAdmin {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "User is not an admin", "error": "unauthorized"})
+	}
+
+	social := &trendlyrdb.Socials{}
+	if err := social.Get(influencerId); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Influencer not found"})
+		return
+	}
+
+	var req sui.ScrapedSocial
+	req.Username = social.Username
+	req.SocialType = social.SocialType
+	req.Manual.QualityScore = social.QualityScore
+	req.Manual.Niches = social.Niches
+
+	b, err := json.Marshal(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to marshal request", "error": err.Error()})
+		return
+	}
+	err = sqshandler.SendToMessageQueue(string(b), 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to send to queue", "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received"})
+
 }
 
 // UpdateInfluencer allows updating the raw scraped fields of an influencer profile.
