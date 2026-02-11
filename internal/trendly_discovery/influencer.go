@@ -644,3 +644,128 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 func convertSocialsToBreif(s trendlyrdb.Socials) *trendlyrdb.Socials {
 	return &s
 }
+
+// UpdateInfluencerRequest holds the raw scraped fields that are allowed to be updated.
+// All fields are pointers so that only explicitly provided values are applied,
+// leaving omitted fields untouched.
+type UpdateInfluencerRequest struct {
+	Name            *string             `json:"name"`
+	Bio             *string             `json:"bio"`
+	ProfilePic      *string             `json:"profile_pic"`
+	ProfilePicHD    *string             `json:"profile_pic_hd"`
+	Category        *string             `json:"category"`
+	ProfileVerified *bool               `json:"profile_verified"`
+	FollowerCount   *int64              `json:"follower_count"`
+	FollowingCount  *int64              `json:"following_count"`
+	ContentCount    *int64              `json:"content_count"`
+	ViewsCount      *int64              `json:"views_count"`
+	EngagementCount *int64              `json:"engagement_count"`
+	EngagementRate  *float32            `json:"engagement_rate"`
+	AverageViews    *float32            `json:"average_views"`
+	AverageLikes    *float32            `json:"average_likes"`
+	AverageComments *float32            `json:"average_comments"`
+	Links           *[]trendlyrdb.Links `json:"links"`
+	ExternalId      *string             `json:"external_id"`
+}
+
+// UpdateInfluencer allows updating the raw scraped fields of an influencer profile.
+// Calculated/AI-deduced fields (gender, location, niches, quality_score) cannot be modified.
+func UpdateInfluencer(c *gin.Context) {
+	influencerId := c.Param("influencerId")
+	if influencerId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
+		return
+	}
+
+	var req UpdateInfluencerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request body"})
+		return
+	}
+
+	// Fetch the existing social profile to verify it exists
+	social := &trendlyrdb.Socials{}
+	if err := social.Get(influencerId); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Influencer not found"})
+		return
+	}
+
+	// Build update map from only the fields that were explicitly provided
+	updates := map[string]interface{}{}
+
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.Bio != nil {
+		updates["bio"] = *req.Bio
+	}
+	if req.ProfilePic != nil {
+		updates["profile_pic"] = *req.ProfilePic
+	}
+	if req.ProfilePicHD != nil {
+		updates["profile_pic_hd"] = *req.ProfilePicHD
+	}
+	if req.Category != nil {
+		updates["category"] = *req.Category
+	}
+	if req.ProfileVerified != nil {
+		updates["profile_verified"] = *req.ProfileVerified
+	}
+	if req.FollowerCount != nil {
+		updates["follower_count"] = *req.FollowerCount
+	}
+	if req.FollowingCount != nil {
+		updates["following_count"] = *req.FollowingCount
+	}
+	if req.ContentCount != nil {
+		updates["content_count"] = *req.ContentCount
+	}
+	if req.ViewsCount != nil {
+		updates["views_count"] = *req.ViewsCount
+	}
+	if req.EngagementCount != nil {
+		updates["engagement_count"] = *req.EngagementCount
+	}
+	if req.EngagementRate != nil {
+		updates["engagement_rate"] = *req.EngagementRate
+	}
+	if req.AverageViews != nil {
+		updates["average_views"] = *req.AverageViews
+	}
+	if req.AverageLikes != nil {
+		updates["average_likes"] = *req.AverageLikes
+	}
+	if req.AverageComments != nil {
+		updates["average_comments"] = *req.AverageComments
+	}
+	if req.Links != nil {
+		updates["links"] = *req.Links
+	}
+	if req.ExternalId != nil {
+		updates["external_id"] = *req.ExternalId
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "No fields to update", "error": "empty-update"})
+		return
+	}
+
+	// Always stamp the last update time
+	updates["last_update_time"] = time.Now().Unix()
+
+	if err := social.Update(updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update influencer"})
+		return
+	}
+
+	// Reload the updated record to return the full object
+	if err := social.Get(influencerId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Updated but failed to reload influencer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Influencer updated successfully",
+		"social":  social,
+	})
+}
