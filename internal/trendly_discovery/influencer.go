@@ -443,10 +443,12 @@ func FetchInfluencer(c *gin.Context) {
 		},
 	}
 	// Fetch latest Instagram posts from RDB to build reel attachments
-	posts, err := trendlyrdb.InstagramPost{}.GetBySocialID(influencerId, 5)
+	posts, err := trendlyrdb.InstagramPost{}.GetBySocialID(influencerId, 30)
 	if err == nil {
-		for _, v := range posts {
-			v := v
+		for i, v := range posts {
+			if i >= 5 {
+				break
+			}
 			attachments = append(attachments, trendlymodels.UserAttachment{
 				Type:     "reel",
 				ImageURL: &v.DisplayURL,
@@ -454,6 +456,14 @@ func FetchInfluencer(c *gin.Context) {
 			})
 		}
 	}
+	socRes := struct {
+		trendlyrdb.Socials
+		Reels []trendlyrdb.InstagramPost `json:"reels"`
+	}{
+		Socials: *social,
+		Reels:   posts,
+	}
+
 	user := trendlymodels.User{
 		Name:            social.Name,
 		IsChatConnected: false,
@@ -497,7 +507,7 @@ func FetchInfluencer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer",
-		"social":   social,
+		"social":   socRes,
 		"analysis": calculatedValue,
 		"influencer": gin.H{
 			"user":   user,
