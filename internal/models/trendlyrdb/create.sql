@@ -42,7 +42,7 @@ CREATE TABLE socials (
     gender VARCHAR(50),
     location VARCHAR(255),
     niches TEXT[] DEFAULT '{}',  -- PostgreSQL text array for better querying
-    quality_score INTEGER CHECK (quality_score IS NULL OR (quality_score >= 0 AND quality_score <= 100)),
+    quality_score INTEGER CHECK (quality_score IS NULL OR (quality_score >= 1 AND quality_score <= 10)),
     
     -- Metadata
     added_by VARCHAR(255),
@@ -64,7 +64,7 @@ COMMENT ON COLUMN socials.links IS 'JSONB array of link objects: [{title, url, l
 COMMENT ON COLUMN socials.gender IS 'Deduced from name, bio, and pronouns';
 COMMENT ON COLUMN socials.location IS 'Deduced from bio and posts location';
 COMMENT ON COLUMN socials.niches IS 'Array of niches deduced from posts, hashtags, and bio';
-COMMENT ON COLUMN socials.quality_score IS 'Quality score: 60=Average, 75=Good, 90=Very Good, 100=Excellent';
+COMMENT ON COLUMN socials.quality_score IS 'Quality score 1-10 (maps to 5-star rating with half-star granularity): 1=Poor, 2=Below Average, ..., 5=Good, ..., 10=Legendary';
 COMMENT ON COLUMN socials.creation_time IS 'Unix timestamp in milliseconds';
 COMMENT ON COLUMN socials.last_update_time IS 'Unix timestamp in milliseconds';
 COMMENT ON COLUMN socials.external_id IS 'External platform user ID';

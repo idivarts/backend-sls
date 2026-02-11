@@ -28,7 +28,7 @@ type InfluencerInviteUnit struct {
 // InfluencerFilters represents the filter payload coming from the frontend.
 // Types are inferred from the intended semantics rather than the TS state strings.
 // Min/Max fields are pointers so omitted filters don't appear in JSON (omitempty).
-// All counts are non-negative. quality is a whole number 0..100. ER fields are percentages (e.g., 1 => 1%).
+// All counts are non-negative. quality is a whole number 1..10. ER fields are percentages (e.g., 1 => 1%).
 type InfluencerFilters = trendlymodels.DiscoverPreferences
 
 // func GetInfluencers(c *gin.Context, req InfluencerFilters) {

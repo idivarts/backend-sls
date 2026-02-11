@@ -77,7 +77,7 @@ type DiscoverPreferences struct {
 	AvgCommentsMin *int64 `firestore:"avgCommentsMin,omitempty" json:"avgCommentsMin,omitempty"`
 	AvgCommentsMax *int64 `firestore:"avgCommentsMax,omitempty" json:"avgCommentsMax,omitempty"`
 
-	// Quality/aesthetics slider (0..100)
+	// Quality/aesthetics slider (1..10, maps to 5-star rating with half-star granularity)
 	QualityMin *int `firestore:"qualityMin,omitempty" json:"qualityMin,omitempty"`
 	QualityMax *int `firestore:"qualityMax,omitempty" json:"qualityMax,omitempty"`
 

@@ -6,6 +6,6 @@ type ScrapedSocial struct {
 	Username   string `json:"username" binding:"required"`
 	Manual     struct {
 		Niches       []string `json:"niches"`
-		QualityScore int      `json:"qualityScore" binding:"gte=0,lte=5"`
+		QualityScore int      `json:"qualityScore" binding:"gte=0,lte=10"`
 	} `json:"manual"`
 }
