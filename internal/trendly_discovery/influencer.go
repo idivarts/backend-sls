@@ -671,7 +671,8 @@ type UpdateInfluencerRequest struct {
 	ExternalId      *string             `json:"external_id"`
 }
 
-func RefreshInfluencer(c *gin.Context) {
+// RescrapeInfluencer rescrapes the influencer profile and updates the social profile
+func RescrapeInfluencer(c *gin.Context) {
 	influencerId := c.Param("influencerId")
 	if influencerId == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
