@@ -683,6 +683,11 @@ func UpdateInfluencer(c *gin.Context) {
 		return
 	}
 
+	manager := middlewares.GetManagerModel(c)
+	if !manager.IsAdmin {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "User is not an admin", "error": "unauthorized"})
+	}
+
 	// Fetch the existing social profile to verify it exists
 	social := &trendlyrdb.Socials{}
 	if err := social.Get(influencerId); err != nil {

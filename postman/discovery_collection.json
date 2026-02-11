@@ -1,0 +1,209 @@
+{
+	"info": {
+		"_postman_id": "discovery-apis-collection",
+		"name": "Trendly Backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Discovery",
+			"item": [
+				{
+					"name": "Brand - Search & Filter",
+					"item": [
+						{
+							"name": "Search Influencers",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"followerMin\": 10000,\n\t\"followerMax\": 500000,\n\t\"erMin\": 1.5,\n\t\"erMax\": 10.0,\n\t\"qualityMin\": 60,\n\t\"selectedNiches\": [\"fashion\", \"beauty\"],\n\t\"genders\": [\"female\"],\n\t\"isVerified\": true,\n\t\"sort\": \"followers\",\n\t\"sort_direction\": \"desc\",\n\t\"offset\": 0,\n\t\"limit\": 15\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/discovery/brands/:brandId/influencers",
+									"host": ["{{baseUrl}}"],
+									"path": ["discovery", "brands", ":brandId", "influencers"],
+									"variable": [
+										{
+											"key": "brandId",
+											"value": "",
+											"description": "The brand ID performing the discovery search"
+										}
+									]
+								},
+								"description": "Searches and filters influencers from the discovery database. Returns a paginated list of influencer profiles matching the given criteria.\n\n**All fields are optional** — omit any filter to leave it unconstrained.\n\n**Range filters:**\n- `followerMin` / `followerMax` (int64) — Follower count range\n- `contentMin` / `contentMax` (int) — Number of posts range\n- `monthlyViewMin` / `monthlyViewMax` (int64) — Estimated monthly views range\n- `monthlyEngagementMin` / `monthlyEngagementMax` (int64) — Monthly engagements range\n- `avgViewsMin` / `avgViewsMax` (int64) — Average views per post range\n- `avgLikesMin` / `avgLikesMax` (int64) — Average likes per post range\n- `avgCommentsMin` / `avgCommentsMax` (int64) — Average comments per post range\n- `qualityMin` / `qualityMax` (int, 0–100) — Content quality score range\n- `erMin` / `erMax` (float, e.g. 1.5 = 1.5%) — Engagement rate percentage range\n\n**Text filters:**\n- `descKeywords` (string[]) — Keywords to search in bio\n- `name` (string) — Search by name or username (partial match)\n\n**Flag filters:**\n- `isVerified` (bool) — Only verified profiles\n- `hasContact` (bool) — Only profiles with contact info\n\n**Multi-select filters:**\n- `genders` (string[]) — e.g. [\"male\", \"female\"]\n- `selectedNiches` (string[]) — e.g. [\"fashion\", \"tech\"]\n- `selectedLocations` (string[]) — e.g. [\"Mumbai\", \"Delhi\"]\n\n**Sorting & Pagination:**\n- `sort` (string) — followers | views | engagement | engagements | engagement_rate | er (default: followers)\n- `sort_direction` (string) — asc | desc (default: desc)\n- `offset` (int) — Pagination offset (default: 0)\n- `limit` (int) — Results per page, 1–500 (default: 15)"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for brands to search, filter, and discover influencers from the scraped social profiles database."
+				},
+				{
+					"name": "Brand - Influencer Profile",
+					"item": [
+						{
+							"name": "Fetch Influencer Details",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/discovery/brands/:brandId/influencers/:influencerId",
+									"host": ["{{baseUrl}}"],
+									"path": ["discovery", "brands", ":brandId", "influencers", ":influencerId"],
+									"variable": [
+										{
+											"key": "brandId",
+											"value": "",
+											"description": "The brand ID performing the lookup"
+										},
+										{
+											"key": "influencerId",
+											"value": "",
+											"description": "The influencer's social profile ID (UUID)"
+										}
+									]
+								},
+								"description": "Fetches the full profile of a discovered influencer including raw social data, calculated analytics, and a normalized user/social representation.\n\nDeducts 1 discovery credit from the brand if this influencer hasn't been viewed before. Returns 400 if the brand has no remaining discovery credits.\n\n**Response includes:**\n- `social` — Full raw social profile (name, bio, followers, engagement, links, etc.)\n- `analysis` — Calculated metrics:\n  - `quality` (int, 0–100) — Content quality score\n  - `trustablity` (int, 0–100) — Trust/authenticity score\n  - `estimatedBudget` ({min, max} in INR) — Estimated cost per post\n  - `estimatedReach` ({min, max}) — Estimated reach range\n  - `cpm` (float) — Cost per 1000 impressions\n- `influencer.user` — Normalized user object with profile, attachments (profile pic + recent reels)\n- `influencer.social` — Platform social object with Instagram profile details\n\n**Side effects:**\n- Deducts 1 discovery credit on first view of this influencer\n- Adds influencer ID to brand's discoveredInfluencers list"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Influencer Profile",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"name\": \"Priya Sharma\",\n\t\"bio\": \"Fashion & Lifestyle Creator | Mumbai | Collabs: priya@example.com\",\n\t\"category\": \"Fashion\",\n\t\"follower_count\": 125000,\n\t\"following_count\": 850,\n\t\"content_count\": 340,\n\t\"views_count\": 2500000,\n\t\"engagement_count\": 180000,\n\t\"engagement_rate\": 3.5,\n\t\"average_views\": 18000,\n\t\"average_likes\": 4500,\n\t\"average_comments\": 120,\n\t\"profile_verified\": true,\n\t\"profile_pic\": \"https://example.com/profile.jpg\",\n\t\"profile_pic_hd\": \"https://example.com/profile_hd.jpg\",\n\t\"links\": [\n\t\t{\n\t\t\t\"title\": \"YouTube\",\n\t\t\t\"url\": \"https://youtube.com/@priyasharma\",\n\t\t\t\"link_type\": \"youtube\"\n\t\t}\n\t],\n\t\"external_id\": \"12345678901\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/discovery/brands/:brandId/influencers/:influencerId",
+									"host": ["{{baseUrl}}"],
+									"path": ["discovery", "brands", ":brandId", "influencers", ":influencerId"],
+									"variable": [
+										{
+											"key": "brandId",
+											"value": "",
+											"description": "The brand ID performing the update"
+										},
+										{
+											"key": "influencerId",
+											"value": "",
+											"description": "The influencer's social profile ID (UUID)"
+										}
+									]
+								},
+								"description": "Updates the raw scraped fields of an influencer's social profile. Only explicitly provided fields are updated — omitted fields remain unchanged. Calculated and AI-deduced fields (gender, location, niches, quality_score) cannot be modified through this endpoint.\n\n**Updatable fields (all optional):**\n- `name` (string) — Display name\n- `bio` (string) — Profile biography\n- `profile_pic` (string) — Profile picture URL\n- `profile_pic_hd` (string) — HD profile picture URL\n- `category` (string) — Profile category\n- `profile_verified` (bool) — Verification status\n- `follower_count` (int64) — Number of followers\n- `following_count` (int64) — Number of accounts followed\n- `content_count` (int64) — Number of posts\n- `views_count` (int64) — Estimated monthly views\n- `engagement_count` (int64) — Estimated monthly engagements\n- `engagement_rate` (float32) — Engagement rate percentage\n- `average_views` (float32) — Average views per post\n- `average_likes` (float32) — Average likes per post\n- `average_comments` (float32) — Average comments per post\n- `links` (array of {title, url, link_type}) — External links\n- `external_id` (string) — External platform user ID\n\n**Protected fields (NOT updatable):**\n- `gender`, `location`, `niches`, `quality_score` — AI-deduced\n- `id`, `username`, `social_type`, `added_by`, `creation_time` — System/identity\n\n**Side effects:**\n- Automatically sets `last_update_time` to current timestamp"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for brands to view and update individual influencer profiles from the discovery database."
+				},
+				{
+					"name": "Brand - Invitations",
+					"item": [
+						{
+							"name": "Invite Influencers to Collaborations",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"influencers\": [\"influencer-uuid-1\", \"influencer-uuid-2\"],\n\t\"collaborations\": [\"collab-id-1\"]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/discovery/brands/:brandId/influencers/invite",
+									"host": ["{{baseUrl}}"],
+									"path": ["discovery", "brands", ":brandId", "influencers", "invite"],
+									"variable": [
+										{
+											"key": "brandId",
+											"value": "",
+											"description": "The brand ID sending the invitations"
+										}
+									]
+								},
+								"description": "Sends invitation(s) to one or more discovered influencers for one or more collaborations. Each influencer × collaboration pair creates one invitation and consumes one connection credit.\n\n**Required fields:**\n- `influencers` (string[], min 1) — Array of influencer social profile IDs to invite\n- `collaborations` (string[], min 1) — Array of collaboration IDs to invite them to\n\n**Side effects:**\n- Deducts connection credits from the brand (count = influencers × collaborations)\n- Creates invitation records in Firestore with status \"waiting\"\n- Returns 400 if not enough connection credits available\n\n**Response includes:**\n- `creditsUsed` (int) — Number of connection credits consumed\n- `invitationsSent` (array) — List of created invitation objects"
+							},
+							"response": []
+						},
+						{
+							"name": "Fetch Invited Influencers",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"offset\": 0,\n\t\"limit\": 20,\n\t\"filter\": \"\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/discovery/brands/:brandId/collaborations/:collabId/influencers",
+									"host": ["{{baseUrl}}"],
+									"path": ["discovery", "brands", ":brandId", "collaborations", ":collabId", "influencers"],
+									"variable": [
+										{
+											"key": "brandId",
+											"value": "",
+											"description": "The brand ID that owns the collaboration"
+										},
+										{
+											"key": "collabId",
+											"value": "",
+											"description": "The collaboration ID to fetch invited influencers for"
+										}
+									]
+								},
+								"description": "Fetches a paginated list of influencers who were invited to a specific collaboration via the discovery flow. Each item includes the influencer's social profile, invitation timestamp, and current status.\n\n**Request fields:**\n- `offset` (int) — Pagination offset (default: 0)\n- `limit` (int) — Number of results to return\n- `filter` (string) — Filter by invitation status. Leave empty for all statuses. Possible values: \"pending\", \"inprogress\", \"accepted\", \"declined\", \"waiting\"\n\n**Response includes:**\n- `influencers` (array) — Each item contains:\n  - Full social profile data (embedded Socials object)\n  - `isDiscover` (bool) — Always true for discovery invitations\n  - `invitedAt` (int64, epoch ms) — When the invitation was sent\n  - `status` (string) — Current invitation status"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for brands to invite discovered influencers to collaborations and track invitation status."
+				}
+			],
+			"description": "All discovery-related APIs for the Trendly platform — covering influencer search, profile viewing, profile updates, and invitation management."
+		}
+	]
+}
