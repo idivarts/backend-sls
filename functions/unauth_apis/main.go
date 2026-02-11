@@ -8,9 +8,9 @@ import (
 func main() {
 	onboard := apihandler.GinEngine.Group("/onboard")
 
-	onboard.POST("/signup", trendlyunauth.InstagramRedirect)
-	onboard.GET("/email-redirection", trendlyunauth.InstagramRedirect)
-	onboard.POST("/reset-password", trendlyunauth.InstagramRedirect)
+	onboard.POST("/signup", trendlyunauth.Signup)
+	onboard.GET("/email-redirection", trendlyunauth.EmailRedirection)
+	onboard.POST("/reset-password", trendlyunauth.ResetPassword)
 
 	instaApi := apihandler.GinEngine.Group("/instagram")
 
