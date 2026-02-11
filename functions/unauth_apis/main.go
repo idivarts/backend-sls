@@ -6,6 +6,12 @@ import (
 )
 
 func main() {
+	onboard := apihandler.GinEngine.Group("/onboard")
+
+	onboard.POST("/signup", trendlyunauth.InstagramRedirect)
+	onboard.GET("/email-redirection", trendlyunauth.InstagramRedirect)
+	onboard.POST("/reset-password", trendlyunauth.InstagramRedirect)
+
 	instaApi := apihandler.GinEngine.Group("/instagram")
 
 	// This is called by frontend. Purpose is to just redirect to insta auth url with needed params
