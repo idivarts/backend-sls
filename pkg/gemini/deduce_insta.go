@@ -26,12 +26,17 @@ func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
 		- gender: string (Deduce from Full Name, Username, and Bio/pronouns)
 		- location: string (Deduce from Bio and Posts' location/geo-tags)
 		- niches: string array (Deduce from Bio, Post Content, and Hashtags)
-		- quality: integer (1-5) 
-		  1: Poor
-		  2: Average
-		  3: Good
-		  4: Very Good
-		  5: Excellent
+		- quality: integer (1-10, maps to a 5-star rating with half-star granularity)
+		  1: Poor (0.5 star)
+		  2: Below Average (1 star)
+		  3: Average (1.5 stars)
+		  4: Above Average (2 stars)
+		  5: Good (2.5 stars)
+		  6: Very Good (3 stars)
+		  7: Excellent (3.5 stars)
+		  8: Outstanding (4 stars)
+		  9: Exceptional (4.5 stars)
+		  10: Legendary (5 stars)
 		  (Determine based on Bio quality, Post caption depth, and Engagement consistency)
 		
 		"""{ts}

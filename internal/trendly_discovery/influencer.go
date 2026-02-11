@@ -209,9 +209,9 @@ func calculateBudget(social *trendlyrdb.Socials) Range {
 	trustMult = clampFloat(trustMult, 0.8, 1.2)
 
 	// Quality multiplier (0.6–1.3)
-	// quality: 0 (cheap creators) → 0.6x, 100 (rich/classy/aesthetic) → 1.3x
+	// quality: 1 (poor creators) → 0.6x, 10 (legendary/aesthetic) → 1.3x
 	quality := float64(social.QualityScore)
-	qualityMult := 0.6 + 0.007*quality // maps 0..100 → 0.8..1.3
+	qualityMult := 0.6 + 0.0778*(quality-1) // maps 1..10 → 0.6..1.3
 	qualityMult = clampFloat(qualityMult, 0.6, 1.3)
 
 	allMult := nicheMult * erMult * verMult * trustMult * qualityMult * 0.75

@@ -47,7 +47,7 @@ type Socials struct {
 	Location string         `gorm:"type:varchar(255)" db:"location" json:"location"`
 	Niches   pq.StringArray `gorm:"type:text[]" db:"niches" json:"niches"`
 
-	QualityScore int `gorm:"type:integer" db:"quality_score" json:"quality_score"`
+	QualityScore int `gorm:"type:integer;check:chk_quality_score,quality_score IS NULL OR (quality_score >= 1 AND quality_score <= 10)" db:"quality_score" json:"quality_score"`
 
 	// Metadata
 	AddedBy        string `gorm:"type:varchar(255)" db:"added_by" json:"added_by"`
