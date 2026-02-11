@@ -20,6 +20,8 @@ func handleUserAPIs() {
 
 	brandAPIs := apihandler.GinEngine.Group("/discovery/brands", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 
+	brandAPIs.GET("/niches", trendlydiscovery.GetNiches)
+
 	brandAPIs.POST("/:brandId/influencers", trendlydiscovery.GetInfluencers)
 	brandAPIs.POST("/:brandId/influencers/invite", trendlydiscovery.InviteInfluencerOnDiscover)
 	brandAPIs.POST("/:brandId/collaborations/:collabId/influencers", trendlydiscovery.FetchInvitedInfluencers)
