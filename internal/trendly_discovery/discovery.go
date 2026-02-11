@@ -8,6 +8,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	"github.com/idivarts/backend-sls/pkg/rdb"
+	"github.com/lib/pq"
 )
 
 // - followers/engagements/views can be large; int64 is used.
@@ -164,7 +165,7 @@ func queryInfluencersFromRDB(req InfluencerFilters) ([]trendlyrdb.Socials, error
 	}
 
 	if len(req.SelectedNiches) > 0 {
-		db = db.Where("niches && ?", req.SelectedNiches)
+		db = db.Where("niches && ?", pq.StringArray(req.SelectedNiches))
 	}
 
 	sortMap := map[string]string{
