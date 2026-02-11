@@ -17,6 +17,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
+	"github.com/lib/pq"
 )
 
 type Range struct {
@@ -679,6 +680,10 @@ type UpdateInfluencerRequest struct {
 	AverageComments *float32            `json:"average_comments"`
 	Links           *[]trendlyrdb.Links `json:"links"`
 	ExternalId      *string             `json:"external_id"`
+	Gender          *string             `json:"gender"`
+	Location        *string             `json:"location"`
+	Niches          *[]string           `json:"niches"`
+	QualityScore    *int                `json:"quality_score"`
 }
 
 // RescrapeInfluencer rescrapes the influencer profile and updates the social profile
@@ -721,8 +726,8 @@ func RescrapeInfluencer(c *gin.Context) {
 
 }
 
-// UpdateInfluencer allows updating the raw scraped fields of an influencer profile.
-// Calculated/AI-deduced fields (gender, location, niches, quality_score) cannot be modified.
+// UpdateInfluencer allows updating fields of an influencer profile including
+// gender, location, niches, and quality_score.
 func UpdateInfluencer(c *gin.Context) {
 	influencerId := c.Param("influencerId")
 	if influencerId == "" {
@@ -801,6 +806,18 @@ func UpdateInfluencer(c *gin.Context) {
 	}
 	if req.ExternalId != nil {
 		updates["external_id"] = *req.ExternalId
+	}
+	if req.Gender != nil {
+		updates["gender"] = *req.Gender
+	}
+	if req.Location != nil {
+		updates["location"] = *req.Location
+	}
+	if req.Niches != nil {
+		updates["niches"] = pq.StringArray(*req.Niches)
+	}
+	if req.QualityScore != nil {
+		updates["quality_score"] = *req.QualityScore
 	}
 
 	if len(updates) == 0 {
