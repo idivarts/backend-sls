@@ -1,0 +1,709 @@
+{
+	"info": {
+		"_postman_id": "monetize-apis-collection",
+		"name": "Trendly Backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Monetization",
+			"item": [
+				{
+					"name": "Brand - Orders",
+					"item": [
+						{
+							"name": "Create Payment Order",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/order",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "order"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Creates a Razorpay payment order for the pre-payment of a contract. If a valid order already exists (status: created/attempted), it reuses the existing order. Also sends a payment link email to brand members."
+							},
+							"response": []
+						},
+						{
+							"name": "Get Payment Order Status",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/order",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "order"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Fetches the current payment order details and status from Razorpay for a given contract."
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for brands to manage payment orders on contracts."
+				},
+				{
+					"name": "Brand - Shipment",
+					"item": [
+						{
+							"name": "Mark as Shipped",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"trackingId\": \"AWB12345678\",\n\t\"shipmentProvider\": \"Delhivery\",\n\t\"expectedDate\": 1740000000000\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/shipment",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "shipment"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Brand marks the product as shipped with tracking details. Notifies the influencer via push notification, email, and stream chat message. Sets contract status to 4 (Shipped)."
+							},
+							"response": []
+						},
+						{
+							"name": "Mark as Delivered",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"screenshotUrl\": \"https://example.com/proof-of-delivery.jpg\",\n\t\"notes\": \"Left at the door\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/shipment/delivered",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "shipment", "delivered"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Brand uploads proof of delivery (screenshot) and marks the shipment as delivered. Notifies influencer to confirm receipt. Sets contract status to 5 (Delivered).\n\n**Required fields:**\n- `screenshotUrl` (string) - URL of the delivery proof screenshot\n\n**Optional fields:**\n- `notes` (string) - Any notes about the delivery"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for brands to manage product shipment lifecycle."
+				},
+				{
+					"name": "Brand - Deliverables",
+					"item": [
+						{
+							"name": "Request Deliverable",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/deliverable/request",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "deliverable", "request"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Brand requests the first video or a revision from the influencer. Notifies influencer via push notification, email, and stream chat. No request body required."
+							},
+							"response": []
+						},
+						{
+							"name": "Approve Deliverable",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"postingScenario\": 1,\n\t\"scheduledDate\": 1740500000000\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/deliverable/approve",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "deliverable", "approve"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Brand approves the submitted deliverable (video) and selects a posting scenario.\n\n**Required fields:**\n- `postingScenario` (int) - The posting arrangement:\n  - `1` = Influencer Will Post (scheduledDate required)\n  - `2` = Influencer and Brand Collab Post (scheduledDate required)\n  - `3` = Brand will use video independently (no scheduledDate needed)\n\n**Conditionally required:**\n- `scheduledDate` (int64, epoch ms) - Required for scenarios 1 & 2"
+							},
+							"response": []
+						},
+						{
+							"name": "Request Revision",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"notes\": \"Please adjust the lighting in the first 10 seconds and add the product close-up shot.\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/deliverable/revision",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "deliverable", "revision"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Brand requests changes to the submitted deliverable. Increments the revision count and stores revision notes. Moves contract status back to 6 (Received) so influencer can rework.\n\n**Required fields:**\n- `notes` (string) - Feedback/instructions for the revision"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for brands to manage the content deliverable review cycle."
+				},
+				{
+					"name": "Brand - Posting",
+					"item": [
+						{
+							"name": "Reschedule Posting",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"newScheduledDate\": 1741000000000\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/brands/contracts/:contractId/posting/reschedule",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "brands", "contracts", ":contractId", "posting", "reschedule"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Brand schedules or reschedules the release date of the approved video. Notifies the influencer.\n\n**Required fields:**\n- `newScheduledDate` (int64, epoch ms) - The new posting date"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for brands to manage the posting schedule."
+				},
+				{
+					"name": "Influencer - Account",
+					"item": [
+						{
+							"name": "Create / Re-create Razorpay Account",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"name\": \"John Doe\",\n\t\"pan\": \"ABCDE1234F\",\n\t\"address\": {\n\t\t\"street\": \"123 Main Street\",\n\t\t\"city\": \"Mumbai\",\n\t\t\"state\": \"Maharashtra\",\n\t\t\"postal_code\": \"400001\"\n\t},\n\t\"bank\": {\n\t\t\"account_number\": \"1234567890123456\",\n\t\t\"ifsc\": \"HDFC0001234\",\n\t\t\"beneficiary_name\": \"John Doe\"\n\t},\n\t\"reCreateAccount\": false\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/account",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "account"]
+								},
+								"description": "Creates a Razorpay Route linked account for the influencer with KYC details (PAN, bank, address). If `reCreateAccount` is true, deletes the old Razorpay account and starts fresh.\n\n**Required fields:**\n- `name` (string) - Name as per PAN\n- `pan` (string) - PAN card number\n- `address` (object) - Current address with street, city, state, postal_code\n- `bank` (object) - Bank details with account_number, ifsc, beneficiary_name\n\n**Optional fields:**\n- `reCreateAccount` (bool) - Set true to delete old account and re-create"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Account Status",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/account",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "account"]
+								},
+								"description": "Polls the current KYC/account verification status from Razorpay. Returns detailed account, stakeholder, and product information. Also self-heals by syncing Razorpay status back to Firestore if they diverge."
+							},
+							"response": []
+						},
+						{
+							"name": "Update Bank Details",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"account_number\": \"9876543210123456\",\n\t\"ifsc\": \"ICIC0001234\",\n\t\"beneficiary_name\": \"John Doe\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/account/bank",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "account", "bank"]
+								},
+								"description": "Updates the influencer's bank account details in both Razorpay and Firestore. Requires an existing Razorpay account.\n\n**Required fields:**\n- `account_number` (string)\n- `ifsc` (string)\n- `beneficiary_name` (string)"
+							},
+							"response": []
+						},
+						{
+							"name": "Update Shipping Address",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"street\": \"456 New Avenue\",\n\t\"city\": \"Bangalore\",\n\t\"state\": \"Karnataka\",\n\t\"postal_code\": \"560001\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/account/address",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "account", "address"]
+								},
+								"description": "Updates the influencer's shipping/current address in both Razorpay (account + stakeholder) and Firestore. Requires existing Razorpay account and stakeholder.\n\n**Required fields:**\n- `street` (string)\n- `city` (string)\n- `state` (string)\n- `postal_code` (string)"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for influencers to manage their Razorpay Route account, bank details, and address."
+				},
+				{
+					"name": "Influencer - Shipment",
+					"item": [
+						{
+							"name": "Request Shipment",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/contracts/:contractId/shipment/request",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "contracts", ":contractId", "shipment", "request"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Influencer requests the brand to ship the product. Notifies the brand via push notification, email, and stream chat. No request body required."
+							},
+							"response": []
+						},
+						{
+							"name": "Mark Shipment Received",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"photoUrl\": \"https://example.com/package-received.jpg\",\n\t\"notes\": \"Package received in good condition\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/contracts/:contractId/shipment/received",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "contracts", ":contractId", "shipment", "received"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Influencer confirms they have received the product. Uploads a photo as proof. Notifies both brand and influencer. Sets contract status to 6 (Received).\n\n**Required fields:**\n- `photoUrl` (string) - URL of the received package photo\n\n**Optional fields:**\n- `notes` (string) - Any notes about the received package"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for influencers to manage the shipment receiving flow."
+				},
+				{
+					"name": "Influencer - Deliverables",
+					"item": [
+						{
+							"name": "Submit Deliverable",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"videoUrl\": \"https://example.com/deliverable-video.mp4\",\n\t\"note\": \"First draft - let me know your thoughts!\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/contracts/:contractId/deliverable",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "contracts", ":contractId", "deliverable"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Influencer submits the video deliverable (first draft or revision). Notifies the brand to review. Sets contract status to 7 (Deliverable Sent).\n\n**Required fields:**\n- `videoUrl` (string) - URL of the submitted video\n\n**Optional fields:**\n- `note` (string) - Any notes for the brand"
+							},
+							"response": []
+						},
+						{
+							"name": "Request Deliverable Approval",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/contracts/:contractId/deliverable/request-approval",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "contracts", ":contractId", "deliverable", "request-approval"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Influencer requests the brand to review and approve the submitted deliverable. (Placeholder endpoint - implementation pending)"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for influencers to submit and manage content deliverables."
+				},
+				{
+					"name": "Influencer - Posting",
+					"item": [
+						{
+							"name": "Request Posting Reschedule",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"note\": \"Need 2 more days to align with my content calendar.\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/contracts/:contractId/posting/request-reschedule",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "contracts", ":contractId", "posting", "request-reschedule"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Influencer requests the brand to reschedule the posting date. Notifies the brand via push notification, email, and stream chat.\n\n**Required fields:**\n- `note` (string) - Reason for requesting the reschedule"
+							},
+							"response": []
+						},
+						{
+							"name": "Mark Video as Posted",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"proofScreenshot\": \"https://example.com/post-proof.jpg\",\n\t\"postUrl\": \"https://instagram.com/p/abc123\",\n\t\"notes\": \"Posted on my main feed!\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/influencers/contracts/:contractId/posting",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "influencers", "contracts", ":contractId", "posting"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "The contract ID for the collaboration"
+										}
+									]
+								},
+								"description": "Influencer marks the video as publicly posted. Provides proof screenshot and the live post URL. Brand has 2 days to review before payment release. Sets contract status to 9 (Posted).\n\n**Required fields:**\n- `proofScreenshot` (string) - Screenshot proving the post is live\n- `postUrl` (string) - URL of the live post\n\n**Optional fields:**\n- `notes` (string) - Any notes about the posting"
+							},
+							"response": []
+						}
+					],
+					"description": "APIs for influencers to manage the posting phase of the collaboration."
+				},
+				{
+					"name": "Webhooks",
+					"item": [
+						{
+							"name": "Payment Webhook (Razorpay)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Razorpay-Signature",
+										"value": "",
+										"description": "HMAC SHA256 signature from Razorpay for webhook verification"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"entity\": \"event\",\n\t\"account_id\": \"acc_xxxxx\",\n\t\"event\": \"order.paid\",\n\t\"payload\": {\n\t\t\"order\": {\n\t\t\t\"entity\": {\n\t\t\t\t\"id\": \"order_xxxxx\",\n\t\t\t\t\"notes\": {\n\t\t\t\t\t\"contractId\": \"contract123\",\n\t\t\t\t\t\"brandId\": \"brand123\",\n\t\t\t\t\t\"collaborationId\": \"collab123\",\n\t\t\t\t\t\"userId\": \"user123\"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/webhooks/payments",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "webhooks", "payments"]
+								},
+								"description": "Razorpay webhook endpoint for payment events. Listens for `order.paid` events to mark the collaboration as paid (contract status 3). Verifies webhook signature using `X-Razorpay-Signature` header. Notifies both brand and influencer."
+							},
+							"response": []
+						},
+						{
+							"name": "Transfer Webhook (Razorpay)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "X-Razorpay-Signature",
+										"value": "",
+										"description": "HMAC SHA256 signature from Razorpay for webhook verification"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"entity\": \"event\",\n\t\"account_id\": \"acc_xxxxx\",\n\t\"event\": \"transfer.processed\",\n\t\"payload\": {\n\t\t\"transfer\": {\n\t\t\t\"entity\": {\n\t\t\t\t\"id\": \"trf_xxxxx\",\n\t\t\t\t\"notes\": {\n\t\t\t\t\t\"contractId\": \"contract123\"\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/monetize/webhooks/transfer",
+									"host": ["{{baseUrl}}"],
+									"path": ["monetize", "webhooks", "transfer"]
+								},
+								"description": "Razorpay webhook endpoint for transfer events. Listens for `transfer.processed` events to mark the contract as settled (status 10) and close the collaboration. Notifies both brand and influencer that the workflow is complete."
+							},
+							"response": []
+						}
+					],
+					"description": "Razorpay webhook endpoints for payment and transfer event processing. These are called by Razorpay, not by the app directly."
+				}
+			],
+			"description": "All monetization-related APIs for the Trendly platform — covering the full contract lifecycle from payment through posting and settlement."
+		}
+	]
+}
