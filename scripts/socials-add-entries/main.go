@@ -90,7 +90,11 @@ func evaluateInstagram(req sui.ScrapedSocial) error {
 		social.Gender = enriched.Gender
 		social.Location = enriched.Location
 		social.Niches = enriched.Niches
-		social.QualityScore = enriched.Quality
+		if req.Manual.QualityScore > 0 {
+			social.QualityScore = req.Manual.QualityScore
+		} else {
+			social.QualityScore = enriched.Quality
+		}
 	}
 
 	// -> Save updated data in mysql

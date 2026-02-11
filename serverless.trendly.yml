@@ -288,6 +288,8 @@ functions:
       - http: ANY /instagram/{proxy+}
       - http: ANY /firebase
       - http: ANY /firebase/{proxy+}
+      - http: ANY /onboard
+      - http: ANY /onboard/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
     package:
