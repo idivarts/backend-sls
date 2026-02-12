@@ -9,7 +9,7 @@ import (
 
 const InstagramActorID = "shu8hvrXbJbY3Eb9W"
 
-func GetInstagram(usernames []string) ([]InstagramInfluencer, error) {
+func GetInstagram(usernames []string, includeReels bool) ([]InstagramInfluencer, error) {
 	urls := make([]string, len(usernames))
 	for i, username := range usernames {
 		urls[i] = fmt.Sprintf("https://www.instagram.com/%s/", username)
@@ -53,13 +53,20 @@ func GetInstagram(usernames []string) ([]InstagramInfluencer, error) {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	if includeReels {
+		results, err = getInstagramReels(results)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get instagram reels: %w", err)
+		}
+	}
+
 	return results, nil
 }
 
-func GetInstagramReels(usernames []string) ([]InstagramInfluencer, error) {
-	urls := make([]string, len(usernames))
-	for i, username := range usernames {
-		urls[i] = fmt.Sprintf("https://www.instagram.com/%s/", username)
+func getInstagramReels(influencers []InstagramInfluencer) ([]InstagramInfluencer, error) {
+	urls := make([]string, len(influencers))
+	for i, influencer := range influencers {
+		urls[i] = fmt.Sprintf("https://www.instagram.com/%s/", influencer.Username)
 	}
 
 	input := InstagramScraperInput{
@@ -101,25 +108,16 @@ func GetInstagramReels(usernames []string) ([]InstagramInfluencer, error) {
 	}
 
 	influencerMap := make(map[string]*InstagramInfluencer)
-	for _, username := range usernames {
-		influencerMap[username] = &InstagramInfluencer{
-			Username:    username,
-			LatestPosts: []InstagramPosts{},
-		}
+	for i, inf := range influencers {
+		influencers[i].Reels = []InstagramPosts{}
+		influencerMap[inf.Username] = &influencers[i]
 	}
 
 	for _, post := range results {
 		if influencer, ok := influencerMap[post.OwnerUsername]; ok {
-			influencer.LatestPosts = append(influencer.LatestPosts, post)
+			influencer.Reels = append(influencer.Reels, post)
 		}
 	}
 
-	returnResults := make([]InstagramInfluencer, 0, len(usernames))
-	for _, username := range usernames {
-		if influencer, ok := influencerMap[username]; ok {
-			returnResults = append(returnResults, *influencer)
-		}
-	}
-
-	return returnResults, nil
+	return influencers, nil
 }

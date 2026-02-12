@@ -22,6 +22,7 @@ type InstagramInfluencer struct {
 	JoinedRecently       bool                       `json:"joinedRecently"`
 	LatestIgtvVideos     []InstagramIgtvVideos      `json:"latestIgtvVideos"`
 	LatestPosts          []InstagramPosts           `json:"latestPosts"`
+	Reels                []InstagramPosts           `json:"reels,omitempty"`
 	PostsCount           float64                    `json:"postsCount"`
 	Private              bool                       `json:"private"`
 	ProfilePicUrl        string                     `json:"profilePicUrl"`
