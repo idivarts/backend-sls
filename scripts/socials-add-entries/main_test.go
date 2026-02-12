@@ -18,9 +18,10 @@ func TestEvaluateInstagram(t *testing.T) {
 
 	req := sui.ScrapedSocial{
 		SocialType: "instagram",
-		Username:   "virat.kohli", // replace with any public username for testing
+		Username:   "_pooja_jain04", // replace with any public username for testing
+		// UseDatabase: false,
 	}
-	req.Manual.Niches = []string{"cricket", "sports", "fitness"}
+	req.Manual.Niches = []string{"Fashion / Beauty", "Lifestyle Vlogs"}
 	req.Manual.QualityScore = 8
 
 	err := evaluateInstagram(req)

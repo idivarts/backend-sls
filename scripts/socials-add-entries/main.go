@@ -43,26 +43,48 @@ func evaluateInput(socialData string) error {
 func evaluateInstagram(req sui.ScrapedSocial) error {
 	log.Println("Evaluating instagram", req)
 
-	// -> Calling api to scrape data
-	instagramData, err := apify.GetInstagram([]string{req.Username})
-	if err != nil {
-		return err
+	social := &trendlyrdb.Socials{}
+	posts := []trendlyrdb.InstagramPost{}
+	var instagramRaw interface{}
+
+	if req.UseDatabase {
+		err := social.GetInstagram(req.Username)
+		if err != nil {
+			return err
+		}
+		posts, err = trendlyrdb.InstagramPost{}.GetBySocialID(social.ID, 30)
+		if err != nil {
+			return err
+		}
+		instagramRaw = struct {
+			*trendlyrdb.Socials
+			Posts []trendlyrdb.InstagramPost `json:"reels"`
+		}{
+			Socials: social,
+			Posts:   posts,
+		}
+	} else {
+		// -> Calling api to scrape data
+		instagramData, err := apify.GetInstagram([]string{req.Username})
+		if err != nil {
+			return err
+		}
+		log.Println("Instagram data", instagramData)
+
+		if len(instagramData) == 0 {
+			return errors.New("no instagram data found")
+		}
+		instagram := instagramData[0]
+		if instagram.Username != req.Username {
+			return errors.New("instagram username mismatch")
+		}
+
+		social, posts = sui.TranslateInstagram(instagram, req)
+
+		// -> Download all the images
+		social, posts = sui.MoveImagesToS3(social, posts)
+		instagramRaw = instagram
 	}
-	log.Println("Instagram data", instagramData)
-
-	if len(instagramData) == 0 {
-		return errors.New("no instagram data found")
-	}
-	instagramRaw := instagramData[0]
-	if instagramRaw.Username != req.Username {
-		return errors.New("instagram username mismatch")
-	}
-
-	social, posts := sui.TranslateInstagram(instagramRaw, req)
-
-	// -> Download all the images
-	social, posts = sui.MoveImagesToS3(social, posts)
-
 	// -> Send Raw for estimations (with Bias input which were sent manually)
 	enrichPayload := map[string]interface{}{
 		"profile": instagramRaw,
