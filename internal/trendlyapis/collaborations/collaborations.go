@@ -253,8 +253,7 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 		return
 	}
 
-	collaboratioDraft := ai_collaboration.CollaborationDraft{}
-	err := collaboratioDraft.GetResults(body.Prompt)
+	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error generating collaboration"})
 		return
