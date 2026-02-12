@@ -38,7 +38,7 @@ type CollaborationDraft struct {
 	QuestionsToInfluencers    []string `json:"questionsToInfluencers"`
 }
 
-func (draft *CollaborationDraft) GetResults(prompt string) error {
+func (CollaborationDraft) GetResults(prompt string) (*CollaborationDraft, error) {
 	model := "gpt-4o-2024-08-06"
 
 	ctx := context.Background()
@@ -65,11 +65,11 @@ func (draft *CollaborationDraft) GetResults(prompt string) error {
 
 	if err != nil {
 		log.Println("Error generating collaboration from prompt:", err.Error())
-		return err
+		return nil, err
 	}
 
 	if len(chat.Choices) == 0 {
-		return errors.New("no response from model")
+		return nil, errors.New("no response from model")
 	}
 
 	rawJSON := chat.Choices[0].Message.Content
@@ -77,16 +77,14 @@ func (draft *CollaborationDraft) GetResults(prompt string) error {
 	var result *CollaborationPromptResponse
 	if err := json.Unmarshal([]byte(rawJSON), &result); err != nil {
 		log.Println("Error parsing structured response:", err.Error())
-		return err
+		return nil, err
 	}
 
 	if result.Error {
-		return errors.New(*result.ErrorMessage)
+		return nil, errors.New(*result.ErrorMessage)
 	}
 
-	draft = result.Collaboration
-
-	return nil
+	return result.Collaboration, nil
 }
 
 // collabSystemPrompt is sent as the system message to guide the LLM.
