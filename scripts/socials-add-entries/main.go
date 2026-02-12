@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
+	"github.com/idivarts/backend-sls/internal/openai/deduce"
 	"github.com/idivarts/backend-sls/pkg/apify"
-	"github.com/idivarts/backend-sls/pkg/gemini"
 	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
 )
 
@@ -83,7 +83,7 @@ func evaluateInstagram(req sui.ScrapedSocial) error {
 		return fmt.Errorf("failed to marshal enrichment payload: %w", err)
 	}
 
-	enriched, err := gemini.EnrichInfluencer(string(enrichJSON))
+	enriched, err := deduce.EnrichInfluencer(string(enrichJSON))
 	if err != nil {
 		log.Println("Enrichment failed, continuing without AI fields:", err)
 	} else {

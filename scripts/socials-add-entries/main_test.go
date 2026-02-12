@@ -21,7 +21,7 @@ func TestEvaluateInstagram(t *testing.T) {
 		Username:   "virat.kohli", // replace with any public username for testing
 	}
 	req.Manual.Niches = []string{"cricket", "sports", "fitness"}
-	req.Manual.QualityScore = 4
+	req.Manual.QualityScore = 8
 
 	err := evaluateInstagram(req)
 	if err != nil {
@@ -41,7 +41,7 @@ func TestHandlerSQSEvent(t *testing.T) {
 		Username:   "virat.kohli", // replace with any public username for testing
 	}
 	body.Manual.Niches = []string{"cricket", "sports", "fitness"}
-	body.Manual.QualityScore = 4
+	body.Manual.QualityScore = 8
 
 	bodyJSON, err := json.Marshal(body)
 	if err != nil {
