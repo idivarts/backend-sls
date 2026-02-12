@@ -36,11 +36,11 @@ func evaluateInput(socialData string) error {
 
 	log.Println("Evaluating input", req)
 	if req.SocialType == "instagram" {
-		return evaluateInstagram(req)
+		return EvaluateInstagram(req)
 	}
 	return nil
 }
-func evaluateInstagram(req sui.ScrapedSocial) error {
+func EvaluateInstagram(req sui.ScrapedSocial) error {
 	log.Println("Evaluating instagram", req)
 
 	social := &trendlyrdb.Socials{}

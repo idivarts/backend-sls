@@ -24,7 +24,7 @@ func TestEvaluateInstagram(t *testing.T) {
 	req.Manual.Niches = []string{"Fashion / Beauty", "Lifestyle Vlogs"}
 	req.Manual.QualityScore = 8
 
-	err := evaluateInstagram(req)
+	err := EvaluateInstagram(req)
 	if err != nil {
 		t.Fatalf("evaluateInstagram failed: %v", err)
 	}
