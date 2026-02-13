@@ -65,7 +65,7 @@ func EvaluateInstagram(req sui.ScrapedSocial) error {
 		}
 	} else {
 		// -> Calling api to scrape data
-		instagram, err := apify.GetInstagram(req.Username, false)
+		instagram, err := apify.GetInstagram(req.Username, req.HighValueInfluencer)
 		if err != nil {
 			return err
 		}
