@@ -9,7 +9,7 @@ import (
 
 const InstagramActorID = "shu8hvrXbJbY3Eb9W"
 
-func GetInstagram(usernames []string, includeReels bool) ([]InstagramInfluencer, error) {
+func GetInstagram(usernames []string, highValueInfluencer bool) ([]InstagramInfluencer, error) {
 	urls := make([]string, len(usernames))
 	for i, username := range usernames {
 		urls[i] = fmt.Sprintf("https://www.instagram.com/%s/", username)
@@ -53,8 +53,8 @@ func GetInstagram(usernames []string, includeReels bool) ([]InstagramInfluencer,
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	if includeReels {
-		results, err = getInstagramReels(results)
+	if highValueInfluencer {
+		results, err = getInstagramReels(results, 30)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get instagram reels: %w", err)
 		}
@@ -63,7 +63,7 @@ func GetInstagram(usernames []string, includeReels bool) ([]InstagramInfluencer,
 	return results, nil
 }
 
-func getInstagramReels(influencers []InstagramInfluencer) ([]InstagramInfluencer, error) {
+func getInstagramReels(influencers []InstagramInfluencer, count int) ([]InstagramInfluencer, error) {
 	urls := make([]string, len(influencers))
 	for i, influencer := range influencers {
 		urls[i] = fmt.Sprintf("https://www.instagram.com/%s/", influencer.Username)
@@ -72,7 +72,7 @@ func getInstagramReels(influencers []InstagramInfluencer) ([]InstagramInfluencer
 	input := InstagramScraperInput{
 		DirectUrls:    urls,
 		ResultsType:   "reels",
-		ResultsLimit:  30,
+		ResultsLimit:  count,
 		AddParentData: false,
 	}
 
