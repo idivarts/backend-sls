@@ -109,6 +109,7 @@ var AllowedNiches = []string{
 	"LGBTQ+",
 	"Kids & Toys",
 	"Anime & Pop Culture",
+	"Others",
 }
 var Genders = []string{
 	"male",
@@ -125,7 +126,7 @@ const enrichSystemPrompt = `You are an expert Social Media Auditor. Your job is 
 Fields to deduce:
 - gender: string (Deduce from Full Name, Username, and Bio/pronouns)
 - location: string (Deduce from Bio and Posts' location/geo-tags)
-- niches: string array (Deduce from Bio, Post Content, and Hashtags) — You MUST try to pick values from the predefined niche list provided in the schema enum. Choose the closest matching niche(s). If nothing fits, or you want to add a new niche, do it only when you are fully sure about the niche.
+- niches: string array (Deduce from Bio, Post Content, and Hashtags) — You MUST have at least one niche to pick values from the predefined niche list provided in the schema enum. Choose the closest matching niche(s). If nothing fits, put the niche as "Others".
 - quality: integer (1-10, maps to a 5-star rating with half-star granularity)
   1: Poor (0.5 star)
   2: Below Average (1 star)
