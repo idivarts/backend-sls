@@ -63,7 +63,7 @@ func GetInstagram(username string, highValueInfluencer bool) (*InstagramInfluenc
 		}
 	}
 
-	scrapeCount := 10 - videoCount
+	scrapeCount := 8 - videoCount
 	if highValueInfluencer {
 		scrapeCount = 30 - videoCount
 	}
