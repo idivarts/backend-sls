@@ -41,7 +41,15 @@ func TranslateInstagram(ig apify.InstagramInfluencer, req ScrapedSocial) (*trend
 	// --- Build Posts ---
 	posts := make([]trendlyrdb.InstagramPost, 0, len(ig.LatestPosts))
 	for _, p := range ig.LatestPosts {
-		posts = append(posts, translatePost(p, socialID))
+		posts = append(posts, translatePost(p, socialID, "latest-post"))
+	}
+
+	for _, p := range ig.Reels {
+		posts = append(posts, translatePost(p, socialID, "reel"))
+	}
+
+	for _, p := range ig.LatestIgtvVideos {
+		posts = append(posts, translatePost(p, socialID, "igtv"))
 	}
 
 	// --- Compute analytics from posts (mirrors old calculateFunctionLater logic) ---
@@ -68,10 +76,11 @@ func translateLinks(urls []apify.InstagramExternalUrls) []trendlyrdb.Links {
 
 // translatePost converts a single Apify post (including its embedded reel
 // data and child posts) into the DB InstagramPost model.
-func translatePost(p apify.InstagramPosts, socialID string) trendlyrdb.InstagramPost {
+func translatePost(p apify.InstagramPosts, socialID string, postLocation string) trendlyrdb.InstagramPost {
 	post := trendlyrdb.InstagramPost{
 		ID:                 p.Id,
 		SocialID:           socialID,
+		PostLocation:       postLocation,
 		Type:               p.Type,
 		ShortCode:          p.ShortCode,
 		Caption:            p.Caption,
@@ -103,7 +112,7 @@ func translatePost(p apify.InstagramPosts, socialID string) trendlyrdb.Instagram
 	if len(p.ChildPosts) > 0 {
 		post.ChildPosts = make([]trendlyrdb.InstagramPost, len(p.ChildPosts))
 		for i, child := range p.ChildPosts {
-			post.ChildPosts[i] = translatePost(child, socialID)
+			post.ChildPosts[i] = translatePost(child, socialID, "child-post")
 		}
 	}
 

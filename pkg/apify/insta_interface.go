@@ -20,7 +20,7 @@ type InstagramInfluencer struct {
 	IsBusinessAccount    bool                       `json:"isBusinessAccount"`
 	IsRestrictedProfile  bool                       `json:"isRestrictedProfile"`
 	JoinedRecently       bool                       `json:"joinedRecently"`
-	LatestIgtvVideos     []InstagramIgtvVideos      `json:"latestIgtvVideos"`
+	LatestIgtvVideos     []InstagramPosts           `json:"latestIgtvVideos"`
 	LatestPosts          []InstagramPosts           `json:"latestPosts"`
 	Reels                []InstagramPosts           `json:"reels,omitempty"`
 	PostsCount           float64                    `json:"postsCount"`
