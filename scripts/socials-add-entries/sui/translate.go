@@ -41,31 +41,26 @@ func TranslateInstagram(ig apify.InstagramInfluencer, req ScrapedSocial) (*trend
 	// --- Build Posts ---
 	posts := make([]trendlyrdb.InstagramPost, 0, len(ig.LatestPosts)+len(ig.LatestIgtvVideos)+len(ig.Reels))
 
+	for _, p := range ig.Reels {
+		posts = append(posts, translatePost(p, socialID, "reels"))
+	}
+	for _, p := range ig.LatestPosts {
+		posts = append(posts, translatePost(p, socialID, "posts"))
+	}
 	for _, p := range ig.LatestIgtvVideos {
 		posts = append(posts, translatePost(p, socialID, "igtv"))
 	}
-	for _, p := range ig.LatestPosts {
-		posts = append(posts, translatePost(p, socialID, "latest-post"))
-	}
-	for _, p := range ig.Reels {
-		posts = append(posts, translatePost(p, socialID, "reel"))
-	}
 
-	// Deduplicate by ShortCode, keeping the last occurrence (later in the array wins).
+	// Deduplicate by ShortCode, keeping the first occurrence.
 	// Also drop posts with an empty ShortCode.
 	seen := make(map[string]bool, len(posts))
 	deduped := make([]trendlyrdb.InstagramPost, 0, len(posts))
-	for i := len(posts) - 1; i >= 0; i-- {
-		sc := posts[i].ShortCode
-		if sc == "" || seen[sc] {
+	for _, p := range posts {
+		if p.ShortCode == "" || seen[p.ShortCode] {
 			continue
 		}
-		seen[sc] = true
-		deduped = append(deduped, posts[i])
-	}
-	// Reverse to restore original order.
-	for i, j := 0, len(deduped)-1; i < j; i, j = i+1, j-1 {
-		deduped[i], deduped[j] = deduped[j], deduped[i]
+		seen[p.ShortCode] = true
+		deduped = append(deduped, p)
 	}
 	posts = deduped
 
@@ -129,7 +124,7 @@ func translatePost(p apify.InstagramPosts, socialID string, postLocation string)
 	if len(p.ChildPosts) > 0 {
 		post.ChildPosts = make([]trendlyrdb.InstagramPost, len(p.ChildPosts))
 		for i, child := range p.ChildPosts {
-			post.ChildPosts[i] = translatePost(child, socialID, "child-post")
+			post.ChildPosts[i] = translatePost(child, socialID, "child-posts")
 		}
 	}
 
