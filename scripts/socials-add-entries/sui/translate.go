@@ -201,7 +201,7 @@ func ComputeAnalytics(social *trendlyrdb.Socials, posts []trendlyrdb.InstagramPo
 
 	for _, p := range posts {
 		// Skip posts older than one month from analytics.
-		if ts, err := time.Parse(time.RFC3339, p.Timestamp); err == nil && ts.Before(oneMonthAgo) {
+		if ts, err := time.Parse(time.RFC3339, p.Timestamp); err == nil && ts.Before(oneMonthAgo) && p.Timestamp != "" {
 			continue
 		}
 
@@ -220,8 +220,10 @@ func ComputeAnalytics(social *trendlyrdb.Socials, posts []trendlyrdb.InstagramPo
 		}
 
 		// No need to exclude pinned posts here, as we are only getting videos less than one month old.
-		social.ViewsCount += views
-		social.EngagementCount += likes + comments
+		if p.Timestamp != "" || !p.IsPinned {
+			social.ViewsCount += views
+			social.EngagementCount += likes + comments
+		}
 
 		// Per-post engagement rate for median calculation.
 		if views > 0 {
