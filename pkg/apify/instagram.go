@@ -63,9 +63,12 @@ func GetInstagram(username string, highValueInfluencer bool) (*InstagramInfluenc
 		}
 	}
 
-	scrapeCount := 8 - videoCount
+	scrapeCount := 0
+	if videoCount < 6 {
+		scrapeCount = 6
+	}
 	if highValueInfluencer {
-		scrapeCount = 30 - videoCount
+		scrapeCount = 20
 	}
 
 	if scrapeCount > 0 {
@@ -81,10 +84,11 @@ func getInstagramReels(influencer *InstagramInfluencer, count int) error {
 	profileURL := fmt.Sprintf("https://www.instagram.com/%s/", influencer.Username)
 
 	input := InstagramScraperInput{
-		DirectUrls:    []string{profileURL},
-		ResultsType:   "reels",
-		ResultsLimit:  count,
-		AddParentData: false,
+		DirectUrls:         []string{profileURL},
+		ResultsType:        "reels",
+		ResultsLimit:       count,
+		AddParentData:      false,
+		OnlyPostsNewerThan: "31 days",
 	}
 
 	payload, err := json.Marshal(input)
