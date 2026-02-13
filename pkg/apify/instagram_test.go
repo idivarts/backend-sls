@@ -9,21 +9,18 @@ import (
 func TestGetInstagram(t *testing.T) {
 	// Note: Verification of parsing would require a more complex mock payload
 	// For now, we just verify it compiles and handles the basic flow.
-	instagramInfluencers, err := GetInstagram([]string{"humansofny"}, true)
+	influencer, err := GetInstagram("humansofny", true)
 	if err != nil {
 		// Mock server isn't injected (using constants), so this will fail to connect or use real constants
 		t.Logf("Got error (expected since mock server isn't injected): %v", err)
-	}
-	if len(instagramInfluencers) == 0 {
-		t.Log("No Instagram Data Found")
 		return
 	}
 	t.Log("Got Instagram Data")
-	t.Log("Username", instagramInfluencers[0].Username)
-	t.Log("Followers Count", instagramInfluencers[0].FollowersCount)
-	t.Log("Posts Count", instagramInfluencers[0].PostsCount)
-	t.Log("Verified", instagramInfluencers[0].Verified)
-	t.Log("Reels Count", len(instagramInfluencers[0].Reels))
+	t.Log("Username", influencer.Username)
+	t.Log("Followers Count", influencer.FollowersCount)
+	t.Log("Posts Count", influencer.PostsCount)
+	t.Log("Verified", influencer.Verified)
+	t.Log("Reels Count", len(influencer.Reels))
 }
 
 func TestMockServer(t *testing.T) {

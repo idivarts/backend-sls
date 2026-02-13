@@ -65,21 +65,17 @@ func EvaluateInstagram(req sui.ScrapedSocial) error {
 		}
 	} else {
 		// -> Calling api to scrape data
-		instagramData, err := apify.GetInstagram([]string{req.Username}, false)
+		instagram, err := apify.GetInstagram(req.Username, false)
 		if err != nil {
 			return err
 		}
-		log.Println("Instagram data", instagramData)
+		log.Println("Instagram data", instagram)
 
-		if len(instagramData) == 0 {
-			return errors.New("no instagram data found")
-		}
-		instagram := instagramData[0]
 		if instagram.Username != req.Username {
 			return errors.New("instagram username mismatch")
 		}
 
-		social, posts = sui.TranslateInstagram(instagram, req)
+		social, posts = sui.TranslateInstagram(*instagram, req)
 
 		// -> Download all the images
 		social, posts = sui.MoveImagesToS3(social, posts)
