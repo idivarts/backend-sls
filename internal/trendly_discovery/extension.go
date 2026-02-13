@@ -24,6 +24,10 @@ func AddInstaProfile(c *gin.Context) {
 		return
 	}
 
+	if req.Manual.QualityScore >= 8 { //One quality step ahead on this
+		req.HighValueInfluencer = true
+	}
+
 	b, err := json.Marshal(&req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to marshal request", "error": err.Error()})
