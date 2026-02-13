@@ -56,7 +56,19 @@ func GetInstagram(username string, highValueInfluencer bool) (*InstagramInfluenc
 
 	influencer := &results[0]
 
+	videoCount := 0
+	for _, post := range influencer.LatestPosts {
+		if post.Type == "Video" {
+			videoCount += 1
+		}
+	}
+
+	scrapeCount := 10 - videoCount
 	if highValueInfluencer {
+		scrapeCount = 30 - videoCount
+	}
+
+	if scrapeCount > 0 {
 		if err := getInstagramReels(influencer, 30); err != nil {
 			return nil, fmt.Errorf("failed to get instagram reels: %w", err)
 		}
