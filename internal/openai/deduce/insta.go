@@ -14,10 +14,11 @@ import (
 // EnrichmentResult is the structured output returned by the LLM.
 // It contains the deduced influencer attributes.
 type EnrichmentResult struct {
-	Gender   string   `json:"gender"`
-	Location string   `json:"location"`
-	Niches   []string `json:"niches"`
-	Quality  int      `json:"quality"`
+	Gender    string   `json:"gender"`
+	Location  string   `json:"location"`
+	Niches    []string `json:"niches"`
+	SubNiches []string `json:"subNiches"`
+	Quality   int      `json:"quality"`
 }
 
 // EnrichInfluencer takes raw influencer information (bio, posts, etc.) as a
@@ -29,7 +30,7 @@ func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
 
 	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
 		Name:        "enrichment_result",
-		Description: openai.String("Deduced influencer enrichment data including gender, location, niches, and quality rating"),
+		Description: openai.String("Deduced influencer enrichment data including gender, location, niches, sub-niches, and quality rating"),
 		Schema:      enrichmentJSONSchema,
 		Strict:      openai.Bool(true),
 	}
@@ -127,6 +128,12 @@ Fields to deduce:
 - gender: string (Deduce from Full Name, Username, and Bio/pronouns)
 - location: string (Deduce from Bio and Posts' location/geo-tags)
 - niches: string array (Deduce from Bio, Post Content, and Hashtags) — You MUST have at least one niche to pick values from the predefined niche list provided in the schema enum. Choose the closest matching niche(s). If nothing fits, put the niche as "Others".
+- subNiches: string array (Optional, free-form sub-niches that provide finer detail beyond the broad niches above). Rules:
+  * Sub-niches are NOT required. If the broad niches already capture the influencer well, return an empty array.
+  * Be very selective — only include a sub-niche when it adds genuinely important specificity that the parent niche alone does not convey (e.g. "Korean Skincare" under Skincare, "Powerlifting" under Fitness, "Street Photography" under Photography).
+  * Maximum 5 sub-niches, but typically 0, 1, or 2. Prefer fewer over more.
+  * Each sub-niche should be a concise, descriptive label (2-4 words max).
+  * Do NOT repeat or rephrase the parent niche — sub-niches must add new information.
 - quality: integer (1-10, maps to a 5-star rating with half-star granularity)
   1: Poor (0.5 star)
   2: Below Average (1 star)
@@ -152,7 +159,7 @@ func buildEnrichmentJSONSchema() map[string]interface{} {
 
 	return map[string]interface{}{
 		"type":                 "object",
-		"required":             []string{"gender", "location", "niches", "quality"},
+		"required":             []string{"gender", "location", "niches", "subNiches", "quality"},
 		"additionalProperties": false,
 		"properties": map[string]interface{}{
 			"gender": map[string]interface{}{
@@ -171,6 +178,14 @@ func buildEnrichmentJSONSchema() map[string]interface{} {
 					"enum": nicheEnum,
 				},
 				"description": "The deduced content niches from Bio, Post Content, and Hashtags. Must only contain values from the predefined enum.",
+			},
+			"subNiches": map[string]interface{}{
+				"type": "array",
+				"items": map[string]interface{}{
+					"type": "string",
+				},
+				"maxItems":    5,
+				"description": "Optional free-form sub-niches providing finer detail beyond the broad niches. Return an empty array when the broad niches are sufficient. Typically 0-2 items, max 5.",
 			},
 			"quality": map[string]interface{}{
 				"type":        "integer",
