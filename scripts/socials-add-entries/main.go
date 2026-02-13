@@ -109,7 +109,7 @@ func EvaluateInstagram(req sui.ScrapedSocial) error {
 	} else {
 		social.Gender = enriched.Gender
 		social.Location = enriched.Location
-		social.Niches = enriched.Niches
+		social.Niches = append(enriched.Niches, enriched.SubNiches...)
 		if req.Manual.QualityScore > 0 {
 			social.QualityScore = req.Manual.QualityScore
 		} else {
