@@ -52,10 +52,12 @@ func EvaluateInstagram(req sui.ScrapedSocial) error {
 		if err != nil {
 			return err
 		}
-		posts, err = trendlyrdb.InstagramPost{}.GetBySocialID(social.ID, 30)
+		posts, err = trendlyrdb.InstagramPost{}.GetVideosBySocialID(social.ID, 30)
 		if err != nil {
 			return err
 		}
+		sui.ComputeAnalytics(social, posts)
+
 		instagramRaw = struct {
 			*trendlyrdb.Socials
 			Posts []trendlyrdb.InstagramPost `json:"reels"`
