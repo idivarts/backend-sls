@@ -24,12 +24,10 @@ func TestDeduce(t *testing.T) {
 	// influencer.Niches = nil
 	// influencer.QualityScore = 0
 
-	instagramData, err := apify.GetInstagram([]string{influencer.Username})
-	if err != nil || len(instagramData) == 0 {
+	incluencerScrapped, err := apify.GetInstagram(influencer.Username, false)
+	if err != nil {
 		t.Fatal(err)
 	}
-
-	incluencerScrapped := instagramData[0]
 
 	jsonData, err := json.Marshal(incluencerScrapped)
 	if err != nil {

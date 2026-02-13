@@ -113,6 +113,18 @@ func (_ InstagramPost) GetBySocialID(socialID string, limit int) ([]InstagramPos
 	return posts, err
 }
 
+func (_ InstagramPost) GetVideosBySocialID(socialID string, limit int) ([]InstagramPost, error) {
+	var posts []InstagramPost
+	query := rdb.GormDB.Where("social_id = ? AND LOWER(type) IN ('video', 'igtv')", socialID).Order("timestamp DESC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&posts).Error
+	return posts, err
+}
+
 // GetByShortCode retrieves a post by Instagram shortcode
 func (data *InstagramPost) GetByShortCode(shortCode string) error {
 	err := rdb.GormDB.Where("short_code = ?", shortCode).First(data).Error

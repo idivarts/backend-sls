@@ -710,6 +710,7 @@ func RescrapeInfluencer(c *gin.Context) {
 	req.SocialType = social.SocialType
 	req.Manual.QualityScore = social.QualityScore
 	req.Manual.Niches = social.Niches
+	req.HighValueInfluencer = true
 
 	b, err := json.Marshal(&req)
 	if err != nil {

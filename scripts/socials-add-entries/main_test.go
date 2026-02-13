@@ -18,12 +18,13 @@ func TestEvaluateInstagram(t *testing.T) {
 
 	req := sui.ScrapedSocial{
 		SocialType: "instagram",
-		Username:   "virat.kohli", // replace with any public username for testing
+		Username:   "_pooja_jain04", // replace with any public username for testing
+		// UseDatabase: false,
 	}
-	req.Manual.Niches = []string{"cricket", "sports", "fitness"}
-	req.Manual.QualityScore = 4
+	req.Manual.Niches = []string{"Fashion / Beauty", "Lifestyle Vlogs"}
+	req.Manual.QualityScore = 8
 
-	err := evaluateInstagram(req)
+	err := EvaluateInstagram(req)
 	if err != nil {
 		t.Fatalf("evaluateInstagram failed: %v", err)
 	}
@@ -41,7 +42,7 @@ func TestHandlerSQSEvent(t *testing.T) {
 		Username:   "virat.kohli", // replace with any public username for testing
 	}
 	body.Manual.Niches = []string{"cricket", "sports", "fitness"}
-	body.Manual.QualityScore = 4
+	body.Manual.QualityScore = 8
 
 	bodyJSON, err := json.Marshal(body)
 	if err != nil {
