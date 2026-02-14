@@ -1,12 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
-	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
-	"github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
+	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 )
 
 func main() {
@@ -15,6 +13,7 @@ func main() {
 
 	for {
 		socials, err := trendlyrdb.Socials{}.GetPaginated(offset, pageSize)
+		scrapeList := []sui.ScrapedSocial{}
 		if err != nil {
 			log.Fatalf("Failed to get socials: %v", err)
 		}
@@ -45,13 +44,15 @@ func main() {
 					QualityScore: social.QualityScore,
 				},
 			}
-			jsonData, err := json.Marshal(scrape)
-			if err != nil {
-				log.Fatalf("Failed to marshal scrape: %v", err)
-			}
-			sqshandler.SendToMessageQueue(string(jsonData), 0)
+			scrapeList = append(scrapeList, scrape)
 		}
-
+		log.Println("Sending to evaluate Socials: %d, (%d, %d)", len(scrapeList), offset, (offset + pageSize))
+		err = sui.EvaluateInstagrams(scrapeList)
+		if err != nil {
+			log.Println("Failed to evaluate socials: %v", err)
+		} else {
+			log.Println("Evaluated Socials: %d, (%d, %d)", len(scrapeList), offset, (offset + pageSize))
+		}
 		offset += len(socials)
 	}
 
