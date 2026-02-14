@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
+	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
-	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
 )
 
 func AddInstaProfile(c *gin.Context) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
+	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 )
 
 func main() {

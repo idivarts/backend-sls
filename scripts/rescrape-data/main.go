@@ -6,7 +6,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
-	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
+	"github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 )
 
 func main() {

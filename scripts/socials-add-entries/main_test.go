@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
+	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 )
 
 // TestEvaluateInstagram calls evaluateInstagram directly with a ScrapedSocial,
