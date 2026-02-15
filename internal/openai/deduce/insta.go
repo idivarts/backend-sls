@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/openai/openai-go/v3"
 )
@@ -68,89 +69,6 @@ func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
 	return &result, nil
 }
 
-// AllowedNiches is the canonical list of influencer niches.
-// To add a new niche, simply append to this slice — the JSON schema and prompt
-// are derived from it automatically, so no other changes are needed.
-var AllowedNiches = []string{
-	// Fashion & Appearance
-	"Fashion & Style",
-	"Beauty & Makeup",
-	"Skincare",
-
-	// Health & Body
-	"Fitness & Gym",
-	"Yoga & Wellness",
-	"Health & Nutrition",
-	"Mental Health",
-
-	// Food
-	"Food & Cooking",
-
-	// Lifestyle & Home
-	"Travel",
-	"Lifestyle",
-	"Parenting & Family",
-	"Home & Interior",
-	"DIY & Crafts",
-	"Gardening & Plants",
-
-	// Creative & Arts
-	"Photography & Videography",
-	"Art & Illustration",
-	"Music",
-	"Dance",
-
-	// Entertainment
-	"Comedy & Skits",
-	"Memes & Humor",
-	"Gaming",
-	"Anime & Cosplay",
-	"Pop Culture & Entertainment",
-
-	// Knowledge & Education
-	"Tech & Gadgets",
-	"Science & Education",
-	"Books & Reading",
-	"Finance & Investing",
-	"Business & Entrepreneurship",
-	"Motivation & Self-Help",
-
-	// Sports & Outdoors
-	"Sports",
-	"Outdoor & Adventure",
-
-	// Niche Interest
-	"Pets & Animals",
-	"Automotive",
-	"Astrology & Spirituality",
-	"Real Estate",
-
-	// Identity & Community
-	"Body Positivity",
-	"LGBTQ+",
-	"Social Causes & Activism",
-	"Sustainability & Environment",
-
-	// Life Events & Luxury
-	"Wedding & Events",
-	"Luxury & High-End",
-
-	// Other Content Types
-	"Relationships & Dating",
-	"Quotes & Affirmations",
-	"Kids & Toys",
-	"NSFW & Adult",
-	"Others",
-}
-var Genders = []string{
-	"male",
-	"female",
-	"couple",
-	"animal",
-	"lgbtq",
-	"gender-neutral",
-}
-
 // enrichSystemPrompt is sent as the system message to guide the LLM.
 const enrichSystemPrompt = `You are an expert Social Media Auditor. Your job is to analyze influencer data and return a JSON object.
 
@@ -182,8 +100,8 @@ Return ONLY a JSON object matching the EnrichmentResult schema.`
 // buildEnrichmentJSONSchema constructs the JSON schema dynamically so the
 // niches enum always stays in sync with the AllowedNiches slice.
 func buildEnrichmentJSONSchema() map[string]interface{} {
-	nicheEnum := make([]interface{}, len(AllowedNiches))
-	for i, n := range AllowedNiches {
+	nicheEnum := make([]interface{}, len(constants.AllowedNiches))
+	for i, n := range constants.AllowedNiches {
 		nicheEnum[i] = n
 	}
 
@@ -195,7 +113,7 @@ func buildEnrichmentJSONSchema() map[string]interface{} {
 			"gender": map[string]interface{}{
 				"type":        "string",
 				"description": "The deduced gender of the influencer based on Full Name, Username, and Bio/pronouns.",
-				"enum":        Genders,
+				"enum":        constants.Genders,
 			},
 			"location": map[string]interface{}{
 				"type":        "string",
