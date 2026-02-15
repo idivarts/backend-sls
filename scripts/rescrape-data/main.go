@@ -2,14 +2,15 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 )
 
 func main() {
-	const pageSize = 20
-	offset := 0
+	const pageSize = 100
+	offset := 20
 
 	for {
 		socials, err := trendlyrdb.Socials{}.GetPaginated(offset, pageSize)
@@ -54,9 +55,10 @@ func main() {
 			log.Println("Evaluated Socials: %d, (%d, %d)", len(scrapeList), offset, (offset + pageSize))
 		}
 		offset += len(socials)
-		if true {
-			break
-		}
+
+		log.Println("Sleeping for 30 seconds. Currently at", offset, (offset + pageSize))
+		time.Sleep(30 * time.Second)
+		log.Println("Done Sleeping")
 	}
 
 	log.Printf("Done. Processed %d total socials.\n", offset)
