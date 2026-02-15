@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	const pageSize = 500
+	const pageSize = 20
 	offset := 0
 
 	for {
@@ -54,6 +54,9 @@ func main() {
 			log.Println("Evaluated Socials: %d, (%d, %d)", len(scrapeList), offset, (offset + pageSize))
 		}
 		offset += len(socials)
+		if true {
+			break
+		}
 	}
 
 	log.Printf("Done. Processed %d total socials.\n", offset)

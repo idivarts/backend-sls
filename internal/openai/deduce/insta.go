@@ -24,7 +24,7 @@ type EnrichmentResult struct {
 // EnrichInfluencer takes raw influencer information (bio, posts, etc.) as a
 // string and returns a deduced EnrichmentResult using OpenAI structured outputs.
 func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
-	model := "gpt-4o-2024-08-06"
+	model := "gpt-5-mini"
 
 	ctx := context.Background()
 
