@@ -10,7 +10,7 @@ import (
 
 func main() {
 	const pageSize = 100
-	offset := 8120
+	offset := 8220
 
 	for {
 		socials, err := trendlyrdb.Socials{}.GetPaginated(offset, pageSize)
@@ -29,8 +29,10 @@ func main() {
 			highValueInfluencer := false
 			useDatabase := true
 			if social.QualityScore > 8 {
-				highValueInfluencer = true
 				useDatabase = false
+			}
+			if social.QualityScore > 9 {
+				highValueInfluencer = true
 			}
 			scrape := sui.ScrapedSocial{
 				Username:            social.Username,
@@ -57,7 +59,7 @@ func main() {
 		offset += len(socials)
 
 		log.Println("Sleeping for 30 seconds. Currently at", offset, (offset + pageSize))
-		time.Sleep(30 * time.Second)
+		time.Sleep(45 * time.Second)
 		log.Println("Done Sleeping")
 	}
 
