@@ -10,7 +10,7 @@ import (
 
 func main() {
 	const pageSize = 100
-	offset := 10100
+	offset := 11000
 	// Moved pointer to 10100 because of the error in the previous run
 
 	for {
