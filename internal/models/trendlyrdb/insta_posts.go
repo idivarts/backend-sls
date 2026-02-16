@@ -125,6 +125,16 @@ func (_ InstagramPost) GetVideosBySocialID(socialID string, limit int) ([]Instag
 	return posts, err
 }
 
+// GetVideosBySocialIDs retrieves video posts for multiple social profiles in a single query.
+func (_ InstagramPost) GetVideosBySocialIDs(socialIDs []string) ([]InstagramPost, error) {
+	var posts []InstagramPost
+	err := rdb.GormDB.
+		Where("social_id IN ? AND LOWER(type) IN ('video', 'igtv')", socialIDs).
+		Order("timestamp DESC").
+		Find(&posts).Error
+	return posts, err
+}
+
 // GetByShortCode retrieves a post by Instagram shortcode
 func (data *InstagramPost) GetByShortCode(shortCode string) error {
 	err := rdb.GormDB.Where("short_code = ?", shortCode).First(data).Error
