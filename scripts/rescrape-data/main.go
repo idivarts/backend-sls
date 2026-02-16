@@ -28,10 +28,10 @@ func main() {
 			log.Println("Social", social.Username)
 			highValueInfluencer := false
 			useDatabase := true
-			if social.QualityScore > 9 {
-				highValueInfluencer = true
-				useDatabase = false
-			}
+			// if social.QualityScore > 9 {
+			// 	highValueInfluencer = true
+			// 	useDatabase = false
+			// }
 			scrape := sui.ScrapedSocial{
 				Username:            social.Username,
 				SocialType:          social.SocialType,
