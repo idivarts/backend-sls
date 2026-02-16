@@ -10,7 +10,7 @@ import (
 
 func main() {
 	const pageSize = 100
-	offset := 8020
+	offset := 8120
 
 	for {
 		socials, err := trendlyrdb.Socials{}.GetPaginated(offset, pageSize)
