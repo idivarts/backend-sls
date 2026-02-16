@@ -10,7 +10,7 @@ import (
 
 func main() {
 	const pageSize = 100
-	offset := 8720
+	offset := 9420
 
 	for {
 		socials, err := trendlyrdb.Socials{}.GetPaginated(offset, pageSize)
@@ -57,7 +57,7 @@ func main() {
 		offset += len(socials)
 
 		log.Println("Sleeping for 30 seconds. Currently at", offset, (offset + pageSize))
-		time.Sleep(50 * time.Second)
+		time.Sleep(30 * time.Second)
 		log.Println("Done Sleeping")
 	}
 
