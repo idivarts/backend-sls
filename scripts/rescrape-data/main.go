@@ -57,7 +57,7 @@ func main() {
 		offset += len(socials)
 
 		log.Println("Sleeping for 30 seconds. Currently at", offset, (offset + pageSize))
-		time.Sleep(45 * time.Second)
+		time.Sleep(50 * time.Second)
 		log.Println("Done Sleeping")
 	}
 
