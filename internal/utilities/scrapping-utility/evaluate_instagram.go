@@ -55,6 +55,11 @@ func EvaluateInstagrams(reqs []ScrapedSocial) error {
 			return fmt.Errorf("batch scrape failed: %w", err)
 		}
 
+		var socialsToInsert []trendlyrdb.Socials
+		var postsToInsert []trendlyrdb.InstagramPost
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+
 		for _, req := range scrapeReqs {
 			instagram, ok := scraped[req.Username]
 			if !ok {
@@ -67,56 +72,73 @@ func EvaluateInstagrams(reqs []ScrapedSocial) error {
 				continue
 			}
 
-			social, posts := TranslateInstagram(*instagram, req)
-			social, posts = MoveImagesToS3(social, posts)
+			wg.Add(1)
+			go func(instagram *apify.InstagramInfluencer, req ScrapedSocial) {
+				defer wg.Done()
 
-			// Enrich with AI
-			enrichPayload := map[string]interface{}{
-				"profile": instagram,
-			}
-			if len(req.Manual.Niches) > 0 || req.Manual.QualityScore > 0 {
-				bias := map[string]interface{}{}
-				if len(req.Manual.Niches) > 0 {
-					bias["suggestedNiches"] = req.Manual.Niches
+				social, posts := TranslateInstagram(*instagram, req)
+				social, posts = MoveImagesToS3(social, posts)
+
+				// Enrich with AI
+				enrichPayload := map[string]interface{}{
+					"profile": instagram,
 				}
-				if req.Manual.QualityScore > 0 {
-					bias["suggestedQualityScore"] = req.Manual.QualityScore
+				if len(req.Manual.Niches) > 0 || req.Manual.QualityScore > 0 {
+					bias := map[string]interface{}{}
+					if len(req.Manual.Niches) > 0 {
+						bias["suggestedNiches"] = req.Manual.Niches
+					}
+					if req.Manual.QualityScore > 0 {
+						bias["suggestedQualityScore"] = req.Manual.QualityScore
+					}
+					enrichPayload["bias"] = bias
 				}
-				enrichPayload["bias"] = bias
-			}
 
-			enrichJSON, err := json.Marshal(enrichPayload)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("marshal enrichment for %s: %w", req.Username, err))
-				continue
-			}
+				enrichJSON, err := json.Marshal(enrichPayload)
+				if err != nil {
+					mu.Lock()
+					errs = append(errs, fmt.Errorf("marshal enrichment for %s: %w", req.Username, err))
+					mu.Unlock()
+					return
+				}
 
-			enriched, err := deduce.EnrichInfluencer(string(enrichJSON))
-			if err != nil {
-				log.Printf("Enrichment failed for %s, continuing without AI fields: %v", req.Username, err)
-			} else {
-				social.Gender = enriched.Gender
-				social.Location = enriched.Location
-				social.Niches = append(enriched.Niches, enriched.SubNiches...)
-				if req.Manual.QualityScore > 0 {
-					social.QualityScore = req.Manual.QualityScore
+				enriched, err := deduce.EnrichInfluencer(string(enrichJSON))
+				if err != nil {
+					log.Printf("Enrichment failed for %s, continuing without AI fields: %v", req.Username, err)
 				} else {
-					social.QualityScore = enriched.Quality
+					social.Gender = enriched.Gender
+					social.Location = enriched.Location
+					social.Niches = append(enriched.Niches, enriched.SubNiches...)
+					if req.Manual.QualityScore > 0 {
+						social.QualityScore = req.Manual.QualityScore
+					} else {
+						social.QualityScore = enriched.Quality
+					}
 				}
-			}
 
-			// Save to DB
-			if err := social.Insert(); err != nil {
-				errs = append(errs, fmt.Errorf("insert social %s: %w", req.Username, err))
-				continue
-			}
-			if err := (trendlyrdb.InstagramPost{}).InsertMultiple(posts); err != nil {
-				errs = append(errs, fmt.Errorf("insert posts %s: %w", req.Username, err))
-				continue
-			}
-
-			log.Printf("Instagram data saved successfully for %s (ID: %d)", req.Username, social.ID)
+				mu.Lock()
+				socialsToInsert = append(socialsToInsert, *social)
+				postsToInsert = append(postsToInsert, posts...)
+				mu.Unlock()
+			}(instagram, req)
 		}
+		wg.Wait()
+
+		// Batch-insert socials
+		if len(socialsToInsert) > 0 {
+			if err := (trendlyrdb.Socials{}).InsertMultiple(socialsToInsert); err != nil {
+				errs = append(errs, fmt.Errorf("batch insert socials: %w", err))
+			}
+		}
+
+		// Batch-insert posts
+		if len(postsToInsert) > 0 {
+			if err := (trendlyrdb.InstagramPost{}).InsertMultiple(postsToInsert); err != nil {
+				errs = append(errs, fmt.Errorf("batch insert posts: %w", err))
+			}
+		}
+
+		log.Printf("Scrape instagrams evaluated: %d socials, %d posts", len(socialsToInsert), len(postsToInsert))
 	}
 
 	return errors.Join(errs...)
