@@ -56,12 +56,22 @@ func CreateAccount(c *gin.Context) {
 		}
 	}
 
+	email := ""
+	if user.Email != nil {
+		email = *user.Email
+	}
+
+	phone := ""
+	if user.PhoneNumber != nil {
+		phone = *user.PhoneNumber
+	}
+
 	// 2. Create Linked Account
 	account, stakeholder, err := payments.CreateLinkedAccount(payments.CreateAccountReq{
 		UserId:  userId,
 		Name:    req.Name,
-		Email:   *user.Email,
-		Phone:   *user.PhoneNumber,
+		Email:   email,
+		Phone:   phone,
 		Address: req.Address,
 		PAN:     req.PAN,
 	})
