@@ -96,6 +96,13 @@ type RPSettlements struct {
 	BeneficiaryName string `json:"beneficiary_name"`
 }
 
+func truncateReferenceID(userId string) string {
+	if len(userId) > 20 {
+		return userId[:20]
+	}
+	return userId
+}
+
 func structFromMap(data map[string]interface{}, target interface{}) error {
 	bytes, err := json.Marshal(data)
 	if err != nil {
@@ -109,7 +116,7 @@ func CreateLinkedAccount(req CreateAccountReq) (*RPAccount, *RPStakeholder, erro
 		"email":               req.Email,
 		"phone":               req.Phone,
 		"type":                "route",
-		"reference_id":        req.UserId,
+		"reference_id":        truncateReferenceID(req.UserId),
 		"legal_business_name": req.Name,
 		"business_type":       "individual",
 		"contact_name":        req.Name,
