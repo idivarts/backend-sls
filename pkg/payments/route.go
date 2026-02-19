@@ -73,21 +73,10 @@ type RPStakeholder struct {
 	Entity              string               `json:"entity"`
 	Name                string               `json:"name"`
 	Email               string               `json:"email"`
-	Phone               *RPPhone             `json:"phone"`
-	Relationship        *RPRelationship      `json:"relationship"`
 	PercentageOwnership float64              `json:"percentage_ownership"`
 	Addresses           map[string]RPAddress `json:"addresses"`
 	KYC                 *RPKYC               `json:"kyc"`
 	Notes               []interface{}        `json:"notes"`
-}
-
-type RPPhone struct {
-	Primary   int64 `json:"primary"`
-	Secondary int64 `json:"secondary"`
-}
-
-type RPRelationship struct {
-	Executive bool `json:"executive"`
 }
 
 type RPKYC struct {
