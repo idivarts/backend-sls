@@ -84,11 +84,24 @@ type RPKYC struct {
 }
 
 type RPProduct struct {
-	ID          string         `json:"id"`
-	AccountId   string         `json:"account_id"`
-	ProductName string         `json:"product_name"`
-	Status      string         `json:"status"`
-	TncAccepted bool           `json:"tnc_accepted"`
+	ID                     string                  `json:"id"`
+	AccountId              string                  `json:"account_id"`
+	ProductName            string                  `json:"product_name"`
+	ActivationStatus       string                  `json:"activation_status"`
+	RequestedAt            int64                   `json:"requested_at"`
+	Tnc                    *RPTnc                  `json:"tnc"`
+	ActiveConfiguration    *RPActiveConfiguration  `json:"active_configuration"`
+	RequestedConfiguration []interface{}           `json:"requested_configuration"`
+	Requirements           []interface{}           `json:"requirements"`
+}
+
+type RPTnc struct {
+	ID         string `json:"id"`
+	Accepted   bool   `json:"accepted"`
+	AcceptedAt int64  `json:"accepted_at"`
+}
+
+type RPActiveConfiguration struct {
 	Settlements *RPSettlements `json:"settlements"`
 }
 
