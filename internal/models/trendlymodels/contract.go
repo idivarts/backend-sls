@@ -9,13 +9,29 @@ import (
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
+type ContractStatus int
+
+const (
+	ContractStatusPending         ContractStatus = 0
+	ContractStatusStarted         ContractStatus = 1
+	ContractStatusPaymentFailed   ContractStatus = 2
+	ContractStatusPaid            ContractStatus = 3
+	ContractStatusShipped         ContractStatus = 4
+	ContractStatusDelivered       ContractStatus = 5
+	ContractStatusReceived        ContractStatus = 6
+	ContractStatusDeliverableSent ContractStatus = 7
+	ContractStatusPostScheduled   ContractStatus = 8
+	ContractStatusPostDone        ContractStatus = 9
+	ContractStatusSettled         ContractStatus = 10
+)
+
 type Contract struct {
-	UserID          string `json:"userId" firestore:"userId"`
-	ManagerID       string `json:"managerId" firestore:"managerId"`
-	CollaborationID string `json:"collaborationId" firestore:"collaborationId"`
-	BrandID         string `json:"brandId" firestore:"brandId"`
-	StreamChannelID string `json:"streamChannelId" firestore:"streamChannelId"`
-	Status          int    `json:"status" firestore:"status"`
+	UserID          string         `json:"userId" firestore:"userId"`
+	ManagerID       string         `json:"managerId" firestore:"managerId"`
+	CollaborationID string         `json:"collaborationId" firestore:"collaborationId"`
+	BrandID         string         `json:"brandId" firestore:"brandId"`
+	StreamChannelID string         `json:"streamChannelId" firestore:"streamChannelId"`
+	Status          ContractStatus `json:"status" firestore:"status"`
 
 	FeedbackFromBrand *struct {
 		Ratings        *int          `json:"ratings,omitempty" firestore:"ratings,omitempty"`

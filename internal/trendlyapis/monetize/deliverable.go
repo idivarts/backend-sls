@@ -100,21 +100,21 @@ func ApproveDeliverable(c *gin.Context) {
 	switch req.PostingScenario {
 	case 1:
 		scenarioText = "Influencer Will Post"
-		data.Contract.Status = 8 // Post Scheduled
+		data.Contract.Status = trendlymodels.ContractStatusPostScheduled
 		if req.ScheduledDate == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Scheduled date is required for this scenario"})
 			return
 		}
 	case 2:
 		scenarioText = "Influencer and Brand Collab Post"
-		data.Contract.Status = 8 // Post Scheduled
+		data.Contract.Status = trendlymodels.ContractStatusPostScheduled
 		if req.ScheduledDate == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Scheduled date is required for this scenario"})
 			return
 		}
 	case 3:
 		scenarioText = "Brand will use video independently"
-		data.Contract.Status = 9 // Post Done
+		data.Contract.Status = trendlymodels.ContractStatusPostDone
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid posting scenario"})
 		return
@@ -225,7 +225,7 @@ func RequestDeliverableChange(c *gin.Context) {
 	data.Contract.Deliverable.RevisionCount++
 	data.Contract.Deliverable.RevisionNotes = append(data.Contract.Deliverable.RevisionNotes, req.Notes)
 	data.Contract.Deliverable.Status = "revision-requested"
-	data.Contract.Status = 6 // Moving back to "Received" (Influencer has the product and needs to rework)
+	data.Contract.Status = trendlymodels.ContractStatusReceived
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
@@ -316,7 +316,7 @@ func SendDeliverable(c *gin.Context) {
 	data.Contract.Deliverable.DeliverableLinks = append(data.Contract.Deliverable.DeliverableLinks, req.VideoURL)
 	data.Contract.Deliverable.Notes = req.Note
 	data.Contract.Deliverable.Status = "submitted"
-	data.Contract.Status = 7 // Marking as Deliverable Sent
+	data.Contract.Status = trendlymodels.ContractStatusDeliverableSent
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {

@@ -89,7 +89,7 @@ func handleOrderPaid(payload map[string]interface{}) {
 	}
 	contract.Payment.Status = "paid"
 	contract.Payment.OrderID = orderID
-	contract.Status = 3 // Paid Status
+	contract.Status = trendlymodels.ContractStatusPaid
 
 	err = contract.Update(contractID)
 	if err != nil {
@@ -225,7 +225,7 @@ func handleTransferProcessed(payload map[string]interface{}) {
 		contract.Payment = &trendlymodels.Payment{}
 	}
 	contract.Payment.TransferID = transferID
-	contract.Status = 10 // Settled/Closed Status
+	contract.Status = trendlymodels.ContractStatusSettled
 
 	err = contract.Update(contractID)
 	if err != nil {
