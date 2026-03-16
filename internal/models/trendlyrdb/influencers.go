@@ -13,6 +13,12 @@ const (
 	InfluencersTableName = "influencers"
 )
 
+var excludedInfluencerIDs = []string{
+	"MvLmVKwUcXXZXfBfQHSnq5udnaO2",
+	"mmUwj1YlPUVn0h2hlN4qVw1bEZo1",
+	"jEZf51INayY4ZcJs2ck0XWR8Ptj2",
+}
+
 type Influencers struct {
 	ID string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
 
@@ -91,6 +97,64 @@ func (_ Influencers) GetPaginated(offset, limit int) ([]Influencers, error) {
 		Find(&results).Error
 
 	return results, err
+}
+
+// GetExploreInfluencerIDs fetches influencer IDs for brand explore flow.
+func (_ Influencers) GetExploreInfluencerIDs(locations, categories, languages []string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	db := rdb.GormDB.Model(&Influencers{}).
+		Where("completion_percentage >= ?", 60).
+		Where("id NOT IN ?", excludedInfluencerIDs)
+
+	if len(locations) > 0 {
+		db = db.Where("location IN ?", locations)
+	}
+	if len(categories) > 0 {
+		db = db.Where("categories && ?", pq.StringArray(categories))
+	}
+	if len(languages) > 0 {
+		db = db.Where("languages && ?", pq.StringArray(languages))
+	}
+
+	ids := []string{}
+	err := db.
+		Order("CASE WHEN reach_count > 20000 AND follower_count > 5000 THEN 1 ELSE 0 END DESC").
+		Order("last_use_time DESC").
+		Limit(limit).
+		Pluck("id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// GetInfluencerForInfluencerIDs fetches influencer IDs for i2i flow.
+func (_ Influencers) GetInfluencerForInfluencerIDs(location string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	db := rdb.GormDB.Model(&Influencers{}).
+		Where("completion_percentage >= ?", 60).
+		Where("id NOT IN ?", excludedInfluencerIDs)
+
+	ids := []string{}
+	err := db.
+		Order(clause.Expr{
+			SQL:  "CASE WHEN LOWER(location) = LOWER(?) THEN 100 WHEN random() > 0.95 THEN 100 ELSE 99 END DESC",
+			Vars: []interface{}{location},
+		}).
+		Order("CASE WHEN reach_count > 20000 AND follower_count > 5000 THEN 1 ELSE 0 END DESC").
+		Order("last_use_time DESC").
+		Limit(limit).
+		Pluck("id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 // Update updates specific fields of an influencer
