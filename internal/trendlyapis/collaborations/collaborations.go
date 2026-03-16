@@ -1,7 +1,6 @@
 package trendlyCollabs
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,13 +14,10 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	ai_collaboration "github.com/idivarts/backend-sls/internal/openai/collaboration"
 	"github.com/idivarts/backend-sls/pkg/myemail"
-	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
-	"github.com/openai/openai-go/v3"
-	"github.com/openai/openai-go/v3/responses"
 )
 
 // nzString returns "NA" if s is empty after trimming; otherwise returns s.
@@ -86,17 +82,8 @@ func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, *trendlymode
 	return evaluateCollab(collab, nil)
 }
 func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Brand) (bool, *trendlymodels.DiscoverPreferences) {
-	// {
-	// 	"id": "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
-	// 	"version": "1",
-	// 	"variables": {
-	// 	  "collaboration_name": "example collaboration_name",
-	// 	  "collaboration_description": "example collaboration_description"
-	// 	}
-	//   }
-
 	budget := "Barter"
-	if collab.Budget != nil && *collab.Budget.Max != 0 {
+	if collab.Budget != nil && collab.Budget.Max != nil && *collab.Budget.Max != 0 {
 		budget = toString(collab.Budget)
 	}
 
@@ -105,58 +92,21 @@ func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Br
 		brandDetails = toString(*brand)
 	}
 
-	// Build prompt variables with "NA" fallbacks when fields are empty/missing.
-	vars := map[string]responses.ResponsePromptVariableUnionParam{
-		"collaboration_name":        {OfString: openai.String(toString(collab.Name))},
-		"collaboration_description": {OfString: openai.String(toString(collab.Description))},
-		"budget":                    {OfString: openai.String(budget)},
-		"location":                  {OfString: openai.String(toString(collab.Location))},
-		"questions":                 {OfString: openai.String(toString(collab.QuestionsToInfluencers))},
-		"links":                     {OfString: openai.String(toString(collab.ExternalLinks))},
-		"brand_details":             {OfString: openai.String(brandDetails)},
-	}
-
-	response, err := myopenai.Client.Responses.New(context.Background(), responses.ResponseNewParams{
-		Prompt: responses.ResponsePromptParam{
-			ID:        "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
-			Variables: vars,
-		},
+	valid, filters, err := ai_collaboration.EvaluateCollaboration(ai_collaboration.CollabEvaluationInput{
+		CollaborationName:        toString(collab.Name),
+		CollaborationDescription: toString(collab.Description),
+		Budget:                   budget,
+		Location:                 toString(collab.Location),
+		Questions:                toString(collab.QuestionsToInfluencers),
+		Links:                    toString(collab.ExternalLinks),
+		BrandDetails:             brandDetails,
 	})
 	if err != nil {
 		log.Println("Error evaluating collab:", err.Error())
 		return false, nil
 	}
-	jsonStr := response.JSON.Output.Raw()
-	mMap := []map[string]interface{}{}
-	err = json.Unmarshal([]byte(jsonStr), &mMap)
-	if err != nil {
-		log.Println("Error parsing evaluation response:", err.Error())
-		return false, nil
-	}
-
-	responseStr := mMap[0]["content"].([]interface{})[0].(map[string]interface{})["text"].(string)
-	rMap := map[string]interface{}{}
-	err = json.Unmarshal([]byte(responseStr), &rMap)
-	if err != nil {
-		log.Println("Error parsing evaluation content:", err.Error())
-		return false, nil
-	}
-
-	valid := rMap["validCollaboration"].(bool)
 	log.Println("Evaluation Response:", valid)
 	if valid {
-		filtersMap := rMap["filters"].(map[string]interface{})
-		filters := &trendlymodels.DiscoverPreferences{}
-		b, err := json.Marshal(filtersMap)
-		if err != nil {
-			log.Println("Error marshalling filters:", err.Error())
-			return false, nil
-		}
-		err = json.Unmarshal(b, filters)
-		if err != nil {
-			log.Println("Error unmarshalling filters:", err.Error())
-			return false, nil
-		}
 		return true, filters
 	}
 	return false, nil
