@@ -75,7 +75,9 @@ func SyncUsers(iterative bool) error {
 			}
 			data = append(data, trendlyrdb.Influencers{
 				ID:               doc.Ref.ID,
+				Email:            myutil.DerefString(user.Email),
 				Location:         myutil.DerefString(user.Location),
+				TotalMediaCount:  len(user.Profile.Attachments),
 				FollowerCount:    followCount,
 				ReachCount:       reach,
 				InteractionCount: interaction,

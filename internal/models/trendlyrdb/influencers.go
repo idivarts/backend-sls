@@ -2,7 +2,9 @@ package trendlyrdb
 
 import (
 	"errors"
+	"strings"
 
+	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/rdb"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
@@ -13,14 +15,27 @@ const (
 	InfluencersTableName = "influencers"
 )
 
-var excludedInfluencerIDs = []string{
+var excludedInfluencerEmails = []string{
 	"MvLmVKwUcXXZXfBfQHSnq5udnaO2",
 	"mmUwj1YlPUVn0h2hlN4qVw1bEZo1",
 	"jEZf51INayY4ZcJs2ck0XWR8Ptj2",
 }
 
+func normalizeEmails(emails []string) []string {
+	normalized := make([]string, 0, len(emails))
+	for _, email := range emails {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email == "" {
+			continue
+		}
+		normalized = append(normalized, email)
+	}
+	return normalized
+}
+
 type Influencers struct {
-	ID string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
+	ID    string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
+	Email string `gorm:"type:varchar(255)" db:"email" json:"email"`
 
 	Location string `gorm:"type:varchar(255)" db:"location" json:"location"`
 
@@ -29,6 +44,7 @@ type Influencers struct {
 	PreferredBrandIndustries pq.StringArray `gorm:"type:text[]" db:"preferred_brand_industries" json:"preferred_brand_industries"`
 	PostType                 pq.StringArray `gorm:"type:text[]" db:"post_type" json:"post_type"`
 	CollaborationType        pq.StringArray `gorm:"type:text[]" db:"collaboration_type" json:"collaboration_type"`
+	TotalMediaCount          int            `gorm:"default:0" db:"total_media_count" json:"total_media_count"`
 
 	FollowerCount        int `gorm:"default:0" db:"follower_count" json:"follower_count"`
 	ReachCount           int `gorm:"default:0" db:"reach_count" json:"reach_count"`
@@ -107,7 +123,10 @@ func (_ Influencers) GetExploreInfluencerIDs(locations, categories, languages []
 
 	db := rdb.GormDB.Model(&Influencers{}).
 		Where("completion_percentage >= ?", 60).
-		Where("id NOT IN ?", excludedInfluencerIDs)
+		Where("total_media_count > 0")
+	if !myutil.IsDevEnvironment() {
+		db = db.Where("(email IS NULL OR (LOWER(email) NOT IN ? AND LOWER(email) NOT LIKE ?))", normalizeEmails(excludedInfluencerEmails), "%@idiv.in")
+	}
 
 	if len(locations) > 0 {
 		db = db.Where("location IN ?", locations)
@@ -139,7 +158,10 @@ func (_ Influencers) GetInfluencerForInfluencerIDs(location string, limit int) (
 
 	db := rdb.GormDB.Model(&Influencers{}).
 		Where("completion_percentage >= ?", 60).
-		Where("id NOT IN ?", excludedInfluencerIDs)
+		Where("total_media_count > 0")
+	if !myutil.IsDevEnvironment() {
+		db = db.Where("(email IS NULL OR (LOWER(email) NOT IN ? AND LOWER(email) NOT LIKE ?))", normalizeEmails(excludedInfluencerEmails), "%@idiv.in")
+	}
 
 	ids := []string{}
 	err := db.
