@@ -90,11 +90,59 @@ Other Brand Details - %s`,
 	return result.ValidCollaboration, result.Filters, nil
 }
 
-const collabEvaluationSystemPrompt = `Evaluate the input and decide if the collaboration created is a valid collaboration or not. There could be scenarios where the person using the platform Trendly, they are just trying out and hence are creating just test collaborations. In that cases, mark validCollaboration as false and return no filters. However, if the collaboration looks like a valid one, suggest some filters that might be a good fit for searching the correct influencer for the collaboration the brand is looking for.
+const collabEvaluationSystemPrompt = `Evaluate the input and decide if the collaboration created is a valid collaboration or not. There could be scenarios where the person using the platform Trendly is just trying things out and creates test collaborations. In those cases, mark validCollaboration as false and return no filters. If the collaboration looks valid, return practical influencer filters for discovery.
 
-Note: while returning the filters, understand the budget and don't return filters like follower count, which is not feasible in the current budget.
+Treat all budget values as INR (Indian Rupees) and optimize for the Indian creator market (metro + tier-2 + tier-3 mix). Keep recommendations realistic for campaign ROI.
 
-Also, whatever filters you don't want to apply, simply don't return them in the response. The only exception is followers min and max. Ideally, min should never be below 2000`
+How to interpret each filter field:
+- followerMin / followerMax: influencer follower band. Use this as the primary affordability control.
+  Example ranges by budget (single creator, typical India pricing, can vary by niche/city):
+  - INR 500-1,500: upto 5,000 followers
+  - INR 1,500-15,000: 5,000 to 50,000 followers
+  - INR 15,000-50,000: 50,000 to 100,000 followers
+  - INR 50,000-1,50,000: 100,000 to 200,000 followers
+  Keep followerMin >= 2000 always.
+
+- monthlyEngagementMin / monthlyEngagementMax: total interactions per month (likes + comments + saves/shares where applicable).
+  Use when goal is awareness with active audience.
+  Typical practical range in India for micro/mid creators: 2,000 to 200,000.
+
+- avgViewsMin / avgViewsMax: typical views per content piece (median/average).
+  Use when campaign depends on reach.
+  Example:
+  - Nano/micro focus: 3,000 to 80,000
+  - Mid tier focus: 20,000 to 400,000
+
+- qualityMin / qualityMax: creator content quality score from 0-10.
+  Suggested interpretation:
+  - 3-5: basic UGC, low production
+  - 6-7: decent brand-safe creator quality
+  - 8-9: strong storytelling + visual consistency
+  - 10: exceptional/premium creators
+  For most paid brand campaigns, prefer qualityMin >= 6.
+
+- erMin / erMax: engagement rate percentage (0-100).
+  Typical healthy bands in India:
+  - Nano/micro creators: 3% to 12%
+  - Mid creators: 2% to 8%
+  - Large creators: 1% to 5%
+  If budget is low but conversion intent is high, prioritize higher erMin over followerMax.
+
+- genders: allowed creator genders. Must use only schema enum values.
+  Use only when campaign explicitly requires gender targeting; otherwise omit.
+
+- selectedNiches: content niches aligned to campaign category (e.g., "Beauty", "Fitness", "Food & Cooking").
+  Keep niche selection focused (usually 1-4 niches).
+
+- selectedLocations: creator operating locations (city/state/region) for logistics/language/relevance.
+  Examples: "Mumbai", "Delhi NCR", "Bengaluru", "Pune", "Hyderabad", "Kolkata", "Chennai", "Ahmedabad".
+  For pan-India digital campaigns, location can be omitted unless language/regional fit is critical.
+
+Response rules:
+- Do not return filters that are not needed.
+- Always return followerMin and followerMax when validCollaboration is true.
+- Keep ranges logically consistent (min <= max).
+- If collaboration is not valid, return validCollaboration=false and omit filters.`
 
 var collabEvaluationJSONSchema = map[string]interface{}{
 	"type":                 "object",
@@ -191,19 +239,19 @@ var collabEvaluationJSONSchema = map[string]interface{}{
 					"minimum":     0,
 					"maximum":     100,
 				},
-				"descKeywords": map[string]interface{}{
-					"type":        "array",
-					"description": "List of keywords to match for description/bio",
-					"items": map[string]interface{}{
-						"type":      "string",
-						"minLength": 1,
-					},
-				},
-				"name": map[string]interface{}{
-					"type":        "string",
-					"description": "Influencer name filter",
-					// "minLength":   1,
-				},
+				// "descKeywords": map[string]interface{}{
+				// 	"type":        "array",
+				// 	"description": "List of keywords to match for description/bio",
+				// 	"items": map[string]interface{}{
+				// 		"type":      "string",
+				// 		"minLength": 1,
+				// 	},
+				// },
+				// "name": map[string]interface{}{
+				// 	"type":        "string",
+				// 	"description": "Influencer name filter",
+				// 	// "minLength":   1,
+				// },
 				// "isVerified": map[string]interface{}{
 				// 	"type":        "boolean",
 				// 	"description": "Filter for verified influencers",
