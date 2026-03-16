@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/openai/deduce"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/openai/openai-go/v3"
 )
@@ -118,22 +119,22 @@ var collabEvaluationJSONSchema = map[string]interface{}{
 					"type":        "number",
 					"description": "Maximum followers allowed",
 				},
-				"contentMin": map[string]interface{}{
-					"type":        "number",
-					"description": "Minimum content/posts required",
-				},
-				"contentMax": map[string]interface{}{
-					"type":        "number",
-					"description": "Maximum content/posts allowed",
-				},
-				"monthlyViewMin": map[string]interface{}{
-					"type":        "number",
-					"description": "Minimum estimated monthly views",
-				},
-				"monthlyViewMax": map[string]interface{}{
-					"type":        "number",
-					"description": "Maximum estimated monthly views",
-				},
+				// "contentMin": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Minimum content/posts required",
+				// },
+				// "contentMax": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Maximum content/posts allowed",
+				// },
+				// "monthlyViewMin": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Minimum estimated monthly views",
+				// },
+				// "monthlyViewMax": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Maximum estimated monthly views",
+				// },
 				"monthlyEngagementMin": map[string]interface{}{
 					"type":        "number",
 					"description": "Minimum estimated monthly engagements",
@@ -150,33 +151,33 @@ var collabEvaluationJSONSchema = map[string]interface{}{
 					"type":        "number",
 					"description": "Maximum average/median views",
 				},
-				"avgLikesMin": map[string]interface{}{
-					"type":        "number",
-					"description": "Minimum average/median likes",
-				},
-				"avgLikesMax": map[string]interface{}{
-					"type":        "number",
-					"description": "Maximum average/median likes",
-				},
-				"avgCommentsMin": map[string]interface{}{
-					"type":        "number",
-					"description": "Minimum average/median comments",
-				},
-				"avgCommentsMax": map[string]interface{}{
-					"type":        "number",
-					"description": "Maximum average/median comments",
-				},
+				// "avgLikesMin": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Minimum average/median likes",
+				// },
+				// "avgLikesMax": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Maximum average/median likes",
+				// },
+				// "avgCommentsMin": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Minimum average/median comments",
+				// },
+				// "avgCommentsMax": map[string]interface{}{
+				// 	"type":        "number",
+				// 	"description": "Maximum average/median comments",
+				// },
 				"qualityMin": map[string]interface{}{
 					"type":        "number",
-					"description": "Minimum quality/aesthetics (0-100)",
+					"description": "Minimum quality/aesthetics (0-10)",
 					"minimum":     0,
-					"maximum":     100,
+					"maximum":     10,
 				},
 				"qualityMax": map[string]interface{}{
 					"type":        "number",
-					"description": "Maximum quality/aesthetics (0-100)",
+					"description": "Maximum quality/aesthetics (0-10)",
 					"minimum":     0,
-					"maximum":     100,
+					"maximum":     10,
 				},
 				"erMin": map[string]interface{}{
 					"type":        "number",
@@ -192,7 +193,7 @@ var collabEvaluationJSONSchema = map[string]interface{}{
 				},
 				"descKeywords": map[string]interface{}{
 					"type":        "array",
-					"description": "List of keywords to match for description",
+					"description": "List of keywords to match for description/bio",
 					"items": map[string]interface{}{
 						"type":      "string",
 						"minLength": 1,
@@ -201,38 +202,37 @@ var collabEvaluationJSONSchema = map[string]interface{}{
 				"name": map[string]interface{}{
 					"type":        "string",
 					"description": "Influencer name filter",
-					"minLength":   1,
+					// "minLength":   1,
 				},
-				"isVerified": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Filter for verified influencers",
-				},
-				"hasContact": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Filter for influencers with contact information",
-				},
+				// "isVerified": map[string]interface{}{
+				// 	"type":        "boolean",
+				// 	"description": "Filter for verified influencers",
+				// },
+				// "hasContact": map[string]interface{}{
+				// 	"type":        "boolean",
+				// 	"description": "Filter for influencers with contact information",
+				// },
 				"genders": map[string]interface{}{
 					"type":        "array",
 					"description": "Array of allowed genders",
 					"items": map[string]interface{}{
-						"type":      "string",
-						"minLength": 1,
+						"type": "string",
+						"enum": deduce.Genders,
 					},
 				},
 				"selectedNiches": map[string]interface{}{
 					"type":        "array",
 					"description": "Array of selected niches",
 					"items": map[string]interface{}{
-						"type":      "string",
-						"minLength": 1,
+						"type": "string",
+						"enum": deduce.AllowedNiches,
 					},
 				},
 				"selectedLocations": map[string]interface{}{
 					"type":        "array",
 					"description": "Array of selected locations",
 					"items": map[string]interface{}{
-						"type":      "string",
-						"minLength": 1,
+						"type": "string",
 					},
 				},
 			},
