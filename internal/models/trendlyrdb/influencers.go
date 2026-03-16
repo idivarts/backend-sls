@@ -16,9 +16,11 @@ const (
 )
 
 var excludedInfluencerEmails = []string{
-	"MvLmVKwUcXXZXfBfQHSnq5udnaO2",
-	"mmUwj1YlPUVn0h2hlN4qVw1bEZo1",
-	"jEZf51INayY4ZcJs2ck0XWR8Ptj2",
+	"debanganamukherjee5@gmail.com",
+	"debangana.here@gmail.com",
+	"rsinha2805@gmail.com",
+	"rahul.sinha1908@gmail.com",
+	"sheandher.product@gmail.com",
 }
 
 func normalizeEmails(emails []string) []string {
