@@ -21,6 +21,9 @@ var excludedInfluencerEmails = []string{
 	"rsinha2805@gmail.com",
 	"rahul.sinha1908@gmail.com",
 	"sheandher.product@gmail.com",
+	"jp4606@srmist.edu.in",
+	"jppurswani2004@gmail.com",
+	"kickbackcartelofficial@gmail.com",
 }
 
 func normalizeEmails(emails []string) []string {
