@@ -289,7 +289,7 @@ func CreateChannel(managerId string, req ICreateChannel) (*ChannelReturn, error)
 		CollaborationID: req.CollaborationID,
 		StreamChannelID: res.Channel.ID,
 		BrandID:         collabMap["brandId"].(string),
-		Status:          0,
+		Status:          trendlymodels.ContractStatusPending,
 	}
 	if contractId != "" {
 		_, err = firestoredb.Client.Collection("contracts").Doc(contractId).Set(context.Background(), contract)

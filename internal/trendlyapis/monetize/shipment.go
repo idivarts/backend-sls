@@ -42,7 +42,7 @@ func MarkShipment(c *gin.Context) {
 	data.Contract.Shipment.ShipmentProvider = req.ShipmentProvider
 	data.Contract.Shipment.ExpectedDate = req.ExpectedDate
 	data.Contract.Shipment.Status = "shipped"
-	data.Contract.Status = 4 // Marking as Shipped
+	data.Contract.Status = trendlymodels.ContractStatusShipped
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
@@ -139,7 +139,7 @@ func MarkShipmentDelivered(c *gin.Context) {
 	if req.ScreenshotURL != "" {
 		data.Contract.Shipment.PackageScreenshots = append(data.Contract.Shipment.PackageScreenshots, req.ScreenshotURL)
 	}
-	data.Contract.Status = 5 // Marking as Delivered
+	data.Contract.Status = trendlymodels.ContractStatusDelivered
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
@@ -299,7 +299,7 @@ func MarkShipmentReceived(c *gin.Context) {
 	if req.PhotoURL != "" {
 		data.Contract.Shipment.PackageScreenshots = append(data.Contract.Shipment.PackageScreenshots, req.PhotoURL)
 	}
-	data.Contract.Status = 6 // Marking as Received
+	data.Contract.Status = trendlymodels.ContractStatusReceived
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {

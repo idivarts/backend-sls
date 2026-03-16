@@ -2,7 +2,9 @@ package trendlyrdb
 
 import (
 	"errors"
+	"strings"
 
+	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/rdb"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
@@ -13,8 +15,32 @@ const (
 	InfluencersTableName = "influencers"
 )
 
+var excludedInfluencerEmails = []string{
+	"debanganamukherjee5@gmail.com",
+	"debangana.here@gmail.com",
+	"rsinha2805@gmail.com",
+	"rahul.sinha1908@gmail.com",
+	"sheandher.product@gmail.com",
+	"jp4606@srmist.edu.in",
+	"jppurswani2004@gmail.com",
+	"kickbackcartelofficial@gmail.com",
+}
+
+func normalizeEmails(emails []string) []string {
+	normalized := make([]string, 0, len(emails))
+	for _, email := range emails {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email == "" {
+			continue
+		}
+		normalized = append(normalized, email)
+	}
+	return normalized
+}
+
 type Influencers struct {
-	ID string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
+	ID    string `gorm:"primaryKey;type:varchar(36)" db:"id" json:"id"`
+	Email string `gorm:"type:varchar(255)" db:"email" json:"email"`
 
 	Location string `gorm:"type:varchar(255)" db:"location" json:"location"`
 
@@ -23,6 +49,7 @@ type Influencers struct {
 	PreferredBrandIndustries pq.StringArray `gorm:"type:text[]" db:"preferred_brand_industries" json:"preferred_brand_industries"`
 	PostType                 pq.StringArray `gorm:"type:text[]" db:"post_type" json:"post_type"`
 	CollaborationType        pq.StringArray `gorm:"type:text[]" db:"collaboration_type" json:"collaboration_type"`
+	TotalMediaCount          int            `gorm:"default:0" db:"total_media_count" json:"total_media_count"`
 
 	FollowerCount        int `gorm:"default:0" db:"follower_count" json:"follower_count"`
 	ReachCount           int `gorm:"default:0" db:"reach_count" json:"reach_count"`
@@ -91,6 +118,70 @@ func (_ Influencers) GetPaginated(offset, limit int) ([]Influencers, error) {
 		Find(&results).Error
 
 	return results, err
+}
+
+// GetExploreInfluencerIDs fetches influencer IDs for brand explore flow.
+func (_ Influencers) GetExploreInfluencerIDs(locations, categories, languages []string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	db := rdb.GormDB.Model(&Influencers{}).
+		Where("completion_percentage >= ?", 60).
+		Where("total_media_count > 0")
+	if !myutil.IsDevEnvironment() {
+		db = db.Where("(email IS NULL OR (LOWER(email) NOT IN ? AND LOWER(email) NOT LIKE ?))", normalizeEmails(excludedInfluencerEmails), "%@idiv.in")
+	}
+
+	if len(locations) > 0 {
+		db = db.Where("location IN ?", locations)
+	}
+	if len(categories) > 0 {
+		db = db.Where("categories && ?", pq.StringArray(categories))
+	}
+	if len(languages) > 0 {
+		db = db.Where("languages && ?", pq.StringArray(languages))
+	}
+
+	ids := []string{}
+	err := db.
+		Order("CASE WHEN reach_count > 20000 AND follower_count > 5000 THEN 1 ELSE 0 END DESC").
+		Order("last_use_time DESC").
+		Limit(limit).
+		Pluck("id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// GetInfluencerForInfluencerIDs fetches influencer IDs for i2i flow.
+func (_ Influencers) GetInfluencerForInfluencerIDs(location string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	db := rdb.GormDB.Model(&Influencers{}).
+		Where("completion_percentage >= ?", 60).
+		Where("total_media_count > 0")
+	if !myutil.IsDevEnvironment() {
+		db = db.Where("(email IS NULL OR (LOWER(email) NOT IN ? AND LOWER(email) NOT LIKE ?))", normalizeEmails(excludedInfluencerEmails), "%@idiv.in")
+	}
+
+	ids := []string{}
+	err := db.
+		Order(clause.Expr{
+			SQL:  "CASE WHEN LOWER(location) = LOWER(?) THEN 100 WHEN random() > 0.95 THEN 100 ELSE 99 END DESC",
+			Vars: []interface{}{location},
+		}).
+		Order("CASE WHEN reach_count > 20000 AND follower_count > 5000 THEN 1 ELSE 0 END DESC").
+		Order("last_use_time DESC").
+		Limit(limit).
+		Pluck("id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 // Update updates specific fields of an influencer

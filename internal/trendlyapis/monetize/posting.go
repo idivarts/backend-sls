@@ -130,7 +130,7 @@ func MarkPosted(c *gin.Context) {
 	data.Contract.Posting.PostURL = req.PostURL
 	data.Contract.Posting.Notes = req.Notes
 	data.Contract.Posting.Status = "posted"
-	data.Contract.Status = 9 // Posted Status
+	data.Contract.Status = trendlymodels.ContractStatusPostDone
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
