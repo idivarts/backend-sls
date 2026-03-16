@@ -60,25 +60,28 @@ func SyncUsers(iterative bool) error {
 			}
 			sName := ""
 			sType := "facebook"
-			followCount := 0
+			followerCount := 0
 			reach := 0
 			interaction := 0
 			if social.IsInstagram {
 				sType = "instagram"
 				sName = social.InstaProfile.Username
-				followCount = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Followers)
+				followerCount = social.InstaProfile.FollowersCount
+				if followerCount == 0 {
+					followerCount = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Followers)
+				}
 				reach = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Views)
 				interaction = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Interactions)
 			} else {
 				sName = social.FBProfile.Name
-				followCount = social.FBProfile.FollowersCount
+				followerCount = social.FBProfile.FollowersCount
 			}
 			data = append(data, trendlyrdb.Influencers{
 				ID:               doc.Ref.ID,
 				Email:            myutil.DerefString(user.Email),
 				Location:         myutil.DerefString(user.Location),
 				TotalMediaCount:  len(user.Profile.Attachments),
-				FollowerCount:    followCount,
+				FollowerCount:    followerCount,
 				ReachCount:       reach,
 				InteractionCount: interaction,
 				PrimarySocial:    sName,

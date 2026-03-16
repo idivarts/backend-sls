@@ -174,7 +174,7 @@ func (_ Influencers) GetInfluencerForInfluencerIDs(location string, limit int) (
 			SQL:  "CASE WHEN LOWER(location) = LOWER(?) THEN 100 WHEN random() > 0.95 THEN 100 ELSE 99 END DESC",
 			Vars: []interface{}{location},
 		}).
-		Order("CASE WHEN reach_count > 20000 AND follower_count > 5000 THEN 1 ELSE 0 END DESC").
+		Order("CASE WHEN (reach_count > 20000 OR reach_count = 0) AND follower_count > 5000 THEN 1 ELSE 0 END DESC").
 		Order("last_use_time DESC").
 		Limit(limit).
 		Pluck("id", &ids).Error
