@@ -196,14 +196,26 @@ func PostCollaboration(c *gin.Context) {
 
 func CreateCollaborationWithPrompt(c *gin.Context) {
 	var body struct {
-		Prompt string `json:"prompt"`
+		Prompt  string `json:"prompt" binding:"required"`
+		BrandID string `json:"brandId"`
 	}
 	if err := c.BindJSON(&body); err != nil || body.Prompt == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "missing prompt"})
 		return
 	}
 
-	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt)
+	brandDetails := ""
+	if body.BrandID != "" {
+		brand := &trendlymodels.Brand{}
+		err := brand.Get(body.BrandID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
+			return
+		}
+		brandDetails = toString(*brand)
+	}
+
+	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error generating collaboration"})
 		return
