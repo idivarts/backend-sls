@@ -205,6 +205,7 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 	}
 
 	brandDetails := ""
+	hasWebsite := false
 	if body.BrandID != "" {
 		brand := &trendlymodels.Brand{}
 		err := brand.Get(body.BrandID)
@@ -213,9 +214,10 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 			return
 		}
 		brandDetails = toString(*brand)
+		hasWebsite = brand.Profile != nil && brand.Profile.Website != nil && *brand.Profile.Website != ""
 	}
 
-	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails)
+	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails, hasWebsite)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error generating collaboration"})
 		return
