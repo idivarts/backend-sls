@@ -1,0 +1,811 @@
+s://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for risee_andshine_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for skincare_techie, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for style_with_joo, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for heart.aashie, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for queen_off_his_kothari, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for shinee_girl_diaries21, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for saumyauniyal_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for barshapatra_17, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for skinsecrets04, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for ugcwithsim_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for ugc_with_dania, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for dhritigour_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for thefoodiedamsel, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for glow_up_with_mahnoor, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for thakkarjigar111, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for meetalixingh, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for organic_skincare_by_sanna, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for divijain1122, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for negitripti29, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for justbeingjasleen, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for im_hxny, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for hercreation_06, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for jashmeet.soni08, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for abeer_shrivastav9, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for luminous_.eternal, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for skinupthetic, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for harshitaasethi, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for _glowwithanjali_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for beautybeyond_07, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for jssxtoo, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for ugcwithchinnuu, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for ssupreemlifestylecreator, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for theaprilglam, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for vijayata_hiranandani_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for skincare_with_shawliee_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for smilesunboxed_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for shruti.vaity, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for makeupbyamijethwa, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for rediscover_with_shreya, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for blushyourskin, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for _ugc_by.saara, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:23 Enrichment failed for the_beauty_secretss, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for anjorikumar, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for shivangiadityasoni__, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for ugc_with_vaishali, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for nbansika, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for blush_auraaa, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for roshkarmal, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for soul_story108, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for ugc_aisha06, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for confessions_of_a_flashy_life, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for mistusinghaa, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for pragati_singh_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for bongbarsha, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for ashok_kumar3250, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for fashion_with_nilu, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for getgorgeouswithaarti, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for _shrutinanda_, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for milirath, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:24 Enrichment failed for purtysamaddarofficial, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Enrichment failed for poojachen, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Enrichment failed for aesthetics3195, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Enrichment failed for deeksha__ugc, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Enrichment failed for ugc_theglowedit, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Enrichment failed for piyabiswas._, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Enrichment failed for meenal.sundriyal24, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Error enriching influencer: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+2026/02/16 15:50:25 Enrichment failed for ankiitadwd__, continuing without AI fields: failed to generate content: POST "https://api.openai.com/v1/chat/completions": 429 Too Many Requests {
+        "message": "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "insufficient_quota"
+    }
+^Csignal: interruptss

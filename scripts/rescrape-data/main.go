@@ -1,20 +1,21 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
-	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
-	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
+	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 )
 
 func main() {
-	const pageSize = 500
-	offset := 0
+	const pageSize = 100
+	offset := 11000
+	// Moved pointer to 10100 because of the error in the previous run
 
 	for {
 		socials, err := trendlyrdb.Socials{}.GetPaginated(offset, pageSize)
+		scrapeList := []sui.ScrapedSocial{}
 		if err != nil {
 			log.Fatalf("Failed to get socials: %v", err)
 		}
@@ -28,10 +29,10 @@ func main() {
 			log.Println("Social", social.Username)
 			highValueInfluencer := false
 			useDatabase := true
-			if social.QualityScore > 8 {
-				highValueInfluencer = true
-				useDatabase = false
-			}
+			// if social.QualityScore > 9 {
+			// 	highValueInfluencer = true
+			// 	useDatabase = false
+			// }
 			scrape := sui.ScrapedSocial{
 				Username:            social.Username,
 				SocialType:          social.SocialType,
@@ -45,14 +46,20 @@ func main() {
 					QualityScore: social.QualityScore,
 				},
 			}
-			jsonData, err := json.Marshal(scrape)
-			if err != nil {
-				log.Fatalf("Failed to marshal scrape: %v", err)
-			}
-			sqshandler.SendToMessageQueue(string(jsonData), 0)
+			scrapeList = append(scrapeList, scrape)
 		}
-
+		log.Println("Sending to evaluate Socials: %d, (%d, %d)", len(scrapeList), offset, (offset + pageSize))
+		err = sui.EvaluateInstagrams(scrapeList)
+		if err != nil {
+			log.Println("Failed to evaluate socials: %v", err)
+		} else {
+			log.Println("Evaluated Socials: %d, (%d, %d)", len(scrapeList), offset, (offset + pageSize))
+		}
 		offset += len(socials)
+
+		log.Println("Sleeping for 30 seconds. Currently at", offset, (offset + pageSize))
+		time.Sleep(30 * time.Second)
+		log.Println("Done Sleeping")
 	}
 
 	log.Printf("Done. Processed %d total socials.\n", offset)

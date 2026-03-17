@@ -65,7 +65,7 @@ func TranslateInstagram(ig apify.InstagramInfluencer, req ScrapedSocial) (*trend
 	posts = deduped
 
 	// --- Compute analytics from posts (mirrors old calculateFunctionLater logic) ---
-	computeAnalytics(social, posts)
+	ComputeAnalytics(social, posts)
 
 	return social, posts
 }
@@ -186,10 +186,10 @@ func translateComments(comments []apify.InstagramComment) []trendlyrdb.Comment {
 // Analytics helpers
 // ---------------------------------------------------------------------------
 
-// computeAnalytics populates the aggregate/calculated fields on the social
+// ComputeAnalytics populates the aggregate/calculated fields on the social
 // profile by iterating over its posts. Pinned posts are excluded from
 // ViewsCount and EngagementCount totals (same rule as the legacy approach).
-func computeAnalytics(social *trendlyrdb.Socials, posts []trendlyrdb.InstagramPost) {
+func ComputeAnalytics(social *trendlyrdb.Socials, posts []trendlyrdb.InstagramPost) {
 	var (
 		viewsList    []int64
 		likesList    []int64
@@ -197,7 +197,14 @@ func computeAnalytics(social *trendlyrdb.Socials, posts []trendlyrdb.InstagramPo
 		eRates       []float32
 	)
 
+	oneMonthAgo := time.Now().AddDate(0, -1, 0)
+
 	for _, p := range posts {
+		// Skip posts older than one month from analytics.
+		if ts, err := time.Parse(time.RFC3339, p.Timestamp); err == nil && ts.Before(oneMonthAgo) && p.Timestamp != "" {
+			continue
+		}
+
 		views := p.VideoViewCount
 		likes := p.LikesCount
 		comments := p.CommentsCount
@@ -212,8 +219,8 @@ func computeAnalytics(social *trendlyrdb.Socials, posts []trendlyrdb.InstagramPo
 			commentsList = append(commentsList, comments)
 		}
 
-		// Totals exclude pinned posts.
-		if !p.IsPinned {
+		// No need to exclude pinned posts here, as we are only getting videos less than one month old.
+		if p.Timestamp != "" || !p.IsPinned {
 			social.ViewsCount += views
 			social.EngagementCount += likes + comments
 		}

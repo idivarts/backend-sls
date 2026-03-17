@@ -157,10 +157,11 @@ type InstagramRelatedProfiles struct {
 }
 
 type InstagramScraperInput struct {
-	DirectUrls    []string `json:"directUrls"`
-	ResultsType   string   `json:"resultsType"`
-	ResultsLimit  int      `json:"resultsLimit"`
-	AddParentData bool     `json:"addParentData"`
-	SearchType    string   `json:"searchType,omitempty"`
-	SearchLimit   int      `json:"searchLimit,omitempty"`
+	DirectUrls         []string `json:"directUrls"`
+	ResultsType        string   `json:"resultsType"`
+	ResultsLimit       int      `json:"resultsLimit"`
+	AddParentData      bool     `json:"addParentData"`
+	SearchType         string   `json:"searchType,omitempty"`
+	SearchLimit        int      `json:"searchLimit,omitempty"`
+	OnlyPostsNewerThan string   `json:"onlyPostsNewerThan,omitempty"`
 }

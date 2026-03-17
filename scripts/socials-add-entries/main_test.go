@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/idivarts/backend-sls/scripts/socials-add-entries/sui"
+	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 )
 
 // TestEvaluateInstagram calls evaluateInstagram directly with a ScrapedSocial,
@@ -24,7 +24,7 @@ func TestEvaluateInstagram(t *testing.T) {
 	req.Manual.Niches = []string{"Fashion / Beauty", "Lifestyle Vlogs"}
 	req.Manual.QualityScore = 8
 
-	err := EvaluateInstagram(req)
+	err := sui.EvaluateInstagram(req)
 	if err != nil {
 		t.Fatalf("evaluateInstagram failed: %v", err)
 	}

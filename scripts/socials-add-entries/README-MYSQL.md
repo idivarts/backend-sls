@@ -4,16 +4,14 @@ CRON to see if any data needs to be rescrapped and send to SQS
 
 Receive SQS for processing the image downloading
     -> Calling api to scrape data
-        (0.0027 per call or 0.0837 per detail call)
-        (0.25 per call or 7 per detail call)
+        IN USD : (0.0027 per call or 0.0837 per detail call + Small cost for Chatgpt)
+        IN INR : (0.25 per call or 5 per detail call + 0.35 for Chatgpt)
+	Generally Speaking - Rs. 0.5 per influencer
+					    AND Rs.5.5 per good influencer
     -> Download all the images
     -> Send Raw for estimations (with Bias input which were sent manually)
     -> Translate the data in Socials Data
     -> Save translated data in mysql instantly
-
-
-
-
 
 // -----------------
 

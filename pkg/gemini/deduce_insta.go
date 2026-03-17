@@ -9,10 +9,11 @@ import (
 )
 
 type EnrichmentResult struct {
-	Gender   string   `json:"gender"`
-	Location string   `json:"location"`
-	Niches   []string `json:"niches"`
-	Quality  int      `json:"quality"`
+	Gender    string   `json:"gender"`
+	Location  string   `json:"location"`
+	Niches    []string `json:"niches"`
+	SubNiches []string `json:"subNiches"`
+	Quality   int      `json:"quality"`
 }
 
 func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
@@ -26,6 +27,11 @@ func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
 		- gender: string (Deduce from Full Name, Username, and Bio/pronouns)
 		- location: string (Deduce from Bio and Posts' location/geo-tags)
 		- niches: string array (Deduce from Bio, Post Content, and Hashtags)
+		- subNiches: string array (Optional, free-form sub-niches for finer detail beyond broad niches). Rules:
+		  * Not required — return an empty array if broad niches are sufficient.
+		  * Be very selective — only include when it adds genuinely important specificity (e.g. "Korean Skincare" under Skincare).
+		  * Maximum 5, but typically 0, 1, or 2. Prefer fewer over more.
+		  * Each sub-niche should be a concise label (2-4 words max). Do NOT repeat the parent niche.
 		- quality: integer (1-10, maps to a 5-star rating with half-star granularity)
 		  1: Poor (0.5 star)
 		  2: Below Average (1 star)
@@ -44,6 +50,7 @@ func EnrichInfluencer(influencerInfo string) (*EnrichmentResult, error) {
 			gender: string
 			location: string
 			niches: string[]
+			subNiches: string[]  // optional free-form sub-niches, max 5, typically 0-2
 			quality: int
 		}
 		"""

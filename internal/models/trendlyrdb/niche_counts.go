@@ -1,6 +1,7 @@
 package trendlyrdb
 
 import (
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/pkg/rdb"
 )
 
@@ -28,6 +29,8 @@ func (_ NicheCount) GetPaginated(offset, limit int, searchKey string) ([]NicheCo
 
 	if searchKey != "" {
 		query = query.Where("niche ILIKE ?", "%"+searchKey+"%")
+	} else {
+		query = query.Where("niche IN ?", constants.AllowedNiches)
 	}
 
 	err := query.
