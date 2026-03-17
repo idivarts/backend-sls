@@ -213,8 +213,27 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
 			return
 		}
-		brandDetails = toString(*brand)
-		hasWebsite = brand.Profile != nil && brand.Profile.Website != nil && *brand.Profile.Website != ""
+
+		// Keep only context that can improve generation quality.
+		brandContext := map[string]interface{}{
+			"name": brand.Name,
+		}
+		if brand.Profile != nil {
+			if brand.Profile.About != nil && strings.TrimSpace(*brand.Profile.About) != "" {
+				brandContext["about"] = *brand.Profile.About
+			}
+			if len(brand.Profile.Industries) > 0 {
+				brandContext["industries"] = brand.Profile.Industries
+			}
+			if brand.Profile.Website != nil && strings.TrimSpace(*brand.Profile.Website) != "" {
+				brandContext["website"] = *brand.Profile.Website
+				hasWebsite = true
+			}
+		}
+		if brand.DiscoverPreferences != nil {
+			brandContext["preferences"] = brand.DiscoverPreferences
+		}
+		brandDetails = toString(brandContext)
 	}
 
 	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails, hasWebsite)

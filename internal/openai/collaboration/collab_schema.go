@@ -74,13 +74,13 @@ func (CollaborationDraft) GetResults(prompt string, brandDetails string, hasWebs
 	}
 
 	if hasWebsiteContext {
-		maxToolCalls := int64(1)
-		params.MaxToolCalls = openai.Int(maxToolCalls)
+		// maxToolCalls := int64(1)
+		// params.MaxToolCalls = openai.Int(maxToolCalls)
 		params.Tools = []responses.ToolUnionParam{
 			{
 				OfWebSearch: &responses.WebSearchToolParam{
 					Type:              responses.WebSearchToolTypeWebSearch,
-					SearchContextSize: responses.WebSearchToolSearchContextSizeLow,
+					SearchContextSize: responses.WebSearchToolSearchContextSizeMedium,
 					UserLocation: responses.WebSearchToolUserLocationParam{
 						Type:    "approximate",
 						Country: openai.String("IN"),
@@ -260,7 +260,7 @@ var collabPromptJSONSchema = map[string]interface{}{
 								"properties": map[string]interface{}{
 									"name": map[string]interface{}{
 										"type":        "string",
-										"description": "Short display name for quick link.",
+										"description": "Short display name for quick link. (less than 25 characters)",
 									},
 									"link": map[string]interface{}{
 										"type":        "string",
