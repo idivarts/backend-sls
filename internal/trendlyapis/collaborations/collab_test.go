@@ -1,7 +1,10 @@
 package trendlyCollabs_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -67,4 +70,18 @@ func TestEvaluateCollab(t *testing.T) {
 		},
 	})
 	t.Log("Evaluation Result:", b, filters)
+}
+func TestCreateCollaborationWithPrompt(t *testing.T) {
+	body := map[string]interface{}{
+		"prompt":  "I am looking for someone who can help me promote trendly. Should be able to create funny reels that highlight the features of trendly.",
+		"brandId": "NhY23uv123lfDcPWX6Xt",
+	}
+	jsonBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", "/collaborations/create", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	trendlyCollabs.CreateCollaborationWithPrompt(c)
+	t.Log("Response:", w.Body.String())
 }

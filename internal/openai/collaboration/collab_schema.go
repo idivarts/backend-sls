@@ -8,6 +8,8 @@ import (
 
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/responses"
+	"github.com/openai/openai-go/v3/shared"
 )
 
 // CollaborationPromptResponse is the structured output returned by the LLM.
@@ -44,39 +46,50 @@ type CollaborationDraft struct {
 }
 
 func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*CollaborationDraft, error) {
-	model := "gpt-4o-2024-08-06"
+	model := "gpt-5-mini"
 
 	ctx := context.Background()
-
-	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
-		Name:        "collaboration_response",
-		Description: openai.String("Generate a collaboration draft or return an error if not enough information"),
-		Schema:      collabPromptJSONSchema,
-		Strict:      openai.Bool(true),
-	}
 
 	userPrompt := prompt
 	if brandDetails != "" {
 		userPrompt = prompt + "\n\nAdditional brand details:\n```{json}" + brandDetails + "```"
 	}
 
-	chat, err := myopenai.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(collabSystemPrompt),
-			openai.UserMessage(userPrompt),
+	response, err := myopenai.Client.Responses.New(ctx, responses.ResponseNewParams{
+		Model:        shared.ResponsesModel(model),
+		Instructions: openai.String(collabSystemPrompt),
+		Input: responses.ResponseNewParamsInputUnion{
+			OfString: openai.String(userPrompt),
 		},
-		Model: openai.ChatModel(model),
-		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
-			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
-				JSONSchema: schemaParam,
-			},
-		},
-		WebSearchOptions: openai.ChatCompletionNewParamsWebSearchOptions{
-			UserLocation: openai.ChatCompletionNewParamsWebSearchOptionsUserLocation{
-				Approximate: openai.ChatCompletionNewParamsWebSearchOptionsUserLocationApproximate{
-					Country: openai.String("IN"),
+		Text: responses.ResponseTextConfigParam{
+			Format: responses.ResponseFormatTextConfigUnionParam{
+				OfJSONSchema: &responses.ResponseFormatTextJSONSchemaConfigParam{
+					Name:        "collaboration_response",
+					Description: openai.String("Generate a collaboration draft or return an error if not enough information"),
+					Schema:      collabPromptJSONSchema,
+					Strict:      openai.Bool(true),
 				},
 			},
+		},
+		Tools: []responses.ToolUnionParam{
+			{
+				OfWebSearch: &responses.WebSearchToolParam{
+					Type:              responses.WebSearchToolTypeWebSearch,
+					SearchContextSize: responses.WebSearchToolSearchContextSizeMedium,
+					UserLocation: responses.WebSearchToolUserLocationParam{
+						Type: "approximate",
+						// Bias web results for Indian market relevance.
+						Country: openai.String("IN"),
+					},
+				},
+			},
+		},
+		ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
+			OfToolChoiceMode: openai.Opt(responses.ToolChoiceOptionsAuto),
+		},
+		Include: []responses.ResponseIncludable{
+			responses.ResponseIncludableWebSearchCallActionSources,
+			responses.ResponseIncludableWebSearchCallResults,
 		},
 	})
 
@@ -85,11 +98,10 @@ func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*Colla
 		return nil, err
 	}
 
-	if len(chat.Choices) == 0 {
-		return nil, errors.New("no response from model")
+	rawJSON := response.OutputText()
+	if rawJSON == "" {
+		return nil, errors.New("empty response from model")
 	}
-
-	rawJSON := chat.Choices[0].Message.Content
 
 	var result *CollaborationPromptResponse
 	if err := json.Unmarshal([]byte(rawJSON), &result); err != nil {
@@ -97,7 +109,14 @@ func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*Colla
 		return nil, err
 	}
 
+	if result == nil {
+		return nil, errors.New("empty structured response from model")
+	}
+
 	if result.Error {
+		if result.ErrorMessage == nil {
+			return nil, errors.New("collaboration generation failed")
+		}
 		return nil, errors.New(*result.ErrorMessage)
 	}
 
