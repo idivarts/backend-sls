@@ -52,7 +52,7 @@ func (CollaborationDraft) GetResults(prompt string, brandDetails string, hasWebs
 
 	userPrompt := prompt
 	if brandDetails != "" {
-		userPrompt = prompt + "\n\nAdditional brand details:\n```{json}" + brandDetails + "```"
+		userPrompt = prompt + "\n\nAdditional brand details:\n```" + brandDetails + "```"
 	}
 
 	params := responses.ResponseNewParams{
