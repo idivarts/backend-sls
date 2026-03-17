@@ -38,7 +38,7 @@ type CollaborationDraft struct {
 	QuestionsToInfluencers    []string `json:"questionsToInfluencers"`
 }
 
-func (CollaborationDraft) GetResults(prompt string) (*CollaborationDraft, error) {
+func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*CollaborationDraft, error) {
 	model := "gpt-4o-2024-08-06"
 
 	ctx := context.Background()
@@ -50,10 +50,15 @@ func (CollaborationDraft) GetResults(prompt string) (*CollaborationDraft, error)
 		Strict:      openai.Bool(true),
 	}
 
+	userPrompt := prompt
+	if brandDetails != "" {
+		userPrompt = prompt + "\n\nAdditional brand details:\n```{json}" + brandDetails + "```"
+	}
+
 	chat, err := myopenai.Client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(collabSystemPrompt),
-			openai.UserMessage(prompt),
+			openai.UserMessage(userPrompt),
 		},
 		Model: openai.ChatModel(model),
 		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
@@ -104,7 +109,8 @@ Rules:
    - "platform": Target social media platforms, e.g. ["instagram", "youtube", "tiktok"].
    - "numberOfInfluencersNeeded": Use explicit number if given, otherwise pick a reasonable default (e.g. 5).
    - "questionsToInfluencers": Generate 2-3 relevant screening questions for applicants based on the collaboration context.
-3. When the user's prompt is vague on certain fields, make smart defaults rather than leaving them empty. The goal is to give the user a usable draft.`
+3. When the user's prompt is vague on certain fields, make smart defaults rather than leaving them empty. The goal is to give the user a usable draft.
+4. If "Additional brand details" are provided in the user message, treat them as high-confidence context and use them to refine campaign name, description, targeting, and screening questions.`
 
 // collabPromptJSONSchema is the OpenAI JSON Schema for structured outputs.
 // It is strict-mode compatible (all properties required, additionalProperties false,
