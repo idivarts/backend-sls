@@ -36,6 +36,11 @@ type CollaborationDraft struct {
 	Platform                  []string `json:"platform"`
 	NumberOfInfluencersNeeded int      `json:"numberOfInfluencersNeeded"`
 	QuestionsToInfluencers    []string `json:"questionsToInfluencers"`
+	RelevantImages            []string `json:"relevantImages"`
+	ExternalLinks             []struct {
+		Name string `json:"name"`
+		Link string `json:"link"`
+	} `json:"externalLinks"`
 }
 
 func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*CollaborationDraft, error) {
@@ -64,6 +69,13 @@ func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*Colla
 		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
 				JSONSchema: schemaParam,
+			},
+		},
+		WebSearchOptions: openai.ChatCompletionNewParamsWebSearchOptions{
+			UserLocation: openai.ChatCompletionNewParamsWebSearchOptionsUserLocation{
+				Approximate: openai.ChatCompletionNewParamsWebSearchOptionsUserLocationApproximate{
+					Country: openai.String("IN"),
+				},
 			},
 		},
 	})
@@ -109,8 +121,13 @@ Rules:
    - "platform": Target social media platforms, e.g. ["instagram", "youtube", "tiktok"].
    - "numberOfInfluencersNeeded": Use explicit number if given, otherwise pick a reasonable default (e.g. 5).
    - "questionsToInfluencers": Generate 2-3 relevant screening questions for applicants based on the collaboration context.
+   - "relevantImages": Array of image URLs relevant to the campaign/brand. Max 6 items.
+   - "externalLinks": Array of quick links for the listing. Max 2 items. Each item must be {"name": "...", "link": "..."}.
 3. When the user's prompt is vague on certain fields, make smart defaults rather than leaving them empty. The goal is to give the user a usable draft.
-4. If "Additional brand details" are provided in the user message, treat them as high-confidence context and use them to refine campaign name, description, targeting, and screening questions.`
+4. If "Additional brand details" are provided in the user message, treat them as high-confidence context and use them to refine campaign name, description, targeting, and screening questions.
+5. If brand details contain a website URL, use web search/browsing context to identify up to 6 relevant image URLs from that website for "relevantImages". If no website is available, return [].
+6. "externalLinks" should include up to 2 useful links users can open quickly (for example official website, key product/category page, social page). If no reliable links are available, return [].
+7. Never invent broken-looking URLs. Prefer canonical public URLs and keep output JSON schema-compliant.`
 
 // collabPromptJSONSchema is the OpenAI JSON Schema for structured outputs.
 // It is strict-mode compatible (all properties required, additionalProperties false,
@@ -135,7 +152,7 @@ var collabPromptJSONSchema = map[string]interface{}{
 			"anyOf": []interface{}{
 				map[string]interface{}{
 					"type":                 "object",
-					"required":             []string{"name", "description", "promotionType", "budget", "preferredContentLanguage", "contentFormat", "platform", "numberOfInfluencersNeeded", "questionsToInfluencers"},
+					"required":             []string{"name", "description", "promotionType", "budget", "preferredContentLanguage", "contentFormat", "platform", "numberOfInfluencersNeeded", "questionsToInfluencers", "relevantImages", "externalLinks"},
 					"additionalProperties": false,
 					"properties": map[string]interface{}{
 						"name": map[string]interface{}{
@@ -201,6 +218,32 @@ var collabPromptJSONSchema = map[string]interface{}{
 							"type":        "array",
 							"items":       map[string]interface{}{"type": "string"},
 							"description": "Screening questions to ask influencers when they apply. Generate 2-3 relevant questions.",
+						},
+						"relevantImages": map[string]interface{}{
+							"type":        "array",
+							"maxItems":    6,
+							"items":       map[string]interface{}{"type": "string"},
+							"description": "Relevant image URLs for the campaign. Return [] if not available.",
+						},
+						"externalLinks": map[string]interface{}{
+							"type":        "array",
+							"maxItems":    2,
+							"description": "Quick links relevant to the campaign/brand. Return [] if not available.",
+							"items": map[string]interface{}{
+								"type":                 "object",
+								"required":             []string{"name", "link"},
+								"additionalProperties": false,
+								"properties": map[string]interface{}{
+									"name": map[string]interface{}{
+										"type":        "string",
+										"description": "Short display name for quick link.",
+									},
+									"link": map[string]interface{}{
+										"type":        "string",
+										"description": "Public URL for the quick link.",
+									},
+								},
+							},
 						},
 					},
 				},
