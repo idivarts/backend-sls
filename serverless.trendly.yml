@@ -214,7 +214,7 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
-    timeout: 120
+    timeout: 30
     events:
       - http: ANY /api/collabs/{proxy+}
   trendly_matchmaking_apis:
