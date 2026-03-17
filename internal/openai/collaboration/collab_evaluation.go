@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/internal/openai/deduce"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/openai/openai-go/v3"
 )
@@ -265,7 +265,7 @@ var collabEvaluationJSONSchema = map[string]interface{}{
 					"description": "Array of allowed genders",
 					"items": map[string]interface{}{
 						"type": "string",
-						"enum": deduce.Genders,
+						"enum": constants.Genders,
 					},
 				},
 				"selectedNiches": map[string]interface{}{
@@ -273,7 +273,7 @@ var collabEvaluationJSONSchema = map[string]interface{}{
 					"description": "Array of selected niches",
 					"items": map[string]interface{}{
 						"type": "string",
-						"enum": deduce.AllowedNiches,
+						"enum": constants.AllowedNiches,
 					},
 				},
 				"selectedLocations": map[string]interface{}{
