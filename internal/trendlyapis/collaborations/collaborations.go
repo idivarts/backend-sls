@@ -78,19 +78,43 @@ func toString(v interface{}) string {
 	}
 }
 
+func formatBrandDetails(brand *trendlymodels.Brand) string {
+	if brand == nil {
+		return ""
+	}
+
+	// Keep only context that can improve generation quality.
+	brandContext := map[string]interface{}{
+		"name": brand.Name,
+	}
+	if brand.Profile != nil {
+		if brand.Profile.About != nil && strings.TrimSpace(*brand.Profile.About) != "" {
+			brandContext["about"] = *brand.Profile.About
+		}
+		if len(brand.Profile.Industries) > 0 {
+			brandContext["industries"] = brand.Profile.Industries
+		}
+		if brand.Profile.Website != nil && strings.TrimSpace(*brand.Profile.Website) != "" {
+			brandContext["website"] = *brand.Profile.Website
+		}
+	}
+	if brand.DiscoverPreferences != nil {
+		brandContext["preferences"] = brand.DiscoverPreferences
+	}
+	return toString(brandContext)
+}
+
 func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, *trendlymodels.DiscoverPreferences) {
 	return evaluateCollab(collab, nil)
 }
+
 func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Brand) (bool, *trendlymodels.DiscoverPreferences) {
 	budget := "Barter"
 	if collab.Budget != nil && collab.Budget.Max != nil && *collab.Budget.Max != 0 {
 		budget = toString(collab.Budget)
 	}
 
-	brandDetails := "Trendly"
-	if brand != nil {
-		brandDetails = toString(*brand)
-	}
+	brandDetails := formatBrandDetails(brand)
 
 	valid, filters, err := ai_collaboration.EvaluateCollaboration(ai_collaboration.CollabEvaluationInput{
 		CollaborationName:        toString(collab.Name),
@@ -205,6 +229,7 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 	}
 
 	brandDetails := ""
+	hasWebsite := false
 	if body.BrandID != "" {
 		brand := &trendlymodels.Brand{}
 		err := brand.Get(body.BrandID)
@@ -212,10 +237,11 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
 			return
 		}
-		brandDetails = toString(*brand)
+		hasWebsite = brand.Profile != nil && brand.Profile.Website != nil && *brand.Profile.Website != ""
+		brandDetails = formatBrandDetails(brand)
 	}
 
-	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails)
+	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails, hasWebsite)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error generating collaboration"})
 		return

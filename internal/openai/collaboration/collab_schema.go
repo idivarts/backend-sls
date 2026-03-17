@@ -45,17 +45,17 @@ type CollaborationDraft struct {
 	} `json:"externalLinks"`
 }
 
-func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*CollaborationDraft, error) {
+func (CollaborationDraft) GetResults(prompt string, brandDetails string, hasWebsiteContext bool) (*CollaborationDraft, error) {
 	model := "gpt-5-mini"
 
 	ctx := context.Background()
 
 	userPrompt := prompt
 	if brandDetails != "" {
-		userPrompt = prompt + "\n\nAdditional brand details:\n```{json}" + brandDetails + "```"
+		userPrompt = prompt + "\n\nAdditional brand details:\n```" + brandDetails + "```"
 	}
 
-	response, err := myopenai.Client.Responses.New(ctx, responses.ResponseNewParams{
+	params := responses.ResponseNewParams{
 		Model:        shared.ResponsesModel(model),
 		Instructions: openai.String(collabSystemPrompt),
 		Input: responses.ResponseNewParamsInputUnion{
@@ -71,28 +71,33 @@ func (CollaborationDraft) GetResults(prompt string, brandDetails string) (*Colla
 				},
 			},
 		},
-		Tools: []responses.ToolUnionParam{
+	}
+
+	if hasWebsiteContext {
+		// maxToolCalls := int64(1)
+		// params.MaxToolCalls = openai.Int(maxToolCalls)
+		params.Tools = []responses.ToolUnionParam{
 			{
 				OfWebSearch: &responses.WebSearchToolParam{
 					Type:              responses.WebSearchToolTypeWebSearch,
 					SearchContextSize: responses.WebSearchToolSearchContextSizeMedium,
 					UserLocation: responses.WebSearchToolUserLocationParam{
-						Type: "approximate",
-						// Bias web results for Indian market relevance.
+						Type:    "approximate",
 						Country: openai.String("IN"),
 					},
 				},
 			},
-		},
-		ToolChoice: responses.ResponseNewParamsToolChoiceUnion{
+		}
+		params.ToolChoice = responses.ResponseNewParamsToolChoiceUnion{
 			OfToolChoiceMode: openai.Opt(responses.ToolChoiceOptionsAuto),
-		},
-		Include: []responses.ResponseIncludable{
+		}
+		params.Include = []responses.ResponseIncludable{
 			responses.ResponseIncludableWebSearchCallActionSources,
 			responses.ResponseIncludableWebSearchCallResults,
-		},
-	})
+		}
+	}
 
+	response, err := myopenai.Client.Responses.New(ctx, params)
 	if err != nil {
 		log.Println("Error generating collaboration from prompt:", err.Error())
 		return nil, err
@@ -255,7 +260,7 @@ var collabPromptJSONSchema = map[string]interface{}{
 								"properties": map[string]interface{}{
 									"name": map[string]interface{}{
 										"type":        "string",
-										"description": "Short display name for quick link.",
+										"description": "Short display name for quick link. (less than 25 characters)",
 									},
 									"link": map[string]interface{}{
 										"type":        "string",
