@@ -15,7 +15,7 @@ func main() {
 	apihandler.StartLambda()
 }
 func handleManagerAPIs(handler *gin.RouterGroup) {
-	managerApisV1 := handler.Use(middlewares.TrendlyMiddleware("managers"))
+	managerApisV1 := handler.Group("/", middlewares.TrendlyMiddleware("managers"))
 
 	managerApisV1.POST("/influencers/:influencerId/unlock", trendlyCollabs.InfluencerUnlocked)
 	managerApisV1.POST("/influencers/:influencerId/message", trendlyCollabs.SendMessage)
@@ -31,7 +31,7 @@ func handleManagerAPIs(handler *gin.RouterGroup) {
 }
 
 func handleUserAPIs(handler *gin.RouterGroup) {
-	userApisV1 := handler.Use(middlewares.TrendlyMiddleware("users"))
+	userApisV1 := handler.Group("/", middlewares.TrendlyMiddleware("users"))
 
 	userApisV1.POST("/contracts/:contractId", trendlyCollabs.RequestToStartContract)
 
