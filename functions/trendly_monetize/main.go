@@ -18,7 +18,7 @@ func main() {
 }
 
 func brandAPIs(handler *gin.RouterGroup) {
-	brands := handler.Group("/brands", middlewares.TrendlyMiddleware("brands"))
+	brands := handler.Group("/brands", middlewares.TrendlyMiddleware("managers"))
 
 	// [BRAND] API to create payment order - for pre-payment of contract
 	brands.POST("/contracts/:contractId/order", monetize.CreateOrder)

@@ -40,7 +40,7 @@ func TrendlyMiddleware(model string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId, b := GetUserId(c)
 		if !b {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 			return
 		}
 
@@ -49,7 +49,7 @@ func TrendlyMiddleware(model string) gin.HandlerFunc {
 			if err != nil {
 				manager, err := firestoredb.Client.Collection("managers").Doc(userId).Get(context.Background())
 				if err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "User not found in User nor Manager Databse"})
+					c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "User not found in User nor Manager Databse"})
 					return
 				}
 				c.Set("userType", "manager")
@@ -61,7 +61,7 @@ func TrendlyMiddleware(model string) gin.HandlerFunc {
 		} else {
 			user, err := firestoredb.Client.Collection(model).Doc(userId).Get(context.Background())
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "User not found in User nor Manager Databse"})
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "User not found in User nor Manager Databse"})
 				return
 			}
 			if model == "managers" {
@@ -82,8 +82,7 @@ func TrendlyExtension() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetHeader("X-USER-ID")
 		if userID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "X-USER-ID header is missing"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "X-USER-ID header is missing"})
 			return
 		}
 		c.Set("firebaseUID", userID)
