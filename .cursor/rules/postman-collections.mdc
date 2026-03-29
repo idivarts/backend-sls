@@ -1,3 +1,9 @@
+---
+description: Generate Postman Collection v2.1 JSON from backend-sls routes and handlers.
+globs: "**/*.go"
+alwaysApply: false
+---
+
 # Postman Collection Generation Context
 
 This document provides context for generating Postman Collection v2.1 JSON files from the `backend-sls` codebase. Use this as a reference whenever the user asks to create a Postman collection for any set of APIs.

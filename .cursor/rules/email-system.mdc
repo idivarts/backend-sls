@@ -1,9 +1,14 @@
+---
+description: Trendly email templates, subjects, and SendGrid sending patterns in backend-sls.
+alwaysApply: true
+---
+
 # Trendly Email System Context
 
 This document provides context for creating, managing, and sending emails within the `backend-sls` project. Use this as a reference whenever email-related tasks are requested.
 
 ## Directory Structure
-- **Templates**: `/Users/rsinha/iDiv/backend-sls/templates/` (HTML files)
+- **Templates**: `templates/` (HTML files)
 - **Template Paths**: `templates/init.go` (Constants for finding templates)
 - **Email Subjects**: `templates/subject.go` (Constants for subject lines)
 - **Sending Logic**: `pkg/myemail/` (SendGrid integration and helper functions)

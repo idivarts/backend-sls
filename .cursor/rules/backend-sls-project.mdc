@@ -1,4 +1,9 @@
-# Antigravity Project Context for `backend-sls`
+---
+description: backend-sls monorepo overview, stack, directories, models, and Go conventions.
+alwaysApply: true
+---
+
+# Project Context for `backend-sls`
 
 ## Project Overview
 This repository (`backend-sls`) is a monorepo-style serverless backend utilizing Go (v1.23) and AWS Lambda. It powers two distinct applications:
@@ -7,7 +12,7 @@ This repository (`backend-sls`) is a monorepo-style serverless backend utilizing
 
 ## Technology Stack
 - **Languages**: Go 1.23 (primary), Node.js (minor, for specific handlers), Shell scripts.
-- **Frameworks**: 
+- **Frameworks**:
   - **Serverless Framework (v3)**: Infrastructure as Code (`serverless.trendly.yml`, `serverless.cc.yml`).
   - **Gin**: Go HTTP web framework (used within Lambda handlers via `aws-lambda-go-api-proxy` or similar patterns).
 - **Cloud Provider**: AWS (Lambda, S3, SQS, Step Functions, CloudFront).
