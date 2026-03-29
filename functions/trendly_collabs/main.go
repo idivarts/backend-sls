@@ -10,10 +10,7 @@ func main() {
 	handleUserAPIs()
 	handleManagerAPIs()
 
-	commonV1 := apihandler.GinEngine.Group("/api/collabs", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("common"))
-
-	commonV1.POST("/contracts/:contractId", trendlyCollabs.StartContract)   // if called by influencer - ask, else start the contract
-	commonV1.POST("/contracts/:contractId/end", trendlyCollabs.EndContract) // if called by influencer - ask, else end contract
+	// commonV1 := apihandler.GinEngine.Group("/api/collabs", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("common"))
 
 	apihandler.StartLambda()
 }
@@ -34,6 +31,9 @@ func handleManagerAPIs() {
 
 func handleUserAPIs() {
 	userApisV1 := apihandler.GinEngine.Group("/api/collabs", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("users"))
+
+	userApisV1.POST("/contracts/:contractId", trendlyCollabs.RequestToStartContract)   // if called by influencer - ask, else start the contract
+	userApisV1.POST("/contracts/:contractId/end", trendlyCollabs.RequestToEndContract) // if called by influencer - ask, else end contract
 
 	userApisV1.POST("/collaborations/:collabId/applications/:userId", trendlyCollabs.SendApplication)
 	userApisV1.PUT("/collaborations/:collabId/applications/:userId", trendlyCollabs.EditApplication)
