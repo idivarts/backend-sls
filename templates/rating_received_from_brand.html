@@ -3,7 +3,7 @@
     {{.InfluencerName}} => Name of the influencer receiving the email
     {{.BrandName}}      => Name of the brand that submitted the rating
     {{.CollabTitle}}    => Title of the collaboration
-    {{.ContractLink}}   => Link to view the contract details including rating (creators app)
+    {{.FeedbackLink}}   => Link to open the collaboration and view rating & feedback (creators app)
 -->
 
 <!DOCTYPE html>
@@ -59,9 +59,9 @@
         <p><strong>{{.BrandName}}</strong> has submitted their rating and feedback for the collaboration titled
             "<strong>{{.CollabTitle}}</strong>".</p>
 
-        <p>You can view the details, including their comments and star rating, directly in the contract.</p>
+        <p>You can open the collaboration anytime to see their full rating and comments.</p>
 
-        <a href="{{.ContractLink}}" class="button">View Contract & Feedback</a>
+        <a href="{{.FeedbackLink}}" class="button">View rating & feedback</a>
 
         <div class="footer">
             You're receiving this email because you're part of a collaboration on Trendly.<br />

@@ -99,20 +99,12 @@ func UserFeedback(c *gin.Context) {
 
 	// Send Email notification
 
-	// 	<!--
-	//   Dynamic Variables:
-	// {{.BrandMemberName}} => Name of the brand member receiving the email
-	// {{.InfluencerName}}  => Name of the influencer who submitted the rating
-	// {{.CollabTitle}}     => Title of the collaboration
-	// {{.ContractLink}}    => Link to view the contract details including rating
-	// -->
-
 	if len(emails) > 0 {
 		data := map[string]interface{}{
 			"BrandMemberName": brand.Name,
 			"InfluencerName":  user.Name,
 			"CollabTitle":     collab.Name,
-			"ContractLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
+			"FeedbackLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationRatedByInfluencer, templates.SubjectInfluencerRatedYou, data)
 		if err != nil {
@@ -217,7 +209,7 @@ func BrandFeedback(c *gin.Context) {
 			"InfluencerName": user.Name,
 			"BrandName":      brand.Name,
 			"CollabTitle":    collab.Name,
-			"ContractLink":  fmt.Sprintf("%s/contract-details/%s", constants.GetCreatorsFronted(), contractId),
+			"FeedbackLink":   fmt.Sprintf("%s/contract-details/%s", constants.GetCreatorsFronted(), contractId),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationRatedByBrand, templates.SubjectBrandRatedInfluencer, data)
 		if err != nil {
