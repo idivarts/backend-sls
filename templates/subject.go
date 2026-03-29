@@ -12,6 +12,7 @@ const (
 	SubjectContractEndedForInfluencer    = "Contract ended – rate the brand to see their rating"
 	SubjectContractEndedForBrand         = "Contract ended – thanks for rating the influencer"
 	SubjectInfluencerRatedYou            = "New rating received from influencer"
+	SubjectBrandRatedInfluencer          = "New rating received from brand"
 	SubjectBrandInvitedYouToCollab       = "You've been invited to a collaboration!"
 	SubjectWelcomeNewInfluencer          = "Welcome to Trendly, Creator!"
 	SubjectWelcomeNewBrand               = "Your brand has been created on Trendly 🎉"

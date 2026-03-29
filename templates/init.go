@@ -17,6 +17,7 @@ const (
 	CollaborationEndNudged            myemail.TemplatePath = "templates/poke_end_contract.html"
 	CollaborationStartRequested       myemail.TemplatePath = "templates/poke_start_collaboration.html"
 	CollaborationRatedByInfluencer    myemail.TemplatePath = "templates/rating_received.html"
+	CollaborationRatedByBrand         myemail.TemplatePath = "templates/rating_received_from_brand.html"
 	CollaborationQuotationRequested   myemail.TemplatePath = "templates/revise_quotation.html"
 	CollaborationStarted              myemail.TemplatePath = "templates/start_collaboration.html"
 	InfluencerJoined                  myemail.TemplatePath = "templates/welcome_influencer.html"
