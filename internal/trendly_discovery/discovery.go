@@ -16,7 +16,7 @@ import (
 // - Field JSON tags mirror the TS property names expected by the app.
 type InfluencerItem struct {
 	trendlyrdb.Socials
-	IsDiscover bool `json:"isDiscover,omitempty"`
+	IsDiscover bool `json:"isDiscover"`
 }
 
 type InfluencerInviteUnit struct {
