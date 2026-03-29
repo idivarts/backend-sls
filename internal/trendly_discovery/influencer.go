@@ -534,8 +534,20 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		return
 	}
 
-	out := []InfluencerInviteUnit{}
+	profiles := make([]trendlyrdb.Socials, 0, len(invites))
 	for _, inv := range invites {
+		if inv.SocialProfile != nil {
+			profiles = append(profiles, *inv.SocialProfile)
+		}
+	}
+	discoverFlags, err := isDiscoverFlagsForSocials(profiles)
+	if err != nil {
+		c.JSON(500, gin.H{"message": "Error resolving discover state", "error": err.Error()})
+		return
+	}
+
+	out := make([]InfluencerInviteUnit, 0, len(profiles))
+	for i, inv := range invites {
 		r := inv.SocialProfile
 		if r == nil {
 			continue
@@ -543,7 +555,7 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		out = append(out, InfluencerInviteUnit{
 			InfluencerItem: InfluencerItem{
 				Socials:    *r,
-				IsDiscover: true,
+				IsDiscover: discoverFlags[i],
 			},
 			InvitedAt: inv.TimeStamp,
 			Status:    inv.Status,
