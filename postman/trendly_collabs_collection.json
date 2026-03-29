@@ -1,0 +1,455 @@
+{
+	"info": {
+		"_postman_id": "trendly-collabs-apis-collection",
+		"name": "Trendly Backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"description": "Collaborations Lambda (`trendly_collabs`): routes under `/api/collabs`. Requires session auth (`ValidateSessionMiddleware`). Use a manager session for Manager folders and an influencer (`user`) session for Influencer folders (`TrendlyMiddleware`). Auth is not set on this collection — configure Bearer/session on your environment or parent collection."
+	},
+	"item": [
+		{
+			"name": "Collaborations",
+			"description": "Collaboration, contract, application, and feedback flows exposed by `functions/trendly_collabs`. Base path: `/api/collabs`.",
+			"item": [
+				{
+					"name": "Manager - Influencer unlock & chat",
+					"description": "Brand manager endpoints to unlock an influencer (credits) and open a Stream chat channel. Requires `TrendlyMiddleware(\"managers\")`.",
+					"item": [
+						{
+							"name": "Unlock influencer",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"brandId\": \"your_brand_firestore_id\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/influencers/:influencerId/unlock",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "influencers", ":influencerId", "unlock"],
+									"variable": [
+										{
+											"key": "influencerId",
+											"value": "",
+											"description": "Firestore user ID of the influencer to unlock for the brand"
+										}
+									]
+								},
+								"description": "Adds the influencer to the brand's `UnlockedInfluencers` list. If newly added, decrements `brand.Credits.Influencer` by 1; returns 400 with `insufficient-credits` if credits are zero.\n\n**Required body fields**\n- `brandId` (string): Brand document ID.\n\n**Side effects**: Persists brand; no email in this handler."
+							},
+							"response": []
+						},
+						{
+							"name": "Create Stream channel (message influencer)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"brandId\": \"your_brand_firestore_id\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/influencers/:influencerId/message",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "influencers", ":influencerId", "message"],
+									"variable": [
+										{
+											"key": "influencerId",
+											"value": "",
+											"description": "Influencer user ID; must already appear in brand.UnlockedInfluencers"
+										}
+									]
+								},
+								"description": "Creates a Stream Chat `messaging` channel between the authenticated manager and the influencer, sends a system message, and may set `IsChatConnected` on manager and user.\n\n**Required body fields**\n- `brandId` (string): Brand document ID (used for unlock check and message text).\n\n**Errors**: `influencer-locked` if influencer is not in unlocked list.\n\n**Side effects**: Stream channel + system message; may update manager and user records."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Manager - Collaborations (AI & publish)",
+					"description": "Draft collaborations via OpenAI and publish/post live with evaluation and credit handling.",
+					"item": [
+						{
+							"name": "Create collaboration draft (AI prompt)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"prompt\": \"Skincare UGC campaign in Mumbai for millennial women, barter with product samples\",\n\t\"brandId\": \"your_brand_firestore_id\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/collaborations",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "collaborations"]
+								},
+								"description": "Generates a collaboration draft from a natural-language prompt using OpenAI.\n\n**Required body fields**\n- `prompt` (string): Non-empty description of the collaboration.\n\n**Optional body fields**\n- `brandId` (string): When set, loads brand context (about, industries, website, discover preferences) to improve generation.\n\n**Success response**: `{ error: false, collaboration: ... }` (draft object from AI layer)."
+							},
+							"response": []
+						},
+						{
+							"name": "Post / publish collaboration",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/collaborations/:collabId",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "collaborations", ":collabId"],
+									"variable": [
+										{
+											"key": "collabId",
+											"value": "",
+											"description": "Collaboration document ID to load from Firestore, evaluate, and save"
+										}
+									]
+								},
+								"description": "Loads the collaboration by ID, runs AI evaluation against guidelines, updates discover `Preferences` when valid, and handles posting: if status becomes `active` and not already posted, decrements `brand.Credits.Collaboration` and appends to `PostedCollaborations`. If active but evaluation fails, status may become `draft` and an email is sent to the manager (`CollaborationTakedown`).\n\n**Request body**: None (collab is read from DB).\n\n**Success**: `{ message, collabId, discoverFilters, updatedStatus }`.\n**Failure (guidelines)**: 400 with `collaboration-payload-not-approved`, `discoverFilters`, `updatedStatus`."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Manager - Invitations & applications",
+					"description": "Notify influencers of invitations and accept, reject, or request revision on applications.",
+					"item": [
+						{
+							"name": "Send collaboration invitation notification",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/collaborations/:collabId/invitations/:userId",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "collaborations", ":collabId", "invitations", ":userId"],
+									"variable": [
+										{
+											"key": "collabId",
+											"value": "",
+											"description": "Collaboration ID"
+										},
+										{
+											"key": "userId",
+											"value": "",
+											"description": "Influencer user ID to invite"
+										}
+									]
+								},
+								"description": "Manager-only. Loads invitation row for `(collabId, userId)`, then sends push notification (`invitation`), email (`InfluencerInvitedToCollab`), using manager name from session and optional `invite.Message` in template data.\n\n**Request body**: None.\n\n**Prerequisites**: Invitation document must exist for the pair."
+							},
+							"response": []
+						},
+						{
+							"name": "Application action (accept | reject | revise)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/collaborations/:collabId/applications/:userId/:action",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "collaborations", ":collabId", "applications", ":userId", ":action"],
+									"variable": [
+										{
+											"key": "collabId",
+											"value": "",
+											"description": "Collaboration ID"
+										},
+										{
+											"key": "userId",
+											"value": "",
+											"description": "Applicant influencer user ID"
+										},
+										{
+											"key": "action",
+											"value": "accept",
+											"description": "One of: `accept` (creates channel + contract, notifications + email + Stream), `reject` (ack only), `revise` (notify influencer to revise quotation; needs existing contract for collab+user)"
+										}
+									]
+								},
+								"description": "Manager-only (`userType` must be `manager`).\n\n**Path `action` enum**\n- `accept`: Creates Stream channel and contract via `CreateChannel`; push + email to influencer; Stream system message. Returns `channel`, `contract`, `contractId` (stream channel id string in response).\n- `reject`: Returns success message only.\n- `revise`: Push + email + Stream message asking to revise quotation; requires contract lookup by collab + user.\n\n**Request body**: None."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Manager - Contract feedback",
+					"description": "Brand member rates the influencer after the contract is post-done or settled.",
+					"item": [
+						{
+							"name": "Submit brand feedback (rate influencer)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"ratings\": 5,\n\t\"feedbackReview\": \"Professional deliverables and clear communication throughout the Mumbai campaign.\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/contracts/:contractId/brand-feedback",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "contracts", ":contractId", "brand-feedback"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "Contract document ID"
+										}
+									]
+								},
+								"description": "Authenticated user must be a `BrandMember` for the contract's brand. Allowed only when contract status is **post-done** or **settled** (`ContractStatusPostDone`, `ContractStatusSettled`).\n\n**Required body fields**\n- `ratings` (int): 1–5 inclusive.\n\n**Optional body fields**\n- `feedbackReview` (string): Free-text review.\n\n**Side effects**: Writes `FeedbackFromBrand` on contract; push + email to influencer (`brand-feedback-given`, `CollaborationRatedByBrand`)."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Influencer - Contracts & applications",
+					"description": "Influencer (`user`) flows: poke brand to start contract, and notify brand of new or updated applications. Requires `TrendlyMiddleware(\"users\")`.",
+					"item": [
+						{
+							"name": "Request brand to start contract",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/contracts/:contractId",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "contracts", ":contractId"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "Contract ID — influencer on this contract triggers brand notifications"
+										}
+									]
+								},
+								"description": "Influencer asks the brand to start the contract. Creates brand notification (`contract-start-request`), emails brand members (`CollaborationStartRequested`), and sends a Stream system message on the contract channel.\n\n**Request body**: None."
+							},
+							"response": []
+						},
+						{
+							"name": "Notify brand — new application",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/collaborations/:collabId/applications/:userId",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "collaborations", ":collabId", "applications", ":userId"],
+									"variable": [
+										{
+											"key": "collabId",
+											"value": "",
+											"description": "Collaboration ID"
+										},
+										{
+											"key": "userId",
+											"value": "",
+											"description": "Must match the authenticated influencer user ID (`userType` user)"
+										}
+									]
+								},
+								"description": "User-only. Loads application for `(collabId, userId)` and notifies the brand: push (`application`), email (`ApplicationSent`) with application timestamp from stored application.\n\n**Request body**: None.\n\n**Note**: Application row must already exist in Firestore before calling."
+							},
+							"response": []
+						},
+						{
+							"name": "Notify brand — updated quotation (edit application)",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/collaborations/:collabId/applications/:userId",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "collaborations", ":collabId", "applications", ":userId"],
+									"variable": [
+										{
+											"key": "collabId",
+											"value": "",
+											"description": "Collaboration ID"
+										},
+										{
+											"key": "userId",
+											"value": "",
+											"description": "Applicant user ID (authenticated influencer)"
+										}
+									]
+								},
+								"description": "User-only. Same path as POST but **PUT**. Notifies brand of revised quotation: push (`new-quotation`), email with quotation and timeline from application, Stream system message on contract channel.\n\n**Request body**: None (application data is read from DB).\n\n**Prerequisites**: Contract must exist for collab + user for Stream step."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Influencer - Contract feedback",
+					"description": "Influencer rates the brand after the contract is post-done or settled.",
+					"item": [
+						{
+							"name": "Submit user (influencer) feedback",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n\t\"ratings\": 4,\n\t\"feedbackReview\": \"Clear briefs and timely responses from the brand team.\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/collabs/contracts/:contractId/user-feedback",
+									"host": ["{{baseUrl}}"],
+									"path": ["api", "collabs", "contracts", ":contractId", "user-feedback"],
+									"variable": [
+										{
+											"key": "contractId",
+											"value": "",
+											"description": "Contract ID — session user must be `contract.UserId`"
+										}
+									]
+								},
+								"description": "Only the influencer on the contract may submit. Same status gate as brand feedback: **post-done** or **settled** only.\n\n**Required body fields**\n- `ratings` (int): 1–5 inclusive.\n\n**Optional body fields**\n- `feedbackReview` (string): Free-text review.\n\n**Side effects**: Writes `FeedbackFromInfluencer`; push + email to brand (`feedback-given`, `CollaborationRatedByInfluencer`)."
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		}
+	]
+}
