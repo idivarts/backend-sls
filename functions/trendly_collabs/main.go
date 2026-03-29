@@ -34,7 +34,6 @@ func handleUserAPIs(handler *gin.RouterGroup) {
 	userApisV1 := handler.Use(middlewares.TrendlyMiddleware("users"))
 
 	userApisV1.POST("/contracts/:contractId", trendlyCollabs.RequestToStartContract)
-	userApisV1.POST("/contracts/:contractId/end", trendlyCollabs.RequestToEndContract)
 
 	userApisV1.POST("/collaborations/:collabId/applications/:userId", trendlyCollabs.SendApplication) // Send Notification for new application
 	userApisV1.PUT("/collaborations/:collabId/applications/:userId", trendlyCollabs.EditApplication)  // Send Notification for updated application
