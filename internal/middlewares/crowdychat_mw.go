@@ -46,15 +46,13 @@ func ValidateSessionMiddleware() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		debugCode := c.GetHeader("X-DEBUG-CODE")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
 			return
 		}
 
 		idToken := strings.TrimPrefix(authHeader, "Bearer ")
 		if idToken == authHeader {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
 			return
 		}
 
@@ -66,8 +64,7 @@ func ValidateSessionMiddleware() gin.HandlerFunc {
 					UID: idToken,
 				}
 			} else {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid ID token"})
-				c.Abort()
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid ID token"})
 				return
 			}
 		}
@@ -103,22 +100,19 @@ func ValidateOrganizationMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := c.GetHeader("X-Organization-ID")
 		if orgID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "X-Organization-ID header is missing"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "X-Organization-ID header is missing"})
 			return
 		}
 
 		// Validate if the user belongs to the specified organization
 		firebaseUID, b := GetUserId(c)
 		if !b {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "User doesnt have a valid session"})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "User doesnt have a valid session"})
 			return
 		}
 
 		if !validateUserOrganization(firebaseUID, orgID) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "User does not belong to the specified organization", "user": firebaseUID, "org": orgID})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User does not belong to the specified organization", "user": firebaseUID, "org": orgID})
 			return
 		}
 
