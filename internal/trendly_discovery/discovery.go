@@ -39,26 +39,33 @@ func GetInfluencers(c *gin.Context) {
 		return
 	}
 
-	socials, err := queryInfluencersFromRDB(req)
+	socials, isDiscover, err := queryInfluencersFromRDB(req)
 	if err != nil {
 		c.JSON(500, gin.H{"message": "Query failed", "error": err.Error()})
 		return
 	}
 
 	out := make([]InfluencerItem, 0, len(socials))
-	for _, s := range socials {
+	for i, s := range socials {
 		brief := convertSocialsToBreif(s)
-		out = append(out, InfluencerItem{Socials: *brief, IsDiscover: true})
+		out = append(out, InfluencerItem{Socials: *brief, IsDiscover: isDiscover[i]})
 	}
 
 	log.Println("Data Processed", out)
 	c.JSON(200, gin.H{"message": "Success", "data": out})
 }
 
+// joinKey matches influencers on PrimarySocial + SocialType to socials Username + SocialType.
+func socialInfluencerJoinKey(username, socialType string) string {
+	return strings.ToLower(strings.TrimSpace(username)) + "|" + socialType
+}
+
 // queryInfluencersFromRDB builds a GORM query over the Postgres-backed
 // socials table, applying the same filters that were previously used
 // in the BigQuery-based FormSQL function.
-func queryInfluencersFromRDB(req InfluencerFilters) ([]trendlyrdb.Socials, error) {
+// isDiscover[i] is true when no influencers row matches socials[i] on
+// (username, social_type) -> (primary_social, social_type); false when a match exists.
+func queryInfluencersFromRDB(req InfluencerFilters) ([]trendlyrdb.Socials, []bool, error) {
 	db := rdb.GormDB.Model(&trendlyrdb.Socials{}).Where("social_type = ?", "instagram")
 
 	if req.FollowerMin != nil {
@@ -204,7 +211,57 @@ func queryInfluencersFromRDB(req InfluencerFilters) ([]trendlyrdb.Socials, error
 
 	var results []trendlyrdb.Socials
 	if err := db.Find(&results).Error; err != nil {
+		return nil, nil, err
+	}
+
+	flags, err := isDiscoverFlagsForSocials(results)
+	if err != nil {
+		return nil, nil, err
+	}
+	return results, flags, nil
+}
+
+// isDiscoverFlagsForSocials returns, for each social row, whether that profile is
+// not yet linked to an influencer (no row in influencers with matching primary_social + social_type).
+func isDiscoverFlagsForSocials(rows []trendlyrdb.Socials) ([]bool, error) {
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	seen := make(map[string]struct{}, len(rows))
+	var ors []string
+	var args []interface{}
+	for _, s := range rows {
+		k := socialInfluencerJoinKey(s.Username, s.SocialType)
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		ors = append(ors, "(LOWER(primary_social) = LOWER(?) AND social_type = ?)")
+		args = append(args, s.Username, s.SocialType)
+	}
+
+	var matched []struct {
+		PrimarySocial string `gorm:"column:primary_social"`
+		SocialType    string `gorm:"column:social_type"`
+	}
+	q := rdb.GormDB.Model(&trendlyrdb.Influencers{}).Select("primary_social", "social_type")
+	if len(ors) > 0 {
+		q = q.Where("("+strings.Join(ors, " OR ")+")", args...)
+	}
+	if err := q.Find(&matched).Error; err != nil {
 		return nil, err
 	}
-	return results, nil
+
+	influencerKeys := make(map[string]struct{}, len(matched))
+	for _, m := range matched {
+		influencerKeys[socialInfluencerJoinKey(m.PrimarySocial, m.SocialType)] = struct{}{}
+	}
+
+	flags := make([]bool, len(rows))
+	for i, s := range rows {
+		_, ok := influencerKeys[socialInfluencerJoinKey(s.Username, s.SocialType)]
+		flags[i] = !ok
+	}
+	return flags, nil
 }
