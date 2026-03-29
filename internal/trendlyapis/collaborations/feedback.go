@@ -40,6 +40,11 @@ func UserFeedback(c *gin.Context) {
 		return
 	}
 
+	if !contractAllowsFeedback(contract.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Feedback can only be submitted when the contract is post-done or settled"})
+		return
+	}
+
 	ratings := req.Ratings
 	ts := time.Now().UnixMilli()
 	fb := &trendlymodels.InfluencerFeedback{
@@ -145,6 +150,11 @@ func BrandFeedback(c *gin.Context) {
 		return
 	}
 
+	if !contractAllowsFeedback(contract.Status) {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Feedback can only be submitted when the contract is post-done or settled"})
+		return
+	}
+
 	ratings := req.Ratings
 	ts := time.Now().UnixMilli()
 	managerID := sessionManagerID
@@ -219,4 +229,13 @@ func BrandFeedback(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully given feedback"})
+}
+
+func contractAllowsFeedback(status trendlymodels.ContractStatus) bool {
+	switch status {
+	case trendlymodels.ContractStatusPostDone, trendlymodels.ContractStatusSettled:
+		return true
+	default:
+		return false
+	}
 }
