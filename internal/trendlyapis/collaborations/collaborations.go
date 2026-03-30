@@ -222,10 +222,13 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 		return
 	}
 
+	// Temporary adjustments as Image search is taking a lot of time
+	disableWebsiteSearch := true
+
 	brandDetails := ""
+	brand := &trendlymodels.Brand{}
 	hasWebsite := false
 	if body.BrandID != "" {
-		brand := &trendlymodels.Brand{}
 		err := brand.Get(body.BrandID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
@@ -235,10 +238,31 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 		brandDetails = formatBrandDetails(brand)
 	}
 
+	if disableWebsiteSearch {
+		hasWebsite = false
+	}
+
 	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails, hasWebsite)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error generating collaboration"})
 		return
+	}
+
+	if disableWebsiteSearch {
+		if brand.Image != nil {
+			collaboratioDraft.RelevantImages = []string{*brand.Image}
+		}
+		if brand.Profile != nil && brand.Profile.Website != nil {
+			collaboratioDraft.ExternalLinks = []struct {
+				Name string `json:"name"`
+				Link string `json:"link"`
+			}{
+				{
+					Name: "Website",
+					Link: *brand.Profile.Website,
+				},
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
