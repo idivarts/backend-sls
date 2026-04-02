@@ -5,11 +5,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myutil"
-	"google.golang.org/api/iterator"
 )
 
 func guessGender(name string) string {
@@ -26,33 +25,29 @@ func guessAllGenders(name []string) []string {
 
 // SyncUsers This will be used to sync users
 func SyncUsers(iterative bool) error {
-	iter := firestoredb.Client.Collection("users").Documents(context.Background())
-	defer iter.Stop()
-
+	docs, err := firestoredb.Client.Collection("users").Documents(context.Background()).GetAll()
+	if err != nil {
+		return err
+	}
+	log.Println("Got all docs", len(docs))
 	total := 0
-	data := []trendlybq.BQInfluencers{}
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			panic(err.Error())
-		}
+	data := []trendlyrdb.Influencers{}
+	for i, doc := range docs {
 		if iterative && time.Since(doc.UpdateTime) > 16*time.Hour {
 			continue
 		}
 		total++
 
-		log.Println("Creating Doc", doc.Ref.ID)
+		log.Println("Creating Doc", i, "/", len(docs), doc.Ref.ID)
 		user := &trendlymodels.User{}
 		err = doc.DataTo(user)
 		if err != nil {
-			panic(err.Error())
+			log.Println("Error In Parsing", doc.Ref.ID)
+			continue
 		}
 
 		if user.PrimarySocial != nil {
-			socialData, err := firestoredb.Client.Collection("users").Doc(doc.Ref.ID).Collection("socials").Doc(*user.PrimarySocial).Get(context.Background())
+			socialData, err := doc.Ref.Collection("socials").Doc(*user.PrimarySocial).Get(context.Background())
 			if err != nil {
 				log.Println("Error fetching social", doc.Ref.ID)
 				continue
@@ -65,23 +60,28 @@ func SyncUsers(iterative bool) error {
 			}
 			sName := ""
 			sType := "facebook"
-			followCount := 0
+			followerCount := 0
 			reach := 0
 			interaction := 0
 			if social.IsInstagram {
 				sType = "instagram"
 				sName = social.InstaProfile.Username
-				followCount = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Followers)
+				followerCount = social.InstaProfile.FollowersCount
+				if followerCount == 0 {
+					followerCount = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Followers)
+				}
 				reach = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Views)
 				interaction = RangeToMidpoint(social.InstaProfile.ApproxMetrics.Interactions)
 			} else {
 				sName = social.FBProfile.Name
-				followCount = social.FBProfile.FollowersCount
+				followerCount = social.FBProfile.FollowersCount
 			}
-			data = append(data, trendlybq.BQInfluencers{
+			data = append(data, trendlyrdb.Influencers{
 				ID:               doc.Ref.ID,
+				Email:            myutil.DerefString(user.Email),
 				Location:         myutil.DerefString(user.Location),
-				FollowerCount:    followCount,
+				TotalMediaCount:  len(user.Profile.Attachments),
+				FollowerCount:    followerCount,
 				ReachCount:       reach,
 				InteractionCount: interaction,
 				PrimarySocial:    sName,
@@ -134,44 +134,13 @@ func SyncUsers(iterative bool) error {
 		}
 	}
 	log.Println("Total vs Valid", total, len(data))
-	log.Println("Deleting", len(data))
-	query, err := trendlybq.BQInfluencers{}.DeleteMultipleSQL(INFLUENCER_TABLE, data)
+	log.Println("Upserting", len(data))
+	err = trendlyrdb.Influencers{}.InsertMultiple(data)
 	if err != nil {
-		log.Fatalf("Failed to create query: %v", err)
+		log.Fatalf("Failed to upsert influencers: %v", err)
 		return err
 	}
-	deleteJob, err := query.Run(context.Background())
-	status, err := deleteJob.Wait(context.Background())
-	if err != nil {
-		log.Fatalf("Error while waiting for delete job to finish: %v", err)
-		return err
-	}
-	if status.Err() != nil {
-		log.Fatalf("Delete job failed: %v", status.Err())
-		return status.Err()
-	}
 
-	log.Println("Deletion Completed", len(data))
-
-	batchSize := 100
-	for i := 0; i < len(data); i += batchSize {
-		end := i + batchSize
-		if end > len(data) {
-			end = len(data)
-		}
-		batch := data[i:end]
-		query, err := trendlybq.BQInfluencers{}.GetInsertMultipleSQL(INFLUENCER_TABLE, batch)
-		if err != nil {
-			log.Fatalf("Failed to create query: %v", err)
-			return err
-		}
-		j, err := query.Run(context.Background())
-		if err != nil {
-			log.Fatalf("Failed to execute query: %v", err)
-			return err
-		}
-		log.Println("Job Created, Batch", i, " : ", j.ID())
-	}
-
+	log.Println("Upsert Completed", len(data))
 	return nil
 }

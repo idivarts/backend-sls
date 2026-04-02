@@ -145,23 +145,23 @@ functions:
     timeout: 30
     events:
       - http: ANY /discovery/{proxy+}
-  trendly_discovery_script:
-    handler: scripts/socials-update-images/main.go
-    environment:
-      S3_BUCKET: trendly-discovery-bucket
-      S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com
-    package:
-      include:
-        - 'service-account.json'
-        - 'key-secrets.json'
-        - 'templates/*'
-    timeout: 900
-    events:
-      - schedule:
-          rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
-          enabled: ${self:custom.isProd.${self:provider.stage}}
-  trendly_discovery_upload_image:
-    handler: scripts/socials-update-images/queue-update-image/main.go
+  # trendly_discovery_script:
+  #   handler: scripts/socials-update-images/main.go
+  #   environment:
+  #     S3_BUCKET: trendly-discovery-bucket
+  #     S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com
+  #   package:
+  #     include:
+  #       - 'service-account.json'
+  #       - 'key-secrets.json'
+  #       - 'templates/*'
+  #   timeout: 900
+  #   events:
+  #     - schedule:
+  #         rate: cron(30 0 * * ? *)  # Runs daily at 6:00 AM IST (00:30 UTC)
+  #         enabled: ${self:custom.isProd.${self:provider.stage}}
+  trendly_discovery_upload:
+    handler: scripts/socials-add-entries/main.go
     environment:
       S3_BUCKET: trendly-discovery-bucket
       S3_URL: https://trendly-discovery-bucket.s3.us-east-1.amazonaws.com
@@ -288,6 +288,8 @@ functions:
       - http: ANY /instagram/{proxy+}
       - http: ANY /firebase
       - http: ANY /firebase/{proxy+}
+      - http: ANY /onboard
+      - http: ANY /onboard/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
     package:

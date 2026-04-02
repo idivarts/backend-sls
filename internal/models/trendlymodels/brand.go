@@ -14,10 +14,13 @@ type Brand struct {
 	Image                 *string `json:"image,omitempty" firestore:"image,omitempty"`
 	PaymentMethodVerified *bool   `json:"paymentMethodVerified,omitempty" firestore:"paymentMethodVerified,omitempty"`
 
-	Profile     *BrandProfile     `json:"profile,omitempty" firestore:"profile,omitempty"`
-	Preferences *BrandPreferences `json:"preferences,omitempty" firestore:"preferences,omitempty"`
-	Backend     *BrandBackend     `json:"backend,omitempty" firestore:"backend,omitempty"`
-	Survey      *BrandSurvey      `json:"survey,omitempty" firestore:"survey,omitempty"`
+	Profile *BrandProfile `json:"profile,omitempty" firestore:"profile,omitempty"`
+
+	Preferences         *BrandPreferences    `json:"preferences,omitempty" firestore:"preferences,omitempty"`
+	DiscoverPreferences *DiscoverPreferences `json:"discoverPreferences,omitempty" firestore:"discoverPreferences,omitempty"`
+
+	Backend *BrandBackend `json:"backend,omitempty" firestore:"backend,omitempty"`
+	Survey  *BrandSurvey  `json:"survey,omitempty" firestore:"survey,omitempty"`
 
 	IsBillingDisabled bool          `json:"isBillingDisabled" firestore:"isBillingDisabled"`
 	Billing           *BrandBilling `json:"billing,omitempty" firestore:"billing,omitempty"`

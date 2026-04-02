@@ -1,5 +1,21 @@
 package payments
 
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+)
+
+// ... existing structs ...
+
+func VerifyWebhookSignature(body []byte, signature string, secret string) bool {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write(body)
+	expectedSignature := hex.EncodeToString(h.Sum(nil))
+	return expectedSignature == signature
+}
+
 type CreateAccountReq struct {
 	Name    string     `json:"name"`
 	Email   string     `json:"email"`
@@ -22,12 +38,100 @@ type BankReq struct {
 	BenificiaryName string `json:"beneficiary_name"`
 }
 
-func CreateLinkedAccount(req CreateAccountReq) (map[string]interface{}, map[string]interface{}, error) {
+// Razorpay Typed Objects
+type RPAccount struct {
+	ID                string     `json:"id"`
+	Email             string     `json:"email"`
+	Phone             string     `json:"phone"`
+	Type              string     `json:"type"`
+	ReferenceID       string     `json:"reference_id"`
+	LegalBusinessName string     `json:"legal_business_name"`
+	BusinessType      string     `json:"business_type"`
+	Status            string     `json:"status"`
+	ContactName       string     `json:"contact_name"`
+	Profile           *RPProfile `json:"profile"`
+}
+
+type RPProfile struct {
+	Category    string               `json:"category"`
+	Subcategory string               `json:"subcategory"`
+	Addresses   map[string]RPAddress `json:"addresses"`
+}
+
+type RPAddress struct {
+	Street     string `json:"street,omitempty"`
+	Street1    string `json:"street1,omitempty"`
+	Street2    string `json:"street2,omitempty"`
+	City       string `json:"city"`
+	State      string `json:"state"`
+	PostalCode string `json:"postal_code"`
+	Country    string `json:"country"`
+}
+
+type RPStakeholder struct {
+	ID                  string               `json:"id"`
+	Entity              string               `json:"entity"`
+	Name                string               `json:"name"`
+	Email               string               `json:"email"`
+	PercentageOwnership float64              `json:"percentage_ownership"`
+	Addresses           map[string]RPAddress `json:"addresses"`
+	KYC                 *RPKYC               `json:"kyc"`
+	Notes               []interface{}        `json:"notes"`
+}
+
+type RPKYC struct {
+	PAN string `json:"pan"`
+}
+
+type RPProduct struct {
+	ID                     string                  `json:"id"`
+	AccountId              string                  `json:"account_id"`
+	ProductName            string                  `json:"product_name"`
+	ActivationStatus       string                  `json:"activation_status"`
+	RequestedAt            int64                   `json:"requested_at"`
+	Tnc                    *RPTnc                  `json:"tnc"`
+	ActiveConfiguration    *RPActiveConfiguration  `json:"active_configuration"`
+	RequestedConfiguration []interface{}           `json:"requested_configuration"`
+	Requirements           []interface{}           `json:"requirements"`
+}
+
+type RPTnc struct {
+	ID         string `json:"id"`
+	Accepted   bool   `json:"accepted"`
+	AcceptedAt int64  `json:"accepted_at"`
+}
+
+type RPActiveConfiguration struct {
+	Settlements *RPSettlements `json:"settlements"`
+}
+
+type RPSettlements struct {
+	AccountNumber   string `json:"account_number"`
+	IFSCCode        string `json:"ifsc_code"`
+	BeneficiaryName string `json:"beneficiary_name"`
+}
+
+func truncateReferenceID(userId string) string {
+	if len(userId) > 20 {
+		return userId[:20]
+	}
+	return userId
+}
+
+func structFromMap(data map[string]interface{}, target interface{}) error {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bytes, target)
+}
+
+func CreateLinkedAccount(req CreateAccountReq) (*RPAccount, *RPStakeholder, error) {
 	payload := map[string]interface{}{
 		"email":               req.Email,
 		"phone":               req.Phone,
 		"type":                "route",
-		"reference_id":        req.UserId,
+		"reference_id":        truncateReferenceID(req.UserId),
 		"legal_business_name": req.Name,
 		"business_type":       "individual",
 		"contact_name":        req.Name,
@@ -46,8 +150,13 @@ func CreateLinkedAccount(req CreateAccountReq) (map[string]interface{}, map[stri
 			},
 		},
 	}
-	account, err := Client.Account.Create(payload, nil)
+	accountMap, err := Client.Account.Create(payload, nil)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	account := &RPAccount{}
+	if err := structFromMap(accountMap, account); err != nil {
 		return nil, nil, err
 	}
 
@@ -69,11 +178,20 @@ func CreateLinkedAccount(req CreateAccountReq) (map[string]interface{}, map[stri
 		},
 	}
 
-	stk, err := Client.Stakeholder.Create(account["id"].(string), stakeholderPayload, nil)
+	stkMap, err := Client.Stakeholder.Create(account.ID, stakeholderPayload, nil)
+	if err != nil {
+		return account, nil, err
+	}
+
+	stk := &RPStakeholder{}
+	if err := structFromMap(stkMap, stk); err != nil {
+		return account, nil, err
+	}
 
 	return account, stk, err
 }
-func UpdateAccountAndStakeHolderAddress(accountId string, stakeholderId string, req CreateAccountReq) (map[string]interface{}, map[string]interface{}, error) {
+
+func UpdateAccountAndStakeHolderAddress(accountId string, stakeholderId string, req CreateAccountReq) (*RPAccount, *RPStakeholder, error) {
 	payload := map[string]interface{}{
 		"email":               req.Email,
 		"legal_business_name": req.Name,
@@ -90,8 +208,13 @@ func UpdateAccountAndStakeHolderAddress(accountId string, stakeholderId string, 
 			},
 		},
 	}
-	account, err := Client.Account.Edit(accountId, payload, nil)
+	accountMap, err := Client.Account.Edit(accountId, payload, nil)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	account := &RPAccount{}
+	if err := structFromMap(accountMap, account); err != nil {
 		return nil, nil, err
 	}
 
@@ -111,13 +234,21 @@ func UpdateAccountAndStakeHolderAddress(accountId string, stakeholderId string, 
 		},
 	}
 
-	stk, err := Client.Stakeholder.Edit(accountId, stakeholderId, stakeholderPayload, nil)
+	stkMap, err := Client.Stakeholder.Edit(accountId, stakeholderId, stakeholderPayload, nil)
+	if err != nil {
+		return account, nil, err
+	}
+
+	stk := &RPStakeholder{}
+	if err := structFromMap(stkMap, stk); err != nil {
+		return account, nil, err
+	}
 
 	return account, stk, err
 }
 
-func CreataOrUpdateProduct(accountId string, bank BankReq) (map[string]interface{}, error) {
-	prodConf, err := Client.Product.RequestProductConfiguration(accountId, map[string]interface{}{
+func CreataOrUpdateProduct(accountId string, bank BankReq) (*RPProduct, error) {
+	prodConfMap, err := Client.Product.RequestProductConfiguration(accountId, map[string]interface{}{
 		"product_name": "route",
 		"tnc_accepted": true,
 	}, nil)
@@ -135,22 +266,80 @@ func CreataOrUpdateProduct(accountId string, bank BankReq) (map[string]interface
 		"tnc_accepted": true,
 	}
 
-	prod, err := Client.Product.Edit(accountId, prodConf["id"].(string), productPayload, nil)
+	prodMap, err := Client.Product.Edit(accountId, prodConfMap["id"].(string), productPayload, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	prod := &RPProduct{}
+	if err := structFromMap(prodMap, prod); err != nil {
+		return nil, err
+	}
 
 	return prod, err
 }
 
-func FetchLinkedAccount(accountId string) (map[string]interface{}, error) {
-	account, err := Client.Account.Fetch(accountId, nil, nil)
+func GetProduct(accountId string) (*RPProduct, error) {
+	productMap, err := Client.Product.RequestProductConfiguration(accountId, map[string]interface{}{
+		"product_name": "route",
+		"tnc_accepted": true,
+	}, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	product := &RPProduct{}
+	if err := structFromMap(productMap, product); err != nil {
+		return nil, err
+	}
+
+	return product, nil
+}
+
+func FetchLinkedAccount(accountId string) (*RPAccount, error) {
+	accountMap, err := Client.Account.Fetch(accountId, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	account := &RPAccount{}
+	if err := structFromMap(accountMap, account); err != nil {
+		return nil, err
+	}
+
 	return account, err
 }
 
-func FetchProductConfiguration(accountId string, prodId string) (map[string]interface{}, error) {
-	product, err := Client.Product.Fetch(accountId, prodId, nil, nil)
-	return product, err
+func FetchProductConfiguration(accountId string, prodId string) (*RPProduct, error) {
+	productMap, err := Client.Product.Fetch(accountId, prodId, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	product := &RPProduct{}
+	if err := structFromMap(productMap, product); err != nil {
+		return nil, err
+	}
+
+	return product, nil
 }
 
-func DeleletAccount(accountId string) (map[string]interface{}, error) {
+func FetchStakeholder(accountId string, stakeholderId string) (*RPStakeholder, error) {
+	stkMap, err := Client.Stakeholder.Fetch(accountId, stakeholderId, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	stk := &RPStakeholder{}
+	if err := structFromMap(stkMap, stk); err != nil {
+		return nil, err
+	}
+
+	return stk, nil
+}
+
+func DeleteAccount(accountId string) (map[string]interface{}, error) {
 	response, err := Client.Account.Delete(accountId, nil, nil)
 	return response, err
 }

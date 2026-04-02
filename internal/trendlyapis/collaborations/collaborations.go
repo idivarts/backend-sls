@@ -1,7 +1,6 @@
 package trendlyCollabs
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,16 +10,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
-	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	ai_collaboration "github.com/idivarts/backend-sls/internal/openai/collaboration"
 	"github.com/idivarts/backend-sls/pkg/myemail"
-	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"github.com/idivarts/backend-sls/pkg/mytime"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
-	"github.com/openai/openai-go/v3"
-	"github.com/openai/openai-go/v3/responses"
 )
 
 // nzString returns "NA" if s is empty after trimming; otherwise returns s.
@@ -81,91 +77,64 @@ func toString(v interface{}) string {
 	}
 }
 
+func formatBrandDetails(brand *trendlymodels.Brand) string {
+	if brand == nil {
+		return ""
+	}
+
+	// Keep only context that can improve generation quality.
+	brandContext := map[string]interface{}{
+		"name": brand.Name,
+	}
+	if brand.Profile != nil {
+		if brand.Profile.About != nil && strings.TrimSpace(*brand.Profile.About) != "" {
+			brandContext["about"] = *brand.Profile.About
+		}
+		if len(brand.Profile.Industries) > 0 {
+			brandContext["industries"] = brand.Profile.Industries
+		}
+		if brand.Profile.Website != nil && strings.TrimSpace(*brand.Profile.Website) != "" {
+			brandContext["website"] = *brand.Profile.Website
+		}
+	}
+	if brand.DiscoverPreferences != nil {
+		brandContext["preferences"] = brand.DiscoverPreferences
+	}
+	return toString(brandContext)
+}
+
 func TestEvaluateCollab(collab *trendlymodels.Collaboration) (bool, *trendlymodels.DiscoverPreferences) {
 	return evaluateCollab(collab, nil)
 }
-func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Brand) (bool, *trendlymodels.DiscoverPreferences) {
-	// {
-	// 	"id": "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
-	// 	"version": "1",
-	// 	"variables": {
-	// 	  "collaboration_name": "example collaboration_name",
-	// 	  "collaboration_description": "example collaboration_description"
-	// 	}
-	//   }
 
+func evaluateCollab(collab *trendlymodels.Collaboration, brand *trendlymodels.Brand) (bool, *trendlymodels.DiscoverPreferences) {
 	budget := "Barter"
-	if collab.Budget != nil && *collab.Budget.Max != 0 {
+	if collab.Budget != nil && collab.Budget.Max != nil && *collab.Budget.Max != 0 {
 		budget = toString(collab.Budget)
 	}
 
-	brandDetails := "Trendly"
-	if brand != nil {
-		brandDetails = toString(*brand)
-	}
+	brandDetails := formatBrandDetails(brand)
 
-	// Build prompt variables with "NA" fallbacks when fields are empty/missing.
-	vars := map[string]responses.ResponsePromptVariableUnionParam{
-		"collaboration_name":        {OfString: openai.String(toString(collab.Name))},
-		"collaboration_description": {OfString: openai.String(toString(collab.Description))},
-		"budget":                    {OfString: openai.String(budget)},
-		"location":                  {OfString: openai.String(toString(collab.Location))},
-		"questions":                 {OfString: openai.String(toString(collab.QuestionsToInfluencers))},
-		"links":                     {OfString: openai.String(toString(collab.ExternalLinks))},
-		"brand_details":             {OfString: openai.String(brandDetails)},
-	}
-
-	response, err := myopenai.Client.Responses.New(context.Background(), responses.ResponseNewParams{
-		Prompt: responses.ResponsePromptParam{
-			ID:        "pmpt_690a4bed81408190affad862efc917dd00fc63fdff223ab2",
-			Variables: vars,
-		},
+	valid, filters, err := ai_collaboration.EvaluateCollaboration(ai_collaboration.CollabEvaluationInput{
+		CollaborationName:        toString(collab.Name),
+		CollaborationDescription: toString(collab.Description),
+		Budget:                   budget,
+		Location:                 toString(collab.Location),
+		Questions:                toString(collab.QuestionsToInfluencers),
+		Links:                    toString(collab.ExternalLinks),
+		BrandDetails:             brandDetails,
 	})
 	if err != nil {
 		log.Println("Error evaluating collab:", err.Error())
 		return false, nil
 	}
-	jsonStr := response.JSON.Output.Raw()
-	mMap := []map[string]interface{}{}
-	err = json.Unmarshal([]byte(jsonStr), &mMap)
-	if err != nil {
-		log.Println("Error parsing evaluation response:", err.Error())
-		return false, nil
-	}
-
-	responseStr := mMap[0]["content"].([]interface{})[0].(map[string]interface{})["text"].(string)
-	rMap := map[string]interface{}{}
-	err = json.Unmarshal([]byte(responseStr), &rMap)
-	if err != nil {
-		log.Println("Error parsing evaluation content:", err.Error())
-		return false, nil
-	}
-
-	valid := rMap["validCollaboration"].(bool)
 	log.Println("Evaluation Response:", valid)
 	if valid {
-		filtersMap := rMap["filters"].(map[string]interface{})
-		filters := &trendlymodels.DiscoverPreferences{}
-		b, err := json.Marshal(filtersMap)
-		if err != nil {
-			log.Println("Error marshalling filters:", err.Error())
-			return false, nil
-		}
-		err = json.Unmarshal(b, filters)
-		if err != nil {
-			log.Println("Error unmarshalling filters:", err.Error())
-			return false, nil
-		}
 		return true, filters
 	}
 	return false, nil
 }
 func PostCollaboration(c *gin.Context) {
-	userType := middlewares.GetUserType(c)
-	if userType == "user" {
-		requestToStart(c)
-		return
-	}
 	collabId := c.Param(("collabId"))
 	// updating := (c.Query("update") != "")
 
@@ -189,8 +158,11 @@ func PostCollaboration(c *gin.Context) {
 
 	valid, filters := evaluateCollab(collab, &brand)
 
+	throwError := false
+
 	if collab.Status == "active" && !valid {
 		collab.Status = "draft"
+		throwError = true
 	}
 
 	if valid {
@@ -219,199 +191,87 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
+	if throwError {
+		// Send email to manager
+		manager := trendlymodels.Manager{}
+		err = manager.Get(collab.ManagerID)
+		if err == nil {
+			data := map[string]interface{}{
+				"ManagerName": manager.Name,
+				"CollabTitle": collab.Name,
+				"DraftLink":   fmt.Sprintf("%s/collaboration-details/%s", constants.TRENDLY_BRANDS_FE, collabId),
+			}
+			_ = myemail.SendCustomHTMLEmail(manager.Email, templates.CollaborationTakedown, templates.SubjectCollaborationTakedown, data)
+		}
+
+		c.JSON(http.StatusBadRequest, gin.H{"error": "collaboration-payload-not-approved", "message": "The Collaboration posted was not put live as it did not meet our guidelines. Please review the collaboration details and make necessary changes before reposting.",
+			"collabId": collabId, "discoverFilters": filters, "updatedStatus": collab.Status}) //, "updating": updating
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Collaboration Started", "collabId": collabId, "discoverFilters": filters, "updatedStatus": collab.Status}) //, "updating": updating
 }
 
 func CreateCollaborationWithPrompt(c *gin.Context) {
 	var body struct {
-		Prompt string `json:"prompt"`
-		Model  string `json:"model"`
+		Prompt  string `json:"prompt" binding:"required"`
+		BrandID string `json:"brandId"`
 	}
 	if err := c.BindJSON(&body); err != nil || body.Prompt == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "missing prompt"})
 		return
 	}
-	model := body.Model
-	if model == "" {
-		model = "gpt-4o" // pick any streaming capable chat model
+
+	// Temporary adjustments as Image search is taking a lot of time
+	disableWebsiteSearch := true
+
+	brandDetails := ""
+	brand := &trendlymodels.Brand{}
+	hasWebsite := false
+	if body.BrandID != "" {
+		err := brand.Get(body.BrandID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
+			return
+		}
+		hasWebsite = brand.Profile != nil && brand.Profile.Website != nil && *brand.Profile.Website != ""
+		brandDetails = formatBrandDetails(brand)
 	}
 
-	// Prepare SSE headers
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Status(http.StatusOK)
+	if disableWebsiteSearch {
+		hasWebsite = false
+	}
 
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
-		c.AbortWithStatusJSON(500, gin.H{"error": "streaming not supported"})
+	collaboratioDraft, err := ai_collaboration.CollaborationDraft{}.GetResults(body.Prompt, brandDetails, hasWebsite)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error generating collaboration"})
 		return
 	}
 
-	// Start the OpenAI stream
-	ctx := context.Background()
-	stream := myopenai.Client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.UserMessage(body.Prompt),
-		},
-		Model: openai.ChatModel(model),
-	})
-	defer stream.Close()
-
-	// Optional helper to assemble partial deltas
-	acc := openai.ChatCompletionAccumulator{}
-
-	for stream.Next() {
-		chunk := stream.Current()
-		acc.AddChunk(chunk)
-
-		// Send the raw delta content as SSE
-		if len(chunk.Choices) > 0 {
-			delta := chunk.Choices[0].Delta.Content
-			if delta != "" {
-				// Standard SSE line
-				c.Writer.Write([]byte("data: " + delta + "\n\n"))
-				flusher.Flush()
+	if disableWebsiteSearch {
+		if brand.Image != nil {
+			collaboratioDraft.RelevantImages = []string{*brand.Image}
+		}
+		if brand.Profile != nil && brand.Profile.Website != nil {
+			collaboratioDraft.ExternalLinks = []struct {
+				Name string `json:"name"`
+				Link string `json:"link"`
+			}{
+				{
+					Name: "Website",
+					Link: *brand.Profile.Website,
+				},
 			}
 		}
-
-		// You can also detect end of a message or a tool call:
-		// if content, ok := acc.JustFinishedContent(); ok { ... }
-		// if tool, ok := acc.JustFinishedToolCall(); ok { ... }
 	}
 
-	if err := stream.Err(); err != nil {
-		// send a final SSE error event then end
-		c.Writer.Write([]byte("event: error\ndata: " + err.Error() + "\n\n"))
-		flusher.Flush()
-		return
-	}
-
-	// SSE end marker is optional. Many clients just stop on socket close.
-	c.Writer.Write([]byte("data: [DONE]\n\n"))
-	flusher.Flush()
+	c.JSON(http.StatusOK, gin.H{
+		"error":         false,
+		"collaboration": collaboratioDraft,
+	})
 }
 
-// Starting a collab | Request to start
-func StartContract(c *gin.Context) {
-	userType := middlewares.GetUserType(c)
-	if userType == "user" {
-		requestToStart(c)
-		return
-	}
-	contractId := c.Param(("contractId"))
-
-	contract := trendlymodels.Contract{}
-	err := contract.Get(contractId)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching contract"})
-		return
-	}
-
-	collab := trendlymodels.Collaboration{}
-	err = collab.Get(contract.CollaborationID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching collaboration"})
-		return
-	}
-
-	brand := trendlymodels.Brand{}
-	err = brand.Get(contract.BrandID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching Brand"})
-		return
-	}
-	if brand.Credits.Contract <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient-credits", "message": "Insufficient Credit to Start Contract"})
-		return
-	}
-
-	user := trendlymodels.User{}
-	err = user.Get(contract.UserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error fetching user"})
-		return
-	}
-
-	// Send Push Notification
-	notif := &trendlymodels.Notification{
-		Title:       fmt.Sprintf("The contract is started : %s", collab.Name),
-		Description: "You can now find the details on the contract's menu",
-		IsRead:      false,
-		Data: &trendlymodels.NotificationData{
-			CollaborationID: &contract.CollaborationID,
-			UserID:          &contract.UserID,
-			GroupID:         &contractId,
-		},
-		TimeStamp: time.Now().UnixMilli(),
-		Type:      "contract-started",
-	}
-	_, emails, err := notif.Insert(trendlymodels.BRAND_COLLECTION, collab.BrandID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	_, _, err = notif.Insert(trendlymodels.USER_COLLECTION, contract.UserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Send Email notification
-
-	// 	<!--
-	//   Dynamic Variables:
-	// {{.RecipientName}}     => Name of the recipient (Brand or Influencer)
-	// {{.CollabTitle}}       => Title of the collaboration
-	// {{.StartDate}}         => Date when the collaboration was started
-	// {{.ContractLink}}      => Link to view the created contract
-	// -->
-
-	if user.Email != nil {
-		data := map[string]interface{}{
-			"RecipientName": user.Name,
-			"CollabTitle":   collab.Name,
-			"StartDate":     mytime.FormatPrettyIST(time.Now()),
-			"ContractLink":  fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contractId),
-		}
-		err = myemail.SendCustomHTMLEmail(*user.Email, templates.CollaborationStarted, templates.SubjectCollaborationStarted, data)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-	}
-	if len(emails) > 0 {
-		data := map[string]interface{}{
-			"RecipientName": brand.Name,
-			"CollabTitle":   collab.Name,
-			"StartDate":     mytime.FormatPrettyIST(time.Now()),
-			"ContractLink":  fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractId),
-		}
-		err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.CollaborationStarted, templates.SubjectCollaborationStarted, data)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-	}
-
-	// Send Stream Notification
-	err = streamchat.SendSystemMessage(contract.StreamChannelID, "Congratulations!! The contract has been started!\nYou can find the contract details on the contract menu")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Stream Error"})
-		return
-	}
-
-	brand.Credits.Contract -= 1
-	_, err = brand.Insert(contract.BrandID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating brand Credits"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully Notified for starting contract"})
-}
-
-func requestToStart(c *gin.Context) {
+func RequestToStartContract(c *gin.Context) {
 	contractId := c.Param(("contractId"))
 
 	contract := trendlymodels.Contract{}

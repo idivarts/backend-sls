@@ -1,6 +1,7 @@
 package trendlydiscovery
 
 import (
+	"encoding/json"
 	"log"
 	"math"
 	"math/rand"
@@ -10,10 +11,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
-	"github.com/idivarts/backend-sls/internal/models/trendlybq"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
+	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 	"github.com/idivarts/backend-sls/pkg/messenger"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
+	"github.com/lib/pq"
 )
 
 type Range struct {
@@ -28,7 +32,7 @@ type CalculatedData struct {
 	CPM             float32 `json:"cpm"`
 }
 
-func calculateTrustablity(social *trendlybq.Socials) int {
+func calculateTrustablity(social *trendlyrdb.Socials) int {
 	// Weights
 	wEngagement := 0.30
 	wRatios := 0.25
@@ -98,7 +102,7 @@ func calculateTrustablity(social *trendlybq.Socials) int {
 	if social.ProfileVerified {
 		verificationScore += 35
 	}
-	if social.HasContacts {
+	if len(social.Links) > 0 {
 		verificationScore += 35
 	}
 	verificationScore = clampFloat(verificationScore, 0, 100)
@@ -127,20 +131,13 @@ func calculateTrustablity(social *trendlybq.Socials) int {
 
 	// 5) Misc signals (0–100)
 	miscScore := 100.0
-	// following/follower ratio penalty
+	// Following/follower ratio penalty
 	ffr := safeDiv(float64(social.FollowingCount), math.Max(followers, 1))
 	if ffr > 1.0 {
 		miscScore -= 30
 	} else if ffr > 0.5 {
 		miscScore -= 20
 	} else if ffr > 0.2 {
-		miscScore -= 10
-	}
-	// Missing UI buttons suggests odd setup
-	if !social.HasFollowButton {
-		miscScore -= 10
-	}
-	if !social.HasMessageButton {
 		miscScore -= 10
 	}
 	miscScore = clampFloat(miscScore, 0, 100)
@@ -150,7 +147,7 @@ func calculateTrustablity(social *trendlybq.Socials) int {
 	return clampInt(int(math.Round(total)), 0, 100)
 }
 
-func calculateBudget(social *trendlybq.Socials) Range {
+func calculateBudget(social *trendlyrdb.Socials) Range {
 	followers := float64(social.FollowerCount)
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
@@ -213,9 +210,9 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	trustMult = clampFloat(trustMult, 0.8, 1.2)
 
 	// Quality multiplier (0.6–1.3)
-	// quality: 0 (cheap creators) → 0.6x, 100 (rich/classy/aesthetic) → 1.3x
+	// quality: 1 (poor creators) → 0.6x, 10 (legendary/aesthetic) → 1.3x
 	quality := float64(social.QualityScore)
-	qualityMult := 0.6 + 0.007*quality // maps 0..100 → 0.8..1.3
+	qualityMult := 0.6 + 0.0778*(quality-1) // maps 1..10 → 0.6..1.3
 	qualityMult = clampFloat(qualityMult, 0.6, 1.3)
 
 	allMult := nicheMult * erMult * verMult * trustMult * qualityMult * 0.75
@@ -276,7 +273,7 @@ func calculateBudget(social *trendlybq.Socials) Range {
 	}
 }
 
-func calculateReach(social *trendlybq.Socials) Range {
+func calculateReach(social *trendlyrdb.Socials) Range {
 	followers := float64(social.FollowerCount)
 	avgViews := float64(social.AverageViews)
 	er := float64(social.EngagementRate)
@@ -424,7 +421,7 @@ func FetchInfluencer(c *gin.Context) {
 		}
 	}
 
-	social := &trendlybq.Socials{}
+	social := &trendlyrdb.Socials{}
 
 	err = social.Get(influencerId)
 	if err != nil {
@@ -446,16 +443,28 @@ func FetchInfluencer(c *gin.Context) {
 			ImageURL: &social.ProfilePic,
 		},
 	}
-	for i, v := range social.Reels {
-		if i >= 5 {
-			break
+	// Fetch latest Instagram posts from RDB to build reel attachments
+	posts, err := trendlyrdb.InstagramPost{}.GetBySocialID(influencerId, 30)
+	if err == nil {
+		for i, v := range posts {
+			if i >= 5 {
+				break
+			}
+			attachments = append(attachments, trendlymodels.UserAttachment{
+				Type:     "reel",
+				ImageURL: &v.DisplayURL,
+				PlayURL:  &v.URL,
+			})
 		}
-		attachments = append(attachments, trendlymodels.UserAttachment{
-			Type:     "reel",
-			ImageURL: &v.ThumbnailURL,
-			PlayURL:  &v.URL,
-		})
 	}
+	socRes := struct {
+		trendlyrdb.Socials
+		Reels []trendlyrdb.InstagramPost `json:"reels"`
+	}{
+		Socials: *social,
+		Reels:   posts,
+	}
+
 	user := trendlymodels.User{
 		Name:            social.Name,
 		IsChatConnected: false,
@@ -472,7 +481,7 @@ func FetchInfluencer(c *gin.Context) {
 		Backend: &trendlymodels.BackendData{
 			Followers:  &social.FollowerCount,
 			Reach:      &social.ViewsCount,
-			Engagement: &social.EnagamentsCount,
+			Engagement: &social.EngagementCount,
 			Gender:     &social.Gender,
 			Quality:    &social.QualityScore,
 		},
@@ -499,7 +508,7 @@ func FetchInfluencer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Fetched influencer",
-		"social":   social,
+		"social":   socRes,
 		"analysis": calculatedValue,
 		"influencer": gin.H{
 			"user":   user,
@@ -525,16 +534,28 @@ func FetchInvitedInfluencers(c *gin.Context) {
 		return
 	}
 
-	out := []InfluencerInviteUnit{}
+	profiles := make([]trendlyrdb.Socials, 0, len(invites))
 	for _, inv := range invites {
+		if inv.SocialProfile != nil {
+			profiles = append(profiles, *inv.SocialProfile)
+		}
+	}
+	discoverFlags, err := isDiscoverFlagsForSocials(profiles)
+	if err != nil {
+		c.JSON(500, gin.H{"message": "Error resolving discover state", "error": err.Error()})
+		return
+	}
+
+	out := make([]InfluencerInviteUnit, 0, len(profiles))
+	for i, inv := range invites {
 		r := inv.SocialProfile
 		if r == nil {
 			continue
 		}
 		out = append(out, InfluencerInviteUnit{
 			InfluencerItem: InfluencerItem{
-				SocialsBreif: *r,
-				IsDiscover:   true,
+				Socials:    *r,
+				IsDiscover: discoverFlags[i],
 			},
 			InvitedAt: inv.TimeStamp,
 			Status:    inv.Status,
@@ -549,7 +570,7 @@ func FetchInvitedInfluencers(c *gin.Context) {
 	})
 }
 
-func TestCalculations(social *trendlybq.Socials) CalculatedData {
+func TestCalculations(social *trendlyrdb.Socials) CalculatedData {
 	calculatedValue := CalculatedData{
 		Quality:         social.QualityScore,
 		Trustablity:     calculateTrustablity(social),
@@ -589,10 +610,16 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	bqSocials, err := trendlybq.Socials{}.GetMultiple(req.Influencers)
+	rdbSocials, err := trendlyrdb.Socials{}.GetMultiple(req.Influencers)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error gettimg socials"})
 		return
+	}
+
+	// Build a map for quick lookup by ID
+	socialMap := make(map[string]trendlyrdb.Socials, len(rdbSocials))
+	for _, s := range rdbSocials {
+		socialMap[s.ID] = s
 	}
 
 	// Send Invitations
@@ -610,11 +637,8 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 				Message:         "Invited via Discovery",
 			}
 
-			for _, s := range bqSocials {
-				if s.ID == infId {
-					invite.SocialProfile = s.ConvertToSocialBreif()
-					break
-				}
+			if s, ok := socialMap[infId]; ok {
+				invite.SocialProfile = convertSocialsToBreif(s)
 			}
 
 			_, err := invite.Create()
@@ -638,4 +662,198 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "api is functional", "creditsUsed": creditUtilized, "invitationsSent": invites})
+}
+
+// convertSocialsToBreif converts an RDB Socials record into the brief
+// structure previously derived from SocialsN8N, so existing Firestore
+// invitations and API responses remain compatible.
+func convertSocialsToBreif(s trendlyrdb.Socials) *trendlyrdb.Socials {
+	return &s
+}
+
+// UpdateInfluencerRequest holds the raw scraped fields that are allowed to be updated.
+// All fields are pointers so that only explicitly provided values are applied,
+// leaving omitted fields untouched.
+type UpdateInfluencerRequest struct {
+	Name            *string             `json:"name"`
+	Bio             *string             `json:"bio"`
+	ProfilePic      *string             `json:"profile_pic"`
+	ProfilePicHD    *string             `json:"profile_pic_hd"`
+	Category        *string             `json:"category"`
+	ProfileVerified *bool               `json:"profile_verified"`
+	FollowerCount   *int64              `json:"follower_count"`
+	FollowingCount  *int64              `json:"following_count"`
+	ContentCount    *int64              `json:"content_count"`
+	ViewsCount      *int64              `json:"views_count"`
+	EngagementCount *int64              `json:"engagement_count"`
+	EngagementRate  *float32            `json:"engagement_rate"`
+	AverageViews    *float32            `json:"average_views"`
+	AverageLikes    *float32            `json:"average_likes"`
+	AverageComments *float32            `json:"average_comments"`
+	Links           *[]trendlyrdb.Links `json:"links"`
+	ExternalId      *string             `json:"external_id"`
+	Gender          *string             `json:"gender"`
+	Location        *string             `json:"location"`
+	Niches          *[]string           `json:"niches"`
+	QualityScore    *int                `json:"quality_score"`
+}
+
+// RescrapeInfluencer rescrapes the influencer profile and updates the social profile
+func RescrapeInfluencer(c *gin.Context) {
+	influencerId := c.Param("influencerId")
+	if influencerId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
+		return
+	}
+
+	manager := middlewares.GetManagerModel(c)
+	if !manager.IsAdmin {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "User is not an admin", "error": "unauthorized"})
+	}
+
+	social := &trendlyrdb.Socials{}
+	if err := social.Get(influencerId); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Influencer not found"})
+		return
+	}
+
+	var req sui.ScrapedSocial
+	req.Username = social.Username
+	req.SocialType = social.SocialType
+	req.Manual.QualityScore = social.QualityScore
+	req.Manual.Niches = social.Niches
+	req.HighValueInfluencer = true
+
+	b, err := json.Marshal(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to marshal request", "error": err.Error()})
+		return
+	}
+	err = sqshandler.SendToMessageQueue(string(b), 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to send to queue", "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"message": "Profile received"})
+
+}
+
+// UpdateInfluencer allows updating fields of an influencer profile including
+// gender, location, niches, and quality_score.
+func UpdateInfluencer(c *gin.Context) {
+	influencerId := c.Param("influencerId")
+	if influencerId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Influencer Id missing", "error": "influencer-id-missing"})
+		return
+	}
+
+	var req UpdateInfluencerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request body"})
+		return
+	}
+
+	manager := middlewares.GetManagerModel(c)
+	if !manager.IsAdmin {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "User is not an admin", "error": "unauthorized"})
+	}
+
+	// Fetch the existing social profile to verify it exists
+	social := &trendlyrdb.Socials{}
+	if err := social.Get(influencerId); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Influencer not found"})
+		return
+	}
+
+	// Build update map from only the fields that were explicitly provided
+	updates := map[string]interface{}{}
+
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.Bio != nil {
+		updates["bio"] = *req.Bio
+	}
+	if req.ProfilePic != nil {
+		updates["profile_pic"] = *req.ProfilePic
+	}
+	if req.ProfilePicHD != nil {
+		updates["profile_pic_hd"] = *req.ProfilePicHD
+	}
+	if req.Category != nil {
+		updates["category"] = *req.Category
+	}
+	if req.ProfileVerified != nil {
+		updates["profile_verified"] = *req.ProfileVerified
+	}
+	if req.FollowerCount != nil {
+		updates["follower_count"] = *req.FollowerCount
+	}
+	if req.FollowingCount != nil {
+		updates["following_count"] = *req.FollowingCount
+	}
+	if req.ContentCount != nil {
+		updates["content_count"] = *req.ContentCount
+	}
+	if req.ViewsCount != nil {
+		updates["views_count"] = *req.ViewsCount
+	}
+	if req.EngagementCount != nil {
+		updates["engagement_count"] = *req.EngagementCount
+	}
+	if req.EngagementRate != nil {
+		updates["engagement_rate"] = *req.EngagementRate
+	}
+	if req.AverageViews != nil {
+		updates["average_views"] = *req.AverageViews
+	}
+	if req.AverageLikes != nil {
+		updates["average_likes"] = *req.AverageLikes
+	}
+	if req.AverageComments != nil {
+		updates["average_comments"] = *req.AverageComments
+	}
+	if req.Links != nil {
+		updates["links"] = *req.Links
+	}
+	if req.ExternalId != nil {
+		updates["external_id"] = *req.ExternalId
+	}
+	if req.Gender != nil {
+		updates["gender"] = *req.Gender
+	}
+	if req.Location != nil {
+		updates["location"] = *req.Location
+	}
+	if req.Niches != nil {
+		updates["niches"] = pq.StringArray(*req.Niches)
+	}
+	if req.QualityScore != nil {
+		updates["quality_score"] = *req.QualityScore
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "No fields to update", "error": "empty-update"})
+		return
+	}
+
+	// Always stamp the last update time
+	updates["last_update_time"] = time.Now().Unix()
+
+	if err := social.Update(updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update influencer"})
+		return
+	}
+
+	// Reload the updated record to return the full object
+	if err := social.Get(influencerId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Updated but failed to reload influencer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Influencer updated successfully",
+		"social":  social,
+	})
 }
