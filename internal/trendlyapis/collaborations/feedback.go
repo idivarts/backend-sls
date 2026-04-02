@@ -13,6 +13,12 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
+// UserFeedbackRequest is the JSON body for POST /contracts/:contractId/user-feedback (influencer rates the brand).
+type UserFeedbackRequest struct {
+	Ratings        int    `json:"ratings" binding:"required,gte=1,lte=5"`
+	FeedbackReview string `json:"feedbackReview,omitempty"`
+}
+
 func UserFeedback(c *gin.Context) {
 	var req UserFeedbackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -119,6 +125,12 @@ func UserFeedback(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully given feedback"})
+}
+
+// BrandFeedbackRequest is the JSON body for POST /contracts/:contractId/brand-feedback (brand rates the influencer).
+type BrandFeedbackRequest struct {
+	Ratings        int    `json:"ratings" binding:"required,gte=1,lte=5"`
+	FeedbackReview string `json:"feedbackReview,omitempty"`
 }
 
 func BrandFeedback(c *gin.Context) {
