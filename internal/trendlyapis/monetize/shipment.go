@@ -299,7 +299,7 @@ func MarkShipmentReceived(c *gin.Context) {
 	if req.PhotoURL != "" {
 		data.Contract.Shipment.PackageScreenshots = append(data.Contract.Shipment.PackageScreenshots, req.PhotoURL)
 	}
-	data.Contract.Status = trendlymodels.ContractStatusReceived
+	data.Contract.Status = trendlymodels.ContractStatusDeliverablePending
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {

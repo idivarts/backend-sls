@@ -225,7 +225,7 @@ func RequestDeliverableChange(c *gin.Context) {
 	data.Contract.Deliverable.RevisionCount++
 	data.Contract.Deliverable.RevisionNotes = append(data.Contract.Deliverable.RevisionNotes, req.Notes)
 	data.Contract.Deliverable.Status = "revision-requested"
-	data.Contract.Status = trendlymodels.ContractStatusReceived
+	data.Contract.Status = trendlymodels.ContractStatusDeliverablePending
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {

@@ -89,7 +89,7 @@ func handleOrderPaid(payload map[string]interface{}) {
 	}
 	contract.Payment.Status = "paid"
 	contract.Payment.OrderID = orderID
-	contract.Status = trendlymodels.ContractStatusPaid
+	contract.Status = trendlymodels.ContractStatusShipmentPending
 
 	err = contract.Update(contractID)
 	if err != nil {

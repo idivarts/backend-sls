@@ -12,17 +12,17 @@ import (
 type ContractStatus int
 
 const (
-	ContractStatusPending         ContractStatus = 0
-	ContractStatusStarted         ContractStatus = 1
-	ContractStatusPaymentFailed   ContractStatus = 2
-	ContractStatusPaid            ContractStatus = 3
-	ContractStatusShipped         ContractStatus = 4
-	ContractStatusDelivered       ContractStatus = 5
-	ContractStatusReceived        ContractStatus = 6
-	ContractStatusDeliverableSent ContractStatus = 7
-	ContractStatusPostScheduled   ContractStatus = 8
-	ContractStatusPostDone        ContractStatus = 9
-	ContractStatusSettled         ContractStatus = 10
+	ContractStatusPending            ContractStatus = 0
+	ContractStatusStarted            ContractStatus = 1
+	ContractStatusPaymentFailed      ContractStatus = 2
+	ContractStatusShipmentPending    ContractStatus = 3
+	ContractStatusShipped            ContractStatus = 4
+	ContractStatusDelivered          ContractStatus = 5
+	ContractStatusDeliverablePending ContractStatus = 6
+	ContractStatusDeliverableSent    ContractStatus = 7
+	ContractStatusPostScheduled      ContractStatus = 8
+	ContractStatusPostDone           ContractStatus = 9
+	ContractStatusSettled            ContractStatus = 10
 )
 
 // InfluencerFeedback is rating and review submitted by the influencer on a contract.
