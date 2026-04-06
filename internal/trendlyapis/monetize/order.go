@@ -19,6 +19,18 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
+	user := &trendlymodels.User{}
+	err = user.Get(data.Contract.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant find User"})
+		return
+	}
+
+	if !user.IsKYCDone || user.KYC == nil || user.KYC.AccountID == "" || user.KYC.Status != "activated" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Influencer is not KYC verified", "message": "Influencer is not KYC verified"})
+		return
+	}
+
 	application := &trendlymodels.Application{}
 	err = application.Get(data.Contract.CollaborationID, data.Contract.UserID)
 	if err != nil {
