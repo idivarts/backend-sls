@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments"
 	"github.com/idivarts/backend-sls/templates"
 )
@@ -39,6 +40,7 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	var orderID string
+	var transferID string
 	var shortURL string
 	reuseOrder := false
 
@@ -81,12 +83,31 @@ func CreateOrder(c *gin.Context) {
 			"userId":          data.Contract.UserID,
 		}
 
-		order, err := payments.CreateOrder(application.Quotation, oNotes, nil)
+		order, err := payments.CreateOrder(application.Quotation, oNotes, []payments.OrderTransfer{
+			{
+				Account:  user.KYC.AccountID,
+				Amount:   (application.Quotation * 90) / 100,
+				Currency: "INR",
+				OnHold:   myutil.BoolPtr(true),
+			},
+		})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Failed to Create Order"})
 			return
 		}
+		if len(order.Transfers) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No transfers found", "message": "Failed to Create Order with Transfers"})
+			return
+		}
+
+		orderTransfer := order.Transfers[0]
+		if orderTransfer.Error != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": orderTransfer.Error.Description, "message": "Failed to Create Order"})
+			return
+		}
+
 		orderID = order.ID
+		transferID = orderTransfer.ID
 
 		// 4. Create a Payment Link for the email
 		customerEmail := ""
@@ -112,10 +133,11 @@ func CreateOrder(c *gin.Context) {
 
 	// 5. Update the Contract with Order/Payment details
 	data.Contract.Payment = &trendlymodels.Payment{
-		OrderID:  orderID,
-		Status:   "waiting_for_payment",
-		ShortURL: shortURL,
-		Amount:   application.Quotation,
+		OrderID:    orderID,
+		TransferID: transferID,
+		Status:     "waiting_for_payment",
+		ShortURL:   shortURL,
+		Amount:     application.Quotation,
 	}
 	data.Contract.Status = trendlymodels.ContractStatusOrderCreated
 	err = data.Contract.Update(data.ContractID)
