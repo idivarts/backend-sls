@@ -1,6 +1,7 @@
 package monetize
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments"
+	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
 
@@ -17,6 +19,18 @@ func CreateOrder(c *gin.Context) {
 	data, err := initializeData(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
+		return
+	}
+
+	application := &trendlymodels.Application{}
+	err = application.Get(data.Contract.CollaborationID, data.Contract.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant find Application"})
+		return
+	}
+
+	if application.Quotation <= 0 {
+		_ = startBarterContract(c, data, application)
 		return
 	}
 
@@ -29,13 +43,6 @@ func CreateOrder(c *gin.Context) {
 
 	if !user.IsKYCDone || user.KYC == nil || user.KYC.AccountID == "" || user.KYC.Status != "activated" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Influencer is not KYC verified", "message": "Influencer is not KYC verified"})
-		return
-	}
-
-	application := &trendlymodels.Application{}
-	err = application.Get(data.Contract.CollaborationID, data.Contract.UserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant find Application"})
 		return
 	}
 
@@ -175,6 +182,94 @@ func CreateOrder(c *gin.Context) {
 	})
 }
 
+// contractStatusAfterFunding matches handleOrderPaid in webhook_orders (post-payment workflow).
+func contractStatusAfterFunding(collab *trendlymodels.Collaboration) trendlymodels.ContractStatus {
+	if collab.PromotionSubject == trendlymodels.PromotionSubjectPhysicalProduct {
+		return trendlymodels.ContractStatusShipmentPending
+	}
+	return trendlymodels.ContractStatusDeliverablePending
+}
+
+// startBarterContract skips Razorpay for zero-quotation (barter) collabs and moves the contract forward
+// as if payment succeeded, without charging the brand.
+func startBarterContract(c *gin.Context, data *struct {
+	ContractID string
+	Contract   *trendlymodels.Contract
+	Brand      *trendlymodels.Brand
+}, _ *trendlymodels.Application) error {
+	collab := &trendlymodels.Collaboration{}
+	if err := collab.Get(data.Contract.CollaborationID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant find Collaboration"})
+		return err
+	}
+
+	nextStatus := contractStatusAfterFunding(collab)
+	data.Contract.Payment = &trendlymodels.Payment{
+		Status: "paid",
+		Amount: 0,
+	}
+	data.Contract.Status = nextStatus
+	if err := data.Contract.Update(data.ContractID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return err
+	}
+
+	influencer := &trendlymodels.User{}
+	_ = influencer.Get(data.Contract.UserID)
+	influencerName := influencer.Name
+	if influencerName == "" {
+		influencerName = "Creator"
+	}
+	collabName := collab.Name
+	if collabName == "" {
+		collabName = "Your Collaboration"
+	}
+
+	notifBrand := &trendlymodels.Notification{
+		Title:       "Collaboration is live",
+		Description: fmt.Sprintf("%s is now active. No payment was required (barter). The creator can start the next steps.", collabName),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "barter-collaboration-started",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	if _, _, err := notifBrand.Insert(trendlymodels.BRAND_COLLECTION, data.Contract.BrandID); err != nil {
+		log.Printf("barter start: brand notification: %v", err)
+	}
+
+	notifInfluencer := &trendlymodels.Notification{
+		Title:       "Collaboration is live",
+		Description: fmt.Sprintf("Your barter collaboration %s with %s is active. You can start working on the next steps.", collabName, data.Brand.Name),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "barter-collaboration-started",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	if _, _, err := notifInfluencer.Insert(trendlymodels.USER_COLLECTION, data.Contract.UserID); err != nil {
+		log.Printf("barter start: influencer notification: %v", err)
+	}
+
+	streamMessage := fmt.Sprintf("🤝 **Barter collaboration is live**\n\nNo payment was required. **%s** and **%s** can move forward with the collaboration. 🚀", data.Brand.Name, influencerName)
+	if err := streamchat.SendSystemMessage(data.Contract.StreamChannelID, streamMessage); err != nil {
+		log.Printf("barter start: stream message: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Barter collaboration started",
+		"barter":   true,
+		"status":   int(nextStatus),
+		"orderId":  "",
+		"shortUrl": "",
+	})
+	return nil
+}
+
 func GetOrder(c *gin.Context) {
 	data, err := initializeData(c)
 	if err != nil {
@@ -182,7 +277,21 @@ func GetOrder(c *gin.Context) {
 		return
 	}
 
-	if data.Contract.Payment == nil || data.Contract.Payment.OrderID == "" {
+	if data.Contract.Payment == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No order found", "message": "No payment order has been created for this contract yet"})
+		return
+	}
+
+	if data.Contract.Payment.OrderID == "" && data.Contract.Payment.Status == "paid" && data.Contract.Payment.Amount == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Barter collaboration — no Razorpay order",
+			"barter":  true,
+			"payment": data.Contract.Payment,
+		})
+		return
+	}
+
+	if data.Contract.Payment.OrderID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No order found", "message": "No payment order has been created for this contract yet"})
 		return
 	}
