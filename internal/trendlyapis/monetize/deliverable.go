@@ -114,7 +114,12 @@ func ApproveDeliverable(c *gin.Context) {
 		}
 	case 3:
 		scenarioText = "Brand will use video independently"
-		data.Contract.Status = trendlymodels.ContractStatusPostDone
+		if data.Contract.Payment != nil && data.Contract.Payment.Status == "paid" && data.Contract.Payment.Amount == 0 {
+			data.Contract.Status = trendlymodels.ContractStatusSettled
+		} else {
+			data.Contract.Status = trendlymodels.ContractStatusPostDone
+		}
+
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid posting scenario"})
 		return
@@ -140,6 +145,16 @@ func ApproveDeliverable(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to release payment after holding for day"})
 			return
 		}
+	}
+	if data.Contract.Status == trendlymodels.ContractStatusSettled {
+		if err := notifyAboutContractEnded(data.ContractID, *data.Contract); err != nil {
+			log.Printf("notify contract ended: %v", err)
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":         "Deliverable approved — collaboration complete",
+			"contractSettled": true,
+		})
+		return
 	}
 
 	// 2. Fetch Influencer for notification
