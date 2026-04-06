@@ -69,7 +69,7 @@ func MapToOrder(m map[string]interface{}) (*Order, error) {
 }
 
 // OrderTransfer is one linked-account transfer embedded in order creation (Razorpay Route / order API).
-// Amount is in the smallest currency unit (paise for INR), consistent with the order amount field.
+// Amount is in whole rupees (same unit as CreateOrder’s amountInRs); CreateOrder sends amount*100 as paise to Razorpay.
 type OrderTransfer struct {
 	Account            string                 `json:"account"`
 	Amount             int                    `json:"amount"`

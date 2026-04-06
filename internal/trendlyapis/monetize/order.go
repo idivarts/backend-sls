@@ -86,7 +86,7 @@ func CreateOrder(c *gin.Context) {
 		order, err := payments.CreateOrder(application.Quotation, oNotes, []payments.OrderTransfer{
 			{
 				Account:  user.KYC.AccountID,
-				Amount:   (application.Quotation * 90) / 100,
+				Amount:   application.Quotation,
 				Currency: "INR",
 				OnHold:   myutil.BoolPtr(true),
 			},
