@@ -45,4 +45,6 @@ const (
 	PostMarkedLiveInfluencer          myemail.TemplatePath = "templates/post_marked_live_influencer.html"
 	PayoutTransferInfluencer          myemail.TemplatePath = "templates/payout_transfer_influencer.html"
 	PayoutTransferBrand               myemail.TemplatePath = "templates/payout_transfer_brand.html"
+	PayoutTransferFailedInfluencer    myemail.TemplatePath = "templates/payout_transfer_failed_influencer.html"
+	PayoutTransferFailedBrand         myemail.TemplatePath = "templates/payout_transfer_failed_brand.html"
 )

@@ -20,7 +20,7 @@ type TransferEntity struct {
 	CreatedAt             int64                  `json:"created_at"`
 	LinkedAccountNotes    []string               `json:"linked_account_notes"`
 	ProcessedAt           *int64                 `json:"processed_at"`
-	Error                 *TransferEntity        `json:"error"`
+	Error                 *TransferEntityError   `json:"error"`
 }
 
 // SettlementEntity represents a Razorpay settlement resource in "transfer.*" or "settlement.*" webhook payloads.

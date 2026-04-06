@@ -42,4 +42,6 @@ const (
 	SubjectPostMarkedLiveForInfluencer   = "Congratulations! 🎉 Your post is live"
 	SubjectPayoutTransferInfluencer      = "Your payout has been initiated – Trendly"
 	SubjectPayoutTransferBrand           = "Collaboration complete – influencer payout initiated"
+	SubjectPayoutTransferFailedInfluencer  = "Issue with your payout transfer – Trendly"
+	SubjectPayoutTransferFailedBrand       = "Influencer payout transfer could not be completed"
 )
