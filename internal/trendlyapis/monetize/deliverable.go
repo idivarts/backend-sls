@@ -134,6 +134,14 @@ func ApproveDeliverable(c *gin.Context) {
 		return
 	}
 
+	if data.Contract.Status == trendlymodels.ContractStatusPostDone {
+		err = releasePaymentAfterHoldingForDay(*data.Contract, 0)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to release payment after holding for day"})
+			return
+		}
+	}
+
 	// 2. Fetch Influencer for notification
 	influencer := &trendlymodels.User{}
 	err = influencer.Get(data.Contract.UserID)

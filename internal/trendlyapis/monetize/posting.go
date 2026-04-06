@@ -10,6 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/payments"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
@@ -109,6 +110,15 @@ type MarkPostedReq struct {
 	Notes           string `json:"notes"`
 }
 
+func releasePaymentAfterHoldingForDay(contract trendlymodels.Contract, days int) error {
+	if contract.Payment == nil || contract.Payment.TransferID == "" {
+		return fmt.Errorf("payment not found")
+	}
+
+	_, err := payments.UpdateTransferHold(contract.Payment.TransferID, days)
+	return err
+}
+
 func MarkPosted(c *gin.Context) {
 	var req MarkPostedReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -135,6 +145,12 @@ func MarkPosted(c *gin.Context) {
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return
+	}
+
+	err = releasePaymentAfterHoldingForDay(*data.Contract, 2)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to release payment after holding for day"})
 		return
 	}
 
