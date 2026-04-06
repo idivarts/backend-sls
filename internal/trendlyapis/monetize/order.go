@@ -85,10 +85,10 @@ func CreateOrder(c *gin.Context) {
 
 		order, err := payments.CreateOrder(application.Quotation, oNotes, []payments.OrderTransfer{
 			{
-				Account:  user.KYC.AccountID,
-				Amount:   application.Quotation,
-				Currency: "INR",
-				OnHold:   myutil.BoolPtr(true),
+				Account:    user.KYC.AccountID,
+				AmountInRs: application.Quotation,
+				Currency:   "INR",
+				OnHold:     myutil.BoolPtr(true),
 			},
 		})
 		if err != nil {

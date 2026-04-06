@@ -72,7 +72,7 @@ func MapToOrder(m map[string]interface{}) (*Order, error) {
 // Amount is in whole rupees (same unit as CreateOrder’s amountInRs); CreateOrder sends amount*100 as paise to Razorpay.
 type OrderTransfer struct {
 	Account            string                 `json:"account"`
-	Amount             int                    `json:"amount"`
+	AmountInRs         int                    `json:"amount"`
 	Currency           string                 `json:"currency"`
 	Notes              map[string]interface{} `json:"notes,omitempty"`
 	LinkedAccountNotes []string               `json:"linked_account_notes,omitempty"`
@@ -97,7 +97,7 @@ func CreateOrder(amountInRs int, notes map[string]interface{}, transfers []Order
 			t := transfers[i]
 			m := map[string]interface{}{
 				"account":  t.Account,
-				"amount":   t.Amount * 100,
+				"amount":   t.AmountInRs * 100,
 				"currency": "INR",
 			}
 			if len(t.Notes) > 0 {
