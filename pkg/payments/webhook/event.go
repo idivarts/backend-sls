@@ -32,7 +32,7 @@ type Payload struct {
 		Entity SettlementEntity `json:"entity"`
 	} `json:"settlement"`
 	Route *struct {
-		Entity RouteEntity            `json:"entity"`
+		Entity RouteProductEntity     `json:"entity"`
 		Data   map[string]interface{} `json:"data"`
 	} `json:"merchant_product"`
 }

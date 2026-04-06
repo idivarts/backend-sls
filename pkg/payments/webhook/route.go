@@ -1,10 +1,11 @@
 package webhook
 
-// RouteEntity matches the transfer resource embedded in Route webhook payloads
-// (e.g. transfer.processed, transfer.failed). See:
-// https://razorpay.com/docs/webhooks/route/
-type RouteEntity struct {
+// RouteProductEntity matches merchant_product in Route webhooks (product.route.*).
+// See: https://razorpay.com/docs/webhooks/payloads/route/
+type RouteProductEntity struct {
+	Entity           string `json:"entity"`
 	ID               string `json:"id"`
 	MerchantID       string `json:"merchant_id"`
+	ProductName      string `json:"product_name"`
 	ActivationStatus string `json:"activation_status"`
 }
