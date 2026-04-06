@@ -28,4 +28,11 @@ type Payload struct {
 	Transfer *struct {
 		Entity TransferEntity `json:"entity"`
 	} `json:"transfer"`
+	Settlement *struct {
+		Entity SettlementEntity `json:"entity"`
+	} `json:"settlement"`
+	Route *struct {
+		Entity RouteEntity            `json:"entity"`
+		Data   map[string]interface{} `json:"data"`
+	} `json:"merchant_product"`
 }

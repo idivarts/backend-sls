@@ -17,6 +17,7 @@ import (
 
 // transfer.processed
 // transfer.failed
+// settlement.processed
 
 func TransferWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
