@@ -19,7 +19,7 @@ import (
 )
 
 // order.paid
-// order.notification.failed
+// payment.failed
 
 func PaymentWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
