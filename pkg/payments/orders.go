@@ -8,17 +8,50 @@ import (
 )
 
 type Order struct {
-	ID         string                 `json:"id"`
-	Entity     string                 `json:"entity"`
-	Amount     int                    `json:"amount"`
-	AmountPaid int                    `json:"amount_paid"`
-	AmountDue  int                    `json:"amount_due"`
-	Currency   string                 `json:"currency"`
-	Receipt    string                 `json:"receipt"`
-	Status     string                 `json:"status"`
-	Attempts   int                    `json:"attempts"`
-	Notes      map[string]interface{} `json:"notes"`
-	CreatedAt  int64                  `json:"created_at"`
+	ID         string                  `json:"id"`
+	Entity     string                  `json:"entity"`
+	Amount     int                     `json:"amount"`
+	AmountPaid int                     `json:"amount_paid"`
+	AmountDue  int                     `json:"amount_due"`
+	Currency   string                  `json:"currency"`
+	Receipt    string                  `json:"receipt"`
+	Status     string                  `json:"status"`
+	Attempts   int                     `json:"attempts"`
+	Notes      map[string]interface{}  `json:"notes"`
+	CreatedAt  int64                   `json:"created_at"`
+	Transfers  []OrderTransferResponse `json:"transfers,omitempty"`
+}
+
+// OrderTransferError is the nested error object on transfers returned with an order.
+type OrderTransferError struct {
+	Code        *string     `json:"code"`
+	Description *string     `json:"description"`
+	Reason      *string     `json:"reason"`
+	Field       *string     `json:"field"`
+	Step        *string     `json:"step"`
+	ID          *string     `json:"id"`
+	Source      *string     `json:"source"`
+	Metadata    interface{} `json:"metadata"`
+}
+
+// OrderTransferResponse is one Route transfer returned on order create/fetch (recipient, status, etc.).
+type OrderTransferResponse struct {
+	ID                    string                 `json:"id"`
+	Entity                string                 `json:"entity"`
+	Status                string                 `json:"status"`
+	Source                string                 `json:"source"`
+	Recipient             string                 `json:"recipient"`
+	Amount                int                    `json:"amount"`
+	Currency              string                 `json:"currency"`
+	AmountReversed        int                    `json:"amount_reversed"`
+	Notes                 map[string]interface{} `json:"notes,omitempty"`
+	LinkedAccountNotes    []string               `json:"linked_account_notes,omitempty"`
+	OnHold                bool                   `json:"on_hold"`
+	OnHoldUntil           *int64                 `json:"on_hold_until,omitempty"`
+	RecipientSettlementID *string                `json:"recipient_settlement_id,omitempty"`
+	CreatedAt             int64                  `json:"created_at"`
+	ProcessedAt           *int64                 `json:"processed_at,omitempty"`
+	Error                 *OrderTransferError    `json:"error,omitempty"`
 }
 
 func MapToOrder(m map[string]interface{}) (*Order, error) {
@@ -35,14 +68,53 @@ func MapToOrder(m map[string]interface{}) (*Order, error) {
 	return &order, nil
 }
 
-func CreateOrder(amountInRs int, notes map[string]interface{}) (*Order, error) {
+// OrderTransfer is one linked-account transfer embedded in order creation (Razorpay Route / order API).
+// Amount is in whole rupees (same unit as CreateOrder’s amountInRs); CreateOrder sends amount*100 as paise to Razorpay.
+type OrderTransfer struct {
+	Account            string                 `json:"account"`
+	AmountInRs         int                    `json:"amount"`
+	Currency           string                 `json:"currency"`
+	Notes              map[string]interface{} `json:"notes,omitempty"`
+	LinkedAccountNotes []string               `json:"linked_account_notes,omitempty"`
+	OnHold             *bool                  `json:"on_hold,omitempty"`
+	OnHoldUntil        *int64                 `json:"on_hold_until,omitempty"`
+}
+
+func CreateOrder(amountInRs int, notes map[string]interface{}, transfers []OrderTransfer) (*Order, error) {
 	// This function will handle the creation of an order.
 	// It will interact with Razorpay's API to create an order and return the order details.
+	// Pass nil or an empty transfers slice to omit "transfers" from the payload.
 
 	data := map[string]interface{}{
 		"amount":   amountInRs * 100, // amount in paise
 		"currency": "INR",
 		"notes":    notes,
+	}
+
+	if len(transfers) > 0 {
+		payload := make([]map[string]interface{}, 0, len(transfers))
+		for i := range transfers {
+			t := transfers[i]
+			m := map[string]interface{}{
+				"account":  t.Account,
+				"amount":   t.AmountInRs * 100,
+				"currency": "INR",
+			}
+			if len(t.Notes) > 0 {
+				m["notes"] = t.Notes
+			}
+			if len(t.LinkedAccountNotes) > 0 {
+				m["linked_account_notes"] = t.LinkedAccountNotes
+			}
+			if t.OnHold != nil {
+				m["on_hold"] = *t.OnHold
+			}
+			if t.OnHoldUntil != nil {
+				m["on_hold_until"] = *t.OnHoldUntil
+			}
+			payload = append(payload, m)
+		}
+		data["transfers"] = payload
 	}
 
 	res, err := Client.Order.Create(data, nil)
