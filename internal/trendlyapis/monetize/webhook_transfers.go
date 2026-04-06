@@ -1,7 +1,7 @@
 package monetize
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,15 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/payments"
+	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 )
-
-type RazorpayTransferEvent struct {
-	Entity    string                 `json:"entity"`
-	AccountID string                 `json:"account_id"`
-	Event     string                 `json:"event"`
-	Payload   map[string]interface{} `json:"payload"`
-}
 
 func TransferWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
@@ -30,42 +24,39 @@ func TransferWebhook(c *gin.Context) {
 	}
 
 	signature := c.GetHeader("X-Razorpay-Signature")
-	if !payments.VerifyWebhookSignature(body, signature, payments.WebhookKey) {
-		log.Printf("Invalid Razorpay signature: %s", signature)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
-		return
-	}
-
-	var event RazorpayTransferEvent
-	if err := json.Unmarshal(body, &event); err != nil {
-		log.Printf("Failed to unmarshal Razorpay event: %v", err)
+	event, err := webhook.VerifyAndParse(body, signature, payments.WebhookKey)
+	if err != nil {
+		if errors.Is(err, webhook.ErrInvalidSignature) {
+			log.Printf("Invalid Razorpay signature: %s", signature)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
+			return
+		}
+		log.Printf("Failed to parse Razorpay event: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal event"})
 		return
 	}
 
 	log.Printf("Received Razorpay Transfer Event: %s", event.Event)
 
-	if event.Event == "transfer.processed" {
-		handleTransferProcessed(event.Payload)
+	if event.Event == "transfer.processed" && event.Payload.Transfer != nil {
+		handleTransferProcessed(&event.Payload.Transfer.Entity)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "received"})
 }
 
-func handleTransferProcessed(payload map[string]interface{}) {
-	transferPayload, ok := payload["transfer"].(map[string]interface{})
-	if !ok {
+func handleTransferProcessed(transfer *webhook.TransferEntity) {
+	if transfer == nil {
 		return
 	}
 
-	entity, ok := transferPayload["entity"].(map[string]interface{})
-	if !ok {
-		return
+	transferID := transfer.ID
+	contractID := ""
+	if transfer.Notes != nil {
+		if v, ok := transfer.Notes["contractId"].(string); ok {
+			contractID = v
+		}
 	}
-
-	transferID, _ := entity["id"].(string)
-	notes, _ := entity["notes"].(map[string]interface{})
-	contractID, _ := notes["contractId"].(string)
 
 	if contractID == "" {
 		log.Printf("No contractId found in notes for transfer: %s", transferID)

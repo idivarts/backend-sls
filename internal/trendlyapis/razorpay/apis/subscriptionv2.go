@@ -74,7 +74,7 @@ func CreateSubscriptionV2(c *gin.Context) {
 	// }, nil)
 	// if plans, ok := body["items"].([]interface{}); ok {
 	// 	for _, item := range plans {
-	// 		var plan paymentwebhooks.PlanEntity
+	// 		var plan webhook.PlanEntity
 	// 		b, _ := json.Marshal(item)   // convert map[string]interface{} -> []byte
 	// 		_ = json.Unmarshal(b, &plan) // convert []byte -> struct
 	// 		if plan.Notes.PlanKey == planKey && plan.Notes.PlanCycle == planCycle && plan.Notes.PlanVersion == PLAN_VERSION {

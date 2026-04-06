@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	paymentwebhooks "github.com/idivarts/backend-sls/internal/trendlyapis/razorpay/payment_webhooks"
+	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
 
 const data = `{
@@ -54,15 +55,14 @@ const data = `{
 }`
 
 func TestParse(t *testing.T) {
-	var event paymentwebhooks.RazorpayWebhookEvent
+	var event webhook.Event
 	bodyBytes := []byte(data)
 	if err := json.Unmarshal(bodyBytes, &event); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-	err := paymentwebhooks.HandleSubscription(event)
+	err := paymentwebhooks.HandleSubscription(&event)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	t.Log("Success")
 }

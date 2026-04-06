@@ -1,4 +1,4 @@
-package paymentwebhooks
+package webhook
 
 type PlanEntity struct {
 	ID        string    `json:"id"`

@@ -1,7 +1,7 @@
 package monetize
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,16 +13,10 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/payments"
+	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
-
-type RazorpayOrderEvent struct {
-	Entity    string                 `json:"entity"`
-	AccountID string                 `json:"account_id"`
-	Event     string                 `json:"event"`
-	Payload   map[string]interface{} `json:"payload"`
-}
 
 func PaymentWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
@@ -33,42 +27,37 @@ func PaymentWebhook(c *gin.Context) {
 	}
 
 	signature := c.GetHeader("X-Razorpay-Signature")
-	if !payments.VerifyWebhookSignature(body, signature, payments.WebhookKey) {
-		log.Printf("Invalid Razorpay signature: %s", signature)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
-		return
-	}
-
-	var event RazorpayOrderEvent
-	if err := json.Unmarshal(body, &event); err != nil {
-		log.Printf("Failed to unmarshal Razorpay event: %v", err)
+	event, err := webhook.VerifyAndParse(body, signature, payments.WebhookKey)
+	if err != nil {
+		if errors.Is(err, webhook.ErrInvalidSignature) {
+			log.Printf("Invalid Razorpay signature: %s", signature)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
+			return
+		}
+		log.Printf("Failed to parse Razorpay event: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal event"})
 		return
 	}
 
 	log.Printf("Received Razorpay Event: %s", event.Event)
 
-	if event.Event == "order.paid" {
-		handleOrderPaid(event.Payload)
+	if event.Event == "order.paid" && event.Payload.Order != nil {
+		handleOrderPaid(&event.Payload.Order.Entity)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "received"})
 }
 
-func handleOrderPaid(payload map[string]interface{}) {
-	orderPayload, ok := payload["order"].(map[string]interface{})
-	if !ok {
+func handleOrderPaid(order *webhook.OrderEntity) {
+	if order == nil {
 		return
 	}
 
-	entity, ok := orderPayload["entity"].(map[string]interface{})
-	if !ok {
-		return
+	orderID := order.ID
+	contractID := ""
+	if order.Notes != nil {
+		contractID = order.Notes["contractId"]
 	}
-
-	orderID, _ := entity["id"].(string)
-	notes, _ := entity["notes"].(map[string]interface{})
-	contractID, _ := notes["contractId"].(string)
 
 	if contractID == "" {
 		log.Printf("No contractId found in notes for order: %s", orderID)
@@ -89,7 +78,15 @@ func handleOrderPaid(payload map[string]interface{}) {
 	}
 	contract.Payment.Status = "paid"
 	contract.Payment.OrderID = orderID
-	contract.Status = trendlymodels.ContractStatusShipmentPending
+
+	collab := &trendlymodels.Collaboration{}
+	err = collab.Get(contract.CollaborationID)
+
+	if collab.PromotionSubject == trendlymodels.PromotionSubjectPhysicalProduct {
+		contract.Status = trendlymodels.ContractStatusShipmentPending
+	} else {
+		contract.Status = trendlymodels.ContractStatusDeliverablePending
+	}
 
 	err = contract.Update(contractID)
 	if err != nil {
@@ -104,10 +101,8 @@ func handleOrderPaid(payload map[string]interface{}) {
 	influencer := &trendlymodels.User{}
 	influencer.Get(contract.UserID)
 
-	collab := &trendlymodels.Collaboration{}
-	err = collab.Get(contract.CollaborationID)
 	collabName := "Your Collaboration"
-	if err == nil {
+	if collab.Name != "" {
 		collabName = collab.Name
 	}
 

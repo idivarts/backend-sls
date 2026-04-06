@@ -1,21 +1,15 @@
 package monetize
 
 import (
-	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/pkg/payments"
+	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
-
-type RazorpayRouteEvent struct {
-	Entity    string                 `json:"entity"`
-	AccountID string                 `json:"account_id"`
-	Event     string                 `json:"event"`
-	Payload   map[string]interface{} `json:"payload"`
-}
 
 func RouteWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
@@ -26,20 +20,19 @@ func RouteWebhook(c *gin.Context) {
 	}
 
 	signature := c.GetHeader("X-Razorpay-Signature")
-	if !payments.VerifyWebhookSignature(body, signature, payments.WebhookKey) {
-		log.Printf("Invalid Razorpay signature: %s", signature)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
-		return
-	}
-
-	var event RazorpayRouteEvent
-	if err := json.Unmarshal(body, &event); err != nil {
-		log.Printf("Failed to unmarshal Razorpay event: %v", err)
+	event, err := webhook.VerifyAndParse(body, signature, payments.WebhookKey)
+	if err != nil {
+		if errors.Is(err, webhook.ErrInvalidSignature) {
+			log.Printf("Invalid Razorpay signature: %s", signature)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
+			return
+		}
+		log.Printf("Failed to parse Razorpay event: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal event"})
 		return
 	}
 
-	log.Printf("Received Razorpay Transfer Event: %s", event.Event)
+	log.Printf("Received Razorpay Route Event: %s", event.Event)
 
 	// Get this done
 
