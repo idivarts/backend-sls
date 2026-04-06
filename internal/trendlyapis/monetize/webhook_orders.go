@@ -227,9 +227,11 @@ func handleOrderPaid(order *webhook.OrderEntity) {
 		emailDataBrand := map[string]interface{}{
 			"BrandMemberName": brand.Name,
 			"CollabTitle":     collabName,
-			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, contractID),
+			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.GetBrandsFronted(), contractID),
 		}
-		_ = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PaymentOrderCreated, templates.SubjectPaymentOrderCreated, emailDataBrand) // Reusing template for now or use a proper success one
+		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PaymentReceivedContractStartedBrand, templates.SubjectPaymentReceivedContractStartedBrand, emailDataBrand); err != nil {
+			log.Printf("order.paid: failed to send brand email for contract %s: %v", contractID, err)
+		}
 	}
 
 	// 5. Notify Influencer
@@ -245,14 +247,16 @@ func handleOrderPaid(order *webhook.OrderEntity) {
 		},
 	}
 	_, _, _ = notifToInfluencer.Insert(trendlymodels.USER_COLLECTION, contract.UserID)
-	if influencer.Email != nil {
+	if influencer.Email != nil && *influencer.Email != "" {
 		emailDataInfluencer := map[string]interface{}{
 			"InfluencerName": influencer.Name,
 			"BrandName":      brand.Name,
 			"CollabTitle":    collabName,
-			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, contractID),
+			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.GetCreatorsFronted(), contractID),
 		}
-		_ = myemail.SendCustomHTMLEmail(*influencer.Email, templates.ShipmentMarked, templates.SubjectShipmentMarked, emailDataInfluencer) // Reusing or custom
+		if err := myemail.SendCustomHTMLEmail(*influencer.Email, templates.ContractFundedStartedInfluencer, templates.SubjectContractFundedStartedInfluencer, emailDataInfluencer); err != nil {
+			log.Printf("order.paid: failed to send influencer email for contract %s: %v", contractID, err)
+		}
 	}
 
 	// 6. Stream System Message
