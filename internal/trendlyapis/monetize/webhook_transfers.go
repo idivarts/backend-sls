@@ -116,6 +116,10 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 		log.Printf("transfer processed: contract %s order mismatch (webhook order %s, contract order %s)", contractID, orderID, contract.Payment.OrderID)
 		return
 	}
+	if contract.Payment != nil && contract.Payment.TransferID != "" && contract.Payment.TransferID != transferID {
+		log.Printf("transfer processed: contract %s transfer mismatch (webhook transfer %s, contract transfer %s)", contractID, transferID, contract.Payment.TransferID)
+		return
+	}
 
 	// 2. Update Contract Status to Settled (10)
 	if contract.Payment == nil {
@@ -224,6 +228,10 @@ func handleTransferFailed(transfer *webhook.TransferEntity) {
 
 	if contract.Status == trendlymodels.ContractStatusSettled {
 		log.Printf("transfer failed: skip contract %s already settled (transfer %s)", contractID, transferID)
+		return
+	}
+	if contract.Payment != nil && contract.Payment.TransferID != "" && contract.Payment.TransferID != transferID {
+		log.Printf("transfer processed: contract %s transfer mismatch (webhook transfer %s, contract transfer %s)", contractID, transferID, contract.Payment.TransferID)
 		return
 	}
 
