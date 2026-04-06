@@ -35,14 +35,53 @@ func MapToOrder(m map[string]interface{}) (*Order, error) {
 	return &order, nil
 }
 
-func CreateOrder(amountInRs int, notes map[string]interface{}) (*Order, error) {
+// OrderTransfer is one linked-account transfer embedded in order creation (Razorpay Route / order API).
+// Amount is in the smallest currency unit (paise for INR), consistent with the order amount field.
+type OrderTransfer struct {
+	Account            string                 `json:"account"`
+	Amount             int                    `json:"amount"`
+	Currency           string                 `json:"currency"`
+	Notes              map[string]interface{} `json:"notes,omitempty"`
+	LinkedAccountNotes []string               `json:"linked_account_notes,omitempty"`
+	OnHold             *bool                  `json:"on_hold,omitempty"`
+	OnHoldUntil        *int64                 `json:"on_hold_until,omitempty"`
+}
+
+func CreateOrder(amountInRs int, notes map[string]interface{}, transfers []OrderTransfer) (*Order, error) {
 	// This function will handle the creation of an order.
 	// It will interact with Razorpay's API to create an order and return the order details.
+	// Pass nil or an empty transfers slice to omit "transfers" from the payload.
 
 	data := map[string]interface{}{
 		"amount":   amountInRs * 100, // amount in paise
 		"currency": "INR",
 		"notes":    notes,
+	}
+
+	if len(transfers) > 0 {
+		payload := make([]map[string]interface{}, 0, len(transfers))
+		for i := range transfers {
+			t := transfers[i]
+			m := map[string]interface{}{
+				"account":  t.Account,
+				"amount":   t.Amount,
+				"currency": t.Currency,
+			}
+			if len(t.Notes) > 0 {
+				m["notes"] = t.Notes
+			}
+			if len(t.LinkedAccountNotes) > 0 {
+				m["linked_account_notes"] = t.LinkedAccountNotes
+			}
+			if t.OnHold != nil {
+				m["on_hold"] = *t.OnHold
+			}
+			if t.OnHoldUntil != nil {
+				m["on_hold_until"] = *t.OnHoldUntil
+			}
+			payload = append(payload, m)
+		}
+		data["transfers"] = payload
 	}
 
 	res, err := Client.Order.Create(data, nil)

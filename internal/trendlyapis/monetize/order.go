@@ -81,7 +81,7 @@ func CreateOrder(c *gin.Context) {
 			"userId":          data.Contract.UserID,
 		}
 
-		order, err := payments.CreateOrder(application.Quotation, oNotes)
+		order, err := payments.CreateOrder(application.Quotation, oNotes, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Failed to Create Order"})
 			return
