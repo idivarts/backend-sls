@@ -1,20 +1,25 @@
 package monetize
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
-
-	"context"
-	"fmt"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/payments"
 	"github.com/idivarts/backend-sls/pkg/payments/webhook"
+	"github.com/idivarts/backend-sls/templates"
+	"google.golang.org/api/iterator"
 )
 
 func RouteWebhook(c *gin.Context) {
@@ -102,6 +107,8 @@ func handleRouteProductWebhook(event *webhook.Event) {
 	if _, _, err := notif.Insert(trendlymodels.USER_COLLECTION, userID); err != nil {
 		log.Printf("route product webhook %s: notification for user %s: %v", event.Event, userID, err)
 	}
+
+	sendRouteProductKYCEmailIfEligible(userID, kycStatus, reason)
 }
 
 func kycStatusFromRouteProductEvent(eventName string) string {
@@ -178,8 +185,112 @@ func resolveInfluencerUserIDForRouteMerchant(ctx context.Context, merchantID str
 	}
 
 	ref := strings.TrimSpace(account.ReferenceID)
+	if ref != "" {
+		if uid, err := userIDFromFirestoreByReferenceID(ctx, ref); err == nil && uid != "" {
+			return uid, nil
+		}
+	}
 
-	return ref, nil
+	return userIDFromFirestoreByKYCAccountID(ctx, merchantID)
+}
+
+func userIDFromFirestoreByKYCAccountID(ctx context.Context, accountID string) (string, error) {
+	iter := firestoredb.Client.Collection("users").Where("kyc.accountId", "==", accountID).Limit(2).Documents(ctx)
+	defer iter.Stop()
+
+	var ids []string
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		ids = append(ids, doc.Ref.ID)
+	}
+	if len(ids) == 0 {
+		return "", fmt.Errorf("no user with kyc.accountId=%s", accountID)
+	}
+	if len(ids) > 1 {
+		return "", fmt.Errorf("multiple users with kyc.accountId=%s", accountID)
+	}
+	return ids[0], nil
+}
+
+func userIDFromFirestoreByReferenceID(ctx context.Context, ref string) (string, error) {
+	snap, err := firestoredb.Client.Collection("users").Doc(ref).Get(ctx)
+	if err == nil && snap.Exists() {
+		return ref, nil
+	}
+
+	iter := firestoredb.Client.Collection("users").
+		OrderBy(firestore.DocumentID, firestore.Asc).
+		StartAt(ref).
+		EndAt(ref + "\uf8ff").
+		Limit(2).
+		Documents(ctx)
+	defer iter.Stop()
+
+	var ids []string
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		ids = append(ids, doc.Ref.ID)
+	}
+	if len(ids) == 0 {
+		return "", fmt.Errorf("no user doc for reference_id prefix %q", ref)
+	}
+	if len(ids) > 1 {
+		return "", fmt.Errorf("ambiguous user docs for reference_id prefix %q: %v", ref, ids)
+	}
+	return ids[0], nil
+}
+
+func sendRouteProductKYCEmailIfEligible(userID, kycStatus string, webhookReason *string) {
+	if !strings.EqualFold(kycStatus, "activated") && !strings.EqualFold(kycStatus, "rejected") {
+		return
+	}
+
+	user := &trendlymodels.User{}
+	if err := user.Get(userID); err != nil {
+		log.Printf("route product KYC email: get user %s: %v", userID, err)
+		return
+	}
+	if user.Email == nil || strings.TrimSpace(*user.Email) == "" {
+		return
+	}
+
+	fe := constants.GetCreatorsFronted()
+	data := map[string]interface{}{
+		"InfluencerName": user.Name,
+		"TrendlyAppLink": fe,
+	}
+
+	var sendErr error
+	switch {
+	case strings.EqualFold(kycStatus, "activated"):
+		sendErr = myemail.SendCustomHTMLEmail(*user.Email, templates.KYCRouteActivatedInfluencer, templates.SubjectKYCRouteActivatedInfluencer, data)
+	case strings.EqualFold(kycStatus, "rejected"):
+		rej := ""
+		if webhookReason != nil {
+			rej = strings.TrimSpace(*webhookReason)
+		}
+		if rej == "" && user.KYC != nil && user.KYC.Reason != nil {
+			rej = strings.TrimSpace(*user.KYC.Reason)
+		}
+		data["RejectionReason"] = rej
+		sendErr = myemail.SendCustomHTMLEmail(*user.Email, templates.KYCRouteRejectedInfluencer, templates.SubjectKYCRouteRejectedInfluencer, data)
+	}
+
+	if sendErr != nil {
+		log.Printf("route product KYC email (%s) for user %s: %v", kycStatus, userID, sendErr)
+	}
 }
 
 func applyRouteProductKYCUpdate(userID, merchantID, kycStatus string, reason *string) error {

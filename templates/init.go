@@ -47,4 +47,6 @@ const (
 	PayoutTransferBrand               myemail.TemplatePath = "templates/payout_transfer_brand.html"
 	PayoutTransferFailedInfluencer    myemail.TemplatePath = "templates/payout_transfer_failed_influencer.html"
 	PayoutTransferFailedBrand         myemail.TemplatePath = "templates/payout_transfer_failed_brand.html"
+	KYCRouteActivatedInfluencer       myemail.TemplatePath = "templates/kyc_route_activated_influencer.html"
+	KYCRouteRejectedInfluencer        myemail.TemplatePath = "templates/kyc_route_rejected_influencer.html"
 )

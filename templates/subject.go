@@ -44,4 +44,6 @@ const (
 	SubjectPayoutTransferBrand           = "Collaboration complete – influencer payout initiated"
 	SubjectPayoutTransferFailedInfluencer  = "Issue with your payout transfer – Trendly"
 	SubjectPayoutTransferFailedBrand       = "Influencer payout transfer could not be completed"
+	SubjectKYCRouteActivatedInfluencer     = "Your payout setup is approved – Trendly"
+	SubjectKYCRouteRejectedInfluencer      = "Update on your payout verification – Trendly"
 )
