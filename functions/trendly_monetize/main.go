@@ -76,10 +76,13 @@ func webhookHandler(handler *gin.RouterGroup) {
 	webhook := handler.Group("/webhooks")
 
 	// [BRAND Webhook] Listen to check the payment status and mark the collaboration paid
-	webhook.Any("/payments", monetize.PaymentWebhook)
+	webhook.Any("/orders", monetize.PaymentWebhook)
 
 	// Once Payment processed, notify both the agents and close the contract
-	webhook.Any("/transfer", monetize.TransferWebhook)
+	webhook.Any("/transfers", monetize.TransferWebhook)
+
+	// Once Payment processed, notify both the agents and close the contract
+	webhook.Any("/routes", monetize.RouteWebhook)
 
 }
 
