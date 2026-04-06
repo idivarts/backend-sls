@@ -95,6 +95,7 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 		contract.Payment = &trendlymodels.Payment{}
 	}
 	contract.Payment.TransferID = transferID
+	contract.Payment.Status = "transfer-processed"
 	contract.Status = trendlymodels.ContractStatusSettled
 
 	err = contract.Update(contractID)
@@ -124,9 +125,9 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 			"Your payout for %s has been released from Trendly. It often takes 1-2 business days for the amount to appear in your bank account, depending on your bank.",
 			collabName,
 		),
-		TimeStamp:   time.Now().UnixMilli(),
-		IsRead:      false,
-		Type:        "payout-completed",
+		TimeStamp: time.Now().UnixMilli(),
+		IsRead:    false,
+		Type:      "payout-completed",
 		Data: &trendlymodels.NotificationData{
 			CollaborationID: &contract.CollaborationID,
 			GroupID:         &contractID,
@@ -151,9 +152,9 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 			"The collaboration %s is complete and the influencer payout has been initiated. Their bank usually credits the funds within 1-2 business days.",
 			collabName,
 		),
-		TimeStamp:   time.Now().UnixMilli(),
-		IsRead:      false,
-		Type:        "collab-closed",
+		TimeStamp: time.Now().UnixMilli(),
+		IsRead:    false,
+		Type:      "collab-closed",
 		Data: &trendlymodels.NotificationData{
 			CollaborationID: &contract.CollaborationID,
 			GroupID:         &contractID,
