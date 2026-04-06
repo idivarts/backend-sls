@@ -13,6 +13,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
 	templates "github.com/idivarts/backend-sls/templates"
 )
@@ -102,7 +103,7 @@ func EmailRedirection(c *gin.Context) {
 	}
 
 	// Redirect to Trendly Brands login page with email pre-filled
-	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s?email=%s", os.Getenv("BRAND_LOGIN_URL"), url.QueryEscape(uRecord.Email)))
+	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s%s?email=%s", constants.GetBrandsFronted(), os.Getenv("BRAND_LOGIN_URL"), url.QueryEscape(uRecord.Email)))
 }
 
 // ResetPassword takes an email and sends a custom password reset email via SendGrid
@@ -123,7 +124,7 @@ func ResetPassword(c *gin.Context) {
 
 	// Generate a Firebase password reset link
 	actionCodeSettings := &auth.ActionCodeSettings{
-		URL:             os.Getenv("BRAND_LOGIN_URL"),
+		URL:             fmt.Sprintf("%s%s", constants.GetBrandsFronted(), os.Getenv("BRAND_LOGIN_URL")),
 		HandleCodeInApp: true,
 	}
 	resetLink, err := fauth.Client.PasswordResetLinkWithSettings(context.Background(), req.Email, actionCodeSettings)

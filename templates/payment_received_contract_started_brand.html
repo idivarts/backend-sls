@@ -1,0 +1,84 @@
+<!-- 
+  Dynamic Variables:
+    {{.BrandMemberName}} => Brand name shown in greeting
+    {{.CollabTitle}}      => Name of the collaboration
+    {{.ContractLink}}    => Link to the contract on the brand Trendly app / web
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Payment received</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #2e7d32;
+        }
+
+        .info-box {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #2e7d32;
+        }
+
+        a.button {
+            background-color: #3f51b5;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>We’ve received your payment</h2>
+
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p>Your payment for "<strong>{{.CollabTitle}}</strong>" has been <strong>successfully received</strong> on
+            Trendly.</p>
+
+        <div class="info-box">
+            <p><strong>Your contract is now started.</strong> The collaboration is live on its next step — you can
+                follow progress and keep everything in one place from your contract.</p>
+        </div>
+
+        <a href="{{.ContractLink}}" class="button">Open contract</a>
+
+        <div class="footer">
+            You're receiving this email because you're a manager for this brand on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,4 +1,4 @@
-package paymentwebhooks
+package webhook
 
 type PaymentEntity struct {
 	AcquirerData struct {

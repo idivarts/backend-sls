@@ -1,4 +1,4 @@
-package paymentwebhooks
+package webhook
 
 type OrderEntity struct {
 	AccountNumber         *string                `json:"account_number"`

@@ -7,43 +7,13 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments"
+	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
 
-type SubscriptionNotes struct {
-	BrandID     string `json:"brandId"`
-	PlanKey     string `json:"planKey"`
-	PlanCycle   string `json:"planCycle"`
-	PlanVersion string `json:"planVersion"`
-}
-type SubscriptionEntity struct {
-	ID                  string            `json:"id"`
-	Entity              string            `json:"entity"`
-	PlanID              string            `json:"plan_id"`
-	CustomerID          string            `json:"customer_id"`
-	Status              string            `json:"status"`
-	CurrentStart        int64             `json:"current_start"`
-	CurrentEnd          int64             `json:"current_end"`
-	EndedAt             *int64            `json:"ended_at"` // nullable
-	Quantity            int               `json:"quantity"`
-	Notes               SubscriptionNotes `json:"notes"`
-	ChargeAt            int64             `json:"charge_at"`
-	StartAt             int64             `json:"start_at"`
-	EndAt               int64             `json:"end_at"`
-	AuthAttempts        int               `json:"auth_attempts"`
-	TotalCount          int               `json:"total_count"`
-	PaidCount           int               `json:"paid_count"`
-	CustomerNotify      bool              `json:"customer_notify"`
-	CreatedAt           int64             `json:"created_at"`
-	ExpireBy            int64             `json:"expire_by"`
-	ShortURL            *string           `json:"short_url"` // nullable
-	HasScheduledChanges bool              `json:"has_scheduled_changes"`
-	ChangeScheduledAt   *int64            `json:"change_scheduled_at"` // nullable
-	Source              string            `json:"source"`
-	OfferID             string            `json:"offer_id"`
-	RemainingCount      int               `json:"remaining_count"`
-}
-
-func HandleSubscription(event RazorpayWebhookEvent) error {
+func HandleSubscription(event *webhook.Event) error {
+	if event.Payload.Subscription == nil {
+		return errors.New("subscription payload missing")
+	}
 
 	subscription := event.Payload.Subscription.Entity
 
@@ -67,7 +37,6 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 	}
 
 	if brand.Billing.Subscription != nil && *brand.Billing.Subscription != "" && *brand.Billing.Subscription != subscription.ID {
-		// Cancel the subscription before adding new
 		subscriptionID := *brand.Billing.Subscription
 		defer func() {
 			_, err := payments.CancelSubscription(subscriptionID, false)
@@ -90,25 +59,19 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 	switch *brand.Billing.BillingStatus {
 	case "created":
 		brand.Billing.Status = myutil.IntPtr(0)
-		break
 	case "authenticated":
 		brand.Billing.IsOnTrial = myutil.BoolPtr(true)
 		brand.Billing.Status = myutil.IntPtr(1)
-		break
 	case "active":
 		brand.Billing.IsOnTrial = myutil.BoolPtr(false)
 		brand.Billing.Status = myutil.IntPtr(1)
-		break
 	case "pending":
 	case "completed":
 		brand.Billing.Status = myutil.IntPtr(5)
-		break
 	case "halted":
 		brand.Billing.Status = myutil.IntPtr(2)
-		break
 	case "cancelled":
 		brand.Billing.Status = myutil.IntPtr(3)
-		break
 	}
 
 	log.Println("Updating Brand Subscription Status to", event.Event, *brand.Billing.BillingStatus, brand.Billing.PlanKey)
@@ -119,7 +82,6 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 			if *brand.Billing.PlanKey == "yearly" {
 				mult = 12
 			}
-			// Made it so that there is no stacking of credits on renewals
 			brand.Credits.Discovery = (bCredit.Discovery * mult)
 			brand.Credits.Collaboration = (bCredit.Collaboration * mult)
 			brand.Credits.Connection = (bCredit.Connection * mult)

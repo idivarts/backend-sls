@@ -13,7 +13,7 @@ type ContractStatus int
 
 const (
 	ContractStatusPending            ContractStatus = 0
-	ContractStatusStarted            ContractStatus = 1
+	ContractStatusOrderCreated       ContractStatus = 1
 	ContractStatusPaymentFailed      ContractStatus = 2
 	ContractStatusShipmentPending    ContractStatus = 3
 	ContractStatusShipped            ContractStatus = 4
