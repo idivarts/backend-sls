@@ -26,6 +26,7 @@ const (
 	SubjectInfluencerInviteRejected      = "Your invite wasn’t accepted—but don’t stop creating ✨"
 	SubjectCollaborationTakedown         = "Important: Your collaboration has been taken down"
 	SubjectPaymentOrderCreated           = "A payment order has been created for your collaboration"
+	SubjectPaymentFailedBrand            = "Payment attempt unsuccessful for your collaboration"
 	SubjectShipmentMarked                = "Your package is on its way! 📦"
 	SubjectShipmentRequested             = "📦 Influencer is waiting for shipment"
 	SubjectShipmentDelivered             = "Great news! Your package has been delivered 🏠"

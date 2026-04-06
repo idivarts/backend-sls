@@ -47,8 +47,110 @@ func PaymentWebhook(c *gin.Context) {
 	if event.Event == "order.paid" && event.Payload.Order != nil {
 		handleOrderPaid(&event.Payload.Order.Entity)
 	}
+	if event.Event == "payment.failed" && event.Payload.Payment != nil {
+		handlePaymentFailed(&event.Payload.Payment.Entity)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "received"})
+}
+
+func handlePaymentFailed(payment *webhook.PaymentEntity) {
+	if payment == nil {
+		return
+	}
+
+	orderID := payment.OrderID
+	if orderID == "" {
+		log.Printf("payment.failed: missing order_id on payment %s", payment.ID)
+		return
+	}
+
+	order, err := payments.FetchOrder(orderID)
+	if err != nil {
+		log.Printf("payment.failed: failed to fetch order %s: %v", orderID, err)
+		return
+	}
+
+	contractID := ""
+	if order.Notes != nil {
+		if v, ok := order.Notes["contractId"].(string); ok {
+			contractID = v
+		}
+	}
+	if contractID == "" {
+		log.Printf("payment.failed: no contractId in order notes for order %s", orderID)
+		return
+	}
+
+	contract := &trendlymodels.Contract{}
+	err = contract.Get(contractID)
+	if err != nil {
+		log.Printf("payment.failed: failed to fetch contract %s for order %s: %v", contractID, orderID, err)
+		return
+	}
+
+	if contract.Payment == nil || contract.Payment.OrderID != orderID {
+		log.Printf("payment.failed: contract %s order mismatch (webhook order %s, contract order %v)", contractID, orderID, contract.Payment)
+		return
+	}
+
+	// Do not overwrite a contract that already progressed past the pre-payment stage (e.g. late webhook after success).
+	if contract.Status != trendlymodels.ContractStatusOrderCreated && contract.Status != trendlymodels.ContractStatusPaymentFailed {
+		log.Printf("payment.failed: skip contract %s with status %d for order %s", contractID, contract.Status, orderID)
+		return
+	}
+
+	contract.Payment.Status = "failed"
+	contract.Payment.PaymentID = payment.ID
+	contract.Status = trendlymodels.ContractStatusPaymentFailed
+
+	err = contract.Update(contractID)
+	if err != nil {
+		log.Printf("payment.failed: failed to update contract %s: %v", contractID, err)
+		return
+	}
+
+	brand := &trendlymodels.Brand{}
+	_ = brand.Get(contract.BrandID)
+
+	collab := &trendlymodels.Collaboration{}
+	_ = collab.Get(contract.CollaborationID)
+	collabName := "Your Collaboration"
+	if collab.Name != "" {
+		collabName = collab.Name
+	}
+
+	failureDetail := "The payment could not be completed. Please try again or use a different payment method."
+	if payment.ErrorDescription != nil && *payment.ErrorDescription != "" {
+		failureDetail = *payment.ErrorDescription
+	}
+
+	notifToBrand := &trendlymodels.Notification{
+		Title:       "Payment unsuccessful",
+		Description: fmt.Sprintf("We could not complete payment for %s. Open the contract to try again.", collabName),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "payment-failed",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &contract.CollaborationID,
+			GroupID:         &contractID,
+		},
+	}
+	_, brandEmails, _ := notifToBrand.Insert(trendlymodels.BRAND_COLLECTION, contract.BrandID)
+	if len(brandEmails) > 0 {
+		emailData := map[string]interface{}{
+			"BrandMemberName": brand.Name,
+			"CollabTitle":     collabName,
+			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, contractID),
+			"FailureDetail":   failureDetail,
+		}
+		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PaymentFailedBrand, templates.SubjectPaymentFailedBrand, emailData); err != nil {
+			log.Printf("payment.failed: failed to send brand email for contract %s: %v", contractID, err)
+		}
+	}
+
+	streamMessage := fmt.Sprintf("⚠️ **Payment unsuccessful**\n\nThe payment for **%s** did not go through. Brand managers: please retry from the contract when you are ready.", collabName)
+	_ = streamchat.SendSystemMessage(contract.StreamChannelID, streamMessage)
 }
 
 func handleOrderPaid(order *webhook.OrderEntity) {

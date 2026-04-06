@@ -29,6 +29,7 @@ const (
 	InfluencerInviteRejected          myemail.TemplatePath = "templates/influencer_rejected.html"
 	CollaborationTakedown             myemail.TemplatePath = "templates/collaboration_takedown.html"
 	PaymentOrderCreated               myemail.TemplatePath = "templates/payment_order_created.html"
+	PaymentFailedBrand                myemail.TemplatePath = "templates/payment_failed_brand.html"
 	ShipmentMarked                    myemail.TemplatePath = "templates/shipment_marked.html"
 	ShipmentRequested                 myemail.TemplatePath = "templates/shipment_request.html"
 	ShipmentDelivered                 myemail.TemplatePath = "templates/shipment_delivered.html"
