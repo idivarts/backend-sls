@@ -40,4 +40,6 @@ const (
 	SubjectPostRescheduledByBrand        = "Update: Your posting date has been rescheduled 🗓️"
 	SubjectPostMarkedLiveForBrand        = "It's LIVE! 🚀 Content has been posted for your review"
 	SubjectPostMarkedLiveForInfluencer   = "Congratulations! 🎉 Your post is live"
+	SubjectPayoutTransferInfluencer      = "Your payout has been initiated – Trendly"
+	SubjectPayoutTransferBrand           = "Collaboration complete – influencer payout initiated"
 )

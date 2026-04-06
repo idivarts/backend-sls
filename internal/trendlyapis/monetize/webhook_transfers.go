@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/payments"
 	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
+	"github.com/idivarts/backend-sls/templates"
 )
 
 // transfer.processed
@@ -114,10 +117,13 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 		collabName = collab.Name
 	}
 
-	// 4. Notify Influencer (Payout Completed)
+	// 4. Notify Influencer (transfer processed — bank settlement may lag 1–2 days)
 	notifToInfluencer := &trendlymodels.Notification{
-		Title:       "Payout Completed! 💰✅",
-		Description: fmt.Sprintf("The funds for your work on %s have been successfully transferred to your bank account.", collabName),
+		Title: "Payout initiated 💸",
+		Description: fmt.Sprintf(
+			"Your payout for %s has been released from Trendly. It often takes 1-2 business days for the amount to appear in your bank account, depending on your bank.",
+			collabName,
+		),
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "payout-completed",
@@ -127,11 +133,24 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 		},
 	}
 	_, _, _ = notifToInfluencer.Insert(trendlymodels.USER_COLLECTION, contract.UserID)
+	if influencer.Email != nil && *influencer.Email != "" {
+		influencerEmailData := map[string]interface{}{
+			"InfluencerName": influencer.Name,
+			"CollabTitle":    collabName,
+			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, contractID),
+		}
+		if err := myemail.SendCustomHTMLEmail(*influencer.Email, templates.PayoutTransferInfluencer, templates.SubjectPayoutTransferInfluencer, influencerEmailData); err != nil {
+			log.Printf("transfer processed: failed to send influencer email for contract %s: %v", contractID, err)
+		}
+	}
 
-	// 5. Notify Brand (Collab Closed)
+	// 5. Notify Brand (collab closed — same settlement caveat for influencer payout)
 	notifToBrand := &trendlymodels.Notification{
-		Title:       "Collaboration Closed! 🏁",
-		Description: fmt.Sprintf("The collaboration for %s is now complete. The influencer has been paid and the funds are settled.", collabName),
+		Title: "Collaboration closed 🏁",
+		Description: fmt.Sprintf(
+			"The collaboration %s is complete and the influencer payout has been initiated. Their bank usually credits the funds within 1-2 business days.",
+			collabName,
+		),
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "collab-closed",
@@ -140,9 +159,19 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 			GroupID:         &contractID,
 		},
 	}
-	_, _, _ = notifToBrand.Insert(trendlymodels.BRAND_COLLECTION, contract.BrandID)
+	_, brandEmails, _ := notifToBrand.Insert(trendlymodels.BRAND_COLLECTION, contract.BrandID)
+	if len(brandEmails) > 0 {
+		brandEmailData := map[string]interface{}{
+			"BrandMemberName": brand.Name,
+			"CollabTitle":     collabName,
+			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, contractID),
+		}
+		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PayoutTransferBrand, templates.SubjectPayoutTransferBrand, brandEmailData); err != nil {
+			log.Printf("transfer processed: failed to send brand emails for contract %s: %v", contractID, err)
+		}
+	}
 
-	// 6. Stream System Message
-	streamMessage := fmt.Sprintf("🏁 **Workflow Complete!**\n\nThe contractual obligations for this collaboration have been met. Funds have been settled to the influencer. This group chat is now for historical reference. Thank you both! ✨")
+	// 6. Stream System Message (both parties — transfer processed ≠ instant bank credit)
+	streamMessage := "🏁 **Collaboration complete**\n\nTrendly has **processed the payout transfer** for this collaboration. The influencer's bank typically shows the money within **1-2 business days** (timing depends on the bank).\n\nThis chat stays available for reference. Thank you both! ✨"
 	_ = streamchat.SendSystemMessage(contract.StreamChannelID, streamMessage)
 }
