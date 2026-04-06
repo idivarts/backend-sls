@@ -46,8 +46,7 @@ func PaymentWebhook(c *gin.Context) {
 
 	if event.Event == "order.paid" && event.Payload.Order != nil {
 		handleOrderPaid(&event.Payload.Order.Entity)
-	}
-	if event.Event == "payment.failed" && event.Payload.Payment != nil {
+	} else if event.Event == "payment.failed" && event.Payload.Payment != nil {
 		handlePaymentFailed(&event.Payload.Payment.Entity)
 	}
 
