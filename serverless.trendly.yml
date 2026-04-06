@@ -24,7 +24,7 @@ provider:
     STREAM_SECRET: ${env:STREAM_SECRET}
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
-    BRAND_LOGIN_URL: "https://brands.trendly.now/login"
+    BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
     SENDGRID_NAME: Trendly

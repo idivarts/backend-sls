@@ -17,3 +17,10 @@ func GetCreatorsFronted() string {
 	}
 	return TRENDLY_CREATORS_FE
 }
+
+func GetBrandsFronted() string {
+	if myutil.IsDevEnvironment() {
+		return TRENDLY_DEV_BRANDS_FE
+	}
+	return TRENDLY_BRANDS_FE
+}
