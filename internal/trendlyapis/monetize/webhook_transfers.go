@@ -55,21 +55,33 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 	}
 
 	transferID := transfer.ID
+
+	orderID, err := payments.OrderIDFromTransferSource(transfer.Source)
+	if err != nil {
+		log.Printf("transfer processed: could not resolve order from transfer %s: %v", transferID, err)
+		return
+	}
+
+	order, err := payments.FetchOrder(orderID)
+	if err != nil {
+		log.Printf("transfer processed: failed to fetch order %s for transfer %s: %v", orderID, transferID, err)
+		return
+	}
+
 	contractID := ""
-	if transfer.Notes != nil {
-		if v, ok := transfer.Notes["contractId"].(string); ok {
+	if order.Notes != nil {
+		if v, ok := order.Notes["contractId"].(string); ok {
 			contractID = v
 		}
 	}
-
 	if contractID == "" {
-		log.Printf("No contractId found in notes for transfer: %s", transferID)
+		log.Printf("transfer processed: no contractId in order %s notes for transfer %s", orderID, transferID)
 		return
 	}
 
 	// 1. Fetch Contract
 	contract := &trendlymodels.Contract{}
-	err := contract.Get(contractID)
+	err = contract.Get(contractID)
 	if err != nil {
 		log.Printf("Failed to fetch contract %s for processed transfer %s: %v", contractID, transferID, err)
 		return

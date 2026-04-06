@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 )
 
 type Order struct {
@@ -62,4 +63,32 @@ func FetchOrder(orderID string) (*Order, error) {
 		return nil, err
 	}
 	return MapToOrder(order)
+}
+
+// OrderIDFromTransferSource resolves the Razorpay order id referenced by a transfer's `source` field.
+// Route transfers may use source order_* or, when tied to a capture, payment id pay_* (order is read from the payment).
+func OrderIDFromTransferSource(source string) (string, error) {
+	s := strings.TrimSpace(source)
+	switch {
+	case s == "":
+		return "", fmt.Errorf("empty transfer source")
+	case strings.HasPrefix(s, "order_"):
+		return s, nil
+	case strings.HasPrefix(s, "pay_"):
+		res, err := Client.Payment.Fetch(s, nil, nil)
+		if err != nil {
+			return "", fmt.Errorf("fetch payment %s: %w", s, err)
+		}
+		raw, ok := res["order_id"]
+		if !ok || raw == nil {
+			return "", fmt.Errorf("payment %s has no order_id", s)
+		}
+		oid, ok := raw.(string)
+		if !ok || oid == "" {
+			return "", fmt.Errorf("payment %s order_id is not a non-empty string", s)
+		}
+		return oid, nil
+	default:
+		return "", fmt.Errorf("unsupported transfer source %q (expected order_* or pay_*)", s)
+	}
 }
