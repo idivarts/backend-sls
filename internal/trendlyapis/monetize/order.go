@@ -105,6 +105,7 @@ func CreateOrder(c *gin.Context) {
 		ShortURL: shortURL,
 		Amount:   application.Quotation,
 	}
+	data.Contract.Status = trendlymodels.ContractStatusOrderCreated
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update Contract with Order details"})
