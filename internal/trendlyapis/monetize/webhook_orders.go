@@ -18,6 +18,9 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
+// order.paid
+// order.notification.failed
+
 func PaymentWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {

@@ -15,6 +15,9 @@ import (
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 )
 
+// transfer.processed
+// transfer.failed
+
 func TransferWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {

@@ -11,6 +11,11 @@ import (
 	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
 
+// product.route.under_review
+// product.route.activated
+// product.route.needs_clarification
+// product.route.rejected
+
 func RouteWebhook(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
