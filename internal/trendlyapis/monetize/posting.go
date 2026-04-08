@@ -37,7 +37,7 @@ func ReSchedulePosting(c *gin.Context) {
 		data.Contract.Posting = &trendlymodels.Posting{}
 	}
 	data.Contract.Posting.ScheduledDate = req.NewScheduledDate
-	data.Contract.Posting.Status = "rescheduled"
+	data.Contract.Posting.Status = trendlymodels.PostingStatusRescheduled
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
@@ -226,8 +226,8 @@ func MarkPosted(c *gin.Context) {
 	data.Contract.Posting.ProofScreenshot = req.ProofScreenshot
 	data.Contract.Posting.PostURL = req.PostURL
 	data.Contract.Posting.Notes = req.Notes
-	data.Contract.Posting.Status = "posted"
-	if data.Contract.Payment != nil && data.Contract.Payment.Status == "paid" && data.Contract.Payment.Amount == 0 {
+	data.Contract.Posting.Status = trendlymodels.PostingStatusPosted
+	if data.Contract.Payment != nil && data.Contract.Payment.Status == trendlymodels.PaymentStatusPaid && data.Contract.Payment.Amount == 0 {
 		data.Contract.Status = trendlymodels.ContractStatusSettled
 	} else {
 		data.Contract.Status = trendlymodels.ContractStatusPostDone

@@ -142,7 +142,7 @@ func CreateOrder(c *gin.Context) {
 	data.Contract.Payment = &trendlymodels.Payment{
 		OrderID:    orderID,
 		TransferID: transferID,
-		Status:     "waiting_for_payment",
+		Status:     trendlymodels.PaymentStatusWaitingForPayment,
 		ShortURL:   shortURL,
 		Amount:     application.Quotation,
 	}
@@ -205,7 +205,7 @@ func startBarterContract(c *gin.Context, data *struct {
 
 	nextStatus := contractStatusAfterFunding(collab)
 	data.Contract.Payment = &trendlymodels.Payment{
-		Status: "paid",
+		Status: trendlymodels.PaymentStatusPaid,
 		Amount: 0,
 	}
 	data.Contract.Status = nextStatus
@@ -282,7 +282,7 @@ func GetOrder(c *gin.Context) {
 		return
 	}
 
-	if data.Contract.Payment.OrderID == "" && data.Contract.Payment.Status == "paid" && data.Contract.Payment.Amount == 0 {
+	if data.Contract.Payment.OrderID == "" && data.Contract.Payment.Status == trendlymodels.PaymentStatusPaid && data.Contract.Payment.Amount == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Barter collaboration — no Razorpay order",
 			"barter":  true,

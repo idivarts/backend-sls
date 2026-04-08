@@ -126,7 +126,7 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 		contract.Payment = &trendlymodels.Payment{}
 	}
 	contract.Payment.TransferID = transferID
-	contract.Payment.Status = "transfer-processed"
+	contract.Payment.Status = trendlymodels.PaymentStatusTransferProcessed
 	contract.Status = trendlymodels.ContractStatusSettled
 
 	err = contract.Update(contractID)
@@ -239,7 +239,7 @@ func handleTransferFailed(transfer *webhook.TransferEntity) {
 		contract.Payment = &trendlymodels.Payment{}
 	}
 	contract.Payment.TransferID = transferID
-	contract.Payment.Status = "transfer-failed"
+	contract.Payment.Status = trendlymodels.PaymentStatusTransferFailed
 	// Contract.Status left unchanged so mid-lifecycle contracts are not forced to a late stage; adjust when you add a dedicated payout-failed status.
 
 	err = contract.Update(contractID)
