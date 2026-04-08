@@ -41,7 +41,7 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	if !user.IsKYCDone || user.KYC == nil || user.KYC.AccountID == "" || user.KYC.Status != "activated" {
+	if !user.IsKYCDone || user.KYC == nil || user.KYC.AccountID == "" || user.KYC.Status != trendlymodels.KYCStatusActivated {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Influencer is not KYC verified", "message": "Influencer is not KYC verified"})
 		return
 	}
