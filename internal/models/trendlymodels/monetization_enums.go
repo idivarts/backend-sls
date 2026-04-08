@@ -30,7 +30,7 @@ const (
 type PaymentStatus string
 
 const (
-	PaymentStatusWaitingForPayment PaymentStatus = "waiting_for_payment"
+	PaymentStatusWaitingForPayment PaymentStatus = "waiting-for-payment"
 	PaymentStatusFailed            PaymentStatus = "failed"
 	PaymentStatusPaid              PaymentStatus = "paid"
 	PaymentStatusTransferProcessed PaymentStatus = "transfer-processed"
