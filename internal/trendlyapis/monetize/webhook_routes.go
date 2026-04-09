@@ -76,7 +76,7 @@ func handleRouteProductWebhook(event *webhook.Event) {
 		return
 	}
 
-	kycStatus := strings.TrimSpace(entity.ActivationStatus)
+	kycStatus := trendlymodels.KYCStatus(strings.TrimSpace(entity.ActivationStatus))
 	if kycStatus == "" {
 		kycStatus = kycStatusFromRouteProductEvent(event.Event)
 	}
@@ -111,16 +111,16 @@ func handleRouteProductWebhook(event *webhook.Event) {
 	sendRouteProductKYCEmailIfEligible(userID, kycStatus, reason)
 }
 
-func kycStatusFromRouteProductEvent(eventName string) string {
+func kycStatusFromRouteProductEvent(eventName string) trendlymodels.KYCStatus {
 	switch eventName {
 	case "product.route.under_review":
-		return "under_review"
+		return trendlymodels.KYCStatusUnderReview
 	case "product.route.needs_clarification":
-		return "needs_clarification"
+		return trendlymodels.KYCStatusNeedsClarification
 	case "product.route.activated":
-		return "activated"
+		return trendlymodels.KYCStatusActivated
 	case "product.route.rejected":
-		return "rejected"
+		return trendlymodels.KYCStatusRejected
 	default:
 		return ""
 	}
@@ -252,8 +252,9 @@ func userIDFromFirestoreByReferenceID(ctx context.Context, ref string) (string, 
 	return ids[0], nil
 }
 
-func sendRouteProductKYCEmailIfEligible(userID, kycStatus string, webhookReason *string) {
-	if !strings.EqualFold(kycStatus, "activated") && !strings.EqualFold(kycStatus, "rejected") {
+func sendRouteProductKYCEmailIfEligible(userID string, kycStatus trendlymodels.KYCStatus, webhookReason *string) {
+	if !strings.EqualFold(string(kycStatus), string(trendlymodels.KYCStatusActivated)) &&
+		!strings.EqualFold(string(kycStatus), string(trendlymodels.KYCStatusRejected)) {
 		return
 	}
 
@@ -274,9 +275,9 @@ func sendRouteProductKYCEmailIfEligible(userID, kycStatus string, webhookReason 
 
 	var sendErr error
 	switch {
-	case strings.EqualFold(kycStatus, "activated"):
+	case strings.EqualFold(string(kycStatus), string(trendlymodels.KYCStatusActivated)):
 		sendErr = myemail.SendCustomHTMLEmail(*user.Email, templates.KYCRouteActivatedInfluencer, templates.SubjectKYCRouteActivatedInfluencer, data)
-	case strings.EqualFold(kycStatus, "rejected"):
+	case strings.EqualFold(string(kycStatus), string(trendlymodels.KYCStatusRejected)):
 		rej := ""
 		if webhookReason != nil {
 			rej = strings.TrimSpace(*webhookReason)
@@ -293,7 +294,7 @@ func sendRouteProductKYCEmailIfEligible(userID, kycStatus string, webhookReason 
 	}
 }
 
-func applyRouteProductKYCUpdate(userID, merchantID, kycStatus string, reason *string) error {
+func applyRouteProductKYCUpdate(userID, merchantID string, kycStatus trendlymodels.KYCStatus, reason *string) error {
 	user := &trendlymodels.User{}
 	if err := user.Get(userID); err != nil {
 		return err
@@ -307,7 +308,7 @@ func applyRouteProductKYCUpdate(userID, merchantID, kycStatus string, reason *st
 	}
 
 	user.KYC.Status = kycStatus
-	if strings.EqualFold(kycStatus, "activated") {
+	if strings.EqualFold(string(kycStatus), string(trendlymodels.KYCStatusActivated)) {
 		user.KYC.Reason = nil
 	} else if reason != nil {
 		user.KYC.Reason = reason
@@ -315,7 +316,7 @@ func applyRouteProductKYCUpdate(userID, merchantID, kycStatus string, reason *st
 	ts := time.Now().UnixMilli()
 	user.KYC.UpdatedAt = &ts
 
-	user.IsKYCDone = strings.EqualFold(kycStatus, "activated")
+	user.IsKYCDone = strings.EqualFold(string(kycStatus), string(trendlymodels.KYCStatusActivated))
 
 	_, err := user.Insert(userID)
 	return err

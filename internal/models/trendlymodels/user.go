@@ -88,9 +88,9 @@ type KYC struct {
 	StakeHolderID string `json:"stakeHolderId" firestore:"stakeHolderId"`
 	ProductID     string `json:"productId" firestore:"productId"`
 
-	Status    string  `json:"status" firestore:"status"`
-	Reason    *string `json:"reason,omitempty" firestore:"reason,omitempty"`
-	UpdatedAt *int64  `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
+	Status    KYCStatus `json:"status" firestore:"status"`
+	Reason    *string   `json:"reason,omitempty" firestore:"reason,omitempty"`
+	UpdatedAt *int64    `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
 
 	PANDetails     *PANDetails     `json:"panDetails,omitempty" firestore:"panDetails,omitempty"`
 	CurrentAddress *CurrentAddress `json:"currentAddress,omitempty" firestore:"currentAddress,omitempty"`

@@ -99,7 +99,7 @@ func handlePaymentFailed(payment *webhook.PaymentEntity) {
 		return
 	}
 
-	contract.Payment.Status = "failed"
+	contract.Payment.Status = trendlymodels.PaymentStatusFailed
 	contract.Payment.PaymentID = payment.ID
 	contract.Status = trendlymodels.ContractStatusPaymentFailed
 
@@ -180,7 +180,7 @@ func handleOrderPaid(order *webhook.OrderEntity) {
 	if contract.Payment == nil {
 		contract.Payment = &trendlymodels.Payment{}
 	}
-	contract.Payment.Status = "paid"
+	contract.Payment.Status = trendlymodels.PaymentStatusPaid
 	contract.Payment.OrderID = orderID
 
 	collab := &trendlymodels.Collaboration{}

@@ -45,7 +45,7 @@ func CreateAccount(c *gin.Context) {
 		user.KYC.AccountID = ""
 		user.KYC.StakeHolderID = ""
 		user.KYC.ProductID = ""
-		user.KYC.Status = "not_started"
+		user.KYC.Status = trendlymodels.KYCStatusNotStarted
 		user.KYC.Reason = nil
 
 		// Persist the reset before continuing
@@ -94,7 +94,7 @@ func CreateAccount(c *gin.Context) {
 	user.KYC.AccountID = account.ID
 	user.KYC.StakeHolderID = stakeholder.ID
 	user.KYC.ProductID = product.ID
-	user.KYC.Status = "in_progress" // Or based on Razorpay status
+	user.KYC.Status = trendlymodels.KYCStatusInProgress // Or based on Razorpay status
 	user.KYC.BankDetails = &trendlymodels.BankDetails{
 		AccountNumber:   req.Bank.AccountNumber,
 		IFSC:            req.Bank.IFSC,
@@ -131,7 +131,7 @@ func GetAccountStatus(c *gin.Context) {
 	if user.KYC == nil || user.KYC.AccountID == "" {
 		c.JSON(http.StatusOK, gin.H{
 			"message":   "Account onboarding has not been started.",
-			"kycStatus": "not_started",
+			"kycStatus": trendlymodels.KYCStatusNotStarted,
 		})
 		return
 	}
@@ -159,9 +159,9 @@ func GetAccountStatus(c *gin.Context) {
 	}
 
 	// 3. Keep Firestore status in sync with Razorpay (Self-healing)
-	if account.Status != "" && account.Status != user.KYC.Status {
+	if account.Status != "" && trendlymodels.KYCStatus(account.Status) != user.KYC.Status {
 		log.Printf("Syncing KYC status for user %s: Razorpay(%s) vs Firestore(%s)", user.Name, account.Status, user.KYC.Status)
-		user.KYC.Status = account.Status
+		user.KYC.Status = trendlymodels.KYCStatus(account.Status)
 
 		userId, _ := middlewares.GetUserId(c)
 		_, updateErr := user.Insert(userId)

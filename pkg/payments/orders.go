@@ -44,7 +44,8 @@ type OrderTransferResponse struct {
 	Amount                int                    `json:"amount"`
 	Currency              string                 `json:"currency"`
 	AmountReversed        int                    `json:"amount_reversed"`
-	Notes                 map[string]interface{} `json:"notes,omitempty"`
+	// Razorpay may return notes as a JSON object or an array (e.g. empty []); use interface{} for both.
+	Notes                 interface{}            `json:"notes,omitempty"`
 	LinkedAccountNotes    []string               `json:"linked_account_notes,omitempty"`
 	OnHold                bool                   `json:"on_hold"`
 	OnHoldUntil           *int64                 `json:"on_hold_until,omitempty"`
