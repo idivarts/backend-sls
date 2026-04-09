@@ -109,7 +109,7 @@ func CreateOrder(c *gin.Context) {
 
 		orderTransfer := order.Transfers[0]
 		if orderTransfer.Error != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": orderTransfer.Error.Description, "message": "Failed to Create Order"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": orderTransfer.Error, "transfer": orderTransfer, "message": "Failed to Create Transfer"})
 			return
 		}
 
