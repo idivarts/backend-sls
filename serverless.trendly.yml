@@ -9,7 +9,7 @@ provider:
   versionFunctions: true  # Enables versioning of Lambda functions
   environment:
     STAGE: ${self:provider.stage}
-    GIN_MODE: ${self:custom.ginMode.${self:provider.stage}, 'release'}
+    GIN_MODE: ${self:custom.ginMode.${self:provider.stage}}
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
