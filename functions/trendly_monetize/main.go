@@ -8,13 +8,25 @@ import (
 )
 
 func main() {
-	handler := apihandler.GinEngine.Group("/monetize", middlewares.ValidateSessionMiddleware())
+	// Razorpay signs the body; no Firebase session on these routes.
+	publicWebhooks := apihandler.GinEngine.Group("/monetize/webhooks")
+	publicWebhooksHandler(publicWebhooks)
 
+	handler := apihandler.GinEngine.Group("/monetize", middlewares.ValidateSessionMiddleware())
 	brandAPIs(handler)
 	influencersAPIs(handler)
-	webhookHandler(handler)
 
 	apihandler.StartLambda()
+}
+func publicWebhooksHandler(handler *gin.RouterGroup) {
+	// [BRAND Webhook] Listen to check the payment status and mark the collaboration paid
+	handler.Any("/orders", monetize.PaymentWebhook)
+
+	// Once Payment processed, notify both the agents and close the contract
+	handler.Any("/transfers", monetize.TransferWebhook)
+
+	// Routes webhook when an influencer is approved and creates a route account
+	handler.Any("/routes", monetize.RouteWebhook)
 }
 
 func brandAPIs(handler *gin.RouterGroup) {
@@ -70,20 +82,6 @@ func influencersAPIs(handler *gin.RouterGroup) {
 	influencer.POST("/contracts/:contractId/posting/request-reschedule", monetize.RequestPostReSchedule)
 	// [USER] Mark video as Posted
 	influencer.POST("/contracts/:contractId/posting", monetize.MarkPosted)
-}
-
-func webhookHandler(handler *gin.RouterGroup) {
-	webhook := handler.Group("/webhooks")
-
-	// [BRAND Webhook] Listen to check the payment status and mark the collaboration paid
-	webhook.Any("/orders", monetize.PaymentWebhook)
-
-	// Once Payment processed, notify both the agents and close the contract
-	webhook.Any("/transfers", monetize.TransferWebhook)
-
-	// Once Payment processed, notify both the agents and close the contract
-	webhook.Any("/routes", monetize.RouteWebhook)
-
 }
 
 // Remind User and Brands on the posting day (Multiple Reminders needed)
