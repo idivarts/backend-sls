@@ -9,6 +9,7 @@ provider:
   versionFunctions: true  # Enables versioning of Lambda functions
   environment:
     STAGE: ${self:provider.stage}
+    GIN_MODE: ${self:custom.ginMode.${self:provider.stage}, 'release'}
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
@@ -94,6 +95,9 @@ custom:
   isProd:
     dev: false
     prod: true
+  ginMode:
+    dev: debug
+    prod: release
   customDomain:
     domainName: be.trendly.now
     basePath: ${self:custom.basePathMap.${self:provider.stage}}
