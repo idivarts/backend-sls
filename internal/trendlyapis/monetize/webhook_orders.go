@@ -18,7 +18,7 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
-// order.paid
+// payment.captured
 // payment.failed
 
 func PaymentWebhook(c *gin.Context) {
@@ -44,8 +44,8 @@ func PaymentWebhook(c *gin.Context) {
 
 	log.Printf("Received Razorpay Event: %s", event.Event)
 
-	if event.Event == "order.paid" && event.Payload.Order != nil {
-		handleOrderPaid(&event.Payload.Order.Entity)
+	if event.Event == "payment.captured" && event.Payload.Payment != nil {
+		handlePaymentCaptured(&event.Payload.Payment.Entity)
 	} else if event.Event == "payment.failed" && event.Payload.Payment != nil {
 		handlePaymentFailed(&event.Payload.Payment.Entity)
 	}
@@ -152,15 +152,28 @@ func handlePaymentFailed(payment *webhook.PaymentEntity) {
 	_ = streamchat.SendSystemMessage(contract.StreamChannelID, streamMessage)
 }
 
-func handleOrderPaid(order *webhook.OrderEntity) {
-	if order == nil {
+func handlePaymentCaptured(payment *webhook.PaymentEntity) {
+	if payment == nil {
 		return
 	}
 
-	orderID := order.ID
+	orderID := payment.OrderID
+	if orderID == "" {
+		log.Printf("payment.captured: missing order_id on payment %s", payment.ID)
+		return
+	}
+
+	order, err := payments.FetchOrder(orderID)
+	if err != nil {
+		log.Printf("payment.captured: failed to fetch order %s: %v", orderID, err)
+		return
+	}
+
 	contractID := ""
 	if order.Notes != nil {
-		contractID = order.Notes["contractId"]
+		if s, ok := order.Notes["contractId"].(string); ok {
+			contractID = s
+		}
 	}
 
 	if contractID == "" {
@@ -170,7 +183,7 @@ func handleOrderPaid(order *webhook.OrderEntity) {
 
 	// 1. Fetch Contract
 	contract := &trendlymodels.Contract{}
-	err := contract.Get(contractID)
+	err = contract.Get(contractID)
 	if err != nil {
 		log.Printf("Failed to fetch contract %s for paid order %s: %v", contractID, orderID, err)
 		return
@@ -182,6 +195,7 @@ func handleOrderPaid(order *webhook.OrderEntity) {
 	}
 	contract.Payment.Status = trendlymodels.PaymentStatusPaid
 	contract.Payment.OrderID = orderID
+	contract.Payment.PaymentID = payment.ID
 
 	collab := &trendlymodels.Collaboration{}
 	err = collab.Get(contract.CollaborationID)
