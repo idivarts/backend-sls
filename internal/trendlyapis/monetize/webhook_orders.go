@@ -120,8 +120,8 @@ func handlePaymentFailed(payment *webhook.PaymentEntity) {
 	}
 
 	failureDetail := "The payment could not be completed. Please try again or use a different payment method."
-	if payment.ErrorDescription != nil && *payment.ErrorDescription != "" {
-		failureDetail = *payment.ErrorDescription
+	if payment.ErrorReason != nil && *payment.ErrorReason != "" {
+		failureDetail = *payment.ErrorReason
 	}
 
 	notifToBrand := &trendlymodels.Notification{
