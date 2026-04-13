@@ -3,6 +3,7 @@ package monetize
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
@@ -162,6 +163,14 @@ func GetAccountStatus(c *gin.Context) {
 	if account.Status != "" && trendlymodels.KYCStatus(account.Status) != user.KYC.Status {
 		log.Printf("Syncing KYC status for user %s: Razorpay(%s) vs Firestore(%s)", user.Name, account.Status, user.KYC.Status)
 		user.KYC.Status = trendlymodels.KYCStatus(account.Status)
+		if user.KYC.Status == trendlymodels.KYCStatusActivated {
+			user.IsKYCDone = true
+		} else {
+			user.IsKYCDone = false
+		}
+
+		mtime := time.Now().UnixMilli()
+		user.KYC.UpdatedAt = &mtime
 
 		userId, _ := middlewares.GetUserId(c)
 		_, updateErr := user.Insert(userId)
