@@ -160,9 +160,9 @@ func GetAccountStatus(c *gin.Context) {
 	}
 
 	// 3. Keep Firestore status in sync with Razorpay (Self-healing)
-	if account.Status != "" && trendlymodels.KYCStatus(account.Status) != user.KYC.Status {
+	if account.Status != "" && trendlymodels.KYCStatus(product.ActivationStatus) != user.KYC.Status {
 		log.Printf("Syncing KYC status for user %s: Razorpay(%s) vs Firestore(%s)", user.Name, account.Status, user.KYC.Status)
-		user.KYC.Status = trendlymodels.KYCStatus(account.Status)
+		user.KYC.Status = trendlymodels.KYCStatus(product.ActivationStatus)
 		if user.KYC.Status == trendlymodels.KYCStatusActivated {
 			user.IsKYCDone = true
 		} else {
