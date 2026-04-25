@@ -13,14 +13,14 @@ func main() {
 }
 
 func handleUserAPIs() {
+	apihandler.GinEngine.GET("/discovery/brands/niches", trendlydiscovery.GetNiches)
+
 	discoveryApi := apihandler.GinEngine.Group("/discovery", middlewares.TrendlyExtension())
 
 	discoveryApi.POST("/extension/instagram", trendlydiscovery.AddInstaProfile)
 	discoveryApi.GET("/extension/instagram", trendlydiscovery.CheckInstaUsername)
 
 	brandAPIs := apihandler.GinEngine.Group("/discovery/brands", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
-
-	brandAPIs.GET("/niches", trendlydiscovery.GetNiches)
 
 	brandAPIs.POST("/:brandId/influencers", trendlydiscovery.GetInfluencers)
 	brandAPIs.POST("/:brandId/influencers/invite", trendlydiscovery.InviteInfluencerOnDiscover)
