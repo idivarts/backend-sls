@@ -84,7 +84,7 @@ func ReSchedulePosting(c *gin.Context) {
 			"BrandName":      data.Brand.Name,
 			"CollabTitle":    collabName,
 			"NewDate":        newDateStr,
-			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"ContractLink":   fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.PostRescheduledInfluencer, templates.SubjectPostRescheduledByBrand, emailData)
 		if err != nil {
@@ -297,7 +297,7 @@ func MarkPosted(c *gin.Context) {
 			"PostURL":         req.PostURL,
 			"Notes":           req.Notes,
 			"ProofScreenshot": req.ProofScreenshot,
-			"ReviewLink":      fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
+			"ReviewLink":      fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PostMarkedLiveBrand, templates.SubjectPostMarkedLiveForBrand, emailDataBrand)
 		if err != nil {
@@ -323,7 +323,7 @@ func MarkPosted(c *gin.Context) {
 			"InfluencerName": influencer.Name,
 			"BrandName":      data.Brand.Name,
 			"CollabTitle":    collabName,
-			"ReviewLink":     fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"ReviewLink":     fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.PostMarkedLiveInfluencer, templates.SubjectPostMarkedLiveForInfluencer, emailDataInfluencer)
 		if err != nil {
@@ -396,7 +396,7 @@ func RequestPostReSchedule(c *gin.Context) {
 			"InfluencerName":  influencer.Name,
 			"CollabTitle":     collabName,
 			"Note":            req.Note,
-			"ShipmentLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
+			"ShipmentLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PostRescheduleRequest, templates.SubjectPostRescheduleRequested, emailData)
 		if err != nil {

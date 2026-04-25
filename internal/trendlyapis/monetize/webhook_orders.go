@@ -140,7 +140,7 @@ func handlePaymentFailed(payment *webhook.PaymentEntity) {
 		emailData := map[string]interface{}{
 			"BrandMemberName": brand.Name,
 			"CollabTitle":     collabName,
-			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, contractID),
+			"ContractLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractID),
 			"FailureDetail":   failureDetail,
 		}
 		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PaymentFailedBrand, templates.SubjectPaymentFailedBrand, emailData); err != nil {
@@ -241,7 +241,7 @@ func handlePaymentCaptured(payment *webhook.PaymentEntity) {
 		emailDataBrand := map[string]interface{}{
 			"BrandMemberName": brand.Name,
 			"CollabTitle":     collabName,
-			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.GetBrandsFronted(), contractID),
+			"ContractLink":    fmt.Sprintf("%s/contract-details/%s", constants.GetBrandsFronted(), contractID),
 		}
 		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PaymentReceivedContractStartedBrand, templates.SubjectPaymentReceivedContractStartedBrand, emailDataBrand); err != nil {
 			log.Printf("order.paid: failed to send brand email for contract %s: %v", contractID, err)
@@ -266,7 +266,7 @@ func handlePaymentCaptured(payment *webhook.PaymentEntity) {
 			"InfluencerName": influencer.Name,
 			"BrandName":      brand.Name,
 			"CollabTitle":    collabName,
-			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.GetCreatorsFronted(), contractID),
+			"ContractLink":   fmt.Sprintf("%s/contract-details/%s", constants.GetCreatorsFronted(), contractID),
 		}
 		if err := myemail.SendCustomHTMLEmail(*influencer.Email, templates.ContractFundedStartedInfluencer, templates.SubjectContractFundedStartedInfluencer, emailDataInfluencer); err != nil {
 			log.Printf("order.paid: failed to send influencer email for contract %s: %v", contractID, err)

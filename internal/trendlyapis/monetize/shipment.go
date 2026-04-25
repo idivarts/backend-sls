@@ -187,7 +187,7 @@ func MarkShipmentDelivered(c *gin.Context) {
 			"CollabTitle":    collabName,
 			"ScreenshotURL":  req.ScreenshotURL,
 			"Notes":          req.Notes,
-			"ConfirmLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"ConfirmLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.ShipmentDelivered, templates.SubjectShipmentDelivered, emailData)
 		if err != nil {
@@ -255,7 +255,7 @@ func RequestShipment(c *gin.Context) {
 			"BrandMemberName": data.Brand.Name,
 			"InfluencerName":  influencer.Name,
 			"CollabTitle":     collabName,
-			"ShipmentLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID), // Example link, might need adjustment if constants available
+			"ShipmentLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, data.ContractID), // Example link, might need adjustment if constants available
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.ShipmentRequested, templates.SubjectShipmentRequested, emailData)
 		if err != nil {
@@ -367,7 +367,7 @@ func MarkShipmentReceived(c *gin.Context) {
 			"InfluencerName":  influencer.Name,
 			"BrandName":       data.Brand.Name,
 			"CollabTitle":     collabName,
-			"DeliverableLink": fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"DeliverableLink": fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.ShipmentReceivedForInfluencer, templates.SubjectShipmentReceivedForInfluencer, emailDataInfluencer)
 		if err != nil {
@@ -420,7 +420,7 @@ func RequestShipmentStatus(c *gin.Context) {
 		influencerName = "Creator"
 	}
 
-	contractURL := fmt.Sprintf("%s/contracts/%s", constants.GetCreatorsFronted(), data.ContractID)
+	contractURL := fmt.Sprintf("%s/contract-details/%s", constants.GetCreatorsFronted(), data.ContractID)
 
 	notif := &trendlymodels.Notification{
 		Title: "Confirm you received the product",
@@ -443,9 +443,9 @@ func RequestShipmentStatus(c *gin.Context) {
 	if influencer.Email != nil && strings.TrimSpace(*influencer.Email) != "" {
 		emailData := map[string]interface{}{
 			"InfluencerName": influencerName,
-			"BrandName":     data.Brand.Name,
-			"CollabTitle":   collabName,
-			"ContractLink":  contractURL,
+			"BrandName":      data.Brand.Name,
+			"CollabTitle":    collabName,
+			"ContractLink":   contractURL,
 		}
 		if err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.ShipmentAcknowledgeReminderInfluencer, templates.SubjectShipmentAcknowledgeReminder, emailData); err != nil {
 			log.Printf("RequestShipmentStatus: email: %v", err)
