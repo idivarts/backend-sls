@@ -210,9 +210,10 @@ func CreateChannel(managerId string, req ICreateChannel) (*ChannelReturn, error)
 	}
 	collabMap := collabObj.Data()
 
-	_, err = firestoredb.Client.Collection("contracts").Where("collaborationId", "==", req.CollaborationID).Where("userId", "==", req.UserID).Documents(context.Background()).Next()
+	err = (&trendlymodels.Contract{}).GetByCollab(req.CollaborationID, req.UserID)
+	// _, err = firestoredb.Client.Collection("contracts").Where("collaborationId", "==", req.CollaborationID).Where("userId", "==", req.UserID).Documents(context.Background()).Next()
 	if err == nil {
-		return nil, err
+		return nil, errors.New("contract already exists")
 	}
 
 	userIDs := []string{managerId, req.UserID}
@@ -290,9 +291,14 @@ func CreateChannel(managerId string, req ICreateChannel) (*ChannelReturn, error)
 		StreamChannelID: res.Channel.ID,
 		BrandID:         collabMap["brandId"].(string),
 		Status:          trendlymodels.ContractStatusPending,
+		ContractTimestamp: trendlymodels.ContractTimestamp{
+			StartedOn: time.Now().UnixMilli(),
+			EndedOn:   nil,
+		},
+		Activity: []trendlymodels.Activity{},
 	}
 	if contractId != "" {
-		_, err = firestoredb.Client.Collection("contracts").Doc(contractId).Set(context.Background(), contract)
+		err = contract.Update(contractId)
 		if err != nil {
 			// c.JSON(http.StatusBadRequest, gin.H{"message": "Error in creating contract", "error": err.Error()})
 			return nil, err
