@@ -36,10 +36,7 @@ type Contract struct {
 
 	FeedbackFromInfluencer *InfluencerFeedback `json:"feedbackFromInfluencer,omitempty" firestore:"feedbackFromInfluencer,omitempty"`
 
-	ContractTimestamp *struct {
-		StartedOn int64 `json:"startedOn" firestore:"startedOn"`
-		EndedOn   int64 `json:"endedOn" firestore:"endedOn"`
-	} `json:"contractTimestamp,omitempty" firestore:"contractTimestamp,omitempty"`
+	ContractTimestamp ContractTimestamp `json:"contractTimestamp" firestore:"contractTimestamp"`
 
 	// All Items for storing the monetization related data
 	Payment *Payment `json:"payment,omitempty" firestore:"payment,omitempty"`
@@ -53,6 +50,11 @@ type Contract struct {
 	Analytics *Analytics `json:"analytics,omitempty" firestore:"analytics,omitempty"`
 
 	Activity []Activity `json:"activity,omitempty" firestore:"activity,omitempty"`
+}
+
+type ContractTimestamp struct {
+	StartedOn int64  `json:"startedOn" firestore:"startedOn"`
+	EndedOn   *int64 `json:"endedOn,omitempty" firestore:"endedOn,omitempty"`
 }
 
 type Payment struct {
@@ -135,7 +137,7 @@ func (c *Contract) Update(contractID string) error {
 }
 
 func (b *Contract) GetByCollab(collabId, userId string) error {
-	iter := firestoredb.Client.Collection("contracts").Where("collaborationId", "==", collabId).Where("userId", "==", userId).Documents(context.Background())
+	iter := firestoredb.Client.Collection("contracts").Where("collaborationId", "==", collabId).Where("userId", "==", userId).Limit(1).Documents(context.Background())
 
 	res, err := iter.Next()
 	if err != nil {

@@ -233,6 +233,11 @@ func MarkPosted(c *gin.Context) {
 		data.Contract.Status = trendlymodels.ContractStatusPostDone
 	}
 
+	if data.Contract.Status == trendlymodels.ContractStatusPostDone || data.Contract.Status == trendlymodels.ContractStatusSettled {
+		endTime := time.Now().UnixMilli()
+		data.Contract.ContractTimestamp.EndedOn = &endTime
+	}
+
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
