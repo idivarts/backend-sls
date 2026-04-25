@@ -41,6 +41,8 @@ func brandAPIs(handler *gin.RouterGroup) {
 	brands.POST("/contracts/:contractId/shipment", monetize.MarkShipment)
 	// [BRANDS] API for mark as product delivered
 	brands.POST("/contracts/:contractId/shipment/delivered", monetize.MarkShipmentDelivered)
+	// [BRANDS] API for confirming if the product is received
+	brands.POST("/contracts/:contractId/shipment/get-status", monetize.RequestShipmentStatus)
 
 	// [BRAND] Request for First Video/ Revision
 	brands.POST("/contracts/:contractId/deliverable/request", monetize.RequestDeliverable)
