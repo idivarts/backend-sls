@@ -48,4 +48,5 @@ const (
 	SubjectPayoutTransferFailedBrand           = "Influencer payout transfer could not be completed"
 	SubjectKYCRouteActivatedInfluencer         = "Your payout setup is approved – Trendly"
 	SubjectKYCRouteRejectedInfluencer          = "Update on your payout verification – Trendly"
+	SubjectKYCRequiredPrepayBlockedInfluencer  = "Urgent: pre-payment is waiting on your profile verification – Trendly"
 )
