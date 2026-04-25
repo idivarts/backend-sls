@@ -32,6 +32,7 @@ const (
 	SubjectShipmentMarked                      = "Your package is on its way! 📦"
 	SubjectShipmentRequested                   = "📦 Influencer is waiting for shipment"
 	SubjectShipmentDelivered                   = "Great news! Your package has been delivered 🏠"
+	SubjectShipmentAcknowledgeReminder         = "Reminder: confirm you received the product with a photo – Trendly"
 	SubjectShipmentReceivedForBrand            = "Product Received! Influencer is ready to create 📽️"
 	SubjectShipmentReceivedForInfluencer       = "Package Received! Time to create some magic ✨"
 	SubjectDeliverableRequested                = "Action Required: Brand is waiting for your deliverable 📽️"
@@ -48,4 +49,5 @@ const (
 	SubjectPayoutTransferFailedBrand           = "Influencer payout transfer could not be completed"
 	SubjectKYCRouteActivatedInfluencer         = "Your payout setup is approved – Trendly"
 	SubjectKYCRouteRejectedInfluencer          = "Update on your payout verification – Trendly"
+	SubjectKYCRequiredPrepayBlockedInfluencer  = "Urgent: pre-payment is waiting on your profile verification – Trendly"
 )

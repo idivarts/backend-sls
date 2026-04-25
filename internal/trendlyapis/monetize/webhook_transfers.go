@@ -169,7 +169,7 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 		influencerEmailData := map[string]interface{}{
 			"InfluencerName": influencer.Name,
 			"CollabTitle":    collabName,
-			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, contractID),
+			"ContractLink":   fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contractID),
 		}
 		if err := myemail.SendCustomHTMLEmail(*influencer.Email, templates.PayoutTransferInfluencer, templates.SubjectPayoutTransferInfluencer, influencerEmailData); err != nil {
 			log.Printf("transfer processed: failed to send influencer email for contract %s: %v", contractID, err)
@@ -196,7 +196,7 @@ func handleTransferProcessed(transfer *webhook.TransferEntity) {
 		brandEmailData := map[string]interface{}{
 			"BrandMemberName": brand.Name,
 			"CollabTitle":     collabName,
-			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, contractID),
+			"ContractLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractID),
 		}
 		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PayoutTransferBrand, templates.SubjectPayoutTransferBrand, brandEmailData); err != nil {
 			log.Printf("transfer processed: failed to send brand emails for contract %s: %v", contractID, err)
@@ -282,7 +282,7 @@ func handleTransferFailed(transfer *webhook.TransferEntity) {
 		influencerEmailData := map[string]interface{}{
 			"InfluencerName": influencer.Name,
 			"CollabTitle":    collabName,
-			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, contractID),
+			"ContractLink":   fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, contractID),
 			"FailureDetail":  failureDetail,
 		}
 		if err := myemail.SendCustomHTMLEmail(*influencer.Email, templates.PayoutTransferFailedInfluencer, templates.SubjectPayoutTransferFailedInfluencer, influencerEmailData); err != nil {
@@ -309,7 +309,7 @@ func handleTransferFailed(transfer *webhook.TransferEntity) {
 		brandEmailData := map[string]interface{}{
 			"BrandMemberName": brand.Name,
 			"CollabTitle":     collabName,
-			"ContractLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, contractID),
+			"ContractLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, contractID),
 			"FailureDetail":   failureDetail,
 		}
 		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PayoutTransferFailedBrand, templates.SubjectPayoutTransferFailedBrand, brandEmailData); err != nil {

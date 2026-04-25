@@ -58,7 +58,7 @@ func RequestDeliverable(c *gin.Context) {
 			"InfluencerName":  influencer.Name,
 			"BrandName":       data.Brand.Name,
 			"CollabTitle":     collabName,
-			"DeliverableLink": fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"DeliverableLink": fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.DeliverableRequested, templates.SubjectDeliverableRequested, emailData)
 		if err != nil {
@@ -206,7 +206,7 @@ func ApproveDeliverable(c *gin.Context) {
 			"PostingScenario":     scenarioText,
 			"ScheduledDate":       scheduledDateStr,
 			"IsInfluencerPosting": req.PostingScenario == 1 || req.PostingScenario == 2,
-			"ContractLink":        fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"ContractLink":        fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.DeliverableApproved, templates.SubjectDeliverableApproved, emailData)
 		if err != nil {
@@ -299,7 +299,7 @@ func RequestDeliverableChange(c *gin.Context) {
 			"BrandName":       data.Brand.Name,
 			"CollabTitle":     collabName,
 			"Feedback":        req.Notes,
-			"DeliverableLink": fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"DeliverableLink": fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.DeliverableRevisionRequested, templates.SubjectDeliverableRevisionRequested, emailData)
 		if err != nil {
@@ -385,7 +385,7 @@ func SendDeliverable(c *gin.Context) {
 			"InfluencerName":  influencer.Name,
 			"CollabTitle":     collabName,
 			"Notes":           req.Note,
-			"ReviewLink":      fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
+			"ReviewLink":      fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.DeliverableSent, templates.SubjectDeliverableSent, emailData)
 		if err != nil {

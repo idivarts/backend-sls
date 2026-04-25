@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
@@ -42,6 +44,54 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	if !user.IsKYCDone || user.KYC == nil || user.KYC.AccountID == "" || user.KYC.Status != trendlymodels.KYCStatusActivated {
+		collabName := "Your Collaboration"
+		collab := &trendlymodels.Collaboration{}
+		if err := collab.Get(data.Contract.CollaborationID); err == nil && collab.Name != "" {
+			collabName = collab.Name
+		}
+		influencerName := user.Name
+		if influencerName == "" {
+			influencerName = "Creator"
+		}
+
+		quotationLabel := fmt.Sprintf("₹%d", application.Quotation)
+		notifKYC := &trendlymodels.Notification{
+			Title: "Urgent: pre-payment is on hold",
+			Description: fmt.Sprintf(
+				"%s tried to pre-pay for %s (%s), but payment could not be started because your profile is not verified. Complete KYC in the app now—the brand is waiting to pay.",
+				data.Brand.Name, collabName, quotationLabel,
+			),
+			TimeStamp: time.Now().UnixMilli(),
+			IsRead:    false,
+			Type:      "kyc-required-for-payment",
+			Data: &trendlymodels.NotificationData{
+				CollaborationID: &data.Contract.CollaborationID,
+				GroupID:         &data.ContractID,
+			},
+		}
+		if _, _, err := notifKYC.Insert(trendlymodels.USER_COLLECTION, data.Contract.UserID); err != nil {
+			log.Printf("KYC check: in-app notification: %v", err)
+		}
+		if data.Contract.StreamChannelID != "" {
+			streamMsg := fmt.Sprintf("**Urgent: pre-payment is on hold**\n\n**%s** tried to pre-pay for **%s** (%s), but the payment **could not be started** because **your profile is not fully verified (KYC)**. Please **complete verification in the app right away** — **%s** is ready to pay and waiting on you. ⏱️", data.Brand.Name, collabName, quotationLabel, data.Brand.Name)
+			if err := streamchat.SendSystemMessage(data.Contract.StreamChannelID, streamMsg); err != nil {
+				log.Printf("KYC check: stream message: %v", err)
+			}
+		}
+		if user.Email != nil && strings.TrimSpace(*user.Email) != "" {
+			contractURL := fmt.Sprintf("%s/contract-details/%s", constants.GetCreatorsFronted(), data.ContractID)
+			emailData := map[string]interface{}{
+				"InfluencerName": influencerName,
+				"BrandName":     data.Brand.Name,
+				"CollabTitle":   collabName,
+				"Quotation":     quotationLabel,
+				"ContractLink":  contractURL,
+			}
+			if err := myemail.SendCustomHTMLEmail(*user.Email, templates.KYCRequiredPrepayBlockedInfluencer, templates.SubjectKYCRequiredPrepayBlockedInfluencer, emailData); err != nil {
+				log.Printf("KYC check: email: %v", err)
+			}
+		}
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Influencer is not KYC verified", "message": "Influencer is not KYC verified"})
 		return
 	}
