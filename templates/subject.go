@@ -50,4 +50,22 @@ const (
 	SubjectKYCRouteActivatedInfluencer         = "Your payout setup is approved – Trendly"
 	SubjectKYCRouteRejectedInfluencer          = "Update on your payout verification – Trendly"
 	SubjectKYCRequiredPrepayBlockedInfluencer  = "Urgent: pre-payment is waiting on your profile verification – Trendly"
+
+	// Dispute subjects
+	SubjectDisputeRaised        = "A dispute has been raised on your contract – Trendly"
+	SubjectDisputeRaisedSupport = "🚨 New contract dispute requires review"
+	SubjectDisputeResolved      = "Your contract dispute has been resolved – Trendly"
+
+	// Cancellation subjects
+	SubjectCancellationRequested = "Cancellation requested on your contract – Trendly"
+	SubjectCancellationApproved  = "Your contract has been cancelled – Trendly"
+	SubjectCancellationRejected  = "Your cancellation request was not approved – Trendly"
+
+	// SLA nudge subjects
+	SubjectSLANudgeBrandShip         = "Reminder: Your influencer is waiting for the product 📦"
+	SubjectSLANudgeBrandReview       = "Reminder: A deliverable is waiting for your review 📽️"
+	SubjectSLANudgeInfluencerReceipt = "Reminder: Please confirm you received the product – Trendly"
+	SubjectSLANudgeInfluencerVideo   = "Reminder: Your collaboration is waiting for your video – Trendly"
+	SubjectSLANudgeInfluencerPost    = "Reminder: Your scheduled posting date has passed – Trendly"
+	SubjectSLAEscalationSupport      = "🚨 SLA Escalation: Contract stuck — action required"
 )

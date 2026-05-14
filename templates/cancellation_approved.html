@@ -1,0 +1,40 @@
+<!--
+  Dynamic Variables:
+    {{.RecipientName}}  => Name of the recipient
+    {{.BrandName}}      => Brand's name (for influencer email) / InfluencerName used for brand email
+    {{.InfluencerName}} => Influencer's name (for brand email)
+    {{.CollabTitle}}    => Collaboration title
+    {{.Reason}}         => Cancellation reason
+    {{.RefundAmount}}   => Refund amount string (e.g. "₹500") or empty
+    {{.ContractLink}}   => Link to contract page
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Contract Cancelled</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; padding: 20px; }
+    .container { background-color: #fff; border-radius: 8px; padding: 24px; max-width: 600px; margin: auto; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+    h2 { color: #054463; }
+    .info-box { background-color: #e8f0f4; border-left: 4px solid #054463; padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+    .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background-color: #054463; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; }
+    .footer { margin-top: 24px; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Contract Cancelled</h2>
+    <p>Hi {{.RecipientName}},</p>
+    <p>The contract for <strong>{{.CollabTitle}}</strong> has been cancelled by mutual agreement.</p>
+    <div class="info-box">
+      <p><strong>Reason:</strong> {{.Reason}}</p>
+      {{if .RefundAmount}}<p><strong>Refund to brand:</strong> {{.RefundAmount}} — this will be processed within 5–7 business days.</p>{{end}}
+    </div>
+    <a href="{{.ContractLink}}" class="btn">View Contract</a>
+    <div class="footer">
+      <p>— Team Trendly</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!--
+  Dynamic Variables:
+    {{.RecipientName}}  => Name of the party whose request was rejected
+    {{.BrandName}}      => Brand's name
+    {{.CollabTitle}}    => Collaboration title
+    {{.ContractLink}}   => Link to contract page
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Cancellation Rejected</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; padding: 20px; }
+    .container { background-color: #fff; border-radius: 8px; padding: 24px; max-width: 600px; margin: auto; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+    h2 { color: #054463; }
+    .info-box { background-color: #e8f0f4; border-left: 4px solid #054463; padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+    .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background-color: #054463; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; }
+    .footer { margin-top: 24px; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Cancellation Request Rejected</h2>
+    <p>Hi {{.RecipientName}},</p>
+    <p>Your cancellation request for <strong>{{.CollabTitle}}</strong> was not approved. The contract continues as normal.</p>
+    <div class="info-box">
+      <p>If you believe this is unfair or there's a serious issue, you can raise a formal dispute from within the contract.</p>
+    </div>
+    <a href="{{.ContractLink}}" class="btn">View Contract</a>
+    <div class="footer">
+      <p>— Team Trendly</p>
+    </div>
+  </div>
+</body>
+</html>
