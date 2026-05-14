@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/sla"
 	"github.com/idivarts/backend-sls/pkg/myquery"
 	"github.com/idivarts/backend-sls/scripts/matchmaking/mm"
 )
@@ -36,6 +37,10 @@ func handler(ctx context.Context) (string, error) {
 	// mm.SyncBrands(false)
 
 	log.Println("Sync Completed")
+
+	log.Println("Running SLA monitor")
+	sla.RunSLAMonitor()
+	log.Println("SLA monitor completed")
 
 	log.Println("Lambda invocation end", time.Now().UnixMicro())
 	return "ok", nil
