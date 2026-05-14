@@ -56,7 +56,7 @@ func CreateOrder(c *gin.Context) {
 
 		quotationLabel := fmt.Sprintf("₹%d", application.Quotation)
 		notifKYC := &trendlymodels.Notification{
-			Title: "Urgent: pre-payment is on hold",
+			Title: "Action needed: payment is on hold",
 			Description: fmt.Sprintf(
 				"%s tried to pre-pay for %s (%s), but payment could not be started because your profile is not verified. Complete KYC in the app now—the brand is waiting to pay.",
 				data.Brand.Name, collabName, quotationLabel,
@@ -117,7 +117,7 @@ func CreateOrder(c *gin.Context) {
 	// 2. Prepare Notification to get Brand Emails
 	notif := &trendlymodels.Notification{
 		Title:       "Payment Order Created",
-		Description: "A payment order has been created for your collaboration. Please complete the pre-payment.",
+		Description: "A payment order has been created for your collaboration. Please complete the payment to start the contract.",
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "payment-order-created",
@@ -277,7 +277,7 @@ func startBarterContract(c *gin.Context, data *struct {
 
 	notifBrand := &trendlymodels.Notification{
 		Title:       "Collaboration is live",
-		Description: fmt.Sprintf("%s is now active. No payment was required (barter). The creator can start the next steps.", collabName),
+		Description: fmt.Sprintf("This is a barter collaboration, so no payment was needed for %s. The creator can start working now.", collabName),
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "barter-collaboration-started",

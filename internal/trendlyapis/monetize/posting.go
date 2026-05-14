@@ -159,7 +159,7 @@ func notifyAboutContractEnded(contractID string, contract trendlymodels.Contract
 
 	notifInfluencer := &trendlymodels.Notification{
 		Title:       "Collaboration complete",
-		Description: fmt.Sprintf("Your collaboration %s with %s is complete. Rate the brand to see their rating.", collabName, brand.Name),
+		Description: fmt.Sprintf("Your collaboration %s with %s is complete. Share your feedback to close it out.", collabName, brand.Name),
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "contract-ended",
@@ -308,7 +308,7 @@ func MarkPosted(c *gin.Context) {
 	// 4. Notify Influencer (Push & Email)
 	notifToInfluencer := &trendlymodels.Notification{
 		Title:       "Congratulations! 🎉",
-		Description: "Your post is live. Funds will be released in 2 days after brand review.",
+		Description: "Your post is live. Funds will be released after the brand's review window closes.",
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "post-live-confirmation",

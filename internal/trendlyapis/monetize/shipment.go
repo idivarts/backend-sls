@@ -68,7 +68,7 @@ func MarkShipment(c *gin.Context) {
 	// 3. Send Push Notification to Influencer
 	notif := &trendlymodels.Notification{
 		Title:       "Package Shipped! 📦",
-		Description: fmt.Sprintf("%s has shipped your package for %s", data.Brand.Name, collabName),
+		Description: fmt.Sprintf("%s has shipped your package for %s.", data.Brand.Name, collabName),
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "shipment-marked",
@@ -235,7 +235,7 @@ func RequestShipment(c *gin.Context) {
 	// 2. Send Push Notification to Brand
 	notif := &trendlymodels.Notification{
 		Title:       "Shipment Requested 📦",
-		Description: fmt.Sprintf("%s is waiting for the shipment for %s", influencer.Name, collabName),
+		Description: fmt.Sprintf("%s has requested a shipment for %s. Please ship at your earliest.", influencer.Name, collabName),
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "shipment-request",
@@ -425,8 +425,8 @@ func RequestShipmentStatus(c *gin.Context) {
 	notif := &trendlymodels.Notification{
 		Title: "Confirm you received the product",
 		Description: fmt.Sprintf(
-			"%s is waiting for you to open the contract and mark the product as received, with a photo. Collaboration: %s.",
-			data.Brand.Name, collabName,
+			"Please open %s and confirm that you've received the product from %s.",
+			collabName, data.Brand.Name,
 		),
 		TimeStamp: time.Now().UnixMilli(),
 		IsRead:    false,

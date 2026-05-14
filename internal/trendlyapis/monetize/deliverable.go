@@ -182,9 +182,17 @@ func ApproveDeliverable(c *gin.Context) {
 		scheduledDateStr = time.UnixMilli(req.ScheduledDate).Format("Jan 02, 2006")
 	}
 
+	approvedBody := fmt.Sprintf("%s has approved your video for %s.", data.Brand.Name, collabName)
+	if req.ScheduledDate > 0 {
+		approvedBody += fmt.Sprintf(" Your post is scheduled for %s.", time.UnixMilli(req.ScheduledDate).Format("Jan 02, 2006"))
+	} else if scenarioText == trendlymodels.PostingScenarioBrandUsesVideoIndependently {
+		approvedBody += " The brand will handle posting directly."
+	} else {
+		approvedBody += " You're free to post whenever ready."
+	}
 	notif := &trendlymodels.Notification{
 		Title:       "Deliverable Approved! 🎉",
-		Description: fmt.Sprintf("%s has approved your video for %s. Posting Scenario: %s", data.Brand.Name, collabName, scenarioText),
+		Description: approvedBody,
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "deliverable-approved",
