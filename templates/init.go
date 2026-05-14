@@ -53,4 +53,23 @@ const (
 	KYCRouteActivatedInfluencer           myemail.TemplatePath = "templates/kyc_route_activated_influencer.html"
 	KYCRouteRejectedInfluencer            myemail.TemplatePath = "templates/kyc_route_rejected_influencer.html"
 	KYCRequiredPrepayBlockedInfluencer    myemail.TemplatePath = "templates/kyc_required_prepay_blocked_influencer.html"
+
+	// Dispute templates
+	DisputeRaisedInfluencer myemail.TemplatePath = "templates/dispute_raised_influencer.html"
+	DisputeRaisedBrand      myemail.TemplatePath = "templates/dispute_raised_brand.html"
+	DisputeRaisedSupport    myemail.TemplatePath = "templates/dispute_raised_support.html"
+	DisputeResolved         myemail.TemplatePath = "templates/dispute_resolved.html"
+
+	// Cancellation templates
+	CancellationRequested myemail.TemplatePath = "templates/cancellation_requested.html"
+	CancellationApproved  myemail.TemplatePath = "templates/cancellation_approved.html"
+	CancellationRejected  myemail.TemplatePath = "templates/cancellation_rejected.html"
+
+	// SLA nudge templates
+	SLANudgeBrandShip          myemail.TemplatePath = "templates/sla_nudge_brand_ship.html"
+	SLANudgeBrandReview        myemail.TemplatePath = "templates/sla_nudge_brand_review.html"
+	SLANudgeInfluencerReceipt  myemail.TemplatePath = "templates/sla_nudge_influencer_receipt.html"
+	SLANudgeInfluencerVideo    myemail.TemplatePath = "templates/sla_nudge_influencer_video.html"
+	SLANudgeInfluencerPost     myemail.TemplatePath = "templates/sla_nudge_influencer_post.html"
+	SLAEscalationSupport       myemail.TemplatePath = "templates/sla_escalation_support.html"
 )

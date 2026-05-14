@@ -1,0 +1,40 @@
+<!--
+  Dynamic Variables:
+    {{.ContractID}}     => Contract ID
+    {{.BrandName}}      => Brand's name
+    {{.InfluencerName}} => Influencer's name
+    {{.CollabTitle}}    => Collaboration title
+    {{.Status}}         => Contract status integer
+    {{.WarningType}}    => SLA warning type constant
+    {{.DaysStuck}}      => Number of days stuck
+    {{.ContractLink}}   => Link to contract in admin/brands app
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SLA Escalation — Support Action Required</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; padding: 20px; }
+    .container { background-color: #fff; border-radius: 8px; padding: 24px; max-width: 600px; margin: auto; }
+    h2 { color: #c62828; }
+    .field { margin: 6px 0; }
+    .label { font-weight: bold; color: #555; min-width: 140px; display: inline-block; }
+    .badge { display: inline-block; background: #c62828; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+    .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background-color: #c62828; color: #fff; text-decoration: none; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🚨 SLA Escalation <span class="badge">Action Required</span></h2>
+    <div class="field"><span class="label">Contract ID:</span> {{.ContractID}}</div>
+    <div class="field"><span class="label">Brand:</span> {{.BrandName}}</div>
+    <div class="field"><span class="label">Influencer:</span> {{.InfluencerName}}</div>
+    <div class="field"><span class="label">Collaboration:</span> {{.CollabTitle}}</div>
+    <div class="field"><span class="label">Contract Status:</span> {{.Status}}</div>
+    <div class="field"><span class="label">Issue Type:</span> {{.WarningType}}</div>
+    <div class="field"><span class="label">Days Stuck:</span> <strong>{{.DaysStuck}} days</strong></div>
+    <a href="{{.ContractLink}}" class="btn">Open Contract in Admin</a>
+  </div>
+</body>
+</html>

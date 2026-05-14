@@ -148,7 +148,7 @@ func routeProductInAppCopy(eventName string) (title, description string) {
 			"We’re reviewing your bank and identity details for payouts. We’ll update you here when something changes."
 	case "product.route.needs_clarification":
 		return "Action needed for payout setup",
-			"We need a bit more information to finish verifying your payout details. Open Monetize / account settings to review and update what’s required."
+			"We need a bit more information to finish verifying your payout details. Open the Monetize section in your account settings to review what’s needed."
 	case "product.route.activated":
 		return "Payout setup approved",
 			"Your payout account is verified. You’re all set to receive payments on Trendly."
