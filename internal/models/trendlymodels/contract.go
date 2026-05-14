@@ -50,6 +50,42 @@ type Contract struct {
 	Analytics *Analytics `json:"analytics,omitempty" firestore:"analytics,omitempty"`
 
 	Activity []Activity `json:"activity,omitempty" firestore:"activity,omitempty"`
+
+	Dispute         *DisputeDetails      `json:"dispute,omitempty" firestore:"dispute,omitempty"`
+	CancellationReq *CancellationRequest `json:"cancellationRequest,omitempty" firestore:"cancellationRequest,omitempty"`
+	SLAWarnings     []SLAWarning         `json:"slaWarnings,omitempty" firestore:"slaWarnings,omitempty"`
+}
+
+// DisputeDetails holds the details of a dispute raised on a contract.
+type DisputeDetails struct {
+	RaisedBy     string   `json:"raisedBy,omitempty" firestore:"raisedBy,omitempty"`
+	RaisedByRole string   `json:"raisedByRole,omitempty" firestore:"raisedByRole,omitempty"` // "influencer" | "brand"
+	Type         string   `json:"type,omitempty" firestore:"type,omitempty"`
+	Description  string   `json:"description,omitempty" firestore:"description,omitempty"`
+	Evidence     []string `json:"evidence,omitempty" firestore:"evidence,omitempty"` // S3 URLs
+	Status       string   `json:"status,omitempty" firestore:"status,omitempty"`     // "open" | "under_review" | "resolved" | "closed"
+	RaisedAt     int64    `json:"raisedAt,omitempty" firestore:"raisedAt,omitempty"`
+	ResolvedAt   int64    `json:"resolvedAt,omitempty" firestore:"resolvedAt,omitempty"`
+	Resolution   string   `json:"resolution,omitempty" firestore:"resolution,omitempty"`
+	AdminID      string   `json:"adminId,omitempty" firestore:"adminId,omitempty"`
+}
+
+// CancellationRequest tracks a pending contract cancellation request.
+type CancellationRequest struct {
+	RequestedBy     string `json:"requestedBy,omitempty" firestore:"requestedBy,omitempty"`
+	RequestedByRole string `json:"requestedByRole,omitempty" firestore:"requestedByRole,omitempty"` // "influencer" | "brand"
+	Reason          string `json:"reason,omitempty" firestore:"reason,omitempty"`
+	Status          string `json:"status,omitempty" firestore:"status,omitempty"` // "pending" | "approved" | "rejected"
+	RequestedAt     int64  `json:"requestedAt,omitempty" firestore:"requestedAt,omitempty"`
+	RespondedAt     int64  `json:"respondedAt,omitempty" firestore:"respondedAt,omitempty"`
+	RefundAmount    int64  `json:"refundAmount,omitempty" firestore:"refundAmount,omitempty"` // paise; 0 for barter/no-refund
+}
+
+// SLAWarning records an SLA nudge or escalation sent for a contract.
+type SLAWarning struct {
+	Type   string `json:"type,omitempty" firestore:"type,omitempty"`   // e.g. "shipment_overdue"
+	Level  string `json:"level,omitempty" firestore:"level,omitempty"` // "nudge" | "support_escalation"
+	SentAt int64  `json:"sentAt,omitempty" firestore:"sentAt,omitempty"`
 }
 
 type ContractTimestamp struct {

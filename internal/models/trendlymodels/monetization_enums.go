@@ -25,6 +25,8 @@ const (
 	ContractStatusPostScheduled      ContractStatus = 8
 	ContractStatusPostDone           ContractStatus = 9
 	ContractStatusSettled            ContractStatus = 10
+	ContractStatusCancelled          ContractStatus = 11
+	ContractStatusDisputed           ContractStatus = 12
 )
 
 type PaymentStatus string

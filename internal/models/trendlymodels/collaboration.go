@@ -53,6 +53,7 @@ type Collaboration struct {
 	TimeStamp                 int64                 `firestore:"timeStamp" json:"timeStamp"`
 	ViewsLastHour             *int                  `firestore:"viewsLastHour,omitempty" json:"viewsLastHour,omitempty"`
 	LastReviewedTimeStamp     *int64                `firestore:"lastReviewedTimeStamp,omitempty" json:"lastReviewedTimeStamp,omitempty"`
+	MaxRevisions              int                   `firestore:"maxRevisions,omitempty" json:"maxRevisions,omitempty"` // default 3 if unset
 }
 
 type Budget struct {

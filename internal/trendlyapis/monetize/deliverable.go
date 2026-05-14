@@ -282,11 +282,22 @@ func RequestDeliverableChange(c *gin.Context) {
 	if err == nil {
 		collabName = collab.Name
 	}
+	maxRevisions := collab.MaxRevisions
+	if maxRevisions == 0 {
+		maxRevisions = constants.DefaultMaxRevisions
+	}
+	revisionLimitExceeded := data.Contract.Deliverable.RevisionCount > maxRevisions
 
 	// 3. Send Push Notification to Influencer
+	revisionTitle := "Revision Requested! 📽️"
+	revisionDesc := fmt.Sprintf("%s has requested some changes for %s. Review the feedback now!", data.Brand.Name, collabName)
+	if revisionLimitExceeded {
+		revisionTitle = "Revision Limit Exceeded ⚠️"
+		revisionDesc = fmt.Sprintf("%s requested revision #%d for %s — this exceeds the agreed limit of %d. You can raise a dispute if you believe this is unreasonable.", data.Brand.Name, data.Contract.Deliverable.RevisionCount, collabName, maxRevisions)
+	}
 	notif := &trendlymodels.Notification{
-		Title:       "Revision Requested! 📽️",
-		Description: fmt.Sprintf("%s has requested some changes for %s. Review the feedback now!", data.Brand.Name, collabName),
+		Title:       revisionTitle,
+		Description: revisionDesc,
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "deliverable-revision",
@@ -323,7 +334,10 @@ func RequestDeliverableChange(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Revision requested successfully",
+		"message":               "Revision requested successfully",
+		"revisionLimitExceeded": revisionLimitExceeded,
+		"revisionCount":         data.Contract.Deliverable.RevisionCount,
+		"maxRevisions":          maxRevisions,
 	})
 }
 
