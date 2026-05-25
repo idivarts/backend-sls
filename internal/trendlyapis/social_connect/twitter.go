@@ -40,11 +40,13 @@ func TwitterInit(c *gin.Context) {
 		return
 	}
 
+	brandId := c.Query("brandId")
 	state := &OAuthState{
 		UserID:         userId,
 		Platform:       trendlymodels.PlatformTwitter,
 		App:            app,
 		CallbackScheme: callbackScheme,
+		BrandID:        brandId,
 		CodeVerifier:   codeVerifier,
 	}
 	encodedState, err := state.Encode()
@@ -143,8 +145,14 @@ func TwitterCallback(c *gin.Context) {
 		Scopes:       strings.Split(tokens.Scope, " "),
 	}
 
-	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
-		log.Printf("twitter: firestore save failed: %v", err)
+	var saveErr error
+	if state.BrandID != "" {
+		saveErr = trendlymodels.SaveBrandSocialAccount(state.BrandID, social, socialToken)
+	} else {
+		saveErr = trendlymodels.SaveSocialAccount(state.UserID, social, socialToken)
+	}
+	if saveErr != nil {
+		log.Printf("twitter: firestore save failed: %v", saveErr)
 		c.Redirect(302, CallbackErrorURL(connectBase, "twitter", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
 	}

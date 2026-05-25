@@ -193,6 +193,73 @@ func SaveSocialAccount(userID string, account *SocialAccount, token *SocialToken
 	return nil
 }
 
+// ─── Brand-level helpers (brands/{brandId}/socialAccounts) ───────────────────
+
+// SaveBrandSocialAccount atomically writes the SocialAccount and its SocialToken
+// under the brand's Firestore sub-collections.
+func SaveBrandSocialAccount(brandID string, account *SocialAccount, token *SocialToken) error {
+	ctx := context.Background()
+
+	pubRef := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialAccounts", brandID)).
+		Doc(account.ID)
+	privRef := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialTokens", brandID)).
+		Doc(account.ID)
+
+	batch := firestoredb.Client.Batch()
+	batch.Set(pubRef, account)
+	batch.Set(privRef, token)
+
+	if _, err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("SaveBrandSocialAccount: batch commit failed: %w", err)
+	}
+	return nil
+}
+
+// ListBrandSocialAccounts returns all social accounts connected to a given brand.
+func ListBrandSocialAccounts(brandID string) ([]SocialAccount, error) {
+	docs, err := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialAccounts", brandID)).
+		Documents(context.Background()).
+		GetAll()
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := make([]SocialAccount, 0, len(docs))
+	for _, doc := range docs {
+		var a SocialAccount
+		if err := doc.DataTo(&a); err != nil {
+			return nil, fmt.Errorf("ListBrandSocialAccounts: failed to decode %s: %w", doc.Ref.ID, err)
+		}
+		accounts = append(accounts, a)
+	}
+	return accounts, nil
+}
+
+// DeleteBrandSocialAccount atomically removes both the SocialAccount and its
+// SocialToken documents for the given brand.
+func DeleteBrandSocialAccount(brandID, socialID string) error {
+	ctx := context.Background()
+
+	pubRef := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialAccounts", brandID)).
+		Doc(socialID)
+	privRef := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialTokens", brandID)).
+		Doc(socialID)
+
+	batch := firestoredb.Client.Batch()
+	batch.Delete(pubRef)
+	batch.Delete(privRef)
+
+	if _, err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("DeleteBrandSocialAccount: batch commit failed: %w", err)
+	}
+	return nil
+}
+
 // DeleteSocialAccount atomically removes both the SocialAccount and its
 // SocialToken documents in a single Firestore batch commit.
 func DeleteSocialAccount(userID, socialID string) error {

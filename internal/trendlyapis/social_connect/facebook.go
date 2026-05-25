@@ -23,11 +23,13 @@ func FacebookInit(c *gin.Context) {
 		return
 	}
 
+	brandId := c.Query("brandId")
 	state := &OAuthState{
 		UserID:         userId,
 		Platform:       trendlymodels.PlatformFacebook,
 		App:            app,
 		CallbackScheme: callbackScheme,
+		BrandID:        brandId,
 	}
 	encodedState, err := state.Encode()
 	if err != nil {
@@ -122,8 +124,14 @@ func FacebookCallback(c *gin.Context) {
 		TokenExpiry: now + longToken.ExpiresIn,
 	}
 
-	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
-		log.Printf("facebook: firestore save failed: %v", err)
+	var saveErr error
+	if state.BrandID != "" {
+		saveErr = trendlymodels.SaveBrandSocialAccount(state.BrandID, social, socialToken)
+	} else {
+		saveErr = trendlymodels.SaveSocialAccount(state.UserID, social, socialToken)
+	}
+	if saveErr != nil {
+		log.Printf("facebook: firestore save failed: %v", saveErr)
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
 	}
