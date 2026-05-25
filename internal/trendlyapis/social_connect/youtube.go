@@ -79,7 +79,6 @@ func YouTubeCallback(c *gin.Context) {
 
 	redirectURI := fmt.Sprintf("%s/connect/youtube/callback", constants.TRENDLY_BE)
 
-	// Exchange code for access + refresh tokens
 	tokens, err := youtube.ExchangeCode(code, redirectURI)
 	if err != nil {
 		log.Printf("youtube: code exchange failed: %v", err)
@@ -87,7 +86,6 @@ func YouTubeCallback(c *gin.Context) {
 		return
 	}
 
-	// Fetch channel profile
 	channel, err := youtube.GetMyChannel(tokens.AccessToken)
 	if err != nil {
 		log.Printf("youtube: channel fetch failed: %v", err)
@@ -99,13 +97,12 @@ func YouTubeCallback(c *gin.Context) {
 	if handle == "" {
 		handle = channel.ID // fallback to channel ID
 	}
-	// Strip leading @ for storage consistency
 	handle = strings.TrimPrefix(handle, "@")
 
-	socialID := trendlymodels.SocialV2ID(trendlymodels.PlatformYouTube, handle)
+	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformYouTube, handle)
 	now := time.Now().Unix()
 
-	social := &trendlymodels.SocialV2{
+	social := &trendlymodels.SocialAccount{
 		ID:              socialID,
 		Platform:        trendlymodels.PlatformYouTube,
 		UserID:          state.UserID,
@@ -119,15 +116,15 @@ func YouTubeCallback(c *gin.Context) {
 		ConnectedAt:     now,
 		UpdatedAt:       now,
 		RawProfile: map[string]interface{}{
-			"channelId":   channel.ID,
-			"customUrl":   channel.Snippet.CustomURL,
-			"country":     channel.Snippet.Country,
-			"viewCount":   channel.Stats.ViewCount,
-			"videoCount":  channel.Stats.VideoCount,
+			"channelId":  channel.ID,
+			"customUrl":  channel.Snippet.CustomURL,
+			"country":    channel.Snippet.Country,
+			"viewCount":  channel.Stats.ViewCount,
+			"videoCount": channel.Stats.VideoCount,
 		},
 	}
 
-	socialPrivate := &trendlymodels.SocialV2Private{
+	socialToken := &trendlymodels.SocialToken{
 		Platform:     trendlymodels.PlatformYouTube,
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
@@ -135,7 +132,7 @@ func YouTubeCallback(c *gin.Context) {
 		Scopes:       strings.Split(tokens.Scope, " "),
 	}
 
-	if err := saveSocialV2(state.UserID, socialID, social, socialPrivate); err != nil {
+	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
 		log.Printf("youtube: firestore save failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "youtube", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return

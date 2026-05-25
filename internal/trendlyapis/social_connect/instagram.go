@@ -1,7 +1,6 @@
 package social_connect
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/url"
@@ -13,16 +12,14 @@ import (
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/instagram"
 )
 
 // InstagramInit redirects the browser to Instagram's OAuth consent screen.
 // Query params (from connect portal):
-//   - token        Firebase JWT (validated by middleware before this handler runs)
+//   - token           Firebase JWT (validated by middleware before this handler runs)
 //   - callbackScheme  e.g. trn-users or trn-brands
-//   - app          "users" | "brands"
-//   - userId       injected by middleware
+//   - app             "users" | "brands"
 func InstagramInit(c *gin.Context) {
 	userId, _ := middlewares.GetUserId(c)
 	callbackScheme := c.Query("callbackScheme")
@@ -69,7 +66,6 @@ func InstagramCallback(c *gin.Context) {
 	code := c.Query("code")
 	rawState := c.Query("state")
 
-	// Instagram sometimes sends error instead of code
 	if errParam := c.Query("error"); errParam != "" {
 		log.Printf("instagram: OAuth error: %s - %s", errParam, c.Query("error_reason"))
 		c.Redirect(302, CallbackErrorURL(connectBase, "instagram", "", "", c.Query("error_description")))
@@ -85,7 +81,6 @@ func InstagramCallback(c *gin.Context) {
 
 	redirectURI := fmt.Sprintf("%s/connect/instagram/callback", constants.TRENDLY_BE)
 
-	// Exchange code for short-lived token
 	shortToken, err := instagram.GetAccessTokenFromCode(code, redirectURI)
 	if err != nil {
 		log.Printf("instagram: code exchange failed: %v", err)
@@ -93,7 +88,6 @@ func InstagramCallback(c *gin.Context) {
 		return
 	}
 
-	// Exchange for long-lived token (valid 60 days)
 	longToken, err := instagram.GetLongLivedAccessToken(shortToken.AccessToken)
 	if err != nil {
 		log.Printf("instagram: long-lived token exchange failed: %v", err)
@@ -101,7 +95,6 @@ func InstagramCallback(c *gin.Context) {
 		return
 	}
 
-	// Fetch profile
 	instaProfile, err := instagram.GetInstagram("me", longToken.AccessToken)
 	if err != nil {
 		log.Printf("instagram: profile fetch failed: %v", err)
@@ -110,13 +103,10 @@ func InstagramCallback(c *gin.Context) {
 	}
 
 	username := instaProfile.Username
-	socialID := trendlymodels.SocialV2ID(trendlymodels.PlatformInstagram, username)
+	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformInstagram, username)
 	now := time.Now().Unix()
 
-	// Expiry: Instagram long-lived tokens last 60 days
-	tokenExpiry := now + longToken.ExpiresIn
-
-	social := &trendlymodels.SocialV2{
+	social := &trendlymodels.SocialAccount{
 		ID:              socialID,
 		Platform:        trendlymodels.PlatformInstagram,
 		UserID:          state.UserID,
@@ -133,36 +123,18 @@ func InstagramCallback(c *gin.Context) {
 		},
 	}
 
-	socialPrivate := &trendlymodels.SocialV2Private{
+	socialToken := &trendlymodels.SocialToken{
 		Platform:    trendlymodels.PlatformInstagram,
 		AccessToken: longToken.AccessToken,
-		TokenExpiry: tokenExpiry,
+		TokenExpiry: now + longToken.ExpiresIn,
 		Scopes:      shortToken.Permissions,
 	}
 
-	if err := saveSocialV2(state.UserID, socialID, social, socialPrivate); err != nil {
+	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
 		log.Printf("instagram: firestore save failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "instagram", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
 	}
 
 	c.Redirect(302, CallbackSuccessURL(connectBase, "instagram", state.CallbackScheme, state.App))
-}
-
-// saveSocialV2 writes public and private social docs to Firestore in parallel.
-func saveSocialV2(userID, socialID string, social *trendlymodels.SocialV2, priv *trendlymodels.SocialV2Private) error {
-	ctx := context.Background()
-
-	pubRef := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socialsV2", userID)).Doc(socialID)
-	privRef := firestoredb.Client.Collection(fmt.Sprintf("users/%s/socialsV2Private", userID)).Doc(socialID)
-
-	// Use a batch write for atomicity
-	batch := firestoredb.Client.Batch()
-	batch.Set(pubRef, social)
-	batch.Set(privRef, priv)
-
-	if _, err := batch.Commit(ctx); err != nil {
-		return fmt.Errorf("saveSocialV2: batch commit failed: %w", err)
-	}
-	return nil
 }

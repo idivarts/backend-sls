@@ -69,7 +69,6 @@ func FacebookCallback(c *gin.Context) {
 
 	redirectURI := fmt.Sprintf("%s/connect/facebook/callback", constants.TRENDLY_BE)
 
-	// Exchange code for short-lived token
 	shortToken, err := messenger.GetAccessTokenFromCode(code, redirectURI)
 	if err != nil {
 		log.Printf("facebook: code exchange failed: %v", err)
@@ -77,7 +76,6 @@ func FacebookCallback(c *gin.Context) {
 		return
 	}
 
-	// Exchange for long-lived token (~60 days)
 	longToken, err := messenger.GetLongLivedAccessToken(shortToken.AccessToken)
 	if err != nil {
 		log.Printf("facebook: long-lived token failed: %v", err)
@@ -85,7 +83,6 @@ func FacebookCallback(c *gin.Context) {
 		return
 	}
 
-	// Fetch Facebook user ID via /me
 	fbUserID, err := messenger.GetMeID(longToken.AccessToken)
 	if err != nil {
 		log.Printf("facebook: /me fetch failed: %v", err)
@@ -93,7 +90,6 @@ func FacebookCallback(c *gin.Context) {
 		return
 	}
 
-	// Fetch full profile
 	fbProfile, _, err := messenger.GetMyFacebook(fbUserID, longToken.AccessToken)
 	if err != nil {
 		log.Printf("facebook: profile fetch failed: %v", err)
@@ -101,11 +97,10 @@ func FacebookCallback(c *gin.Context) {
 		return
 	}
 
-	socialID := trendlymodels.SocialV2ID(trendlymodels.PlatformFacebook, fbUserID)
+	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformFacebook, fbUserID)
 	now := time.Now().Unix()
-	tokenExpiry := now + longToken.ExpiresIn
 
-	social := &trendlymodels.SocialV2{
+	social := &trendlymodels.SocialAccount{
 		ID:              socialID,
 		Platform:        trendlymodels.PlatformFacebook,
 		UserID:          state.UserID,
@@ -121,13 +116,13 @@ func FacebookCallback(c *gin.Context) {
 		},
 	}
 
-	socialPrivate := &trendlymodels.SocialV2Private{
+	socialToken := &trendlymodels.SocialToken{
 		Platform:    trendlymodels.PlatformFacebook,
 		AccessToken: longToken.AccessToken,
-		TokenExpiry: tokenExpiry,
+		TokenExpiry: now + longToken.ExpiresIn,
 	}
 
-	if err := saveSocialV2(state.UserID, socialID, social, socialPrivate); err != nil {
+	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
 		log.Printf("facebook: firestore save failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return

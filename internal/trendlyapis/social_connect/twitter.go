@@ -34,7 +34,6 @@ func TwitterInit(c *gin.Context) {
 		return
 	}
 
-	// Generate PKCE code_verifier (43–128 chars, URL-safe base64, no padding)
 	codeVerifier, codeChallenge, err := generatePKCE()
 	if err != nil {
 		c.JSON(500, gin.H{"error": "failed to generate PKCE"})
@@ -97,7 +96,6 @@ func TwitterCallback(c *gin.Context) {
 
 	redirectURI := fmt.Sprintf("%s/connect/twitter/callback", constants.TRENDLY_BE)
 
-	// Exchange code + PKCE verifier for tokens
 	tokens, err := twitter.ExchangeCode(code, redirectURI, state.CodeVerifier)
 	if err != nil {
 		log.Printf("twitter: code exchange failed: %v", err)
@@ -105,7 +103,6 @@ func TwitterCallback(c *gin.Context) {
 		return
 	}
 
-	// Fetch user profile
 	user, err := twitter.GetMe(tokens.AccessToken)
 	if err != nil {
 		log.Printf("twitter: profile fetch failed: %v", err)
@@ -113,16 +110,16 @@ func TwitterCallback(c *gin.Context) {
 		return
 	}
 
-	socialID := trendlymodels.SocialV2ID(trendlymodels.PlatformTwitter, user.Username)
+	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformTwitter, user.Username)
 	now := time.Now().Unix()
 
-	social := &trendlymodels.SocialV2{
+	social := &trendlymodels.SocialAccount{
 		ID:              socialID,
 		Platform:        trendlymodels.PlatformTwitter,
 		UserID:          state.UserID,
 		Username:        user.Username,
 		DisplayName:     user.Name,
-		ProfileImageURL: strings.Replace(user.ProfileImageURL, "_normal", "", 1), // get full-size
+		ProfileImageURL: strings.Replace(user.ProfileImageURL, "_normal", "", 1),
 		Bio:             user.Description,
 		ProfileURL:      "https://twitter.com/" + user.Username,
 		FollowerCount:   user.PublicMetrics.FollowersCount,
@@ -138,15 +135,15 @@ func TwitterCallback(c *gin.Context) {
 		},
 	}
 
-	socialPrivate := &trendlymodels.SocialV2Private{
+	socialToken := &trendlymodels.SocialToken{
 		Platform:     trendlymodels.PlatformTwitter,
 		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken, // Twitter rotates refresh tokens
+		RefreshToken: tokens.RefreshToken,
 		TokenExpiry:  tokens.ExpiresAt(),
 		Scopes:       strings.Split(tokens.Scope, " "),
 	}
 
-	if err := saveSocialV2(state.UserID, socialID, social, socialPrivate); err != nil {
+	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
 		log.Printf("twitter: firestore save failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "twitter", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return

@@ -1,7 +1,7 @@
 // Package main implements a scheduled Lambda function that refreshes
 // expiring social platform access tokens stored in Firestore.
 //
-// Runs every 6 hours via EventBridge cron. For each user's socialsV2Private
+// Runs every 6 hours via EventBridge cron. For each user's socialTokens
 // sub-collection, it finds tokens expiring within the next 7 days and
 // attempts a refresh using the appropriate platform client.
 //
@@ -29,7 +29,7 @@ import (
 	"github.com/idivarts/backend-sls/pkg/youtube"
 )
 
-const refreshWindowDays = 7 // Refresh tokens expiring within this many days
+const refreshWindowDays = 7
 
 func main() {
 	lambda.Start(handler)
@@ -41,7 +41,6 @@ func handler(ctx context.Context) error {
 	now := time.Now().Unix()
 	deadline := now + int64(refreshWindowDays*24*60*60)
 
-	// Iterate over all users
 	userDocs, err := firestoredb.Client.Collection("users").Documents(ctx).GetAll()
 	if err != nil {
 		return fmt.Errorf("social_refresh: failed to list users: %w", err)
@@ -52,32 +51,34 @@ func handler(ctx context.Context) error {
 	for _, userDoc := range userDocs {
 		userID := userDoc.Ref.ID
 
-		privDocs, err := firestoredb.Client.
-			Collection(fmt.Sprintf("users/%s/socialsV2Private", userID)).
+		// Use the model's ListSocialTokens equivalent by reading the sub-collection
+		// directly — there is no list helper for tokens since it's an internal scan.
+		tokenDocs, err := firestoredb.Client.
+			Collection(fmt.Sprintf("users/%s/socialTokens", userID)).
 			Documents(ctx).
 			GetAll()
 		if err != nil {
-			log.Printf("social_refresh: failed to list socialsV2Private for %s: %v", userID, err)
+			log.Printf("social_refresh: failed to list socialTokens for %s: %v", userID, err)
 			continue
 		}
 
-		for _, privDoc := range privDocs {
-			var priv trendlymodels.SocialV2Private
-			if err := privDoc.DataTo(&priv); err != nil {
-				log.Printf("social_refresh: failed to decode private doc %s/%s: %v", userID, privDoc.Ref.ID, err)
+		for _, tokenDoc := range tokenDocs {
+			var token trendlymodels.SocialToken
+			if err := tokenDoc.DataTo(&token); err != nil {
+				log.Printf("social_refresh: failed to decode token doc %s/%s: %v", userID, tokenDoc.Ref.ID, err)
 				failed++
 				continue
 			}
 
-			// Skip tokens with no expiry (e.g. non-expiring tokens) or plenty of time left
-			if priv.TokenExpiry > 0 && priv.TokenExpiry > deadline {
+			// Skip tokens with no expiry or plenty of time remaining
+			if token.TokenExpiry > 0 && token.TokenExpiry > deadline {
 				skipped++
 				continue
 			}
 
-			if err := refreshToken(ctx, userID, privDoc.Ref.ID, &priv); err != nil {
+			if err := refreshToken(userID, tokenDoc.Ref.ID, &token); err != nil {
 				log.Printf("social_refresh: failed to refresh %s/%s [%s]: %v",
-					userID, privDoc.Ref.ID, priv.Platform, err)
+					userID, tokenDoc.Ref.ID, token.Platform, err)
 				failed++
 			} else {
 				refreshed++
@@ -89,112 +90,89 @@ func handler(ctx context.Context) error {
 	return nil
 }
 
-// refreshToken attempts to refresh the access token for a single social account.
-func refreshToken(ctx context.Context, userID, socialID string, priv *trendlymodels.SocialV2Private) error {
-	switch priv.Platform {
+// refreshToken dispatches to the correct platform refresh handler.
+func refreshToken(userID, socialID string, token *trendlymodels.SocialToken) error {
+	switch token.Platform {
 	case trendlymodels.PlatformInstagram:
-		return refreshInstagram(ctx, userID, socialID, priv)
+		return refreshInstagram(userID, socialID, token)
 	case trendlymodels.PlatformYouTube:
-		return refreshYouTube(ctx, userID, socialID, priv)
+		return refreshYouTube(userID, socialID, token)
 	case trendlymodels.PlatformLinkedIn:
-		return refreshLinkedIn(ctx, userID, socialID, priv)
+		return refreshLinkedIn(userID, socialID, token)
 	case trendlymodels.PlatformTwitter:
-		return refreshTwitter(ctx, userID, socialID, priv)
+		return refreshTwitter(userID, socialID, token)
 	case trendlymodels.PlatformFacebook:
 		// Facebook long-lived tokens cannot be refreshed via API.
-		// Log a warning; the user will need to reconnect when the token expires.
 		log.Printf("social_refresh: Facebook token for %s/%s expiring soon — user must reconnect", userID, socialID)
 		return nil
 	default:
-		return fmt.Errorf("unknown platform %q", priv.Platform)
+		return fmt.Errorf("unknown platform %q", token.Platform)
 	}
 }
 
-// refreshInstagram refreshes an Instagram long-lived token (valid 60 days).
-// Instagram's refresh endpoint simply extends the expiry of an existing long-lived token.
-func refreshInstagram(ctx context.Context, userID, socialID string, priv *trendlymodels.SocialV2Private) error {
-	newToken, err := instagram.RefreshLongLivedToken(priv.AccessToken)
+func refreshInstagram(userID, socialID string, token *trendlymodels.SocialToken) error {
+	newToken, err := instagram.RefreshLongLivedToken(token.AccessToken)
 	if err != nil {
 		return fmt.Errorf("instagram refresh: %w", err)
 	}
-	return persistPrivate(ctx, userID, socialID, priv.Platform, map[string]interface{}{
-		"accessToken": newToken.AccessToken,
-		"tokenExpiry": time.Now().Add(time.Duration(newToken.ExpiresIn) * time.Second).Unix(),
+	_, err = token.Update(userID, socialID, []firestore.Update{
+		{Path: "accessToken", Value: newToken.AccessToken},
+		{Path: "tokenExpiry", Value: time.Now().Add(time.Duration(newToken.ExpiresIn) * time.Second).Unix()},
 	})
+	return err
 }
 
-// refreshYouTube uses the stored refresh token to get a new access token.
-func refreshYouTube(ctx context.Context, userID, socialID string, priv *trendlymodels.SocialV2Private) error {
-	if priv.RefreshToken == "" {
+func refreshYouTube(userID, socialID string, token *trendlymodels.SocialToken) error {
+	if token.RefreshToken == "" {
 		return fmt.Errorf("youtube: no refresh token stored for %s/%s", userID, socialID)
 	}
-	newTokens, err := youtube.RefreshAccessToken(priv.RefreshToken)
+	newTokens, err := youtube.RefreshAccessToken(token.RefreshToken)
 	if err != nil {
 		return fmt.Errorf("youtube refresh: %w", err)
 	}
-	return persistPrivate(ctx, userID, socialID, priv.Platform, map[string]interface{}{
-		"accessToken": newTokens.AccessToken,
-		"tokenExpiry": newTokens.ExpiresAt(),
-		// Google doesn't rotate refresh tokens; keep the existing one
+	// Google doesn't rotate refresh tokens; only update access token + expiry
+	_, err = token.Update(userID, socialID, []firestore.Update{
+		{Path: "accessToken", Value: newTokens.AccessToken},
+		{Path: "tokenExpiry", Value: newTokens.ExpiresAt()},
 	})
+	return err
 }
 
-// refreshLinkedIn uses the stored refresh token (if available).
-func refreshLinkedIn(ctx context.Context, userID, socialID string, priv *trendlymodels.SocialV2Private) error {
-	if priv.RefreshToken == "" {
-		// LinkedIn only issues refresh tokens with offline_access scope.
-		// Without it, the user must reconnect when the token expires.
+func refreshLinkedIn(userID, socialID string, token *trendlymodels.SocialToken) error {
+	if token.RefreshToken == "" {
 		log.Printf("social_refresh: LinkedIn token for %s/%s expiring soon — no refresh token; user must reconnect", userID, socialID)
 		return nil
 	}
-	newTokens, err := linkedin.RefreshAccessToken(priv.RefreshToken)
+	newTokens, err := linkedin.RefreshAccessToken(token.RefreshToken)
 	if err != nil {
 		return fmt.Errorf("linkedin refresh: %w", err)
 	}
-	updates := map[string]interface{}{
-		"accessToken": newTokens.AccessToken,
-		"tokenExpiry": newTokens.ExpiresAt(),
+	updates := []firestore.Update{
+		{Path: "accessToken", Value: newTokens.AccessToken},
+		{Path: "tokenExpiry", Value: newTokens.ExpiresAt()},
 	}
 	if newTokens.RefreshToken != "" {
-		updates["refreshToken"] = newTokens.RefreshToken
+		updates = append(updates, firestore.Update{Path: "refreshToken", Value: newTokens.RefreshToken})
 	}
-	return persistPrivate(ctx, userID, socialID, priv.Platform, updates)
+	_, err = token.Update(userID, socialID, updates)
+	return err
 }
 
-// refreshTwitter uses the stored refresh token (Twitter rotates refresh tokens).
-func refreshTwitter(ctx context.Context, userID, socialID string, priv *trendlymodels.SocialV2Private) error {
-	if priv.RefreshToken == "" {
+func refreshTwitter(userID, socialID string, token *trendlymodels.SocialToken) error {
+	if token.RefreshToken == "" {
 		return fmt.Errorf("twitter: no refresh token stored for %s/%s", userID, socialID)
 	}
-	newTokens, err := twitter.RefreshAccessToken(priv.RefreshToken)
+	newTokens, err := twitter.RefreshAccessToken(token.RefreshToken)
 	if err != nil {
 		return fmt.Errorf("twitter refresh: %w", err)
 	}
-	updates := map[string]interface{}{
-		"accessToken": newTokens.AccessToken,
-		"tokenExpiry": newTokens.ExpiresAt(),
+	updates := []firestore.Update{
+		{Path: "accessToken", Value: newTokens.AccessToken},
+		{Path: "tokenExpiry", Value: newTokens.ExpiresAt()},
 	}
-	// Twitter always rotates refresh tokens
 	if newTokens.RefreshToken != "" {
-		updates["refreshToken"] = newTokens.RefreshToken
+		updates = append(updates, firestore.Update{Path: "refreshToken", Value: newTokens.RefreshToken})
 	}
-	return persistPrivate(ctx, userID, socialID, priv.Platform, updates)
-}
-
-// persistPrivate applies a partial update to a socialsV2Private document.
-func persistPrivate(ctx context.Context, userID, socialID string, platform trendlymodels.Platform, fields map[string]interface{}) error {
-	ref := firestoredb.Client.
-		Collection(fmt.Sprintf("users/%s/socialsV2Private", userID)).
-		Doc(socialID)
-
-	updates := make([]firestore.Update, 0, len(fields))
-	for k, v := range fields {
-		updates = append(updates, firestore.Update{Path: k, Value: v})
-	}
-
-	if _, err := ref.Update(ctx, updates); err != nil {
-		return fmt.Errorf("persistPrivate [%s/%s/%s]: %w", userID, socialID, platform, err)
-	}
-	log.Printf("social_refresh: refreshed token for %s/%s [%s]", userID, socialID, platform)
-	return nil
+	_, err = token.Update(userID, socialID, updates)
+	return err
 }

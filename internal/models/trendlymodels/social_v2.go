@@ -1,5 +1,15 @@
 package trendlymodels
 
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+
+	"cloud.google.com/go/firestore"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+)
+
 // ─── Platform constants ────────────────────────────────────────────────────────
 
 // Platform identifies a social media platform using a stable string key.
@@ -14,14 +24,14 @@ const (
 	PlatformTwitter   Platform = "twitter"
 )
 
-// ─── SocialV2 (users/{userId}/socialsV2/{id}) ─────────────────────────────────
+// ─── SocialAccount (users/{userId}/socialAccounts/{id}) ───────────────────────
 
-// SocialV2 is the forward-only public social account document.
+// SocialAccount is the public social account document.
 // It lives alongside the legacy `socials` sub-collection; the old collection
 // is never written to for new connections.
-type SocialV2 struct {
+type SocialAccount struct {
 	// Core identity
-	ID       string   `json:"id" firestore:"id"`             // deterministic: platform:username
+	ID       string   `json:"id" firestore:"id"`             // deterministic: sha256(platform:username)
 	Platform Platform `json:"platform" firestore:"platform"` // "instagram", "facebook", etc.
 	UserID   string   `json:"userId" firestore:"userId"`
 
@@ -46,21 +56,161 @@ type SocialV2 struct {
 	RawProfile map[string]interface{} `json:"rawProfile,omitempty" firestore:"rawProfile"`
 }
 
-// SocialV2ID returns the canonical document ID for a social account.
-// Format: "{platform}:{username}" — deterministic and collision-free.
-func SocialV2ID(platform Platform, username string) string {
-	return platform + ":" + username
+// SocialAccountID returns the canonical document ID for a social account.
+// It is the SHA-256 hex digest of "{platform}:{username}" — deterministic and opaque.
+func SocialAccountID(platform Platform, username string) string {
+	h := sha256.Sum256([]byte(platform + ":" + username))
+	return hex.EncodeToString(h[:])
 }
 
-// ─── SocialV2Private (users/{userId}/socialsV2Private/{id}) ───────────────────
+// Insert creates or overwrites the public social account document in Firestore.
+func (s *SocialAccount) Insert(userID string) (*firestore.WriteResult, error) {
+	res, err := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialAccounts", userID)).
+		Doc(s.ID).
+		Set(context.Background(), s)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
 
-// SocialV2Private holds sensitive token data in a separate sub-collection.
+// Get reads the social account document into the receiver.
+func (s *SocialAccount) Get(userID, id string) error {
+	res, err := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialAccounts", userID)).
+		Doc(id).
+		Get(context.Background())
+	if err != nil {
+		return err
+	}
+	return res.DataTo(s)
+}
+
+// Update performs a partial update on the social account document.
+func (s *SocialAccount) Update(userID, id string, fields []firestore.Update) (*firestore.WriteResult, error) {
+	res, err := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialAccounts", userID)).
+		Doc(id).
+		Update(context.Background(), fields)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// ListSocialAccounts returns all social accounts for a given user.
+func ListSocialAccounts(userID string) ([]SocialAccount, error) {
+	docs, err := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialAccounts", userID)).
+		Documents(context.Background()).
+		GetAll()
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := make([]SocialAccount, 0, len(docs))
+	for _, doc := range docs {
+		var a SocialAccount
+		if err := doc.DataTo(&a); err != nil {
+			return nil, fmt.Errorf("ListSocialAccounts: failed to decode %s: %w", doc.Ref.ID, err)
+		}
+		accounts = append(accounts, a)
+	}
+	return accounts, nil
+}
+
+// ─── SocialToken (users/{userId}/socialTokens/{id}) ───────────────────────────
+
+// SocialToken holds sensitive token data in a separate sub-collection.
 // Access rules should restrict reads to server-side only (Firebase security rules).
-type SocialV2Private struct {
+type SocialToken struct {
 	Platform     Platform `json:"platform" firestore:"platform"`
 	AccessToken  string   `json:"accessToken" firestore:"accessToken"`
 	RefreshToken string   `json:"refreshToken,omitempty" firestore:"refreshToken"` // empty for non-refreshable tokens
 	TokenExpiry  int64    `json:"tokenExpiry" firestore:"tokenExpiry"`             // Unix timestamp; 0 = no expiry
 	Scopes       []string `json:"scopes,omitempty" firestore:"scopes"`
 	// PKCE verifier is only stored transiently during the OAuth flow (not persisted here).
+}
+
+// Set creates or overwrites the token document in Firestore.
+func (t *SocialToken) Set(userID, id string) (*firestore.WriteResult, error) {
+	res, err := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialTokens", userID)).
+		Doc(id).
+		Set(context.Background(), t)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// Get reads the token document into the receiver.
+func (t *SocialToken) Get(userID, id string) error {
+	res, err := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialTokens", userID)).
+		Doc(id).
+		Get(context.Background())
+	if err != nil {
+		return err
+	}
+	return res.DataTo(t)
+}
+
+// Update performs a partial update on the token document.
+func (t *SocialToken) Update(userID, id string, fields []firestore.Update) (*firestore.WriteResult, error) {
+	res, err := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialTokens", userID)).
+		Doc(id).
+		Update(context.Background(), fields)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// ─── Batch helpers ────────────────────────────────────────────────────────────
+
+// SaveSocialAccount atomically writes both the public SocialAccount and its
+// SocialToken in a single Firestore batch commit.
+func SaveSocialAccount(userID string, account *SocialAccount, token *SocialToken) error {
+	ctx := context.Background()
+
+	pubRef := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialAccounts", userID)).
+		Doc(account.ID)
+	privRef := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialTokens", userID)).
+		Doc(account.ID)
+
+	batch := firestoredb.Client.Batch()
+	batch.Set(pubRef, account)
+	batch.Set(privRef, token)
+
+	if _, err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("SaveSocialAccount: batch commit failed: %w", err)
+	}
+	return nil
+}
+
+// DeleteSocialAccount atomically removes both the SocialAccount and its
+// SocialToken documents in a single Firestore batch commit.
+func DeleteSocialAccount(userID, socialID string) error {
+	ctx := context.Background()
+
+	pubRef := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialAccounts", userID)).
+		Doc(socialID)
+	privRef := firestoredb.Client.
+		Collection(fmt.Sprintf("users/%s/socialTokens", userID)).
+		Doc(socialID)
+
+	batch := firestoredb.Client.Batch()
+	batch.Delete(pubRef)
+	batch.Delete(privRef)
+
+	if _, err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("DeleteSocialAccount: batch commit failed: %w", err)
+	}
+	return nil
 }

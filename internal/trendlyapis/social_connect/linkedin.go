@@ -84,7 +84,6 @@ func LinkedInCallback(c *gin.Context) {
 		return
 	}
 
-	// Fetch member profile
 	profile, err := linkedin.GetMe(tokens.AccessToken)
 	if err != nil {
 		log.Printf("linkedin: profile fetch failed: %v", err)
@@ -92,15 +91,15 @@ func LinkedInCallback(c *gin.Context) {
 		return
 	}
 
-	// LinkedIn sub is the member URN; extract the numeric ID part as username
+	// LinkedIn sub is the member URN; extract the ID part as username
 	// e.g. "urn:li:person:abc123" → "abc123"
 	parts := strings.Split(profile.Sub, ":")
 	username := parts[len(parts)-1]
 
-	socialID := trendlymodels.SocialV2ID(trendlymodels.PlatformLinkedIn, username)
+	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformLinkedIn, username)
 	now := time.Now().Unix()
 
-	social := &trendlymodels.SocialV2{
+	social := &trendlymodels.SocialAccount{
 		ID:              socialID,
 		Platform:        trendlymodels.PlatformLinkedIn,
 		UserID:          state.UserID,
@@ -118,17 +117,17 @@ func LinkedInCallback(c *gin.Context) {
 		},
 	}
 
-	socialPrivate := &trendlymodels.SocialV2Private{
+	socialToken := &trendlymodels.SocialToken{
 		Platform:    trendlymodels.PlatformLinkedIn,
 		AccessToken: tokens.AccessToken,
 		TokenExpiry: tokens.ExpiresAt(),
 		Scopes:      strings.Split(tokens.Scope, " "),
 	}
 	if tokens.RefreshToken != "" {
-		socialPrivate.RefreshToken = tokens.RefreshToken
+		socialToken.RefreshToken = tokens.RefreshToken
 	}
 
-	if err := saveSocialV2(state.UserID, socialID, social, socialPrivate); err != nil {
+	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
 		log.Printf("linkedin: firestore save failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "linkedin", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
