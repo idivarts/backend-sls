@@ -31,6 +31,13 @@ provider:
     SENDGRID_NAME: Trendly
     SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
+    # Social Connect V2 — new OAuth platform credentials
+    YOUTUBE_CLIENT_ID: ${env:YOUTUBE_CLIENT_ID, ''}
+    YOUTUBE_CLIENT_SECRET: ${env:YOUTUBE_CLIENT_SECRET, ''}
+    LINKEDIN_CLIENT_ID: ${env:LINKEDIN_CLIENT_ID, ''}
+    LINKEDIN_CLIENT_SECRET: ${env:LINKEDIN_CLIENT_SECRET, ''}
+    TWITTER_CLIENT_ID: ${env:TWITTER_CLIENT_ID, ''}
+    TWITTER_CLIENT_SECRET: ${env:TWITTER_CLIENT_SECRET, ''}
     # All Razorpay related variables
     GROWTH_PLAN_ID: plan_QywVXV2flgIY7N
     BUSINESS_PLAN_ID: plan_QywX8bnObf3P42
@@ -134,6 +141,19 @@ functions:
             - cron(30 2 * * ? *)   # 8:00 AM IST daily
             - cron(30 14 * * ? *)  # 8:00 PM IST daily
           enabled: ${self:custom.isProd.${self:provider.stage}}
+  social_token_refresh:
+    handler: functions/trendly_social_refresh/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+    timeout: 900  # 15 min — can scan many users
+    memorySize: 256
+    description: "Refreshes expiring social platform OAuth tokens (runs every 6h)"
+    events:
+      - schedule:
+          rate: cron(0 */6 * * ? *)  # Every 6 hours
+          enabled: true
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
     environment:
@@ -294,6 +314,9 @@ functions:
       - http: ANY /firebase/{proxy+}
       - http: ANY /onboard
       - http: ANY /onboard/{proxy+}
+      # Social Connect V2 portal routes
+      - http: ANY /connect
+      - http: ANY /connect/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
     package:

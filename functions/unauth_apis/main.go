@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 	trendlyunauth "github.com/idivarts/backend-sls/internal/trendlyapis/unauth_apis"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
@@ -14,21 +15,31 @@ func main() {
 
 	instaApi := apihandler.GinEngine.Group("/instagram")
 
-	// This is called by frontend. Purpose is to just redirect to insta auth url with needed params
+	// Legacy: called by frontend to redirect to IG auth url (pre-connect-portal flow)
 	instaApi.GET("/redirect", trendlyunauth.InstagramRedirect)
-
-	// From insta server we get redirected here with code -> we inturn we redirect to frontend with code
 	instaApi.GET("/auth/:redirect_type", trendlyunauth.InstagramAuthRedirect)
-
-	// Insta calls this api to deauthorize our app for a user
 	instaApi.GET("/deauth", trendlyunauth.InstagramDeAuth)
-
-	// Insta calls this api to delete our app for a user
 	instaApi.GET("/delete", trendlyunauth.InstagramDelete)
 
 	firebaseApi := apihandler.GinEngine.Group("/firebase")
-
 	firebaseApi.GET("/brands/members/add", trendlyunauth.ValidateFirebaseCallback)
+
+	// ── Social Connect Portal (V2 OAuth flow) ─────────────────────────────────
+	// Init routes: browser redirect from connect portal — token in query param.
+	connectInit := apihandler.GinEngine.Group("/connect", social_connect.ValidateQueryTokenMiddleware())
+	connectInit.GET("/instagram", social_connect.InstagramInit)
+	connectInit.GET("/facebook", social_connect.FacebookInit)
+	connectInit.GET("/youtube", social_connect.YouTubeInit)
+	connectInit.GET("/linkedin", social_connect.LinkedInInit)
+	connectInit.GET("/twitter", social_connect.TwitterInit)
+
+	// Callback routes: called by OAuth provider — no auth header; userId in state.
+	connectCallback := apihandler.GinEngine.Group("/connect")
+	connectCallback.GET("/instagram/callback", social_connect.InstagramCallback)
+	connectCallback.GET("/facebook/callback", social_connect.FacebookCallback)
+	connectCallback.GET("/youtube/callback", social_connect.YouTubeCallback)
+	connectCallback.GET("/linkedin/callback", social_connect.LinkedInCallback)
+	connectCallback.GET("/twitter/callback", social_connect.TwitterCallback)
 
 	apihandler.StartLambda()
 }
