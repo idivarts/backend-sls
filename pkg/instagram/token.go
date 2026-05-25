@@ -76,6 +76,34 @@ func GetAccessTokenFromCode(code, redirectUri string) (*CodeResponse, error) {
 	return token, nil
 }
 
+// RefreshLongLivedToken extends an existing long-lived Instagram access token.
+// Long-lived tokens are valid for 60 days and can be refreshed any time after
+// the first 24 hours. The refreshed token is also valid for 60 days from the
+// time of the call.
+func RefreshLongLivedToken(accessToken string) (*TokenResponse, error) {
+	url := fmt.Sprintf("%s/refresh_access_token?grant_type=ig_refresh_token&access_token=%s", BaseURL, accessToken)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("instagram: refresh request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("instagram: unexpected status " + resp.Status + ": " + string(b))
+	}
+
+	token := &TokenResponse{}
+	if err := json.Unmarshal(b, token); err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
 func GetLongLivedAccessToken(accessToken string) (*TokenResponse, error) {
 	url := fmt.Sprintf("%s/access_token?grant_type=ig_exchange_token&client_secret=%s&access_token=%s", BaseURL, ClientSecret, accessToken)
 

@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
 
@@ -29,6 +30,7 @@ func handleManagerAPIs() {
 func handleUserAPIs() {
 	userApisV1 := apihandler.GinEngine.Group("/api/v2", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("users"))
 
+	// Legacy social connect (pre-connect-portal flow — kept for backward compat)
 	userApisV1.POST("/socials/facebook", trendlyapis.FacebookLogin)
 	userApisV1.POST("/socials/instagram", trendlyapis.ConnectInstagram)
 	userApisV1.POST("/socials/instagram/manual", trendlyapis.ConnectInstagramManual)
@@ -38,4 +40,8 @@ func handleUserAPIs() {
 
 	// Get Social Medias
 	userApisV1.GET("/socials/medias", trendlyapis.FetchMedias)
+
+	// ── Social V2 (connect-portal OAuth flow) ─────────────────────────────────
+	userApisV1.GET("/socials/v2", social_connect.ListSocials)
+	userApisV1.DELETE("/socials/v2/:id", social_connect.DeleteSocial)
 }
