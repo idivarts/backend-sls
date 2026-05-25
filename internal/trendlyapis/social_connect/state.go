@@ -17,7 +17,10 @@ type OAuthState struct {
 	Platform       trendlymodels.Platform    `json:"platform"`
 	App            string                    `json:"app"`            // "users" | "brands"
 	CallbackScheme string                    `json:"callbackScheme"` // deep-link scheme or https prefix
-	IssuedAt       int64                     `json:"iat"`            // Unix timestamp for expiry check
+	// BrandID is set when app="brands" so the callback saves under
+	// brands/{brandId}/socialAccounts instead of users/{userId}/socialAccounts.
+	BrandID  string `json:"brandId,omitempty"`
+	IssuedAt int64  `json:"iat"` // Unix timestamp for expiry check
 	// PKCE support: for Twitter, we need to persist the code_verifier through the redirect.
 	// For other platforms this field is empty.
 	CodeVerifier string `json:"cv,omitempty"`

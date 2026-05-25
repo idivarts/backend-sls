@@ -29,11 +29,13 @@ func InstagramInit(c *gin.Context) {
 		return
 	}
 
+	brandId := c.Query("brandId")
 	state := &OAuthState{
 		UserID:         userId,
 		Platform:       trendlymodels.PlatformInstagram,
 		App:            app,
 		CallbackScheme: callbackScheme,
+		BrandID:        brandId,
 	}
 	encodedState, err := state.Encode()
 	if err != nil {
@@ -130,8 +132,15 @@ func InstagramCallback(c *gin.Context) {
 		Scopes:      shortToken.Permissions,
 	}
 
-	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
-		log.Printf("instagram: firestore save failed: %v", err)
+	var saveErr error
+	if state.BrandID != "" {
+		social.UserID = state.UserID // keep userId for audit; Firestore path uses brandId
+		saveErr = trendlymodels.SaveBrandSocialAccount(state.BrandID, social, socialToken)
+	} else {
+		saveErr = trendlymodels.SaveSocialAccount(state.UserID, social, socialToken)
+	}
+	if saveErr != nil {
+		log.Printf("instagram: firestore save failed: %v", saveErr)
 		c.Redirect(302, CallbackErrorURL(connectBase, "instagram", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
 	}

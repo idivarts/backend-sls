@@ -25,6 +25,10 @@ func handleManagerAPIs() {
 	managerApisV1 := apihandler.GinEngine.Group("/api/v2", middlewares.ValidateSessionMiddleware(), middlewares.TrendlyMiddleware("managers"))
 	managerApisV1.POST("/brands/members", trendlyapis.CreateBrandMember)
 	managerApisV1.POST("/brands/create", trendlyapis.CreateBrand)
+
+	// ── Brand social accounts (brands/{brandId}/socialAccounts) ───────────────
+	managerApisV1.GET("/brands/:brandId/socials", social_connect.ListBrandSocials)
+	managerApisV1.DELETE("/brands/:brandId/socials/:id", social_connect.DeleteBrandSocial)
 }
 
 func handleUserAPIs() {

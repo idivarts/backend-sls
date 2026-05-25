@@ -31,11 +31,13 @@ func YouTubeInit(c *gin.Context) {
 		return
 	}
 
+	brandId := c.Query("brandId")
 	state := &OAuthState{
 		UserID:         userId,
 		Platform:       trendlymodels.PlatformYouTube,
 		App:            app,
 		CallbackScheme: callbackScheme,
+		BrandID:        brandId,
 	}
 	encodedState, err := state.Encode()
 	if err != nil {
@@ -132,8 +134,14 @@ func YouTubeCallback(c *gin.Context) {
 		Scopes:       strings.Split(tokens.Scope, " "),
 	}
 
-	if err := trendlymodels.SaveSocialAccount(state.UserID, social, socialToken); err != nil {
-		log.Printf("youtube: firestore save failed: %v", err)
+	var saveErr error
+	if state.BrandID != "" {
+		saveErr = trendlymodels.SaveBrandSocialAccount(state.BrandID, social, socialToken)
+	} else {
+		saveErr = trendlymodels.SaveSocialAccount(state.UserID, social, socialToken)
+	}
+	if saveErr != nil {
+		log.Printf("youtube: firestore save failed: %v", saveErr)
 		c.Redirect(302, CallbackErrorURL(connectBase, "youtube", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
 	}
