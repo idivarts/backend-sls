@@ -17,14 +17,11 @@ provider:
     IMAGE_CF_DISTRIBUTION_URL: https://d1tfun8qrz04mk.cloudfront.net
     ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
     WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
-    FB_CLIENT_ID: 567254166026958
-    FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
-    INSTA_CLIENT_ID: 1166596944824933
-    INSTA_CLIENT_SECRET: ${env:INSTA_CLIENT_SECRET}
     STREAM_CLIENT: gg9xameygwse
     STREAM_SECRET: ${env:STREAM_SECRET}
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
+    OPENROUTER_API_KEY: ${env:OPENROUTER_API_KEY, ''}
     BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
@@ -32,6 +29,10 @@ provider:
     SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
     # Social Connect V2 — new OAuth platform credentials
+    FB_CLIENT_ID: ${env:FB_CLIENT_ID, '567254166026958'}
+    FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
+    INSTA_CLIENT_ID: ${env:INSTA_CLIENT_ID, '1166596944824933'}
+    INSTA_CLIENT_SECRET: ${env:INSTA_CLIENT_SECRET}
     YOUTUBE_CLIENT_ID: ${env:YOUTUBE_CLIENT_ID, ''}
     YOUTUBE_CLIENT_SECRET: ${env:YOUTUBE_CLIENT_SECRET, ''}
     LINKEDIN_CLIENT_ID: ${env:LINKEDIN_CLIENT_ID, ''}
@@ -76,6 +77,10 @@ provider:
           Action:
             - "sqs:sendmessage"
           Resource: { "Fn::GetAtt": ["DiscoveryMessageQueue", "Arn"] }
+        - Effect: "Allow"
+          Action:
+            - "execute-api:ManageConnections"
+          Resource: "arn:aws:execute-api:*:*:*/@connections/*"
 plugins:
   - serverless-go-plugin
   - serverless-domain-manager
@@ -241,6 +246,16 @@ functions:
     timeout: 30
     events:
       - http: ANY /api/collabs/{proxy+}
+  trendly_ai_apis:
+    handler: functions/trendly_ai/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /api/ai/{proxy+}
   trendly_matchmaking_apis:
     handler: functions/trendly_matchmaking/main.go
     package:
@@ -324,6 +339,7 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
+    timeout: 300
     events:
       - websocket: $connect
       - websocket: $disconnect
