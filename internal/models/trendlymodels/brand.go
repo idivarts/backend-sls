@@ -34,6 +34,8 @@ type Brand struct {
 
 	HasPayWall bool `json:"hasPayWall" firestore:"hasPayWall"`
 
+	AIVoice *string `json:"aiVoice,omitempty" firestore:"aiVoice,omitempty"`
+
 	// Members       []BrandMember  `json:"members" firestore:"members"`
 	// Notifications []Notification `json:"notifications" firestore:"notifications"`
 }
