@@ -33,3 +33,10 @@ func GetConnectFronted() string {
 	}
 	return TRENDLY_CONNECT
 }
+
+func GetTrendlyBE() string {
+	if myutil.IsDevEnvironment() {
+		return TRENDLY_BE + "/dev"
+	}
+	return TRENDLY_BE
+}

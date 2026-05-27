@@ -49,7 +49,7 @@ func InstagramInit(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/instagram/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/instagram/callback", constants.GetTrendlyBE())
 	authURL := fmt.Sprintf(
 		"https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0"+
 			"&client_id=%s&redirect_uri=%s&response_type=code"+
@@ -81,7 +81,7 @@ func InstagramCallback(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/instagram/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/instagram/callback", constants.GetTrendlyBE())
 
 	shortToken, err := instagram.GetAccessTokenFromCode(code, redirectURI)
 	if err != nil {
