@@ -44,7 +44,7 @@ func LinkedInInit(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/linkedin/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/linkedin/callback", constants.GetTrendlyBE())
 	authURL := fmt.Sprintf(
 		"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s",
 		linkedin.AuthURL,
@@ -77,7 +77,7 @@ func LinkedInCallback(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/linkedin/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/linkedin/callback", constants.GetTrendlyBE())
 
 	tokens, err := linkedin.ExchangeCode(code, redirectURI)
 	if err != nil {

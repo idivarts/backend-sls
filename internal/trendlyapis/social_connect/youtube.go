@@ -45,7 +45,7 @@ func YouTubeInit(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/youtube/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/youtube/callback", constants.GetTrendlyBE())
 	authURL := fmt.Sprintf(
 		"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s"+
 			"&access_type=offline&prompt=consent",
@@ -79,7 +79,7 @@ func YouTubeCallback(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/youtube/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/youtube/callback", constants.GetTrendlyBE())
 
 	tokens, err := youtube.ExchangeCode(code, redirectURI)
 	if err != nil {

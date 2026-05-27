@@ -55,7 +55,7 @@ func TwitterInit(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/twitter/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/twitter/callback", constants.GetTrendlyBE())
 	authURL := fmt.Sprintf(
 		"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s"+
 			"&state=%s&code_challenge=%s&code_challenge_method=S256",
@@ -96,7 +96,7 @@ func TwitterCallback(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/twitter/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/twitter/callback", constants.GetTrendlyBE())
 
 	tokens, err := twitter.ExchangeCode(code, redirectURI, state.CodeVerifier)
 	if err != nil {

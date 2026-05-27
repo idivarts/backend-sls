@@ -37,7 +37,7 @@ func FacebookInit(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/facebook/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/facebook/callback", constants.GetTrendlyBE())
 	authURL := fmt.Sprintf(
 		"https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=%s&scope=%s&state=%s&response_type=code",
 		messenger.ClientID,
@@ -69,7 +69,7 @@ func FacebookCallback(c *gin.Context) {
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/connect/facebook/callback", constants.TRENDLY_BE)
+	redirectURI := fmt.Sprintf("%s/connect/facebook/callback", constants.GetTrendlyBE())
 
 	shortToken, err := messenger.GetAccessTokenFromCode(code, redirectURI)
 	if err != nil {
