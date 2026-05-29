@@ -32,7 +32,7 @@
         "functions/razorpay": false,
         "functions/s3": true,
         "functions/stream_sqs_hook": true,
-        "functions/unauth_apis": true,
+        "functions/unauth_apis": false,
         "functions/websocket": true
     }
 }
