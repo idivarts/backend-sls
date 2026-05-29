@@ -1,5 +1,17 @@
 # CLAUDE.md — backend-sls
 
+> **⚠️ Read the monorepo root before going further.**
+> This file covers only `backend-sls`-specific detail. For the complete picture
+> of the entire Trendly platform — every micro-repo, shared architecture,
+> domain model, auth flow, contract lifecycle, Notion preferences, and more —
+> read the parent first:
+>
+> - **Full monorepo context**: `../CLAUDE.md`
+> - **Knowledge graph** (keyword → exact file path, token-efficient lookups): `../.claude/knowledge-graph.json`
+>
+> When working across repos (e.g. backend + mobile app), always load `../CLAUDE.md`
+> so you have the full picture before touching any code.
+
 **Read this before touching any code in this project.**
 This file was migrated from `.cursor/rules/` and is the authoritative context for all AI-assisted work in this repo.
 
