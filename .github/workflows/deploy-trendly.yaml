@@ -33,6 +33,8 @@ jobs:
       - run: go mod download
       - name: Add Service JSON and Deploy
         env:
+          # Schema-less WS API Gateway host, picked per-stage from org-level action variables
+          WEBSOCKET_TRENDLY: ${{ env.STAGE == 'prod' && vars.WEBSOCKET_PROD_TRENDLY || vars.WEBSOCKET_DEV_TRENDLY }}
           JWT_ENCODE_KEY: ${{ secrets.JWT_ENCODE_KEY }}
           FB_CLIENT_ID: ${{ vars.FB_CLIENT_ID }}
           FB_CLIENT_SECRET: ${{ secrets.FB_CLIENT_SECRET }}
