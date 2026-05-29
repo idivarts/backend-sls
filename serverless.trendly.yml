@@ -16,7 +16,9 @@ provider:
     CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
     IMAGE_CF_DISTRIBUTION_URL: https://d1tfun8qrz04mk.cloudfront.net
     ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
-    WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
+    # WEBSOCKET_TRENDLY is the schema-less WS API Gateway host (e.g. cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev)
+    # passed in per-stage from GitHub Actions (org vars WEBSOCKET_DEV_TRENDLY / WEBSOCKET_PROD_TRENDLY).
+    WS_GATEWAY_ENDPOINT: https://${env:WEBSOCKET_TRENDLY, 'cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev'}
     STREAM_CLIENT: gg9xameygwse
     STREAM_SECRET: ${env:STREAM_SECRET}
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
