@@ -7,6 +7,12 @@ import (
 	"net/http"
 )
 
+// Locale represents the locale object returned by LinkedIn's OIDC userinfo endpoint.
+type Locale struct {
+	Country  string `json:"country"`
+	Language string `json:"language"`
+}
+
 // Profile represents a LinkedIn member profile from the OpenID Connect userinfo endpoint.
 // For full profile data (follower count, etc.) you need the Marketing Developer Platform.
 type Profile struct {
@@ -16,7 +22,7 @@ type Profile struct {
 	FamilyName string `json:"family_name"`
 	Picture    string `json:"picture"`
 	Email      string `json:"email"`
-	Locale     string `json:"locale"`
+	Locale     Locale `json:"locale"`
 }
 
 // GetMe returns the authenticated member's profile via the OIDC userinfo endpoint.

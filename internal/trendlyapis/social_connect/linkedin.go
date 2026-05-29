@@ -115,7 +115,7 @@ func LinkedInCallback(c *gin.Context) {
 			"email":      profile.Email,
 			"givenName":  profile.GivenName,
 			"familyName": profile.FamilyName,
-			"locale":     profile.Locale,
+			"locale":     profile.Locale.Language + "_" + profile.Locale.Country,
 		},
 	}
 
