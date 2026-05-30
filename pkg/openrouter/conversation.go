@@ -91,7 +91,7 @@ func DeleteConversation(ctx context.Context, conversationID string) error {
 	return err
 }
 
-func ListConversations(ctx context.Context, brandID, userID, module string, limit int) ([]trendlymodels.AIConversation, error) {
+func ListConversations(ctx context.Context, brandID, userID, module, contextID string, limit int) ([]trendlymodels.AIConversation, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -100,6 +100,12 @@ func ListConversations(ctx context.Context, brandID, userID, module string, limi
 		Where("userId", "==", userID)
 	if module != "" {
 		q = q.Where("module", "==", module)
+	}
+	// Only filter when a contextId is supplied. The contextId field is omitted
+	// for empty values (firestore:"contextId,omitempty"), so an `== ""` filter
+	// would wrongly match nothing for context-less modules (e.g. "general").
+	if contextID != "" {
+		q = q.Where("contextId", "==", contextID)
 	}
 	q = q.OrderBy("updatedAt", firestore.Desc).Limit(limit)
 

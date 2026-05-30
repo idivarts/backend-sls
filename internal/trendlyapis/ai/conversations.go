@@ -53,13 +53,14 @@ func ListConversations(c *gin.Context) {
 		return
 	}
 	module := c.Query("module")
+	contextID := c.Query("contextId")
 	limit := 50
 	if v := c.Query("limit"); v != "" {
 		if n, err := atoi(v); err == nil && n > 0 && n <= 200 {
 			limit = n
 		}
 	}
-	out, err := openrouter.ListConversations(c.Request.Context(), brandID, managerID, module, limit)
+	out, err := openrouter.ListConversations(c.Request.Context(), brandID, managerID, module, contextID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
