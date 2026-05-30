@@ -1,0 +1,221 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /{path=**}/applications/{applicationId} {
+      allow read: if isAuthenticated();
+    }
+    match /{path=**}/invitations/{invitationId} {
+      allow read: if isAuthenticated();
+    }
+    match /{path=**}/members/{memberId} {
+      allow read: if isAuthenticated();
+    }
+
+    match /scrapped-socials/{socialId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
+    match /agency-hires/{hireId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /collaborations-invites/{collabUserId} {
+      allow read, write: if isAuthenticated() && isAdmin();
+    }
+    match /connections/{userId} {
+      allow read: if isAuthenticated();
+      // allow write: if isAuthenticated();
+    }
+    match /userImages/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Stores data about influencers and creators
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId && !doesManagerExists(userId);
+      allow update, delete: if isAuthenticated() && request.auth.uid == userId && validateUserUpdate();
+
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if isAuthenticated();
+      }
+      match /socials/{socialId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && request.auth.uid == userId;
+      }
+      match /invitations/{inviteUserId} {
+        allow read: if isAuthenticated();
+        allow update: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+
+    // Stores all brand managers
+    match /managers/{managerId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == managerId && !doesUserExists(managerId);
+      allow update, delete: if isAuthenticated() && request.auth.uid == managerId;
+
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && request.auth.uid == managerId;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Stores all brands
+    match /brands/{brandId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      match /socials/{socialId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+      match /socialAccounts/{accountId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+
+      // ── Strategies ───────────────────────────────────────────────────────
+      // Tightened: only brand members can read/write strategies.
+      match /strategies/{strategyId} {
+        allow read:            if isAuthenticated() && isBrandMember(brandId);
+        allow create:          if isAuthenticated() && isBrandMember(brandId);
+        allow update, delete:  if isAuthenticated() && isBrandMember(brandId);
+
+        // Strategy document-level and snippet comments
+        match /comments/{commentId} {
+          allow read:   if isAuthenticated() && isBrandMember(brandId);
+          allow create: if isAuthenticated() && isBrandMember(brandId);
+          // Only the comment author can edit or delete their own comment
+          allow update, delete: if isAuthenticated() && isBrandMember(brandId) && isCommentAuthor();
+        }
+
+        // Presence heartbeats — each manager can only write their own doc
+        match /presence/{managerId} {
+          allow read:  if isAuthenticated() && isBrandMember(brandId);
+          allow write: if isAuthenticated() && isBrandMember(brandId)
+                         && request.auth.uid == managerId;
+        }
+      }
+
+      // ── Contents ─────────────────────────────────────────────────────────
+      // Tightened: only brand members can read/write content items.
+      match /contents/{contentId} {
+        allow read:            if isAuthenticated() && isBrandMember(brandId);
+        allow create:          if isAuthenticated() && isBrandMember(brandId);
+        allow update, delete:  if isAuthenticated() && isBrandMember(brandId);
+
+        // Content comments — shared between Calendar and Content detail page
+        match /comments/{commentId} {
+          allow read:   if isAuthenticated() && isBrandMember(brandId);
+          allow create: if isAuthenticated() && isBrandMember(brandId);
+          allow update, delete: if isAuthenticated() && isBrandMember(brandId) && isCommentAuthor();
+        }
+      }
+
+      // ── Calendar month-level comments ────────────────────────────────────
+      // Stored at brands/{brandId}/calendarComments/{YYYY-MM}/comments/{commentId}
+      match /calendarComments/{month}/comments/{commentId} {
+        allow read:   if isAuthenticated() && isBrandMember(brandId);
+        allow create: if isAuthenticated() && isBrandMember(brandId);
+        allow update, delete: if isAuthenticated() && isBrandMember(brandId) && isCommentAuthor();
+      }
+
+      match /members/{managerId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Stores all collaborations
+    match /collaborations/{collaborationId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      match /applications/{applicationId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+      match /invitations/{invitationId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // // Stores groups created for collaborations
+    // match /groups/{groupId} {
+    //   allow read: if isAuthenticated();
+    //   allow write: if isAuthenticated();
+    //   match /messages/{messageId} {
+    //     allow read: if isAuthenticated();
+    //     allow write: if isAuthenticated();
+    //   }
+    // }
+
+    // Stores contracts created for collaborations
+    match /contracts/{contractId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      // // match /deliverables/{deliverableId} {
+      // //   allow read, write: if isAuthenticated();
+      // // }
+      // // match /payments/{paymentId} {
+      // //   allow read, write: if isAuthenticated();
+      // // }
+    }
+
+    // ── Helper functions ────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return true;
+    }
+
+    function doesManagerExists(uid) {
+      return exists(/databases/$(database)/documents/managers/$(uid));
+    }
+
+    function doesUserExists(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid));
+    }
+
+    /**
+     * Returns true if the calling user is a registered member of the given brand.
+     * Checks for the manager doc under brands/{brandId}/members/{uid}.
+     */
+    function isBrandMember(brandId) {
+      return exists(
+        /databases/$(database)/documents/brands/$(brandId)/members/$(request.auth.uid)
+      );
+    }
+
+    /**
+     * Returns true if the calling user authored the comment being updated/deleted.
+     * Used to enforce that managers can only edit or delete their own comments.
+     */
+    function isCommentAuthor() {
+      return request.auth.uid == resource.data.authorId;
+    }
+
+    function validateUserUpdate() {
+      return (
+        request.resource.data.isChatConnected == resource.data.isChatConnected ||
+        !(resource.data.keys().hasAll(['isChatConnected']))
+      );
+    }
+  }
+}
