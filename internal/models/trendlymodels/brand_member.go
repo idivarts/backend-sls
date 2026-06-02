@@ -9,9 +9,31 @@ import (
 )
 
 type BrandMember struct {
-	ManagerID string `json:"managerId" firestore:"managerId"`
-	Role      string `json:"role" firestore:"role"`
-	Status    int    `json:"status" firestore:"status"`
+	ManagerID string    `json:"managerId" firestore:"managerId"`
+	Role      BrandRole `json:"role" firestore:"role"`
+	Status    int       `json:"status" firestore:"status"`
+	// TeamIDs scopes which teams (and therefore which socials/collabs) this
+	// member can act on. Empty means the brand's default team only.
+	TeamIDs []string `json:"teamIds,omitempty" firestore:"teamIds,omitempty"`
+	// Overrides are per-member capability toggles that win over the role
+	// default. Keys are Capability strings; only OverridableCapabilities are
+	// honoured. Stored as map[string]bool for Firestore compatibility.
+	Overrides map[string]bool `json:"overrides,omitempty" firestore:"overrides,omitempty"`
+}
+
+// HasCapability resolves whether this member effectively holds cap. Resolution
+// order: Owner has everything; an explicit per-member override wins next; the
+// role default applies otherwise.
+func (b *BrandMember) HasCapability(cap Capability) bool {
+	if b.Role == RoleOwner {
+		return true
+	}
+	if b.Overrides != nil {
+		if v, ok := b.Overrides[string(cap)]; ok {
+			return v
+		}
+	}
+	return roleCapabilities[b.Role][cap]
 }
 
 func (b *BrandMember) Set(brandID string) (*firestore.WriteResult, error) {
@@ -29,6 +51,11 @@ func (b *BrandMember) Get(brandID, userID string) error {
 	if err != nil {
 		return err
 	}
+	return err
+}
+
+func DeleteBrandMember(brandID, managerID string) error {
+	_, err := firestoredb.Client.Collection("brands").Doc(brandID).Collection("members").Doc(managerID).Delete(context.Background())
 	return err
 }
 

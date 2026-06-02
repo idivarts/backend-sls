@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
+	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
@@ -21,6 +22,10 @@ func CreateOrder(c *gin.Context) {
 	data, err := initializeData(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
+		return
+	}
+
+	if _, ok := middlewares.RequireBrandCapability(c, data.Contract.BrandID, trendlymodels.CapFundContracts); !ok {
 		return
 	}
 
