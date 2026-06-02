@@ -26,9 +26,21 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/members", trendlyapis.CreateBrandMember)
 	managerApisV1.POST("/brands/create", trendlyapis.CreateBrand)
 
+	// ── Brand member management (role / teams / override toggles) ─────────────
+	managerApisV1.GET("/brands/:brandId/members", trendlyapis.ListBrandMembers)
+	managerApisV1.PATCH("/brands/:brandId/members/:managerId", trendlyapis.UpdateBrandMember)
+	managerApisV1.DELETE("/brands/:brandId/members/:managerId", trendlyapis.RemoveBrandMember)
+
+	// ── Teams (brands/{brandId}/teams) ────────────────────────────────────────
+	managerApisV1.GET("/brands/:brandId/teams", trendlyapis.ListTeams)
+	managerApisV1.POST("/brands/:brandId/teams", trendlyapis.CreateTeam)
+	managerApisV1.PATCH("/brands/:brandId/teams/:teamId", trendlyapis.UpdateTeam)
+	managerApisV1.DELETE("/brands/:brandId/teams/:teamId", trendlyapis.DeleteTeam)
+
 	// ── Brand social accounts (brands/{brandId}/socialAccounts) ───────────────
 	managerApisV1.GET("/brands/:brandId/socials", social_connect.ListBrandSocials)
 	managerApisV1.DELETE("/brands/:brandId/socials/:id", social_connect.DeleteBrandSocial)
+	managerApisV1.POST("/brands/:brandId/socials/:id/team", trendlyapis.AssignSocialTeam)
 }
 
 func handleUserAPIs() {

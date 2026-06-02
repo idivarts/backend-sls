@@ -82,11 +82,11 @@ service cloud.firestore {
       }
 
       // ── Strategies ───────────────────────────────────────────────────────
-      // Tightened: only brand members can read/write strategies.
+      // Read: any brand member. Mutate: content-strategy capability holders
+      // (owner / admin / content_manager).
       match /strategies/{strategyId} {
-        allow read:            if isAuthenticated() && isBrandMember(brandId);
-        allow create:          if isAuthenticated() && isBrandMember(brandId);
-        allow update, delete:  if isAuthenticated() && isBrandMember(brandId);
+        allow read:                   if isAuthenticated() && isBrandMember(brandId);
+        allow create, update, delete: if isAuthenticated() && canManageContentStrategy(brandId);
 
         // Strategy document-level and snippet comments
         match /comments/{commentId} {
@@ -105,11 +105,12 @@ service cloud.firestore {
       }
 
       // ── Contents ─────────────────────────────────────────────────────────
-      // Tightened: only brand members can read/write content items.
+      // Read: any brand member. Create/update: manage_content holders
+      // (incl. content_creator). Delete: content managers/admins/owners only.
       match /contents/{contentId} {
-        allow read:            if isAuthenticated() && isBrandMember(brandId);
-        allow create:          if isAuthenticated() && isBrandMember(brandId);
-        allow update, delete:  if isAuthenticated() && isBrandMember(brandId);
+        allow read:           if isAuthenticated() && isBrandMember(brandId);
+        allow create, update: if isAuthenticated() && canManageContent(brandId);
+        allow delete:         if isAuthenticated() && canDeleteContent(brandId);
 
         // Content comments — shared between Calendar and Content detail page
         match /comments/{commentId} {
@@ -131,6 +132,16 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isAuthenticated();
       }
+
+      // ── Teams ────────────────────────────────────────────────────────────
+      // Organizational units within a brand (socials/members are scoped here).
+      // Any brand member may read; only owner/admin may mutate (manage_teams is
+      // not an overridable capability, so role alone decides write access).
+      match /teams/{teamId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if isAuthenticated() && canManageBrandTeams(brandId);
+      }
+
       match /notifications/{notificationId} {
         allow read: if isAuthenticated();
         allow write: if isAuthenticated();
@@ -201,6 +212,53 @@ service cloud.firestore {
       return exists(
         /databases/$(database)/documents/brands/$(brandId)/members/$(request.auth.uid)
       );
+    }
+
+    /**
+     * Returns the calling user's role string within the given brand, or null if
+     * they are not a member. Mirrors BrandRole in the backend.
+     */
+    function getBrandRole(brandId) {
+      return get(
+        /databases/$(database)/documents/brands/$(brandId)/members/$(request.auth.uid)
+      ).data.role;
+    }
+
+    /**
+     * Returns true if the caller may manage the brand's teams (owner/admin).
+     * manage_teams is not an overridable capability, so role alone decides.
+     */
+    function canManageBrandTeams(brandId) {
+      return isBrandMember(brandId) && (getBrandRole(brandId) in ['owner', 'admin']);
+    }
+
+    /**
+     * True while the member still carries a pre-RBAC legacy role (e.g. "user",
+     * "manager"). Such members are allowed through until the role backfill runs
+     * — mirrors the backend's transition shim. Remove once migration completes.
+     */
+    function isLegacyBrandRole(brandId) {
+      return !(getBrandRole(brandId) in
+        ['owner', 'admin', 'campaign_manager', 'content_manager', 'content_creator', 'viewer']);
+    }
+
+    // Content-strategy mutations: owner / admin / content_manager.
+    function canManageContentStrategy(brandId) {
+      return isBrandMember(brandId) &&
+        (isLegacyBrandRole(brandId) || getBrandRole(brandId) in ['owner', 'admin', 'content_manager']);
+    }
+
+    // Content create/update: owner / admin / content_manager / content_creator.
+    function canManageContent(brandId) {
+      return isBrandMember(brandId) &&
+        (isLegacyBrandRole(brandId) ||
+         getBrandRole(brandId) in ['owner', 'admin', 'content_manager', 'content_creator']);
+    }
+
+    // Content delete: owner / admin / content_manager (creators cannot delete).
+    function canDeleteContent(brandId) {
+      return isBrandMember(brandId) &&
+        (isLegacyBrandRole(brandId) || getBrandRole(brandId) in ['owner', 'admin', 'content_manager']);
     }
 
     /**

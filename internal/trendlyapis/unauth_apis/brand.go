@@ -37,11 +37,14 @@ func ValidateFirebaseCallback(c *gin.Context) {
 		return
 	}
 
-	bmember := trendlymodels.BrandMember{
-		ManagerID: uid,
-		Role:      "user",
-		Status:    1,
+	// Preserve the role/teams assigned at invite time — only flip the status to
+	// accepted. Fall back to a viewer membership if no pending invite exists.
+	bmember := trendlymodels.BrandMember{}
+	if err = bmember.Get(req.BrandID, uid); err != nil {
+		bmember = trendlymodels.BrandMember{ManagerID: uid, Role: trendlymodels.RoleViewer}
 	}
+	bmember.ManagerID = uid
+	bmember.Status = 1
 	_, err = bmember.Set(req.BrandID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

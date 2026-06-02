@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
+	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	ai_collaboration "github.com/idivarts/backend-sls/internal/openai/collaboration"
 	"github.com/idivarts/backend-sls/pkg/myemail"
@@ -145,6 +146,10 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
+	if _, ok := middlewares.RequireBrandCapability(c, collab.BrandID, trendlymodels.CapManageCollaborations); !ok {
+		return
+	}
+
 	brand := trendlymodels.Brand{}
 	err = brand.Get(collab.BrandID)
 	if err != nil {
@@ -220,6 +225,12 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 	if err := c.BindJSON(&body); err != nil || body.Prompt == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "missing prompt"})
 		return
+	}
+
+	if body.BrandID != "" {
+		if _, ok := middlewares.RequireBrandCapability(c, body.BrandID, trendlymodels.CapManageCollaborations); !ok {
+			return
+		}
 	}
 
 	// Temporary adjustments as Image search is taking a lot of time
