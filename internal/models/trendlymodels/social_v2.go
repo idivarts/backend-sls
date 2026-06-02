@@ -35,6 +35,18 @@ type SocialAccount struct {
 	Platform Platform `json:"platform" firestore:"platform"` // "instagram", "facebook", etc.
 	UserID   string   `json:"userId" firestore:"userId"`
 
+	// PlatformAccountID is the platform's own account id — the Instagram
+	// Business Account id or the Facebook Page id. It is the key Meta webhooks
+	// arrive under (entry.id), so it is what the inbox webhook router uses to
+	// resolve an event back to a connected account. Distinct from `ID`, which
+	// is an opaque hash of platform:username.
+	PlatformAccountID string `json:"platformAccountId,omitempty" firestore:"platformAccountId,omitempty"`
+
+	// InstagramBusinessID is the IG Business Account id linked to a Facebook
+	// Page (only set on facebook page accounts). Page-linked IG message/comment
+	// webhooks arrive under this id and are served using the page access token.
+	InstagramBusinessID string `json:"instagramBusinessId,omitempty" firestore:"instagramBusinessId,omitempty"`
+
 	// Profile info (refreshed on each reconnect / token refresh)
 	Username        string `json:"username" firestore:"username"`
 	DisplayName     string `json:"displayName" firestore:"displayName"`
@@ -241,6 +253,39 @@ func ListBrandSocialAccounts(brandID string) ([]SocialAccount, error) {
 		accounts = append(accounts, a)
 	}
 	return accounts, nil
+}
+
+// GetBrandSocialToken reads the (sensitive) token document for a brand-connected
+// social account. Server-side only.
+func GetBrandSocialToken(brandID, id string) (*SocialToken, error) {
+	doc, err := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialTokens", brandID)).
+		Doc(id).
+		Get(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var t SocialToken
+	if err := doc.DataTo(&t); err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+// GetBrandSocialAccount reads a single brand-connected social account.
+func GetBrandSocialAccount(brandID, id string) (*SocialAccount, error) {
+	doc, err := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialAccounts", brandID)).
+		Doc(id).
+		Get(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	var a SocialAccount
+	if err := doc.DataTo(&a); err != nil {
+		return nil, err
+	}
+	return &a, nil
 }
 
 // AssignBrandSocialTeam moves a brand-connected social account to a team.
