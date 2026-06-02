@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
@@ -41,6 +42,14 @@ func handleManagerAPIs() {
 	managerApisV1.GET("/brands/:brandId/socials", social_connect.ListBrandSocials)
 	managerApisV1.DELETE("/brands/:brandId/socials/:id", social_connect.DeleteBrandSocial)
 	managerApisV1.POST("/brands/:brandId/socials/:id/team", trendlyapis.AssignSocialTeam)
+
+	// ── Inbox (omni-channel DMs + comments across connected Meta accounts) ────
+	managerApisV1.GET("/brands/:brandId/inbox", inbox.GetInbox)
+	managerApisV1.POST("/brands/:brandId/inbox/sync", inbox.SyncInbox)
+	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/reply", inbox.ReplyToConversation)
+	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/hide", inbox.HideComment)
+	managerApisV1.DELETE("/brands/:brandId/inbox/conversations/:id", inbox.DeleteConversation)
+	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/read", inbox.ReadConversation)
 }
 
 func handleUserAPIs() {
