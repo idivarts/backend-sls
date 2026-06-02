@@ -30,8 +30,14 @@ Instagram and Facebook accounts from inside the Trendly Inbox.
 ## 1. Permissions to request
 
 ### Already granted today (from `social-oauth-setup.md`, read-only)
-- Instagram: `instagram_business_basic`, `instagram_business_manage_insights`
-- Facebook: `pages_show_list`, `instagram_basic`, `instagram_manage_insights`, `pages_read_engagement`
+- Instagram (via separate Instagram OAuth flow): `instagram_business_basic`, `instagram_business_manage_insights`
+- Facebook (via Facebook OAuth flow): `pages_show_list`, `pages_read_engagement`
+
+> **Note:** Instagram permissions (`instagram_basic`, `instagram_manage_insights`,
+> `instagram_manage_messages`, `instagram_manage_comments`) are **not** requested
+> through the Facebook OAuth flow. Instagram has its own separate OAuth flow
+> (`internal/trendlyapis/social_connect/instagram.go` or `unauth_apis/instagram.go`).
+> Do **not** add Instagram scopes to the Facebook connect URL.
 
 ### NEW scopes the Inbox requires
 
