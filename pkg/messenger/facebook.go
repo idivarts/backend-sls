@@ -24,6 +24,10 @@ type FacebookProfile struct {
 	Email                    *string     `json:"email,omitempty" firestore:"email,omitempty"`
 	FanCount                 int         `json:"fan_count" firestore:"fan_count"`
 	FollowersCount           int         `json:"followers_count" firestore:"followers_count"`
+	// AccessToken is the Page access token, only present on entries returned in
+	// the `accounts` edge (i.e. Pages the user manages). It is what messaging /
+	// comment Graph calls for the Page (and its linked IG account) use.
+	AccessToken              string      `json:"access_token,omitempty" firestore:"-"`
 	InstagramBusinessAccount *struct {
 		ID string `json:"id"`
 	} `json:"instagram_business_account,omitempty"`
@@ -47,7 +51,7 @@ type FacebookProfileAccounts struct {
 func GetMyFacebook(pageId, accessToken string) (*FacebookProfile, *FacebookProfileAccounts, error) {
 	// Set the API endpoint
 	// apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,about,location,website,email,picture{url},accounts{id,name,about,category,category_list,location,website,emails,fan_count,followers_count,picture{url},cover{source},instagram_business_account}&access_token=%s", BaseURL, ApiVersion, pageId, accessToken)
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,email,picture{url},accounts{id,name,followers_count,picture{url},instagram_business_account}&access_token=%s", BaseURL, ApiVersion, pageId, accessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,email,picture{url},accounts{id,name,followers_count,picture{url},access_token,instagram_business_account}&access_token=%s", BaseURL, ApiVersion, pageId, accessToken)
 	return getFacebook(apiURL)
 }
 

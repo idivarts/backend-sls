@@ -20,6 +20,11 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && isAdmin();
     }
+    // Reverse index: platformAccountId -> connected brand/user + social.
+    // Written/read server-side only (inbox webhook routing). Admin SDK bypasses.
+    match /socialAccountIndex/{platformAccountId} {
+      allow read, write: if false;
+    }
     match /agency-hires/{hireId} {
       allow read, write: if isAuthenticated();
     }
@@ -79,6 +84,18 @@ service cloud.firestore {
       match /socialAccounts/{accountId} {
         allow read: if isAuthenticated();
         allow write: if isAuthenticated();
+      }
+      // Access tokens are sensitive — server-only (Admin SDK bypasses rules).
+      // Never readable/writable by clients.
+      match /socialTokens/{accountId} {
+        allow read, write: if false;
+      }
+
+      // Inbox conversations (DMs + comments). Read: any brand member. Writes go
+      // through the backend (Admin SDK), so clients never write directly.
+      match /inbox/{conversationId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
       }
 
       // ── Strategies ───────────────────────────────────────────────────────

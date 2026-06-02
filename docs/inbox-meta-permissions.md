@@ -83,15 +83,19 @@ The backend already subscribes Pages to `messages` and `message_echoes`
 - `comments` / `mentions` (Instagram) — new comments & @-mentions
 
 **Setup steps:**
-1. In the Meta App dashboard → **Webhooks**, configure the callback URL:
-   `https://be.trendly.now/instagram/webhook` (prod) and the `…/dev/…` variant.
-   *(Confirm/extend the existing webhook handler under `functions/unauth_apis`.)*
-2. Set the **Verify Token** (matches the backend's configured value).
+1. In the Meta App dashboard → **Webhooks**, configure the callback URLs
+   (handled by the `message_webhook` lambda):
+   - Instagram: `https://be.trendly.now/webhooks/instagram` (`…/dev/…` for dev)
+   - Facebook:  `https://be.trendly.now/webhooks/facebook`
+   - Data deletion: `https://be.trendly.now/webhooks/data-deletion`
+2. Set the **Verify Token** to match `WEBHOOK_VERIFY_TOKEN` (defaults to the
+   historical value if unset). Used by `GET /webhooks/{instagram,facebook}`.
 3. Subscribe the app to the fields above at the **app** level.
-4. Per connected Page, call `SubscribeApp()` with the extended field list so the
-   Page emits events to the app.
-5. Validate the `X-Hub-Signature-256` header on every inbound webhook using the
-   app secret.
+4. Connected Pages are auto-subscribed on connect (the FB connect callback calls
+   `SubscribeApp()` per Page with the extended field list).
+5. Signature validation (`X-Hub-Signature-256`) is implemented in the receiver;
+   set `WEBHOOK_STRICT_SIGNATURE=true` to reject bad signatures (default logs +
+   continues to avoid disrupting the existing chatbot during rollout).
 
 ---
 

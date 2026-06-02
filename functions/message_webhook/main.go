@@ -15,6 +15,10 @@ func main() {
 	webhooksHandler.POST("/facebook", messagewebhook.Receive)
 	webhooksHandler.GET("/facebook", messagewebhook.Validation)
 
+	// Meta data deletion request callback (required for App Review).
+	webhooksHandler.POST("/data-deletion", messagewebhook.DataDeletion)
+	webhooksHandler.GET("/data-deletion/status", messagewebhook.DataDeletionStatus)
+
 	apihandler.GinEngine.GET("/test/sqs", sqsapp.SendTestSQSMessage)
 
 	apihandler.StartLambda()

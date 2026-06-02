@@ -7,7 +7,10 @@ import (
 	"net/http"
 )
 
-const webhook_events = "messages,message_echoes"
+// Subscribed webhook fields. messages/message_echoes power DMs; feed (Facebook
+// Page) and comments/mentions (Instagram) power the comment inbox. Meta ignores
+// fields not applicable to a given subscription target.
+const webhook_events = "messages,message_echoes,feed,comments,mentions"
 
 func SubscribeApp(doSubsription bool, pageAccessToken string) error {
 	// Convert the message struct to JSON
