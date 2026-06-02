@@ -11,9 +11,12 @@ type IMessageWebhook struct {
 }
 
 type Entry struct {
-	ID        string      `json:"id"`   // ID of your Instagram Professional account
+	ID        string      `json:"id"`   // ID of your Instagram Professional account / FB Page
 	Time      int64       `json:"time"` // Unix timestamp of the event
 	Messaging []Messaging `json:"messaging"`
+	// Changes carries comment/feed events (IG `comments`/`mentions`, FB `feed`).
+	// DMs arrive under Messaging; comments arrive under Changes.
+	Changes []Change `json:"changes,omitempty"`
 }
 
 type MessageType string
@@ -130,6 +133,75 @@ func CalcualateMessageType(msg *Messaging) MessageType {
 		// None of the optional fields are populated
 	}
 	return ""
+}
+
+// ── Comment / feed change events ──────────────────────────────────────────────
+
+// Change is a single entry under entry.changes (comments, mentions, feed).
+type Change struct {
+	Field string      `json:"field"` // "comments" | "mentions" | "feed"
+	Value ChangeValue `json:"value"`
+}
+
+// ChangeValue is a union covering both the Instagram `comments` shape and the
+// Facebook `feed` shape. Use the helper methods to read normalized values.
+type ChangeValue struct {
+	From struct {
+		ID       string `json:"id"`
+		Username string `json:"username,omitempty"` // Instagram
+		Name     string `json:"name,omitempty"`     // Facebook
+	} `json:"from"`
+
+	// Instagram `comments`
+	ID       string `json:"id,omitempty"`        // IG comment id
+	Text     string `json:"text,omitempty"`      // IG comment text
+	ParentID string `json:"parent_id,omitempty"` // set when it's a reply
+	Media    *struct {
+		ID               string `json:"id"`
+		MediaProductType string `json:"media_product_type,omitempty"`
+	} `json:"media,omitempty"`
+
+	// Facebook `feed`
+	Item        string `json:"item,omitempty"`         // "comment" | "post" | ...
+	Verb        string `json:"verb,omitempty"`         // add | edited | remove | hide | unhide
+	CommentID   string `json:"comment_id,omitempty"`   // FB comment id
+	PostID      string `json:"post_id,omitempty"`      // FB post id
+	Message     string `json:"message,omitempty"`      // FB comment text
+	CreatedTime int64  `json:"created_time,omitempty"` // FB (seconds)
+}
+
+// CommentExternalID returns the platform comment id regardless of channel.
+func (v *ChangeValue) CommentExternalID() string {
+	if v.ID != "" {
+		return v.ID
+	}
+	return v.CommentID
+}
+
+// CommentText returns the comment body regardless of channel.
+func (v *ChangeValue) CommentText() string {
+	if v.Text != "" {
+		return v.Text
+	}
+	return v.Message
+}
+
+// PostID returns the parent post/media id regardless of channel.
+func (v *ChangeValue) PostRef() string {
+	if v.Media != nil && v.Media.ID != "" {
+		return v.Media.ID
+	}
+	return v.PostID
+}
+
+// IsRemoval reports whether this change deletes the comment (Facebook `feed`).
+func (v *ChangeValue) IsRemoval() bool {
+	return v.Verb == "remove" || v.Verb == "delete"
+}
+
+// IsReply reports whether the comment is a reply to another comment.
+func (v *ChangeValue) IsReply() bool {
+	return v.ParentID != ""
 }
 
 func NewWebHook(jsonString string) (*IMessageWebhook, error) {
