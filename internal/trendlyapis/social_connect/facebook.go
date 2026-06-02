@@ -42,7 +42,7 @@ func FacebookInit(c *gin.Context) {
 		"https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=%s&scope=%s&state=%s&response_type=code",
 		messenger.ClientID,
 		url.QueryEscape(redirectURI),
-		url.QueryEscape("pages_show_list,instagram_basic,instagram_manage_insights,pages_read_engagement"),
+		url.QueryEscape("pages_show_list,instagram_basic,instagram_manage_insights,pages_read_engagement,pages_messaging,pages_manage_engagement,pages_manage_metadata,instagram_manage_messages,instagram_manage_comments"),
 		url.QueryEscape(encodedState),
 	)
 	c.Redirect(302, authURL)
@@ -92,46 +92,95 @@ func FacebookCallback(c *gin.Context) {
 		return
 	}
 
-	fbProfile, _, err := messenger.GetMyFacebook(fbUserID, longToken.AccessToken)
+	// We store one SocialAccount per managed Page (not the personal FB user),
+	// because the inbox needs Page access tokens to read/reply to Messenger and
+	// Page comments, and the page-linked IG Business Account for IG messaging.
+	_, accounts, err := messenger.GetMyFacebook(fbUserID, longToken.AccessToken)
 	if err != nil {
 		log.Printf("facebook: profile fetch failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to fetch Facebook profile."))
 		return
 	}
 
-	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformFacebook, fbUserID)
+	var pages []messenger.FacebookProfile
+	if accounts != nil {
+		pages = accounts.Accounts.Data
+	}
+	if len(pages) == 0 {
+		log.Printf("facebook: no managed pages for user %s", fbUserID)
+		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "No Facebook Pages found. Connect a Page you manage to use the inbox."))
+		return
+	}
+
 	now := time.Now().Unix()
+	savedCount := 0
 
-	social := &trendlymodels.SocialAccount{
-		ID:              socialID,
-		Platform:        trendlymodels.PlatformFacebook,
-		UserID:          state.UserID,
-		Username:        fbUserID,
-		DisplayName:     fbProfile.Name,
-		ProfileImageURL: fbProfile.Picture.Data.URL,
-		FollowerCount:   int64(fbProfile.FollowersCount),
-		ConnectedAt:     now,
-		UpdatedAt:       now,
-		RawProfile: map[string]interface{}{
-			"id":   fbUserID,
-			"name": fbProfile.Name,
-		},
+	for i := range pages {
+		page := pages[i]
+		if page.ID == "" || page.AccessToken == "" {
+			continue
+		}
+
+		pageSocialID := trendlymodels.SocialAccountID(trendlymodels.PlatformFacebook, page.ID)
+		igBusinessID := ""
+		if page.InstagramBusinessAccount != nil {
+			igBusinessID = page.InstagramBusinessAccount.ID
+		}
+
+		social := &trendlymodels.SocialAccount{
+			ID:                  pageSocialID,
+			Platform:            trendlymodels.PlatformFacebook,
+			UserID:              state.UserID,
+			PlatformAccountID:   page.ID,
+			InstagramBusinessID: igBusinessID,
+			Username:            page.ID,
+			DisplayName:         page.Name,
+			ProfileImageURL:     page.Picture.Data.URL,
+			FollowerCount:       int64(page.FollowersCount),
+			ConnectedAt:         now,
+			UpdatedAt:           now,
+			RawProfile: map[string]interface{}{
+				"id":                       page.ID,
+				"name":                     page.Name,
+				"fbUserId":                 fbUserID,
+				"instagramBusinessAccount": igBusinessID,
+			},
+		}
+
+		socialToken := &trendlymodels.SocialToken{
+			Platform:    trendlymodels.PlatformFacebook,
+			AccessToken: page.AccessToken, // PAGE token (not the user token)
+			TokenExpiry: 0,                // page tokens from a long-lived user token don't expire
+		}
+
+		var saveErr error
+		if state.BrandID != "" {
+			saveErr = trendlymodels.SaveBrandSocialAccount(state.BrandID, social, socialToken)
+		} else {
+			saveErr = trendlymodels.SaveSocialAccount(state.UserID, social, socialToken)
+		}
+		if saveErr != nil {
+			log.Printf("facebook: firestore save failed for page %s: %v", page.ID, saveErr)
+			continue
+		}
+		savedCount++
+
+		// Index the Page id, and the linked IG Business Account id — page-linked
+		// IG message/comment webhooks arrive under the IG id but are served with
+		// this Page's token, so both resolve to the same social account.
+		upsertSocialIndex(page.ID, trendlymodels.PlatformFacebook, state, pageSocialID, now)
+		if igBusinessID != "" {
+			upsertSocialIndex(igBusinessID, trendlymodels.PlatformInstagram, state, pageSocialID, now)
+		}
+
+		// Subscribe the Page to inbox webhooks (DMs + comments). Best-effort:
+		// real-time delivery degrades on failure, the connection still succeeds.
+		if err := messenger.SubscribeApp(true, page.AccessToken); err != nil {
+			log.Printf("facebook: webhook subscribe failed for page %s: %v", page.ID, err)
+		}
 	}
 
-	socialToken := &trendlymodels.SocialToken{
-		Platform:    trendlymodels.PlatformFacebook,
-		AccessToken: longToken.AccessToken,
-		TokenExpiry: now + longToken.ExpiresIn,
-	}
-
-	var saveErr error
-	if state.BrandID != "" {
-		saveErr = trendlymodels.SaveBrandSocialAccount(state.BrandID, social, socialToken)
-	} else {
-		saveErr = trendlymodels.SaveSocialAccount(state.UserID, social, socialToken)
-	}
-	if saveErr != nil {
-		log.Printf("facebook: firestore save failed: %v", saveErr)
+	if savedCount == 0 {
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
 	}

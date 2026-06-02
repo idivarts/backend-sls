@@ -42,10 +42,23 @@ func DeleteBrandSocial(c *gin.Context) {
 		return
 	}
 
+	// Read the account first so we can clean up its webhook-routing index
+	// entries (page id and any linked IG business id). Best-effort.
+	account, getErr := trendlymodels.GetBrandSocialAccount(brandID, socialID)
+
 	if err := trendlymodels.DeleteBrandSocialAccount(brandID, socialID); err != nil {
 		log.Printf("deleteBrandSocial: failed to delete %s/%s: %v", brandID, socialID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete brand social"})
 		return
+	}
+
+	if getErr == nil && account != nil {
+		if account.PlatformAccountID != "" {
+			_ = trendlymodels.DeleteSocialAccountIndex(account.PlatformAccountID)
+		}
+		if account.InstagramBusinessID != "" {
+			_ = trendlymodels.DeleteSocialAccountIndex(account.InstagramBusinessID)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "brand social account disconnected"})

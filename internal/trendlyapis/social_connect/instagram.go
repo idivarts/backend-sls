@@ -53,7 +53,7 @@ func InstagramInit(c *gin.Context) {
 	authURL := fmt.Sprintf(
 		"https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0"+
 			"&client_id=%s&redirect_uri=%s&response_type=code"+
-			"&scope=instagram_business_basic,instagram_business_manage_insights"+
+			"&scope=instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_messages,instagram_business_manage_comments"+
 			"&state=%s",
 		clientId, url.QueryEscape(redirectURI), url.QueryEscape(encodedState),
 	)
@@ -106,22 +106,24 @@ func InstagramCallback(c *gin.Context) {
 
 	username := instaProfile.Username
 	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformInstagram, username)
+	igAccountID := strconv.FormatInt(shortToken.UserID, 10)
 	now := time.Now().Unix()
 
 	social := &trendlymodels.SocialAccount{
-		ID:              socialID,
-		Platform:        trendlymodels.PlatformInstagram,
-		UserID:          state.UserID,
-		Username:        username,
-		DisplayName:     instaProfile.Name,
-		ProfileImageURL: instaProfile.ProfilePictureURL,
-		FollowerCount:   int64(instaProfile.FollowersCount),
-		FollowingCount:  int64(instaProfile.FollowsCount),
-		MediaCount:      int64(instaProfile.MediaCount),
-		ConnectedAt:     now,
-		UpdatedAt:       now,
+		ID:                socialID,
+		Platform:          trendlymodels.PlatformInstagram,
+		UserID:            state.UserID,
+		PlatformAccountID: igAccountID,
+		Username:          username,
+		DisplayName:       instaProfile.Name,
+		ProfileImageURL:   instaProfile.ProfilePictureURL,
+		FollowerCount:     int64(instaProfile.FollowersCount),
+		FollowingCount:    int64(instaProfile.FollowsCount),
+		MediaCount:        int64(instaProfile.MediaCount),
+		ConnectedAt:       now,
+		UpdatedAt:         now,
 		RawProfile: map[string]interface{}{
-			"id": strconv.FormatInt(shortToken.UserID, 10),
+			"id": igAccountID,
 		},
 	}
 
@@ -144,6 +146,11 @@ func InstagramCallback(c *gin.Context) {
 		c.Redirect(302, CallbackErrorURL(connectBase, "instagram", state.CallbackScheme, state.App, "Failed to save connection. Please try again."))
 		return
 	}
+
+	// Index by the IG account id so inbox webhooks can resolve events to this
+	// connection. Non-fatal: a failure here only degrades real-time webhook
+	// routing, not the connection itself.
+	upsertSocialIndex(igAccountID, trendlymodels.PlatformInstagram, state, socialID, now)
 
 	c.Redirect(302, CallbackSuccessURL(connectBase, "instagram", state.CallbackScheme, state.App))
 }
