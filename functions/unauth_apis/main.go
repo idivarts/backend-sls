@@ -24,6 +24,12 @@ func main() {
 	firebaseApi := apihandler.GinEngine.Group("/firebase")
 	firebaseApi.GET("/brands/members/add", trendlyunauth.ValidateFirebaseCallback)
 
+	// Public free AI tools for the marketing website (no auth).
+	// CORS + OPTIONS preflight are handled globally by middlewares.CORSMiddleware.
+	// ⚠️ Unauthenticated + AI-cost-incurring — needs rate limiting before prod (see tools.go).
+	toolsApi := apihandler.GinEngine.Group("/tools")
+	toolsApi.POST("/generate", trendlyunauth.GenerateToolContent)
+
 	// ── Social Connect Portal (V2 OAuth flow) ─────────────────────────────────
 	// Init routes: browser redirect from connect portal — token in query param.
 	connectInit := apihandler.GinEngine.Group("/connect", social_connect.ValidateQueryTokenMiddleware())
