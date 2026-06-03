@@ -4,6 +4,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
@@ -42,6 +43,11 @@ func handleManagerAPIs() {
 	managerApisV1.GET("/brands/:brandId/socials", social_connect.ListBrandSocials)
 	managerApisV1.DELETE("/brands/:brandId/socials/:id", social_connect.DeleteBrandSocial)
 	managerApisV1.POST("/brands/:brandId/socials/:id/team", trendlyapis.AssignSocialTeam)
+
+	// ── Content publishing + scheduling (brands/{brandId}/contents) ───────────
+	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish", publishing.PublishNow)
+	managerApisV1.POST("/brands/:brandId/contents/:contentId/schedule", publishing.SchedulePublish)
+	managerApisV1.DELETE("/brands/:brandId/contents/:contentId/schedule", publishing.CancelSchedule)
 
 	// ── Inbox (omni-channel DMs + comments across connected Meta accounts) ────
 	managerApisV1.GET("/brands/:brandId/inbox", inbox.GetInbox)

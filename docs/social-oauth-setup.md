@@ -64,15 +64,23 @@ Instagram and Facebook share the same Meta app. A single Meta app covers both pl
 ```
 instagram_business_basic
 instagram_business_manage_insights
+instagram_business_manage_messages
+instagram_business_manage_comments
+instagram_business_content_publish
 ```
 
-These are requested in code. No action needed in the console beyond granting them during App Review (required before going live).
+These are requested in code (`social_connect/instagram.go`). No action needed in the console beyond granting them during App Review (required before going live).
+
+`instagram_business_content_publish` is required for publishing photos, reels, and carousels to a connected Instagram Business account.
 
 ### App Review (Prod only)
 
 Before prod goes live, submit for review. Required permissions:
 - `instagram_business_basic`
 - `instagram_business_manage_insights`
+- `instagram_business_manage_messages`
+- `instagram_business_manage_comments`
+- `instagram_business_content_publish`
 
 ### Env vars to set
 
@@ -112,12 +120,16 @@ Uses the **same Meta app** as Instagram. No separate app needed.
 
 ```
 pages_show_list
-instagram_basic
-instagram_manage_insights
 pages_read_engagement
+pages_messaging
+pages_manage_engagement
+pages_manage_metadata
+pages_manage_posts
 ```
 
-These are requested in code (`facebook.go`). Submit for App Review before prod.
+These are requested in code (`social_connect/facebook.go`). Submit for App Review before prod.
+
+`pages_manage_posts` is required for publishing photos and feed posts to a connected Page via `PublishPagePhoto` / `PublishPageFeed` in `pkg/messenger/publish.go`.
 
 ### Env vars to set
 
@@ -304,8 +316,8 @@ Set these in AWS Secrets Manager or your CI/CD secret store, then reference them
 
 ## Checklist before going live (prod)
 
-- [ ] Instagram: App Review approved for `instagram_business_basic`, `instagram_business_manage_insights`
-- [ ] Facebook: App Review approved for `pages_show_list`, `pages_read_engagement`, `instagram_basic`, `instagram_manage_insights`
+- [ ] Instagram: App Review approved for `instagram_business_basic`, `instagram_business_manage_insights`, `instagram_business_manage_messages`, `instagram_business_manage_comments`, `instagram_business_content_publish`
+- [ ] Facebook: App Review approved for `pages_show_list`, `pages_read_engagement`, `pages_messaging`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_manage_posts`
 - [ ] YouTube: OAuth consent screen published and verified (if requesting sensitive scopes)
 - [ ] LinkedIn: "Sign In with LinkedIn using OpenID Connect" product approved
 - [ ] Twitter: App set to "Web App" type with `offline.access` scope enabled

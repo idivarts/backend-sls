@@ -30,8 +30,14 @@ Instagram and Facebook accounts from inside the Trendly Inbox.
 ## 1. Permissions to request
 
 ### Already granted today (from `social-oauth-setup.md`, read-only)
-- Instagram: `instagram_business_basic`, `instagram_business_manage_insights`
-- Facebook: `pages_show_list`, `instagram_basic`, `instagram_manage_insights`, `pages_read_engagement`
+- Instagram (via separate Instagram OAuth flow): `instagram_business_basic`, `instagram_business_manage_insights`, `instagram_business_manage_messages`, `instagram_business_manage_comments`, `instagram_business_content_publish`
+- Facebook (via Facebook OAuth flow): `pages_show_list`, `pages_read_engagement`, `pages_messaging`, `pages_manage_engagement`, `pages_manage_metadata`, `pages_manage_posts`
+
+> **Note:** Instagram permissions (`instagram_basic`, `instagram_manage_insights`,
+> `instagram_manage_messages`, `instagram_manage_comments`) are **not** requested
+> through the Facebook OAuth flow. Instagram has its own separate OAuth flow
+> (`internal/trendlyapis/social_connect/instagram.go` or `unauth_apis/instagram.go`).
+> Do **not** add Instagram scopes to the Facebook connect URL.
 
 ### NEW scopes the Inbox requires
 
@@ -142,7 +148,7 @@ For **each** requested scope, Meta requires:
 
 | Concern | File |
 |---|---|
-| OAuth scope list (Meta connect) | `internal/trendlyapis/facebook.go`, `internal/trendlyapis/unauth_apis/instagram.go` |
+| OAuth scope list (Meta connect) | `internal/trendlyapis/social_connect/facebook.go`, `internal/trendlyapis/unauth_apis/instagram.go` |
 | Long-lived token exchange | `pkg/messenger/token.go` |
 | Page webhook subscription | `pkg/messenger/subscribe_app.go` (extend field list) |
 | Conversations / messages fetch | `pkg/messenger/conversation.go`, `pkg/messenger/message.go` |
