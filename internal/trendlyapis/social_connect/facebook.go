@@ -42,7 +42,7 @@ func FacebookInit(c *gin.Context) {
 		"https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=%s&scope=%s&state=%s&response_type=code",
 		messenger.ClientID,
 		url.QueryEscape(redirectURI),
-		url.QueryEscape("pages_show_list,pages_read_engagement,pages_messaging,pages_manage_engagement,pages_manage_metadata"),
+		url.QueryEscape("pages_show_list,pages_read_engagement,pages_messaging,pages_manage_engagement,pages_manage_metadata,pages_manage_posts"),
 		// ,instagram_basic,instagram_manage_insights,instagram_manage_messages,instagram_manage_comments
 		url.QueryEscape(encodedState),
 	)

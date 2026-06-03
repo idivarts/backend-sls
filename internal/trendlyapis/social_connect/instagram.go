@@ -53,7 +53,7 @@ func InstagramInit(c *gin.Context) {
 	authURL := fmt.Sprintf(
 		"https://www.instagram.com/oauth/authorize?enable_fb_login=1&force_authentication=0"+
 			"&client_id=%s&redirect_uri=%s&response_type=code"+
-			"&scope=instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_messages,instagram_business_manage_comments"+
+			"&scope=instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish"+
 			"&state=%s",
 		clientId, url.QueryEscape(redirectURI), url.QueryEscape(encodedState),
 	)
