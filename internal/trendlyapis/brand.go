@@ -37,6 +37,16 @@ func CreateBrand(c *gin.Context) {
 		return
 	}
 
+	// Idempotent finalize: a brand whose onboarding already completed must not be
+	// re-provisioned (which would reset billing/credits). The AI onboarding flow
+	// creates a draft first and calls this once at the end, so guard against any
+	// duplicate finalize call.
+	if brand.OnboardingComplete {
+		c.JSON(http.StatusOK, gin.H{"message": "Brand already initiated"})
+		return
+	}
+
+	brand.OnboardingComplete = true
 	brand.IsBillingDisabled = false
 	brand.Billing = &trendlymodels.BrandBilling{
 		BillingStatus: myutil.StrPtr("active"),

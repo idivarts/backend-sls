@@ -13,11 +13,36 @@ type AIConversation struct {
 }
 
 type AIMessage struct {
-	Role        string `json:"role" firestore:"role"`
-	Content     string `json:"content" firestore:"content"`
-	Model       string `json:"model,omitempty" firestore:"model,omitempty"`
-	FocusedText string `json:"focusedText,omitempty" firestore:"focusedText,omitempty"`
-	ImageURL    string `json:"imageUrl,omitempty" firestore:"imageUrl,omitempty"`
-	TokenCount  int    `json:"tokenCount,omitempty" firestore:"tokenCount,omitempty"`
-	Timestamp   int64  `json:"timestamp" firestore:"timestamp"`
+	Role        string     `json:"role" firestore:"role"`
+	Content     string     `json:"content" firestore:"content"`
+	Model       string     `json:"model,omitempty" firestore:"model,omitempty"`
+	FocusedText string     `json:"focusedText,omitempty" firestore:"focusedText,omitempty"`
+	ImageURL    string     `json:"imageUrl,omitempty" firestore:"imageUrl,omitempty"`
+	TokenCount  int        `json:"tokenCount,omitempty" firestore:"tokenCount,omitempty"`
+	Timestamp   int64      `json:"timestamp" firestore:"timestamp"`
+	Control     *AIControl `json:"control,omitempty" firestore:"control,omitempty"`
+}
+
+// AIControl is an optional structured answer control attached to an assistant
+// message. It lets the AI ask a question with real UI controls instead of plain
+// text — either a set of selectable options or a typed/validated input field.
+// Available to every module (see ai package client tools ask_options/ask_input).
+type AIControl struct {
+	// Kind is "options" or "input".
+	Kind string `json:"kind" firestore:"kind"`
+
+	// Options-control fields.
+	SelectionType string            `json:"selectionType,omitempty" firestore:"selectionType,omitempty"` // "single" | "multi"
+	Options       []AIControlOption `json:"options,omitempty" firestore:"options,omitempty"`
+	AllowCustom   bool              `json:"allowCustom,omitempty" firestore:"allowCustom,omitempty"`
+
+	// Input-control fields.
+	InputType   string `json:"inputType,omitempty" firestore:"inputType,omitempty"` // "text" | "phone" | "url" | "email"
+	Placeholder string `json:"placeholder,omitempty" firestore:"placeholder,omitempty"`
+	Optional    bool   `json:"optional,omitempty" firestore:"optional,omitempty"`
+}
+
+type AIControlOption struct {
+	Label string `json:"label" firestore:"label"`
+	Value string `json:"value" firestore:"value"`
 }

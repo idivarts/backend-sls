@@ -34,6 +34,16 @@ type Brand struct {
 
 	HasPayWall bool `json:"hasPayWall" firestore:"hasPayWall"`
 
+	// Age is the brand's maturity bucket collected during onboarding
+	// ("JUST_STARTING" | "LT_1" | "LT_5" | "GT_5").
+	Age *string `json:"age,omitempty" firestore:"age,omitempty"`
+
+	// OnboardingComplete is false for a draft brand created at the start of the
+	// AI onboarding chat and flipped to true only when onboarding finishes and
+	// the brand is provisioned (billing/credits/team). Draft brands must be
+	// excluded from billing/discover/list surfaces until this is true.
+	OnboardingComplete bool `json:"onboardingComplete" firestore:"onboardingComplete"`
+
 	AIVoice *string `json:"aiVoice,omitempty" firestore:"aiVoice,omitempty"`
 
 	// Members       []BrandMember  `json:"members" firestore:"members"`
