@@ -31,6 +31,10 @@ type Message struct {
 }
 
 type ToolCall struct {
+	// Index is only populated on streamed tool-call deltas. OpenRouter splits a
+	// single tool call across many SSE chunks (id/name in the first, arguments
+	// dribbled across the rest) and uses index to tell concurrent calls apart.
+	Index    *int         `json:"index,omitempty"`
 	ID       string       `json:"id"`
 	Type     string       `json:"type"`
 	Function ToolCallFunc `json:"function"`
@@ -110,6 +114,10 @@ func ChatCompletionStream(ctx context.Context, req ChatRequest, cb StreamCallbac
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
 	var usage *Usage
+	// Tool calls arrive fragmented across chunks; accumulate by index and emit
+	// each as a single complete ToolCall once the stream ends.
+	toolAccum := map[int]*ToolCall{}
+	var toolOrder []int
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
@@ -135,9 +143,26 @@ func ChatCompletionStream(ctx context.Context, req ChatRequest, cb StreamCallbac
 				cb.OnDelta(ch.Delta.Content)
 			}
 			for _, tc := range ch.Delta.ToolCalls {
-				if cb.OnToolCall != nil {
-					cb.OnToolCall(tc)
+				idx := 0
+				if tc.Index != nil {
+					idx = *tc.Index
 				}
+				acc, ok := toolAccum[idx]
+				if !ok {
+					acc = &ToolCall{}
+					toolAccum[idx] = acc
+					toolOrder = append(toolOrder, idx)
+				}
+				if tc.ID != "" {
+					acc.ID = tc.ID
+				}
+				if tc.Type != "" {
+					acc.Type = tc.Type
+				}
+				if tc.Function.Name != "" {
+					acc.Function.Name = tc.Function.Name
+				}
+				acc.Function.Arguments += tc.Function.Arguments
 			}
 		}
 	}
@@ -146,6 +171,11 @@ func ChatCompletionStream(ctx context.Context, req ChatRequest, cb StreamCallbac
 			cb.OnError(err)
 		}
 		return err
+	}
+	if cb.OnToolCall != nil {
+		for _, idx := range toolOrder {
+			cb.OnToolCall(*toolAccum[idx])
+		}
 	}
 	if cb.OnDone != nil {
 		cb.OnDone(usage)
