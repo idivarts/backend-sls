@@ -24,4 +24,13 @@ func RegisterRoutes(engine *gin.Engine) {
 	g.POST("/content/hashtags", HTTPHashtags)
 
 	g.GET("/models", ListModels)
+
+	// Strategy → calendar conversion lives under its own prefix (documented
+	// contract), same manager-session middleware.
+	cs := engine.Group("/api/content-strategy",
+		middlewares.ValidateSessionMiddleware(),
+		middlewares.TrendlyMiddleware("managers"),
+	)
+	cs.POST("/:strategyId/push-to-calendar", HTTPPushToCalendar)
+	cs.POST("/:strategyId/recheck-duration", HTTPRecheckDuration)
 }

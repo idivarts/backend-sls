@@ -79,16 +79,20 @@ func onboardingServerTools() []openrouter.Tool {
 	}
 }
 
-// dispatchServerTool runs an onboarding server tool. It returns a JSON result
-// string (fed back to the model), whether onboarding is now complete, and any
-// hard error. Validation failures are returned as result content (not errors) so
-// the model can recover by re-asking the user.
-func dispatchServerTool(ctx context.Context, brandID, name, arguments string) (string, bool, error) {
+// dispatchServerTool runs a server tool. It returns a JSON result string (fed
+// back to the model), a completion flag (onboarding complete / strategy doc
+// ready — chat.go turns this into the matching WS signal), and any hard error.
+// contextID is the conversation's ContextID (e.g. the strategyId), passed
+// through for tools that act on a specific document. Validation failures are
+// returned as result content (not errors) so the model can recover by re-asking.
+func dispatchServerTool(ctx context.Context, brandID, contextID, name, arguments string) (string, bool, error) {
 	switch name {
 	case toolSetBrandFields:
 		return setBrandFields(ctx, brandID, arguments)
 	case toolCompleteOnboarding:
 		return completeOnboarding(ctx, brandID)
+	case toolSetStrategyBrief, toolGenerateStrategyDoc, toolApplyStrategyEdit:
+		return dispatchStrategyTool(ctx, brandID, contextID, name, arguments)
 	default:
 		return jsonResult(map[string]any{"ok": false, "error": "unknown tool: " + name}), false, nil
 	}
