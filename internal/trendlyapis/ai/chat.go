@@ -148,7 +148,7 @@ func handleMessageWS(req WSRequest) {
 				ToolCalls: echo,
 			})
 			for _, sc := range serverCalls {
-				result, complete, derr := dispatchServerTool(ctx, conv.BrandID, conv.ContextID, sc.Function.Name, sc.Function.Arguments)
+				result, complete, derr := dispatchServerTool(ctx, conv.BrandID, conv.UserID, conv.ContextID, sc.Function.Name, sc.Function.Arguments)
 				if derr != nil {
 					log.Printf("ai server tool %s: %v", sc.Function.Name, derr)
 				}
@@ -240,6 +240,9 @@ func toolsForModule(module string) []openrouter.Tool {
 	}
 	if module == moduleStrategy {
 		tools = append(tools, strategyServerTools()...)
+	}
+	if module == moduleCalendar {
+		tools = append(tools, calendarServerTools()...)
 	}
 	return tools
 }
