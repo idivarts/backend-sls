@@ -113,11 +113,23 @@ service cloud.firestore {
           allow update, delete: if isAuthenticated() && isBrandMember(brandId) && isCommentAuthor();
         }
 
-        // Presence heartbeats — each manager can only write their own doc
+        // Presence heartbeats — each manager can only write their own doc.
+        // Also carries Yjs awareness state (cursor/selection) for live co-editing.
         match /presence/{managerId} {
           allow read:  if isAuthenticated() && isBrandMember(brandId);
           allow write: if isAuthenticated() && isBrandMember(brandId)
                          && request.auth.uid == managerId;
+        }
+
+        // Yjs CRDT update log (real-time collaboration, Phase 2).
+        // Append-only base64 deltas + periodic compaction snapshots. Any brand
+        // member may read (to sync); content-strategy capability holders may
+        // append. Delete is allowed for the same holders so compaction can
+        // prune superseded deltas after writing a snapshot.
+        match /yupdates/{updateId} {
+          allow read:   if isAuthenticated() && isBrandMember(brandId);
+          allow create: if isAuthenticated() && canManageContentStrategy(brandId);
+          allow delete: if isAuthenticated() && canManageContentStrategy(brandId);
         }
       }
 

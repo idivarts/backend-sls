@@ -276,6 +276,7 @@ functions:
     timeout: 30
     events:
       - http: ANY /api/ai/{proxy+}
+      - http: ANY /api/content-strategy/{proxy+}
   trendly_matchmaking_apis:
     handler: functions/trendly_matchmaking/main.go
     package:

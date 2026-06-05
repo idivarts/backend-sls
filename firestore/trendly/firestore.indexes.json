@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "yupdates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isSnapshot",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "inbox",
       "queryScope": "COLLECTION",
       "fields": [

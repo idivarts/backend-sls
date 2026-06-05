@@ -15,7 +15,7 @@ import (
 
 // maxToolSteps caps the agentic loop so a misbehaving model can't spin forever
 // calling server tools without ever producing a user-facing turn.
-const maxToolSteps = 6
+const maxToolSteps = 8
 
 func handleMessageWS(req WSRequest) {
 	ctx := context.Background()
@@ -76,7 +76,9 @@ func handleMessageWS(req WSRequest) {
 	var fullText strings.Builder // cumulative across steps — matches what the client accumulates
 	var finalUsage *openrouter.Usage
 	var pendingControl *trendlymodels.AIControl
-	onboardingComplete := false
+	// completed is set by a terminal server tool (complete_onboarding /
+	// generate_strategy_doc); the matching WS signal is chosen by module below.
+	completed := false
 
 	for step := 0; step < maxToolSteps; step++ {
 		var stepText strings.Builder
@@ -146,12 +148,12 @@ func handleMessageWS(req WSRequest) {
 				ToolCalls: echo,
 			})
 			for _, sc := range serverCalls {
-				result, complete, derr := dispatchServerTool(ctx, conv.BrandID, sc.Function.Name, sc.Function.Arguments)
+				result, complete, derr := dispatchServerTool(ctx, conv.BrandID, conv.ContextID, sc.Function.Name, sc.Function.Arguments)
 				if derr != nil {
 					log.Printf("ai server tool %s: %v", sc.Function.Name, derr)
 				}
 				if complete {
-					onboardingComplete = true
+					completed = true
 				}
 				msgs = append(msgs, openrouter.Message{
 					Role:       "tool",
@@ -210,9 +212,13 @@ func handleMessageWS(req WSRequest) {
 			"control":        pendingControl,
 		})
 	}
-	if onboardingComplete {
+	if completed {
+		signal := "onboarding_complete"
+		if conv.Module == moduleStrategy {
+			signal = "strategy_ready"
+		}
 		wsSend(req.ConnectionID, map[string]any{
-			"type":           "onboarding_complete",
+			"type":           signal,
 			"conversationId": conv.ID,
 		})
 	}
@@ -231,6 +237,9 @@ func toolsForModule(module string) []openrouter.Tool {
 	tools := clientTools()
 	if module == moduleOnboarding {
 		tools = append(tools, onboardingServerTools()...)
+	}
+	if module == moduleStrategy {
+		tools = append(tools, strategyServerTools()...)
 	}
 	return tools
 }

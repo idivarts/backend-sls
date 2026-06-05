@@ -78,6 +78,12 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		return sb.String()
 	}
 
+	if module == moduleStrategy {
+		sb.WriteString(strategyInstructions)
+		sb.WriteString(controlsInstructions)
+		return sb.String()
+	}
+
 	sb.WriteString("\nAnswer concisely. Match the brand voice. If a question is ambiguous, ask one clarifying question.")
 	sb.WriteString(controlsInstructions)
 	return sb.String()
