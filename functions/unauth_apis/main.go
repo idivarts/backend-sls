@@ -24,6 +24,11 @@ func main() {
 	firebaseApi := apihandler.GinEngine.Group("/firebase")
 	firebaseApi.GET("/brands/members/add", trendlyunauth.ValidateFirebaseCallback)
 
+	// Public, view-only share links (no auth). Resolves a shareLinks/{token} and
+	// returns the calendar-month payload. CORS handled globally.
+	publicApi := apihandler.GinEngine.Group("/public")
+	publicApi.GET("/shares/:token", trendlyunauth.PublicShareResolve)
+
 	// Public free AI tools for the marketing website (no auth).
 	// CORS + OPTIONS preflight are handled globally by middlewares.CORSMiddleware.
 	// ⚠️ Unauthenticated + AI-cost-incurring — needs rate limiting before prod (see tools.go).
