@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -213,14 +214,26 @@ func handleScriptGenWS(req WSRequest) {
 		p.VideoType, p.Topic, p.KeyMessage, p.Tone,
 	)
 
+	// Accumulate the streamed script so it can be persisted on completion — this
+	// makes the result survive a websocket drop and keeps the content doc (and
+	// thus the AI chat context) up to date.
+	var scriptBuf strings.Builder
 	streamErr := openrouter.ChatCompletionStream(context.Background(), openrouter.ChatRequest{
 		Model:    model,
 		Messages: []openrouter.Message{{Role: "system", Content: sys}, {Role: "user", Content: user}},
 	}, openrouter.StreamCallbacks{
 		OnDelta: func(delta string) {
+			scriptBuf.WriteString(delta)
 			wsSend(req.ConnectionID, map[string]any{"type": "token", "delta": delta})
 		},
 		OnDone: func(u *openrouter.Usage) {
+			if p.ContextID != "" {
+				if s := strings.TrimSpace(scriptBuf.String()); s != "" {
+					if err := trendlymodels.UpdateContentFields(p.BrandID, p.ContextID, map[string]any{"script": s}); err != nil {
+						log.Printf("ai script persist: %v", err)
+					}
+				}
+			}
 			wsSend(req.ConnectionID, map[string]any{"type": "done", "usage": u})
 		},
 		OnError: func(e error) {
@@ -236,10 +249,12 @@ func handleScriptGenWS(req WSRequest) {
 
 type imagePayload struct {
 	BrandID     string `json:"brandId"`
+	ContextID   string `json:"contextId"` // content doc id — where results + status are persisted
 	Description string `json:"description"`
 	Style       string `json:"style"`
 	AspectRatio string `json:"aspectRatio"`
 	Count       int    `json:"count"`
+	Multi       bool   `json:"multi"` // carousel: append; single: replace the image
 }
 
 func handleImageGenWS(req WSRequest) {
@@ -270,6 +285,29 @@ func handleImageGenWS(req WSRequest) {
 		prompt = fmt.Sprintf("%s. Style: %s.", p.Description, p.Style)
 	}
 
+	// Mark the job running on the content doc up-front so the brand app shows
+	// progress immediately and can recover the result even if this socket drops.
+	setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
+		"status":         "generating",
+		"prompt":         p.Description,
+		"error":          "",
+		"requestedCount": p.Count,
+		"completedCount": 0,
+		"startedAt":      time.Now().UnixMilli(),
+	})
+
+	// Snapshot existing attachments once so generated images can be appended
+	// (carousel) or replace the image (single) and persisted incrementally.
+	var existing []trendlymodels.ContentAttachment
+	if p.ContextID != "" {
+		if ct, err := trendlymodels.GetContent(p.BrandID, p.ContextID); err == nil && ct != nil {
+			existing = ct.Attachments
+		}
+	}
+	generated := make([]trendlymodels.ContentAttachment, 0, p.Count)
+
+	completed := 0
+	var firstErr error
 	for i := 0; i < p.Count; i++ {
 		wsSend(req.ConnectionID, map[string]any{
 			"type":  "image_status",
@@ -283,22 +321,45 @@ func handleImageGenWS(req WSRequest) {
 			N:      1,
 		})
 		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
 			wsErrorTo(req.ConnectionID, fmt.Sprintf("image %d failed: %v", i, err))
 			continue
 		}
+
 		url := ""
 		if len(resp.Data) > 0 {
-			url = resp.Data[0].URL
-			if url == "" && resp.Data[0].B64JSON != "" {
-				if s3url, err := uploadBase64Image(resp.Data[0].B64JSON, p.BrandID); err == nil {
+			if resp.Data[0].URL != "" {
+				if s3url, uerr := uploadFromURL(resp.Data[0].URL, p.BrandID); uerr == nil {
 					url = s3url
+				} else if firstErr == nil {
+					firstErr = uerr
 				}
-			} else if url != "" {
-				if s3url, err := uploadFromURL(url, p.BrandID); err == nil {
+			} else if resp.Data[0].B64JSON != "" {
+				if s3url, uerr := uploadBase64Image(resp.Data[0].B64JSON, p.BrandID); uerr == nil {
 					url = s3url
+				} else if firstErr == nil {
+					firstErr = uerr
 				}
 			}
 		}
+		if url == "" {
+			wsErrorTo(req.ConnectionID, fmt.Sprintf("image %d: upload failed", i))
+			continue
+		}
+
+		generated = append(generated, trendlymodels.ContentAttachment{Type: "image", ImageURL: url})
+		completed++
+
+		// Persist incrementally: the image lands on the content doc regardless of
+		// whether the originating socket is still connected.
+		persistGeneratedImages(p.BrandID, p.ContextID, existing, generated, p.Multi)
+		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
+			"status":         "generating",
+			"completedCount": completed,
+		})
+
 		wsSend(req.ConnectionID, map[string]any{
 			"type":  "image",
 			"index": i,
@@ -306,7 +367,59 @@ func handleImageGenWS(req WSRequest) {
 		})
 	}
 
+	if completed == 0 {
+		msg := "image generation failed"
+		if firstErr != nil {
+			msg = firstErr.Error()
+		}
+		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
+			"status": "error",
+			"error":  msg,
+		})
+	} else {
+		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
+			"status":         "done",
+			"error":          "",
+			"completedCount": completed,
+		})
+	}
+
 	wsSend(req.ConnectionID, map[string]any{"type": "done"})
+}
+
+// setImageGenStatus merge-updates the imageGeneration block on the content doc.
+// No-ops when there is no content context (ad-hoc generation not tied to a piece).
+func setImageGenStatus(brandID, contentID string, fields map[string]any) {
+	if contentID == "" {
+		return
+	}
+	fields["updatedAt"] = time.Now().UnixMilli()
+	if err := trendlymodels.UpdateContentFields(brandID, contentID, map[string]any{
+		"imageGeneration": fields,
+	}); err != nil {
+		log.Printf("ai image-gen status update: %v", err)
+	}
+}
+
+// persistGeneratedImages writes the content doc's attachments so generated
+// images are saved without the user pressing Save. Carousels append to the
+// existing set; single-image types replace it.
+func persistGeneratedImages(brandID, contentID string, existing, generated []trendlymodels.ContentAttachment, multi bool) {
+	if contentID == "" {
+		return
+	}
+	var next []trendlymodels.ContentAttachment
+	if multi {
+		next = append(next, existing...)
+		next = append(next, generated...)
+	} else {
+		next = append(next, generated...)
+	}
+	if err := trendlymodels.UpdateContentFields(brandID, contentID, map[string]any{
+		"attachments": next,
+	}); err != nil {
+		log.Printf("ai image-gen attachments update: %v", err)
+	}
 }
 
 func aspectToSize(ratio string) string {
@@ -380,13 +493,19 @@ func uploadFromURL(url, brandID string) (string, error) {
 	return uploadBytes(data, ct, brandID, ext)
 }
 
+// uploadBytes stores an image in S3 following the same convention as the
+// /s3/v1/images pre-sign endpoint used by the apps (useAWSContext): same bucket,
+// the shared `uploads/` prefix, and the CloudFront URL the apps already render.
+// AI-generated images thus live alongside user uploads and need no special
+// handling on the client.
 func uploadBytes(data []byte, contentType, brandID, ext string) (string, error) {
 	bucket := os.Getenv("IMAGE_S3_BUCKET_NAME")
 	cdn := os.Getenv("IMAGE_CF_DISTRIBUTION_URL")
 	if bucket == "" {
 		return "", fmt.Errorf("IMAGE_S3_BUCKET_NAME not set")
 	}
-	key := fmt.Sprintf("ai-gen/%s/%d_%s.%s", brandID, time.Now().Unix(), uuid.NewString(), ext)
+	filename := fmt.Sprintf("file_%d_ai_%s.%s", time.Now().Unix(), uuid.NewString(), ext)
+	key := fmt.Sprintf("uploads/%s", filename)
 	_, err := getS3().PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
@@ -397,7 +516,7 @@ func uploadBytes(data []byte, contentType, brandID, ext string) (string, error) 
 		return "", err
 	}
 	if cdn != "" {
-		return fmt.Sprintf("%s/%s", strings.TrimRight(cdn, "/"), key), nil
+		return fmt.Sprintf("%s/uploads/%s", strings.TrimRight(cdn, "/"), filename), nil
 	}
 	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key), nil
 }

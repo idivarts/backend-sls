@@ -28,6 +28,19 @@ type Message struct {
 	Name       string     `json:"name,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+	// Images is populated on assistant responses from image-generation models
+	// (modalities: ["image","text"]). Each entry's image_url.url is either a
+	// data URI ("data:image/png;base64,…") or an https URL.
+	Images []OutputImage `json:"images,omitempty"`
+}
+
+type OutputImage struct {
+	Type     string       `json:"type"`
+	ImageURL ImageURLData `json:"image_url"`
+}
+
+type ImageURLData struct {
+	URL string `json:"url"`
 }
 
 type ToolCall struct {
@@ -54,6 +67,10 @@ type ChatRequest struct {
 	MaxTokens      int             `json:"max_tokens,omitempty"`
 	Plugins        []Plugin        `json:"plugins,omitempty"`
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+	// Modalities requests non-text output. For image generation send
+	// ["image","text"] — the generated image comes back on the assistant
+	// message's Images field.
+	Modalities []string `json:"modalities,omitempty"`
 }
 
 // ResponseFormat asks the model to constrain its output. Type is "json_object"
@@ -216,21 +233,48 @@ type ImageData struct {
 	B64JSON string `json:"b64_json,omitempty"`
 }
 
+// GenerateImage produces a single image. OpenRouter serves image generation
+// through the chat-completions endpoint with modalities:["image","text"] (there
+// is no stable OpenAI-style /images/generations route), so we issue a chat
+// request and pull the image off the assistant message. The result is mapped
+// back onto ImageResponse so callers stay agnostic to the transport: data-URI
+// images populate B64JSON, hosted images populate URL.
 func GenerateImage(ctx context.Context, req ImageRequest) (*ImageResponse, error) {
-	if req.N == 0 {
-		req.N = 1
+	prompt := req.Prompt
+	if req.Size != "" {
+		prompt = fmt.Sprintf("%s\n\nGenerate the image at %s resolution (matching that aspect ratio).", prompt, req.Size)
 	}
-	body, err := doRequest(ctx, "/images/generations", req)
+
+	chatResp, err := ChatCompletion(ctx, ChatRequest{
+		Model:      req.Model,
+		Messages:   []Message{{Role: "user", Content: prompt}},
+		Modalities: []string{"image", "text"},
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer body.Close()
 
-	var resp ImageResponse
-	if err := json.NewDecoder(body).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("decode image response: %w", err)
+	out := &ImageResponse{}
+	for _, ch := range chatResp.Choices {
+		for _, img := range ch.Message.Images {
+			url := strings.TrimSpace(img.ImageURL.URL)
+			if url == "" {
+				continue
+			}
+			if strings.HasPrefix(url, "data:") {
+				// data:<mime>;base64,<payload>
+				if idx := strings.Index(url, ","); idx >= 0 {
+					out.Data = append(out.Data, ImageData{B64JSON: url[idx+1:]})
+					continue
+				}
+			}
+			out.Data = append(out.Data, ImageData{URL: url})
+		}
 	}
-	return &resp, nil
+	if len(out.Data) == 0 {
+		return nil, fmt.Errorf("model %q returned no image", req.Model)
+	}
+	return out, nil
 }
 
 func doRequest(ctx context.Context, path string, payload interface{}) (io.ReadCloser, error) {

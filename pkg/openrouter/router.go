@@ -23,7 +23,7 @@ var DefaultModelFor = map[TaskType]string{
 	TaskScript:     "anthropic/claude-opus-4",
 	TaskMultimodal: "google/gemini-2.5-pro",
 	TaskReasoning:  "openai/o3",
-	TaskImage:      "openai/gpt-image-1",
+	TaskImage:      "google/gemini-2.5-flash-image-preview",
 }
 
 func ResolveModel(task TaskType, requested string) string {
