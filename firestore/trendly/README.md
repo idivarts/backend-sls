@@ -3,10 +3,10 @@ This will contain all the firestore related files like rules and tests for trend
 Before Running command, Login -
 
 ```
+firebase login --reauth
 firebase login:add
 firebase login:ci
 ```
-
 
 Deploy code -
 

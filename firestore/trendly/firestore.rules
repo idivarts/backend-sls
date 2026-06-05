@@ -28,6 +28,22 @@ service cloud.firestore {
     match /agency-hires/{hireId} {
       allow read, write: if isAuthenticated();
     }
+
+    // ── Public share links ────────────────────────────────────────────────
+    // Maps an unguessable token → a shared Strategy / Calendar month / Content.
+    // Anyone (anonymous included) may resolve an ENABLED link; disabling it
+    // (enabled=false) revokes public access. Only content managers of the
+    // owning brand may create/toggle a link.
+    match /shareLinks/{token} {
+      allow read:   if resource.data.enabled == true;
+      allow create: if isAuthenticated() &&
+                       (canManageContent(request.resource.data.brandId) ||
+                        canManageContentStrategy(request.resource.data.brandId));
+      allow update, delete: if isAuthenticated() &&
+                       (canManageContent(resource.data.brandId) ||
+                        canManageContentStrategy(resource.data.brandId));
+    }
+
     match /collaborations-invites/{collabUserId} {
       allow read, write: if isAuthenticated() && isAdmin();
     }
@@ -102,15 +118,24 @@ service cloud.firestore {
       // Read: any brand member. Mutate: content-strategy capability holders
       // (owner / admin / content_manager).
       match /strategies/{strategyId} {
-        allow read:                   if isAuthenticated() && isBrandMember(brandId);
+        // Read: any brand member, OR anyone when the doc is publicly shared.
+        allow read:                   if (isAuthenticated() && isBrandMember(brandId))
+                                         || isResourcePublic();
         allow create, update, delete: if isAuthenticated() && canManageContentStrategy(brandId);
 
-        // Strategy document-level and snippet comments
+        // Strategy document-level and snippet comments.
+        // Brand members always read/write. On a publicly-shared strategy a
+        // logged-in NON-anonymous guest may also read and post (Tier 2) — but
+        // anonymous (logged-out) viewers cannot.
         match /comments/{commentId} {
-          allow read:   if isAuthenticated() && isBrandMember(brandId);
-          allow create: if isAuthenticated() && isBrandMember(brandId);
+          allow read:   if (isAuthenticated() && isBrandMember(brandId))
+                           || (isNonAnonAuthed() && strategyShared(brandId, strategyId));
+          allow create: if ((isAuthenticated() && isBrandMember(brandId))
+                           || (isNonAnonAuthed() && strategyShared(brandId, strategyId)))
+                           && request.resource.data.authorId == request.auth.uid;
           // Only the comment author can edit or delete their own comment
-          allow update, delete: if isAuthenticated() && isBrandMember(brandId) && isCommentAuthor();
+          allow update, delete: if isAuthenticated() && isCommentAuthor() &&
+                           (isBrandMember(brandId) || strategyShared(brandId, strategyId));
         }
 
         // Presence heartbeats — each manager can only write their own doc.
@@ -137,16 +162,35 @@ service cloud.firestore {
       // Read: any brand member. Create/update: manage_content holders
       // (incl. content_creator). Delete: content managers/admins/owners only.
       match /contents/{contentId} {
-        allow read:           if isAuthenticated() && isBrandMember(brandId);
+        // Read: any brand member, OR anyone when the doc is publicly shared.
+        allow read:           if (isAuthenticated() && isBrandMember(brandId))
+                                 || isResourcePublic();
         allow create, update: if isAuthenticated() && canManageContent(brandId);
         allow delete:         if isAuthenticated() && canDeleteContent(brandId);
 
-        // Content comments — shared between Calendar and Content detail page
+        // Content comments — shared between Calendar and Content detail page.
+        // On a publicly-shared content a logged-in NON-anonymous guest may also
+        // read and post (Tier 2); anonymous viewers cannot.
         match /comments/{commentId} {
-          allow read:   if isAuthenticated() && isBrandMember(brandId);
-          allow create: if isAuthenticated() && isBrandMember(brandId);
-          allow update, delete: if isAuthenticated() && isBrandMember(brandId) && isCommentAuthor();
+          allow read:   if (isAuthenticated() && isBrandMember(brandId))
+                           || (isNonAnonAuthed() && contentShared(brandId, contentId));
+          allow create: if ((isAuthenticated() && isBrandMember(brandId))
+                           || (isNonAnonAuthed() && contentShared(brandId, contentId)))
+                           && request.resource.data.authorId == request.auth.uid;
+          allow update, delete: if isAuthenticated() && isCommentAuthor() &&
+                           (isBrandMember(brandId) || contentShared(brandId, contentId));
         }
+      }
+
+      // ── Calendar month public share toggle ───────────────────────────────
+      // Stored at brands/{brandId}/calendarShares/{YYYY-MM}. Tracks whether a
+      // month is publicly shared + the token. The month's content items are
+      // served to public viewers by the backend (Admin SDK), so this doc only
+      // gates the toggle state — readable by anyone when enabled.
+      match /calendarShares/{month} {
+        allow read:   if (isAuthenticated() && isBrandMember(brandId))
+                         || (resource != null && resource.data.enabled == true);
+        allow write:  if isAuthenticated() && canManageContent(brandId);
       }
 
       // ── Calendar month-level comments ────────────────────────────────────
@@ -219,6 +263,38 @@ service cloud.firestore {
 
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    // True for Firebase anonymous sessions (used by logged-out public viewers).
+    function isAnonymous() {
+      return isAuthenticated() &&
+        request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // True for a real (non-anonymous) logged-in user — i.e. an actual manager
+    // account, which may or may not be a member of the shared brand.
+    function isNonAnonAuthed() {
+      return isAuthenticated() && !isAnonymous();
+    }
+
+    // True when the document being read carries an enabled public-share flag.
+    // Used on the resource's own read rule (cheap field check, no extra read).
+    function isResourcePublic() {
+      return resource != null &&
+        resource.data.get('publicShare', {}).get('enabled', false) == true;
+    }
+
+    // True when the given strategy is publicly shared (cross-doc lookup — used
+    // only by the comments sub-rules, not the hot document read path).
+    function strategyShared(brandId, strategyId) {
+      return get(/databases/$(database)/documents/brands/$(brandId)/strategies/$(strategyId))
+        .data.get('publicShare', {}).get('enabled', false) == true;
+    }
+
+    // True when the given content item is publicly shared.
+    function contentShared(brandId, contentId) {
+      return get(/databases/$(database)/documents/brands/$(brandId)/contents/$(contentId))
+        .data.get('publicShare', {}).get('enabled', false) == true;
     }
 
     function isAdmin() {
