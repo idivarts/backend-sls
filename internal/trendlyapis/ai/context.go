@@ -84,6 +84,12 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		return sb.String()
 	}
 
+	if module == moduleCalendar {
+		sb.WriteString(calendarInstructions)
+		sb.WriteString(controlsInstructions)
+		return sb.String()
+	}
+
 	sb.WriteString("\nAnswer concisely. Match the brand voice. If a question is ambiguous, ask one clarifying question.")
 	sb.WriteString(controlsInstructions)
 	return sb.String()
@@ -261,11 +267,17 @@ func loadCalendarMonth(brandID string) string {
 			break
 		}
 		data := doc.Data()
+		if archived, _ := data["isArchived"].(bool); archived {
+			continue
+		}
 		title, _ := data["title"].(string)
-		platform, _ := data["platform"].(string)
-		when, _ := data["postingTimeStamp"].(int64)
+		format, _ := data["contentFormat"].(string)
+		status, _ := data["status"].(string)
+		when, _ := toInt64(data["postingTimeStamp"])
 		t := time.UnixMilli(when).Format("2006-01-02")
-		lines = append(lines, fmt.Sprintf("- [%s] %s (%s)", t, title, platform))
+		// The [id:…] prefix lets the calendar tools target the exact post the
+		// user references without re-stating its title.
+		lines = append(lines, fmt.Sprintf("- [id:%s] [%s] %s — %s (%s)", doc.Ref.ID, t, title, format, status))
 		count++
 		if count >= 50 {
 			break
