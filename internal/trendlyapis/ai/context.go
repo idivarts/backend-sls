@@ -240,10 +240,57 @@ func loadContentBrief(brandID, contentID string) string {
 	if caption, ok := data["caption"].(string); ok && caption != "" {
 		parts = append(parts, "Caption: "+caption)
 	}
+	if hashtags, ok := data["hashtags"].(string); ok && hashtags != "" {
+		parts = append(parts, "Hashtags: "+hashtags)
+	}
 	if script, ok := data["script"].(string); ok && script != "" {
 		parts = append(parts, "Script: "+script)
 	}
+	if summary := summariseAttachments(data["attachments"]); summary != "" {
+		parts = append(parts, summary)
+	}
 	return strings.Join(parts, "\n")
+}
+
+// summariseAttachments produces a short, model-friendly description of the media
+// currently on a content piece so the AI chat knows what visuals/video exist.
+func summariseAttachments(raw any) string {
+	list, ok := raw.([]any)
+	if !ok || len(list) == 0 {
+		return ""
+	}
+	images, videos := 0, 0
+	var urls []string
+	for _, item := range list {
+		att, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch t, _ := att["type"].(string); t {
+		case "video", "reel":
+			videos++
+		default:
+			images++
+			if u, ok := att["imageUrl"].(string); ok && u != "" {
+				urls = append(urls, u)
+			}
+		}
+	}
+	if images == 0 && videos == 0 {
+		return ""
+	}
+	var segs []string
+	if images > 0 {
+		segs = append(segs, fmt.Sprintf("%d image(s)", images))
+	}
+	if videos > 0 {
+		segs = append(segs, fmt.Sprintf("%d video(s)", videos))
+	}
+	line := "Media attached: " + strings.Join(segs, ", ")
+	if len(urls) > 0 {
+		line += " — " + strings.Join(urls, ", ")
+	}
+	return line
 }
 
 func loadCalendarMonth(brandID string) string {

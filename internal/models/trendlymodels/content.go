@@ -26,20 +26,36 @@ type ContentDestination struct {
 	Username        string `json:"username,omitempty" firestore:"username"`
 }
 
+// ContentImageGeneration tracks the live state of an AI image-generation job on
+// the content doc. It is written by the websocket image handler so the brand app
+// can render progress and the finished image from its Firestore subscription —
+// independent of the websocket connection that kicked the job off.
+type ContentImageGeneration struct {
+	Status         string `json:"status" firestore:"status"` // "generating" | "done" | "error"
+	Prompt         string `json:"prompt,omitempty" firestore:"prompt"`
+	Error          string `json:"error,omitempty" firestore:"error"`
+	RequestedCount int    `json:"requestedCount,omitempty" firestore:"requestedCount"`
+	CompletedCount int    `json:"completedCount,omitempty" firestore:"completedCount"`
+	StartedAt      int64  `json:"startedAt,omitempty" firestore:"startedAt"`
+	UpdatedAt      int64  `json:"updatedAt,omitempty" firestore:"updatedAt"`
+}
+
 type Content struct {
-	Title                string               `json:"title" firestore:"title"`
-	Caption              string               `json:"caption,omitempty" firestore:"caption"`
-	Hashtags             string               `json:"hashtags,omitempty" firestore:"hashtags"`
-	Status               string               `json:"status" firestore:"status"`
-	ContentFormat        string               `json:"contentFormat" firestore:"contentFormat"`
-	Attachments          []ContentAttachment  `json:"attachments,omitempty" firestore:"attachments"`
-	Destinations         []ContentDestination `json:"destinations,omitempty" firestore:"destinations"`
-	ScheduleMode         string               `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
-	ScheduledAt          int64                `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
-	ScheduleExecutionArn string               `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
-	PublishedIds         map[string]string    `json:"publishedIds,omitempty" firestore:"publishedIds"`
-	PublishError         string               `json:"publishError,omitempty" firestore:"publishError"`
-	PostedURL            string               `json:"postedUrl,omitempty" firestore:"postedUrl"`
+	Title                string                  `json:"title" firestore:"title"`
+	Caption              string                  `json:"caption,omitempty" firestore:"caption"`
+	Hashtags             string                  `json:"hashtags,omitempty" firestore:"hashtags"`
+	Script               string                  `json:"script,omitempty" firestore:"script"`
+	Status               string                  `json:"status" firestore:"status"`
+	ContentFormat        string                  `json:"contentFormat" firestore:"contentFormat"`
+	Attachments          []ContentAttachment     `json:"attachments,omitempty" firestore:"attachments"`
+	Destinations         []ContentDestination    `json:"destinations,omitempty" firestore:"destinations"`
+	ImageGeneration      *ContentImageGeneration `json:"imageGeneration,omitempty" firestore:"imageGeneration"`
+	ScheduleMode         string                  `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
+	ScheduledAt          int64                   `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
+	ScheduleExecutionArn string                  `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
+	PublishedIds         map[string]string       `json:"publishedIds,omitempty" firestore:"publishedIds"`
+	PublishError         string                  `json:"publishError,omitempty" firestore:"publishError"`
+	PostedURL            string                  `json:"postedUrl,omitempty" firestore:"postedUrl"`
 }
 
 // GetContent reads a single content document for a brand.
