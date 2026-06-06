@@ -90,9 +90,6 @@ func publishToInstagram(igUserID, accessToken string, ct *trendlymodels.Content)
 		if err != nil {
 			return "", err
 		}
-		if err = waitForContainer(creationID, accessToken); err != nil {
-			return "", err
-		}
 	case "story":
 		img := firstImageURL(ct)
 		if img == "" {
@@ -113,6 +110,9 @@ func publishToInstagram(igUserID, accessToken string, ct *trendlymodels.Content)
 			if cerr != nil {
 				return "", cerr
 			}
+			if werr := waitForContainer(cid, accessToken); werr != nil {
+				return "", werr
+			}
 			childIDs = append(childIDs, cid)
 		}
 		creationID, err = instagram.CreateCarouselContainer(igUserID, childIDs, caption, accessToken)
@@ -130,6 +130,9 @@ func publishToInstagram(igUserID, accessToken string, ct *trendlymodels.Content)
 		}
 	}
 
+	if err = waitForContainer(creationID, accessToken); err != nil {
+		return "", err
+	}
 	return instagram.PublishContainer(igUserID, creationID, accessToken)
 }
 
