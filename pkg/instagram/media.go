@@ -23,6 +23,7 @@ type InstagramMedia struct {
 	CommentsCount int                  `json:"comments_count"`
 	LikeCount     int                  `json:"like_count"`
 	ID            string               `json:"id"`
+	TopComments   []InstagramComment   `json:"top_comments,omitempty"`
 }
 
 type instaResponse struct {
@@ -30,9 +31,10 @@ type instaResponse struct {
 }
 
 type IGetMediaParams struct {
-	GraphType int
-	PageID    string
-	Count     int
+	GraphType   int
+	PageID      string
+	Count       int
+	TopComments bool
 }
 
 func GetMedia(pageID, accessToken string, params IGetMediaParams) ([]InstagramMedia, error) {
@@ -87,5 +89,21 @@ func GetMedia(pageID, accessToken string, params IGetMediaParams) ([]InstagramMe
 	if err != nil {
 		return nil, err
 	}
+
+	if params.TopComments {
+		commentParams := IGetCommentsParams{
+			GraphType: params.GraphType,
+			Count:     2,
+		}
+		for i := range data.Data {
+			comments, err := GetComments(data.Data[i].ID, accessToken, commentParams)
+			if err != nil {
+				log.Println("Error fetching top comments for media", data.Data[i].ID, ":", err)
+				continue
+			}
+			data.Data[i].TopComments = comments
+		}
+	}
+
 	return data.Data, nil
 }
