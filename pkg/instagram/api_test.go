@@ -1,11 +1,20 @@
 package instagram_test
 
 import (
+	"encoding/json"
 	"log"
 	"testing"
 
 	"github.com/idivarts/backend-sls/pkg/instagram"
 )
+
+func prettyJSON(v interface{}) string {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
 
 const code = `AQAB6OfvQEP1tq_wXSHZXrnLnKNQL8tUmkYIPswgB9BSXO0bTkdyMIKs3eY5D4MBk3mlCAaTRHUlIkmfD7TlNN_q-P8YNm2lbLdKxD6zJLNYIZDloptz5wWIe6ghu0DIov6yuC9Fu84ELYSGszwtFYgWZK1ooUQ744EqoeZ0Umcij4Uese8LBjQGtBT8Y-EldfRTt-L4yC8qump9b9vbINairnuqrlpSeqnSRXQljC-n-w#_`
 const accessToken = `IGAAQlA4RZBCmVBZAFBNX1VoN3lJeHBkRjAxNm1Qa2hkRmlrTjBQNGdxUlNWclZATTTM5cWxURGNHZA1lJZAEJWc3VGLWFmdlZAaMW9uTzhtZAmQ4VGk5NE9USHFrZA2VDeFRQdk84cUJYVS1WUnVDWFNvSTh1MEhSUEVlTXhERUxhZAXlnVGgxWThOXzgycVJR`
@@ -19,14 +28,14 @@ func TestToken(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	log.Println("Access Token:", accessToken.AccessToken)
+	log.Println("Access Token:", prettyJSON(accessToken))
 
 	llToken, err := instagram.GetLongLivedAccessToken(accessToken.AccessToken)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	log.Println("Long Lived Access Token:", llToken.AccessToken)
+	log.Println("Long Lived Access Token:", prettyJSON(llToken))
 }
 
 func TestAccessToken(t *testing.T) {
@@ -35,7 +44,7 @@ func TestAccessToken(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	log.Println("Long Lived Access Token:", llToken.AccessToken)
+	log.Println("Long Lived Access Token:", prettyJSON(llToken))
 }
 
 func TestGetUser(t *testing.T) {
@@ -44,25 +53,25 @@ func TestGetUser(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	log.Println("Instagram Data:", iData)
+	log.Println("Instagram Data:", prettyJSON(iData))
 }
 
 func TestInstaInsights(t *testing.T) {
-	iData, err := instagram.GetInsights("", longLivedAccessToken, []string{"impressions"}, "day", instagram.InsightParams{})
+	iData, err := instagram.GetInsights("me", longLivedAccessToken, []instagram.InsightMetric{instagram.MetricReach, instagram.MetricReplies}, instagram.PeriodDay, instagram.InsightParams{})
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	log.Println("Instagram Data:", iData)
+	log.Println("Instagram Data:", prettyJSON(iData))
 }
 
 func TestMedia(t *testing.T) {
-	iData, err := instagram.GetMedia("", longLivedAccessToken, instagram.IGetMediaParams{GraphType: 1})
+	iData, err := instagram.GetMedia("me", longLivedAccessToken, instagram.IGetMediaParams{GraphType: 1, TopComments: true})
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	log.Println("Instagram Data:", iData)
+	log.Println("Instagram Data:", prettyJSON(iData))
 }
 
 func TestMediaFromFBGraph(t *testing.T) {
@@ -74,5 +83,5 @@ func TestMediaFromFBGraph(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	log.Println("Instagram Data:", iData)
+	log.Println("Instagram Data:", prettyJSON(iData))
 }
