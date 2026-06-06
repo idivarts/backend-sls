@@ -22,6 +22,29 @@ func TestFacebookFetch(t *testing.T) {
 	log.Println(string(fbJSON))
 }
 
+func TestFacebookInsights(t *testing.T) {
+	metrics := []messenger.FBInsightMetric{
+		// messenger.FBMetricPageImpressions,
+		messenger.FBMetricPageImpressionsUnique,
+		messenger.FBMetricPagePostEngagements,
+		// messenger.FBMetricPageFans,
+		messenger.FBMetricPageFollows,
+	}
+
+	err := messenger.GetFacebookInsights(
+		"311133518746783",
+		messenger.TestPageAccessToken,
+		metrics,
+		messenger.FBPeriodDay,
+		messenger.FBInsightParams{
+			DatePreset: messenger.FBDatePresetLast30d,
+		},
+	)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestInstaFetch(t *testing.T) {
 	insta, err := messenger.GetInstagram("17841466618151294", "EAAID6icQOs4BO6GdTXuC4GxBXyKuAmw9nZCnGtwPSOawq2EG4ra385MOL9Wu3esiZCwjqNM5FxiIgDSy55ZBwg9SXLFGoWtgjEcUnG5bIZAkRZCbLNOPTfwhZBwOLONahIlwTw5PZBOKqwpN0ZBoorfWoxaoYz9fJbgAtZC9C2NkKZBr2wVNhuWZBETdl2RBwZBhtmLO")
 	if err != nil {
