@@ -137,18 +137,13 @@ func CreateSubscriptionV2(c *gin.Context) {
 			}
 		}
 
-		// The subscriber who sets up the brand is its Owner. Ensure the brand's
-		// default team exists and scope the owner to it.
+		// The subscriber who sets up the brand is added to the default team, which
+		// always holds full access (all features + privileges).
 		defTeam, _ := trendlymodels.EnsureDefaultTeam(req.BrandID, uid, time.Now().UnixMilli())
-		ownerTeams := []string{}
-		if defTeam != "" {
-			ownerTeams = []string{defTeam}
-		}
 		brandMember := trendlymodels.BrandMember{
 			ManagerID: uid,
-			Role:      trendlymodels.RoleOwner,
 			Status:    1,
-			TeamIDs:   ownerTeams,
+			TeamID:    defTeam,
 		}
 		_, err = brandMember.Set(req.BrandID)
 		if err != nil {

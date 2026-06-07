@@ -146,7 +146,7 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
-	if _, ok := middlewares.RequireBrandCapability(c, collab.BrandID, trendlymodels.CapManageCollaborations); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, collab.BrandID, trendlymodels.FeatureInfluencerMarketing, trendlymodels.PrivInfluencerManage); !ok {
 		return
 	}
 
@@ -228,7 +228,7 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 	}
 
 	if body.BrandID != "" {
-		if _, ok := middlewares.RequireBrandCapability(c, body.BrandID, trendlymodels.CapManageCollaborations); !ok {
+		if _, ok := middlewares.RequireFeaturePrivilege(c, body.BrandID, trendlymodels.FeatureInfluencerMarketing, trendlymodels.PrivInfluencerManage); !ok {
 			return
 		}
 	}

@@ -9,31 +9,25 @@ import (
 )
 
 type BrandMember struct {
-	ManagerID string    `json:"managerId" firestore:"managerId"`
-	Role      BrandRole `json:"role" firestore:"role"`
-	Status    int       `json:"status" firestore:"status"`
-	// TeamIDs scopes which teams (and therefore which socials/collabs) this
-	// member can act on. Empty means the brand's default team only.
-	TeamIDs []string `json:"teamIds,omitempty" firestore:"teamIds,omitempty"`
-	// Overrides are per-member capability toggles that win over the role
-	// default. Keys are Capability strings; only OverridableCapabilities are
-	// honoured. Stored as map[string]bool for Firestore compatibility.
-	Overrides map[string]bool `json:"overrides,omitempty" firestore:"overrides,omitempty"`
+	ManagerID string `json:"managerId" firestore:"managerId"`
+	Status    int    `json:"status" firestore:"status"`
+	// TeamID is the single team this member belongs to. The member inherits that
+	// team's feature privileges. Empty only for members not yet migrated to the
+	// team-privilege model (see scripts/migrate-teams-v2).
+	TeamID string `json:"teamId,omitempty" firestore:"teamId,omitempty"`
 }
 
-// HasCapability resolves whether this member effectively holds cap. Resolution
-// order: Owner has everything; an explicit per-member override wins next; the
-// role default applies otherwise.
-func (b *BrandMember) HasCapability(cap Capability) bool {
-	if b.Role == RoleOwner {
-		return true
+// ResolveTeam loads the team this member belongs to. Returns (nil, nil) when the
+// member has no team assigned (pre-migration legacy member).
+func (b *BrandMember) ResolveTeam(brandID string) (*Team, error) {
+	if b.TeamID == "" {
+		return nil, nil
 	}
-	if b.Overrides != nil {
-		if v, ok := b.Overrides[string(cap)]; ok {
-			return v
-		}
+	team := &Team{}
+	if err := team.Get(brandID, b.TeamID); err != nil {
+		return nil, err
 	}
-	return roleCapabilities[b.Role][cap]
+	return team, nil
 }
 
 func (b *BrandMember) Set(brandID string) (*firestore.WriteResult, error) {

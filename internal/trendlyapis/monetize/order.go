@@ -25,7 +25,7 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	if _, ok := middlewares.RequireBrandCapability(c, data.Contract.BrandID, trendlymodels.CapFundContracts); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, data.Contract.BrandID, trendlymodels.FeatureInfluencerMarketing, trendlymodels.PrivInfluencerAdmin); !ok {
 		return
 	}
 

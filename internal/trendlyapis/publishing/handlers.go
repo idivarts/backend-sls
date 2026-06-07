@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	delayedsqs "github.com/idivarts/backend-sls/pkg/delayed_sqs"
 )
@@ -24,6 +25,10 @@ func PublishNow(c *gin.Context) {
 	brandID := c.Param("brandId")
 	contentID := c.Param("contentId")
 
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureContentCalendar, trendlymodels.PrivCalendarPublish); !ok {
+		return
+	}
+
 	if err := PublishContent(brandID, contentID); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error(), "message": "Publish failed"})
 		return
@@ -36,6 +41,10 @@ func PublishNow(c *gin.Context) {
 func SchedulePublish(c *gin.Context) {
 	brandID := c.Param("brandId")
 	contentID := c.Param("contentId")
+
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureContentCalendar, trendlymodels.PrivCalendarPublish); !ok {
+		return
+	}
 
 	var req struct {
 		ScheduledAt int64 `json:"scheduledAt" binding:"required"`
@@ -85,6 +94,10 @@ func SchedulePublish(c *gin.Context) {
 func CancelSchedule(c *gin.Context) {
 	brandID := c.Param("brandId")
 	contentID := c.Param("contentId")
+
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureContentCalendar, trendlymodels.PrivCalendarPublish); !ok {
+		return
+	}
 
 	ct, err := trendlymodels.GetContent(brandID, contentID)
 	if err != nil {
