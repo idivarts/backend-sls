@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 // InfluencerFeedback is rating and review submitted by the influencer on a contract.
@@ -170,6 +171,32 @@ func (c *Contract) Update(contractID string) error {
 	_, err = firestoredb.Client.Collection("contracts").Doc(contractID).Set(context.Background(), data, firestore.MergeAll)
 
 	return err
+}
+
+// HasActiveContracts reports whether the brand has any contract that is not in a
+// terminal state (Settled or Cancelled). Used as a guard before deleting a
+// brand so in-flight collaborations/payouts are never orphaned.
+func HasActiveContracts(brandID string) (bool, error) {
+	iter := firestoredb.Client.Collection("contracts").Where("brandId", "==", brandID).Documents(context.Background())
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return false, err
+		}
+		var c Contract
+		if err := doc.DataTo(&c); err != nil {
+			return false, err
+		}
+		if c.Status != ContractStatusSettled && c.Status != ContractStatusCancelled {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (b *Contract) GetByCollab(collabId, userId string) error {

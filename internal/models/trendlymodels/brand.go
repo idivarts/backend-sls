@@ -15,6 +15,14 @@ type Brand struct {
 	Image                 *string `json:"image,omitempty" firestore:"image,omitempty"`
 	PaymentMethodVerified *bool   `json:"paymentMethodVerified,omitempty" firestore:"paymentMethodVerified,omitempty"`
 
+	// OrganizationID is the parent org this brand belongs to. Brands created
+	// before the Organization rollout have no value here until backfilled.
+	OrganizationID *string `json:"organizationId,omitempty" firestore:"organizationId,omitempty"`
+
+	// DeletedAt soft-deletes the brand (epoch ms). Non-nil means deleted; such
+	// brands are removed from their org's brandIds and excluded from surfaces.
+	DeletedAt *int64 `json:"deletedAt,omitempty" firestore:"deletedAt,omitempty"`
+
 	// Country is the brand's ISO-3166 alpha-2 country code (e.g. "IN", "US"),
 	// captured silently from the client at onboarding. It is the source of truth
 	// for India-only gating (discovery, in-app invites, Razorpay payments).
@@ -38,7 +46,10 @@ type Brand struct {
 	ConnectedInfluencers  BrandInfluencerConnect `json:"connectedInfluencers" firestore:"connectedInfluencers"`
 	PostedCollaborations  []string               `json:"postedCollaborations,omitempty" firestore:"postedCollaborations,omitempty"`
 
-	Credits BrandCredits `json:"credits" firestore:"credits"`
+	// NOTE: the old per-brand `Credits` (BrandCredits, 5 buckets) is removed.
+	// Billing/subscription moves to the Organization, and the new credit system
+	// is a single org-level token wallet (see the Credit System ticket). Legacy
+	// Firestore docs may still carry a `credits` map; it is simply ignored.
 
 	HasPayWall bool `json:"hasPayWall" firestore:"hasPayWall"`
 
@@ -60,13 +71,6 @@ type Brand struct {
 type BrandInfluencerConnect struct {
 	Requested []string `json:"requested,omitempty" firestore:"requested,omitempty"`
 	Connected []string `json:"connected,omitempty" firestore:"connected,omitempty"`
-}
-type BrandCredits struct {
-	Influencer    int `json:"influencer" firestore:"influencer"`
-	Discovery     int `json:"discovery" firestore:"discovery"`
-	Connection    int `json:"connection" firestore:"connection"`
-	Collaboration int `json:"collaboration" firestore:"collaboration"`
-	Contract      int `json:"contract" firestore:"contract"`
 }
 type BrandBilling struct {
 	Subscription    *string `json:"subscription,omitempty" firestore:"subscription,omitempty"`
@@ -110,39 +114,6 @@ type BrandSurvey struct {
 	Purpose            *string `json:"purpose,omitempty" firestore:"purpose,omitempty"`
 	CollaborationValue *string `json:"collaborationValue,omitempty" firestore:"collaborationValue,omitempty"`
 }
-
-var (
-	PlanCreditsMap = map[string]BrandCredits{
-		"starter": BrandCredits{
-			Influencer:    5,
-			Discovery:     1,
-			Connection:    0,
-			Collaboration: 1,
-			Contract:      1,
-		},
-		"growth": BrandCredits{
-			Influencer:    50,
-			Discovery:     50,
-			Connection:    10,
-			Collaboration: 5,
-			Contract:      8,
-		},
-		"pro": BrandCredits{
-			Influencer:    200,
-			Discovery:     100,
-			Connection:    20,
-			Collaboration: 100,
-			Contract:      200,
-		},
-		"enterprise": BrandCredits{
-			Influencer:    200,
-			Discovery:     200,
-			Connection:    50,
-			Collaboration: 100,
-			Contract:      200,
-		},
-	}
-)
 
 // IsIndia reports whether the brand should be treated as India-based. A brand
 // with no Country set (all legacy brands) is treated as India for backward
