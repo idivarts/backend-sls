@@ -2,6 +2,7 @@ package trendlydiscovery
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -10,13 +11,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
 	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
+	"github.com/idivarts/backend-sls/templates"
 	"github.com/lib/pq"
 )
 
@@ -597,6 +601,9 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
+	managerObj := middlewares.GetUserObject(c)
+	managerName, _ := managerObj["name"].(string)
+
 	brand := &trendlymodels.Brand{}
 	err := brand.Get(brandId)
 	if err != nil {
@@ -604,64 +611,209 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	// Verify if enough credits are present
-	if brand.Credits.Connection < (len(req.Influencers) * len(req.Collaborations)) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "not-enough-connection-credits", "message": "Not enough connection credits"})
-		return
-	}
-
+	// Resolve the requested socials and classify each as on-platform vs discover-only.
 	rdbSocials, err := trendlyrdb.Socials{}.GetMultiple(req.Influencers)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error gettimg socials"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error getting socials"})
 		return
 	}
 
-	// Build a map for quick lookup by ID
 	socialMap := make(map[string]trendlyrdb.Socials, len(rdbSocials))
 	for _, s := range rdbSocials {
 		socialMap[s.ID] = s
 	}
 
-	// Send Invitations
-	invites := []trendlymodels.Invitation{}
-	for _, infId := range req.Influencers {
-		for _, collabId := range req.Collaborations {
-			invite := trendlymodels.Invitation{
-				UserID:     infId,
-				IsDiscover: true,
+	matchedInfluencers, err := matchedInfluencersForSocials(rdbSocials)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error resolving influencers"})
+		return
+	}
 
+	// The agency gate is evaluated once per brand — it only affects discover-only invites.
+	agencyActive, err := trendlymodels.BrandHasActiveAgencyHire(brandId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error checking agency hire status"})
+		return
+	}
+
+	// Cache collaboration lookups (needed only for the on-platform email/notification path).
+	collabCache := map[string]*trendlymodels.Collaboration{}
+	getCollab := func(id string) (*trendlymodels.Collaboration, error) {
+		if cc, ok := collabCache[id]; ok {
+			return cc, nil
+		}
+		cc := &trendlymodels.Collaboration{}
+		if err := cc.Get(id); err != nil {
+			return nil, err
+		}
+		collabCache[id] = cc
+		return cc, nil
+	}
+
+	type inviteResult struct {
+		InfluencerID string `json:"influencerId"`
+		Outcome      string `json:"outcome"` // "invited" | "emailed" | "agency-required" | "skipped"
+	}
+
+	results := []inviteResult{}
+	createdInvites := []trendlymodels.Invitation{}
+	agencyBlocked := 0
+	connectionCredits := brand.Credits.Connection
+
+	for _, infId := range req.Influencers {
+		s, ok := socialMap[infId]
+		if !ok {
+			results = append(results, inviteResult{InfluencerID: infId, Outcome: "skipped"})
+			continue
+		}
+
+		joinKey := socialInfluencerJoinKey(s.Username, s.SocialType)
+		inf, onPlatform := matchedInfluencers[joinKey]
+
+		if !onPlatform {
+			// Discover-only influencer — gated behind an active agency hire.
+			if !agencyActive {
+				agencyBlocked++
+				results = append(results, inviteResult{InfluencerID: infId, Outcome: "agency-required"})
+				continue
+			}
+
+			anyCreated := false
+			for _, collabId := range req.Collaborations {
+				if connectionCredits <= 0 {
+					break
+				}
+				inviteSocial := s
+				invite := trendlymodels.Invitation{
+					UserID:          infId,
+					IsDiscover:      true,
+					CollaborationID: collabId,
+					ManagerID:       managerId,
+					Status:          "waiting",
+					TimeStamp:       time.Now().UnixMilli(),
+					Message:         "Invited via Discovery",
+					SocialProfile:   convertSocialsToBreif(inviteSocial),
+				}
+				if _, err := invite.Create(); err != nil {
+					log.Println("Error sending discover invite:", err.Error())
+					continue
+				}
+				connectionCredits--
+				anyCreated = true
+				createdInvites = append(createdInvites, invite)
+			}
+			if anyCreated {
+				results = append(results, inviteResult{InfluencerID: infId, Outcome: "invited"})
+			} else {
+				results = append(results, inviteResult{InfluencerID: infId, Outcome: "skipped"})
+			}
+			continue
+		}
+
+		// On-platform influencer — resolve the platform user, create an in-app
+		// invite, push a notification, and email an apply link.
+		userId, user, err := trendlymodels.GetUserByEmail(inf.Email)
+		if err != nil {
+			log.Println("Error resolving platform user for influencer", infId, err.Error())
+			results = append(results, inviteResult{InfluencerID: infId, Outcome: "skipped"})
+			continue
+		}
+		if userId == "" || user == nil || user.Email == nil {
+			log.Println("On-platform influencer could not be resolved to a user:", infId, inf.Email)
+			results = append(results, inviteResult{InfluencerID: infId, Outcome: "skipped"})
+			continue
+		}
+
+		emailedAny := false
+		for _, collabId := range req.Collaborations {
+			collab, err := getCollab(collabId)
+			if err != nil {
+				log.Println("Error fetching collab for on-platform invite:", collabId, err.Error())
+				continue
+			}
+
+			inviteSocial := s
+			invite := trendlymodels.Invitation{
+				UserID:          userId,
+				IsDiscover:      false,
 				CollaborationID: collabId,
 				ManagerID:       managerId,
 				Status:          "waiting",
 				TimeStamp:       time.Now().UnixMilli(),
 				Message:         "Invited via Discovery",
+				SocialProfile:   convertSocialsToBreif(inviteSocial),
 			}
-
-			if s, ok := socialMap[infId]; ok {
-				invite.SocialProfile = convertSocialsToBreif(s)
-			}
-
-			_, err := invite.Create()
-			if err != nil {
-				log.Println("Error sending invite:", err.Error())
+			if _, err := invite.CreateInApp(collabId, userId); err != nil {
+				log.Println("Error creating in-app invite:", err.Error())
 				continue
 			}
-			invites = append(invites, invite)
+
+			cId := collabId
+			uId := userId
+			notif := &trendlymodels.Notification{
+				Title:       fmt.Sprintf("You have been invited to %s", collab.Name),
+				Description: fmt.Sprintf("%s (from %s) has invited you to this collaboration. Apply Now!", managerName, brand.Name),
+				IsRead:      false,
+				Data: &trendlymodels.NotificationData{
+					CollaborationID: &cId,
+					UserID:          &uId,
+				},
+				TimeStamp: time.Now().UnixMilli(),
+				Type:      "invitation",
+			}
+			if _, _, err := notif.Insert(trendlymodels.USER_COLLECTION, userId); err != nil {
+				log.Println("Error creating invite notification:", err.Error())
+			}
+
+			data := map[string]interface{}{
+				"InfluencerName": user.Name,
+				"BrandName":      brand.Name,
+				"CollabTitle":    collab.Name,
+				"ApplyLink":      fmt.Sprintf("%s/collaboration/%s", constants.TRENDLY_CREATORS_FE, collabId),
+			}
+			if err := myemail.SendCustomHTMLEmail(*user.Email, templates.InfluencerInvitedToCollab, templates.SubjectBrandInvitedYouToCollab, data); err != nil {
+				log.Println("Error sending invite email:", err.Error())
+				continue
+			}
+			emailedAny = true
+			createdInvites = append(createdInvites, invite)
+		}
+
+		if emailedAny {
+			results = append(results, inviteResult{InfluencerID: infId, Outcome: "emailed"})
+		} else {
+			results = append(results, inviteResult{InfluencerID: infId, Outcome: "skipped"})
 		}
 	}
 
-	creditUtilized := len(invites)
-
-	// Do the calculation of reducing the connection credits here. If invite was already sent before, do not reduce the credit
-	brand.Credits.Connection -= creditUtilized
-
-	_, err = brand.Insert(brandId)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
+	// If nothing could be created and the only blocker was a missing agency hire,
+	// surface a dedicated error so the frontend can route to the hire-us page.
+	if len(createdInvites) == 0 && agencyBlocked > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "agency-not-hired",
+			"message": "Hire our agency to invite creators discovered outside the platform.",
+			"results": results,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "api is functional", "creditsUsed": creditUtilized, "invitationsSent": invites})
+	// Persist connection-credit usage (consumed only by discover-only invites).
+	creditUtilized := brand.Credits.Connection - connectionCredits
+	if creditUtilized > 0 {
+		brand.Credits.Connection = connectionCredits
+		if _, err = brand.Insert(brandId); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "api is functional",
+		"creditsUsed":     creditUtilized,
+		"invitationsSent": createdInvites,
+		"results":         results,
+		"agencyRequired":  agencyBlocked > 0,
+	})
 }
 
 // convertSocialsToBreif converts an RDB Socials record into the brief
