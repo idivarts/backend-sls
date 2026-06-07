@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "agency-hires",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "brandId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "yupdates",
       "queryScope": "COLLECTION",
       "fields": [

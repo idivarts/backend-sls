@@ -265,3 +265,44 @@ func isDiscoverFlagsForSocials(rows []trendlyrdb.Socials) ([]bool, error) {
 	}
 	return flags, nil
 }
+
+// matchedInfluencersForSocials returns, for the given social rows, the matching
+// on-platform influencer record keyed by the social's join key
+// (username + social type). Socials with no matching influencer (i.e.
+// discover-only profiles) are simply absent from the returned map. This reuses
+// the same (primary_social, social_type) join used by isDiscoverFlagsForSocials,
+// but additionally returns the influencer row (notably its email) so callers can
+// resolve the platform user.
+func matchedInfluencersForSocials(rows []trendlyrdb.Socials) (map[string]trendlyrdb.Influencers, error) {
+	out := map[string]trendlyrdb.Influencers{}
+	if len(rows) == 0 {
+		return out, nil
+	}
+
+	seen := make(map[string]struct{}, len(rows))
+	var ors []string
+	var args []interface{}
+	for _, s := range rows {
+		k := socialInfluencerJoinKey(s.Username, s.SocialType)
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		ors = append(ors, "(LOWER(primary_social) = LOWER(?) AND social_type = ?)")
+		args = append(args, s.Username, s.SocialType)
+	}
+
+	var matched []trendlyrdb.Influencers
+	q := rdb.GormDB.Model(&trendlyrdb.Influencers{})
+	if len(ors) > 0 {
+		q = q.Where("("+strings.Join(ors, " OR ")+")", args...)
+	}
+	if err := q.Find(&matched).Error; err != nil {
+		return nil, err
+	}
+
+	for _, m := range matched {
+		out[socialInfluencerJoinKey(m.PrimarySocial, m.SocialType)] = m
+	}
+	return out, nil
+}

@@ -168,6 +168,31 @@ func (u *User) Get(uid string) error {
 	return err
 }
 
+// GetUserByEmail looks up a single platform user by their stored email address.
+// Returns ("", nil, nil) when no user is found (not an error), so callers can
+// gracefully skip influencers whose account can't be resolved.
+func GetUserByEmail(email string) (string, *User, error) {
+	if email == "" {
+		return "", nil, nil
+	}
+	iter := firestoredb.Client.Collection("users").Where("email", "==", email).Limit(1).Documents(context.Background())
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err == iterator.Done {
+		return "", nil, nil
+	}
+	if err != nil {
+		return "", nil, err
+	}
+
+	u := &User{}
+	if err := doc.DataTo(u); err != nil {
+		return "", nil, err
+	}
+	return doc.Ref.ID, u, nil
+}
+
 func GetInfluencerIDs(startAfter *interface{}, limit int) ([]string, error) {
 	var iter *firestore.DocumentIterator
 
