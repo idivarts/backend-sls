@@ -37,6 +37,11 @@ const (
 	PaymentStatusPaid              PaymentStatus = "paid"
 	PaymentStatusTransferProcessed PaymentStatus = "transfer-processed"
 	PaymentStatusTransferFailed    PaymentStatus = "transfer-failed"
+	// PaymentStatusSelfManaged marks a contract whose payment is settled
+	// off-platform by the brand and influencer directly (used for non-India
+	// brands where Razorpay/Razorpay Route is unavailable). Trendly processes
+	// no money and initiates no payout/transfer for these contracts.
+	PaymentStatusSelfManaged PaymentStatus = "self-managed"
 )
 
 type ShipmentStatus string

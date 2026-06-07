@@ -227,7 +227,7 @@ func MarkPosted(c *gin.Context) {
 	data.Contract.Posting.PostURL = req.PostURL
 	data.Contract.Posting.Notes = req.Notes
 	data.Contract.Posting.Status = trendlymodels.PostingStatusPosted
-	if data.Contract.Payment != nil && data.Contract.Payment.Status == trendlymodels.PaymentStatusPaid && data.Contract.Payment.Amount == 0 {
+	if contractHasNoPlatformPayout(data.Contract.Payment) {
 		data.Contract.Status = trendlymodels.ContractStatusSettled
 	} else {
 		data.Contract.Status = trendlymodels.ContractStatusPostDone

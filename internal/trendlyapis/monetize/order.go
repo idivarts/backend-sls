@@ -41,6 +41,17 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
+	// Razorpay (and Razorpay Route payouts) only support India. Non-India brands
+	// must settle off-platform via the acknowledge endpoint instead of creating
+	// an online payment order. Guard server-side so the client can't bypass it.
+	if !data.Brand.IsIndia() {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "region_not_supported",
+			"message": "Online payments are not available in your region. Acknowledge off-platform settlement to start the contract.",
+		})
+		return
+	}
+
 	user := &trendlymodels.User{}
 	err = user.Get(data.Contract.UserID)
 	if err != nil {
@@ -245,6 +256,141 @@ func contractStatusAfterFunding(collab *trendlymodels.Collaboration) trendlymode
 	return trendlymodels.ContractStatusDeliverablePending
 }
 
+// contractHasNoPlatformPayout reports whether a contract requires no Razorpay
+// payout/transfer to the influencer — true for barter (paid, zero amount) and
+// for self-managed (off-platform) payments. Such contracts settle directly on
+// post/approval instead of waiting for a transfer.processed webhook.
+func contractHasNoPlatformPayout(p *trendlymodels.Payment) bool {
+	if p == nil {
+		return false
+	}
+	if p.Status == trendlymodels.PaymentStatusSelfManaged {
+		return true
+	}
+	return p.Status == trendlymodels.PaymentStatusPaid && p.Amount == 0
+}
+
+type acknowledgeSelfManagedReq struct {
+	Acknowledged bool `json:"acknowledged"`
+}
+
+// AcknowledgeSelfManagedPayment starts a contract for a non-India brand without
+// any online payment. The brand acknowledges that Trendly does not process
+// payments in their region and that they and the influencer will settle
+// compensation directly. On acknowledgement the contract advances exactly like a
+// funded contract (shipment- or deliverable-pending), with no Razorpay order or
+// payout transfer.
+func AcknowledgeSelfManagedPayment(c *gin.Context) {
+	data, err := initializeData(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to retrieve initialization data"})
+		return
+	}
+
+	if _, ok := middlewares.RequireFeaturePrivilege(c, data.Contract.BrandID, trendlymodels.FeatureInfluencerMarketing, trendlymodels.PrivInfluencerAdmin); !ok {
+		return
+	}
+
+	var req acknowledgeSelfManagedReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid request payload"})
+		return
+	}
+	if !req.Acknowledged {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "not_acknowledged", "message": "You must acknowledge off-platform settlement to start the contract"})
+		return
+	}
+
+	// This path is only for non-India brands; India brands must pay via Razorpay.
+	if data.Brand.IsIndia() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "region_supported", "message": "Online payments are available for your region; please complete payment instead"})
+		return
+	}
+
+	application := &trendlymodels.Application{}
+	if err := application.Get(data.Contract.CollaborationID, data.Contract.UserID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant find Application"})
+		return
+	}
+
+	// Zero-quotation collabs are barter — reuse the barter flow regardless of region.
+	if application.Quotation <= 0 {
+		_ = startBarterContract(c, data, application)
+		return
+	}
+
+	collab := &trendlymodels.Collaboration{}
+	if err := collab.Get(data.Contract.CollaborationID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant find Collaboration"})
+		return
+	}
+
+	nextStatus := contractStatusAfterFunding(collab)
+	data.Contract.Payment = &trendlymodels.Payment{
+		Status: trendlymodels.PaymentStatusSelfManaged,
+		Amount: application.Quotation,
+	}
+	data.Contract.Status = nextStatus
+	if err := data.Contract.Update(data.ContractID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return
+	}
+
+	influencer := &trendlymodels.User{}
+	_ = influencer.Get(data.Contract.UserID)
+	influencerName := influencer.Name
+	if influencerName == "" {
+		influencerName = "Creator"
+	}
+	collabName := collab.Name
+	if collabName == "" {
+		collabName = "Your Collaboration"
+	}
+
+	notifBrand := &trendlymodels.Notification{
+		Title:       "Collaboration is live",
+		Description: fmt.Sprintf("You've started %s. Trendly doesn't process payments in your region — please settle compensation directly with %s.", collabName, influencerName),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "self-managed-collaboration-started",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	if _, _, err := notifBrand.Insert(trendlymodels.BRAND_COLLECTION, data.Contract.BrandID); err != nil {
+		log.Printf("self-managed start: brand notification: %v", err)
+	}
+
+	notifInfluencer := &trendlymodels.Notification{
+		Title:       "Collaboration is live",
+		Description: fmt.Sprintf("Your collaboration %s with %s is active. Payment for this contract is handled directly between you and the brand — Trendly does not process it.", collabName, data.Brand.Name),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "self-managed-collaboration-started",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &data.Contract.CollaborationID,
+			GroupID:         &data.ContractID,
+		},
+	}
+	if _, _, err := notifInfluencer.Insert(trendlymodels.USER_COLLECTION, data.Contract.UserID); err != nil {
+		log.Printf("self-managed start: influencer notification: %v", err)
+	}
+
+	if data.Contract.StreamChannelID != "" {
+		streamMessage := fmt.Sprintf("🤝 **Collaboration is live**\n\nPayment is handled **directly between %s and %s** — Trendly does not process payments in this region. Please settle compensation fairly and the creator can begin. 🚀", data.Brand.Name, influencerName)
+		if err := streamchat.SendSystemMessage(data.Contract.StreamChannelID, streamMessage); err != nil {
+			log.Printf("self-managed start: stream message: %v", err)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Contract started with off-platform settlement",
+		"selfManaged": true,
+		"status":      int(nextStatus),
+	})
+}
+
 // startBarterContract skips Razorpay for zero-quotation (barter) collabs and moves the contract forward
 // as if payment succeeded, without charging the brand.
 func startBarterContract(c *gin.Context, data *struct {
@@ -342,6 +488,15 @@ func GetOrder(c *gin.Context) {
 			"message": "Barter collaboration — no Razorpay order",
 			"barter":  true,
 			"payment": data.Contract.Payment,
+		})
+		return
+	}
+
+	if data.Contract.Payment.Status == trendlymodels.PaymentStatusSelfManaged {
+		c.JSON(http.StatusOK, gin.H{
+			"message":     "Self-managed collaboration — settled off-platform, no Razorpay order",
+			"selfManaged": true,
+			"payment":     data.Contract.Payment,
 		})
 		return
 	}

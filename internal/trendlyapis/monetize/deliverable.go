@@ -114,7 +114,7 @@ func ApproveDeliverable(c *gin.Context) {
 		}
 	case 3:
 		scenarioText = trendlymodels.PostingScenarioBrandUsesVideoIndependently
-		if data.Contract.Payment != nil && data.Contract.Payment.Status == trendlymodels.PaymentStatusPaid && data.Contract.Payment.Amount == 0 {
+		if contractHasNoPlatformPayout(data.Contract.Payment) {
 			data.Contract.Status = trendlymodels.ContractStatusSettled
 		} else {
 			data.Contract.Status = trendlymodels.ContractStatusPostDone
