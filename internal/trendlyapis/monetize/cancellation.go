@@ -213,6 +213,9 @@ func calculateRefundAmount(contract *trendlymodels.Contract) int64 {
 	if contract.Payment == nil || contract.Payment.Amount == 0 {
 		return 0 // barter or unpaid
 	}
+	if contract.Payment.Status == trendlymodels.PaymentStatusSelfManaged {
+		return 0 // settled off-platform — Trendly holds no funds to refund
+	}
 	fullAmountPaise := int64(contract.Payment.Amount) * 100
 
 	switch contract.Status {

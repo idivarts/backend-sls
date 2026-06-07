@@ -173,6 +173,37 @@ func joinMetrics(items []InsightMetric) string {
 	return strings.Join(s, ",")
 }
 
+// GetMediaInsights fetches insight metrics for a single media object
+// (/{ig-media-id}/insights). Unlike account insights it takes no `period`
+// param (media insights are lifetime). graphType selects the Graph base URL
+// the same way GetMedia does. Reuses InsightResponse + its Total/Find helpers.
+func GetMediaInsights(mediaID, accessToken string, graphType int, metrics []InsightMetric) (*InsightResponse, error) {
+	iParam := url.Values{}
+	iParam.Set("metric", joinMetrics(metrics))
+	iParam.Set("access_token", accessToken)
+	apiURL := fmt.Sprintf("%s/%s/insights?%s", GraphBaseURL(graphType), mediaID, iParam.Encode())
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
+	}
+
+	data := InsightResponse{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
 func GetInsights(
 	pageID,
 	accessToken string,

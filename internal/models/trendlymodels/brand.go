@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
@@ -13,6 +14,13 @@ type Brand struct {
 	Name                  string  `json:"name" firestore:"name"`
 	Image                 *string `json:"image,omitempty" firestore:"image,omitempty"`
 	PaymentMethodVerified *bool   `json:"paymentMethodVerified,omitempty" firestore:"paymentMethodVerified,omitempty"`
+
+	// Country is the brand's ISO-3166 alpha-2 country code (e.g. "IN", "US"),
+	// captured silently from the client at onboarding. It is the source of truth
+	// for India-only gating (discovery, in-app invites, Razorpay payments).
+	// Legacy brands have no value here and MUST be treated as India — use
+	// IsIndia() rather than comparing this field directly.
+	Country *string `json:"country,omitempty" firestore:"country,omitempty"`
 
 	Profile *BrandProfile `json:"profile,omitempty" firestore:"profile,omitempty"`
 
@@ -135,6 +143,16 @@ var (
 		},
 	}
 )
+
+// IsIndia reports whether the brand should be treated as India-based. A brand
+// with no Country set (all legacy brands) is treated as India for backward
+// compatibility. Comparison is case-insensitive on the alpha-2 code "IN".
+func (b *Brand) IsIndia() bool {
+	if b.Country == nil || *b.Country == "" {
+		return true
+	}
+	return strings.EqualFold(*b.Country, "IN")
+}
 
 func (u *Brand) Get(brandId string) error {
 	res, err := firestoredb.Client.Collection("brands").Doc(brandId).Get((context.Background()))

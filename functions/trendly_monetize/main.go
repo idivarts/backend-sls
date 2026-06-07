@@ -36,6 +36,8 @@ func brandAPIs(handler *gin.RouterGroup) {
 	brands.POST("/contracts/:contractId/order", monetize.CreateOrder)
 	// [BRAND] API to check the payment status of the order
 	brands.GET("/contracts/:contractId/order", monetize.GetOrder)
+	// [BRAND] API for non-India brands to acknowledge off-platform settlement and start the contract (no Razorpay)
+	brands.POST("/contracts/:contractId/order/acknowledge", monetize.AcknowledgeSelfManagedPayment)
 
 	// [BRAND] API for marking as shipped
 	brands.POST("/contracts/:contractId/shipment", monetize.MarkShipment)

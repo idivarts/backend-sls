@@ -52,6 +52,8 @@ func handleManagerAPIs() {
 	// ── Analytics / Reporting (unified Meta insights) ─────────────────────────
 	managerApisV1.GET("/brands/:brandId/analytics/overview", analytics.GetBrandAnalyticsOverview)
 	managerApisV1.GET("/brands/:brandId/analytics/accounts/:id", analytics.GetBrandAccountAnalytics)
+	// Per-post basic analytics for a single published media (Content details page).
+	managerApisV1.GET("/brands/:brandId/analytics/media/:mediaId", analytics.GetPostAnalytics)
 
 	// ── Inbox (omni-channel DMs + comments across connected Meta accounts) ────
 	managerApisV1.GET("/brands/:brandId/inbox", inbox.GetInbox)
