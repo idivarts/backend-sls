@@ -31,7 +31,7 @@ func TestFacebookInsights(t *testing.T) {
 		messenger.FBMetricPageFollows,
 	}
 
-	err := messenger.GetFacebookInsights(
+	_, err := messenger.GetFacebookInsights(
 		"311133518746783",
 		messenger.TestPageAccessToken,
 		metrics,

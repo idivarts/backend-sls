@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
@@ -28,7 +29,7 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/members", trendlyapis.CreateBrandMember)
 	managerApisV1.POST("/brands/create", trendlyapis.CreateBrand)
 
-	// ── Brand member management (role / teams / override toggles) ─────────────
+	// ── Brand member management (team assignment) ─────────────────────────────
 	managerApisV1.GET("/brands/:brandId/members", trendlyapis.ListBrandMembers)
 	managerApisV1.PATCH("/brands/:brandId/members/:managerId", trendlyapis.UpdateBrandMember)
 	managerApisV1.DELETE("/brands/:brandId/members/:managerId", trendlyapis.RemoveBrandMember)
@@ -42,12 +43,15 @@ func handleManagerAPIs() {
 	// ── Brand social accounts (brands/{brandId}/socialAccounts) ───────────────
 	managerApisV1.GET("/brands/:brandId/socials", social_connect.ListBrandSocials)
 	managerApisV1.DELETE("/brands/:brandId/socials/:id", social_connect.DeleteBrandSocial)
-	managerApisV1.POST("/brands/:brandId/socials/:id/team", trendlyapis.AssignSocialTeam)
 
 	// ── Content publishing + scheduling (brands/{brandId}/contents) ───────────
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish", publishing.PublishNow)
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/schedule", publishing.SchedulePublish)
 	managerApisV1.DELETE("/brands/:brandId/contents/:contentId/schedule", publishing.CancelSchedule)
+
+	// ── Analytics / Reporting (unified Meta insights) ─────────────────────────
+	managerApisV1.GET("/brands/:brandId/analytics/overview", analytics.GetBrandAnalyticsOverview)
+	managerApisV1.GET("/brands/:brandId/analytics/accounts/:id", analytics.GetBrandAccountAnalytics)
 
 	// ── Inbox (omni-channel DMs + comments across connected Meta accounts) ────
 	managerApisV1.GET("/brands/:brandId/inbox", inbox.GetInbox)
@@ -56,6 +60,14 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/hide", inbox.HideComment)
 	managerApisV1.DELETE("/brands/:brandId/inbox/conversations/:id", inbox.DeleteConversation)
 	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/read", inbox.ReadConversation)
+
+	// Media tab — browse published posts/reels and their comments (on-demand
+	// Graph reads). Comment actions are keyed by comment id (no stored conv).
+	managerApisV1.GET("/brands/:brandId/inbox/media", inbox.GetMediaList)
+	managerApisV1.GET("/brands/:brandId/inbox/media/:mediaId/comments", inbox.GetMediaComments)
+	managerApisV1.POST("/brands/:brandId/inbox/comments/:commentId/reply", inbox.ReplyToMediaCommentHandler)
+	managerApisV1.POST("/brands/:brandId/inbox/comments/:commentId/hide", inbox.HideMediaCommentHandler)
+	managerApisV1.DELETE("/brands/:brandId/inbox/comments/:commentId", inbox.DeleteMediaCommentHandler)
 }
 
 func handleUserAPIs() {

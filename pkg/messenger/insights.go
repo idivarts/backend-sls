@@ -1,6 +1,7 @@
 package messenger
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -59,15 +60,15 @@ const (
 	FBMetricPageVideoViewTime           FBInsightMetric = "page_video_view_time"
 
 	// Fans / demographics
-	FBMetricPageFans                  FBInsightMetric = "page_fans"
-	FBMetricPageFansLocale            FBInsightMetric = "page_fans_locale"
-	FBMetricPageFansCity              FBInsightMetric = "page_fans_city"
-	FBMetricPageFansCountry           FBInsightMetric = "page_fans_country"
-	FBMetricPageFanAdds               FBInsightMetric = "page_fan_adds"
-	FBMetricPageFanAddsUnique         FBInsightMetric = "page_fan_adds_unique"
-	FBMetricPageFanRemoves            FBInsightMetric = "page_fan_removes"
-	FBMetricPageFanRemovesUnique      FBInsightMetric = "page_fan_removes_unique"
-	FBMetricPageFansByLikeSource      FBInsightMetric = "page_fans_by_like_source"
+	FBMetricPageFans                   FBInsightMetric = "page_fans"
+	FBMetricPageFansLocale             FBInsightMetric = "page_fans_locale"
+	FBMetricPageFansCity               FBInsightMetric = "page_fans_city"
+	FBMetricPageFansCountry            FBInsightMetric = "page_fans_country"
+	FBMetricPageFanAdds                FBInsightMetric = "page_fan_adds"
+	FBMetricPageFanAddsUnique          FBInsightMetric = "page_fan_adds_unique"
+	FBMetricPageFanRemoves             FBInsightMetric = "page_fan_removes"
+	FBMetricPageFanRemovesUnique       FBInsightMetric = "page_fan_removes_unique"
+	FBMetricPageFansByLikeSource       FBInsightMetric = "page_fans_by_like_source"
 	FBMetricPageFansByLikeSourceUnique FBInsightMetric = "page_fans_by_like_source_unique"
 
 	// Reactions
@@ -80,25 +81,25 @@ const (
 	FBMetricPageReactionsTotal      FBInsightMetric = "page_actions_post_reactions_total"
 
 	// Post-level
-	FBMetricPostClicks                  FBInsightMetric = "post_clicks"
-	FBMetricPostClicksByType            FBInsightMetric = "post_clicks_by_type"
-	FBMetricPostImpressions             FBInsightMetric = "post_impressions"
-	FBMetricPostImpressionsUnique       FBInsightMetric = "post_impressions_unique"
-	FBMetricPostImpressionsPaid         FBInsightMetric = "post_impressions_paid"
-	FBMetricPostImpressionsPaidUnique   FBInsightMetric = "post_impressions_paid_unique"
-	FBMetricPostImpressionsFan          FBInsightMetric = "post_impressions_fan"
-	FBMetricPostImpressionsFanUnique    FBInsightMetric = "post_impressions_fan_unique"
-	FBMetricPostImpressionsOrganic      FBInsightMetric = "post_impressions_organic"
+	FBMetricPostClicks                   FBInsightMetric = "post_clicks"
+	FBMetricPostClicksByType             FBInsightMetric = "post_clicks_by_type"
+	FBMetricPostImpressions              FBInsightMetric = "post_impressions"
+	FBMetricPostImpressionsUnique        FBInsightMetric = "post_impressions_unique"
+	FBMetricPostImpressionsPaid          FBInsightMetric = "post_impressions_paid"
+	FBMetricPostImpressionsPaidUnique    FBInsightMetric = "post_impressions_paid_unique"
+	FBMetricPostImpressionsFan           FBInsightMetric = "post_impressions_fan"
+	FBMetricPostImpressionsFanUnique     FBInsightMetric = "post_impressions_fan_unique"
+	FBMetricPostImpressionsOrganic       FBInsightMetric = "post_impressions_organic"
 	FBMetricPostImpressionsOrganicUnique FBInsightMetric = "post_impressions_organic_unique"
-	FBMetricPostImpressionsViral        FBInsightMetric = "post_impressions_viral"
-	FBMetricPostImpressionsViralUnique  FBInsightMetric = "post_impressions_viral_unique"
-	FBMetricPostReactionsLikeTotal      FBInsightMetric = "post_reactions_like_total"
-	FBMetricPostReactionsLoveTotal      FBInsightMetric = "post_reactions_love_total"
-	FBMetricPostReactionsWowTotal       FBInsightMetric = "post_reactions_wow_total"
-	FBMetricPostReactionsHahaTotal      FBInsightMetric = "post_reactions_haha_total"
-	FBMetricPostReactionsSorryTotal     FBInsightMetric = "post_reactions_sorry_total"
-	FBMetricPostReactionsAngerTotal     FBInsightMetric = "post_reactions_anger_total"
-	FBMetricPostReactionsByTypeTotal    FBInsightMetric = "post_reactions_by_type_total"
+	FBMetricPostImpressionsViral         FBInsightMetric = "post_impressions_viral"
+	FBMetricPostImpressionsViralUnique   FBInsightMetric = "post_impressions_viral_unique"
+	FBMetricPostReactionsLikeTotal       FBInsightMetric = "post_reactions_like_total"
+	FBMetricPostReactionsLoveTotal       FBInsightMetric = "post_reactions_love_total"
+	FBMetricPostReactionsWowTotal        FBInsightMetric = "post_reactions_wow_total"
+	FBMetricPostReactionsHahaTotal       FBInsightMetric = "post_reactions_haha_total"
+	FBMetricPostReactionsSorryTotal      FBInsightMetric = "post_reactions_sorry_total"
+	FBMetricPostReactionsAngerTotal      FBInsightMetric = "post_reactions_anger_total"
+	FBMetricPostReactionsByTypeTotal     FBInsightMetric = "post_reactions_by_type_total"
 
 	// Post video
 	FBMetricPostVideoViews        FBInsightMetric = "post_video_views"
@@ -126,32 +127,132 @@ const (
 type FBInsightDatePreset string
 
 const (
-	FBDatePresetToday             FBInsightDatePreset = "today"
-	FBDatePresetYesterday         FBInsightDatePreset = "yesterday"
-	FBDatePresetThisMonth         FBInsightDatePreset = "this_month"
-	FBDatePresetLastMonth         FBInsightDatePreset = "last_month"
-	FBDatePresetThisQuarter       FBInsightDatePreset = "this_quarter"
-	FBDatePresetMaximum           FBInsightDatePreset = "maximum"
-	FBDatePresetDataMaximum       FBInsightDatePreset = "data_maximum"
-	FBDatePresetLast3d            FBInsightDatePreset = "last_3d"
-	FBDatePresetLast7d            FBInsightDatePreset = "last_7d"
-	FBDatePresetLast14d           FBInsightDatePreset = "last_14d"
-	FBDatePresetLast28d           FBInsightDatePreset = "last_28d"
-	FBDatePresetLast30d           FBInsightDatePreset = "last_30d"
-	FBDatePresetLast90d           FBInsightDatePreset = "last_90d"
-	FBDatePresetLastWeekMonSun    FBInsightDatePreset = "last_week_mon_sun"
-	FBDatePresetLastWeekSunSat    FBInsightDatePreset = "last_week_sun_sat"
-	FBDatePresetLastQuarter       FBInsightDatePreset = "last_quarter"
-	FBDatePresetLastYear          FBInsightDatePreset = "last_year"
-	FBDatePresetThisWeekMonToday  FBInsightDatePreset = "this_week_mon_today"
-	FBDatePresetThisWeekSunToday  FBInsightDatePreset = "this_week_sun_today"
-	FBDatePresetThisYear          FBInsightDatePreset = "this_year"
+	FBDatePresetToday            FBInsightDatePreset = "today"
+	FBDatePresetYesterday        FBInsightDatePreset = "yesterday"
+	FBDatePresetThisMonth        FBInsightDatePreset = "this_month"
+	FBDatePresetLastMonth        FBInsightDatePreset = "last_month"
+	FBDatePresetThisQuarter      FBInsightDatePreset = "this_quarter"
+	FBDatePresetMaximum          FBInsightDatePreset = "maximum"
+	FBDatePresetDataMaximum      FBInsightDatePreset = "data_maximum"
+	FBDatePresetLast3d           FBInsightDatePreset = "last_3d"
+	FBDatePresetLast7d           FBInsightDatePreset = "last_7d"
+	FBDatePresetLast14d          FBInsightDatePreset = "last_14d"
+	FBDatePresetLast28d          FBInsightDatePreset = "last_28d"
+	FBDatePresetLast30d          FBInsightDatePreset = "last_30d"
+	FBDatePresetLast90d          FBInsightDatePreset = "last_90d"
+	FBDatePresetLastWeekMonSun   FBInsightDatePreset = "last_week_mon_sun"
+	FBDatePresetLastWeekSunSat   FBInsightDatePreset = "last_week_sun_sat"
+	FBDatePresetLastQuarter      FBInsightDatePreset = "last_quarter"
+	FBDatePresetLastYear         FBInsightDatePreset = "last_year"
+	FBDatePresetThisWeekMonToday FBInsightDatePreset = "this_week_mon_today"
+	FBDatePresetThisWeekSunToday FBInsightDatePreset = "this_week_sun_today"
+	FBDatePresetThisYear         FBInsightDatePreset = "this_year"
 )
 
 type FBInsightParams struct {
 	DatePreset FBInsightDatePreset
 	Since      string
 	Until      string
+}
+
+// ─── Response types ───────────────────────────────────────────────────────────
+//
+// Each FB page insights metric returns a `values` array of {value, end_time}.
+// `value` is usually a number, but for demographic metrics (page_fans_country,
+// page_fans_city, page_fans_locale, ...) it is a JSON object map of
+// dimension → count. It is therefore parsed lazily as RawMessage.
+
+// FBInsightValue is one data point for a metric.
+type FBInsightValue struct {
+	Value   json.RawMessage `json:"value"`
+	EndTime string          `json:"end_time"`
+}
+
+// AsInt interprets the value as a scalar number. ok is false if it is an object.
+func (v FBInsightValue) AsInt() (int64, bool) {
+	var n int64
+	if err := json.Unmarshal(v.Value, &n); err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// AsMap interprets the value as a dimension → count map (demographic metrics).
+func (v FBInsightValue) AsMap() (map[string]int64, bool) {
+	m := map[string]int64{}
+	if err := json.Unmarshal(v.Value, &m); err != nil {
+		return nil, false
+	}
+	return m, true
+}
+
+// FBInsightDatum is a single metric entry in the response.
+type FBInsightDatum struct {
+	Name        string           `json:"name"`
+	Period      string           `json:"period"`
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	Values      []FBInsightValue `json:"values"`
+	ID          string           `json:"id"`
+}
+
+// FBInsightResponse is the top-level page insights response.
+type FBInsightResponse struct {
+	Data []FBInsightDatum `json:"data"`
+}
+
+// Find returns the datum for the given metric name, or nil if absent.
+func (r *FBInsightResponse) Find(metric FBInsightMetric) *FBInsightDatum {
+	if r == nil {
+		return nil
+	}
+	for i := range r.Data {
+		if r.Data[i].Name == string(metric) {
+			return &r.Data[i]
+		}
+	}
+	return nil
+}
+
+// Total sums the scalar points of a metric across the returned range.
+// Returns 0 if the metric is absent or object-valued.
+func (r *FBInsightResponse) Total(metric FBInsightMetric) int64 {
+	d := r.Find(metric)
+	if d == nil {
+		return 0
+	}
+	var sum int64
+	for _, v := range d.Values {
+		if n, ok := v.AsInt(); ok {
+			sum += n
+		}
+	}
+	return sum
+}
+
+// Latest returns the last scalar point of a metric (useful for lifetime/snapshot
+// metrics like page_fans). Returns 0 if absent.
+func (r *FBInsightResponse) Latest(metric FBInsightMetric) int64 {
+	d := r.Find(metric)
+	if d == nil || len(d.Values) == 0 {
+		return 0
+	}
+	if n, ok := d.Values[len(d.Values)-1].AsInt(); ok {
+		return n
+	}
+	return 0
+}
+
+// LatestMap returns the last object-valued point of a demographic metric.
+func (r *FBInsightResponse) LatestMap(metric FBInsightMetric) map[string]int64 {
+	d := r.Find(metric)
+	if d == nil || len(d.Values) == 0 {
+		return nil
+	}
+	if m, ok := d.Values[len(d.Values)-1].AsMap(); ok {
+		return m
+	}
+	return nil
 }
 
 // joinFBMetrics joins a slice of metrics with commas
@@ -169,7 +270,7 @@ func GetFacebookInsights(
 	metrics []FBInsightMetric,
 	period FBInsightPeriod,
 	params FBInsightParams,
-) error {
+) (*FBInsightResponse, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
@@ -191,7 +292,6 @@ func GetFacebookInsights(
 	iParam.Set("access_token", accessToken)
 
 	allParams := iParam.Encode()
-	log.Println("All Params:", allParams)
 
 	// Combine base URL and query parameters
 	apiURL = fmt.Sprintf("%s?%s", apiURL, allParams)
@@ -199,21 +299,24 @@ func GetFacebookInsights(
 	// Make the API request
 	resp, err := client.Get(apiURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
 	}
 
-	// Print the response body
-	fmt.Println(string(body))
-	return nil
+	data := FBInsightResponse{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		log.Printf("messenger.GetFacebookInsights: failed to unmarshal response: %v", err)
+		return nil, err
+	}
+	return &data, nil
 }
