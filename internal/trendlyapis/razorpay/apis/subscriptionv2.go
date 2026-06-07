@@ -157,6 +157,11 @@ func CreateSubscriptionV2(c *gin.Context) {
 		"planKey":   planKey,
 		"planCycle": planCycle,
 	}
+	// Billing lives on the Organization now — carry organizationId so the webhook
+	// writes org billing. Legacy brands without an org still carry only brandId.
+	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+		notes["organizationId"] = *brand.OrganizationID
+	}
 
 	var id, link string
 
@@ -189,11 +194,6 @@ func CreateSubscriptionV2(c *gin.Context) {
 			TrialEnds:       &tEndTime,
 			Status:          myutil.IntPtr(0),
 		}
-		x, b := trendlymodels.PlanCreditsMap[planKey]
-		if b {
-			brand.Credits = x
-		}
-
 		if req.AdminData != nil && req.AdminData.OneTimePayment != nil {
 			brand.Billing.Subscription = nil
 			brand.Billing.PaymentLinkId = &id

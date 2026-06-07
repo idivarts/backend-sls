@@ -29,6 +29,17 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/members", trendlyapis.CreateBrandMember)
 	managerApisV1.POST("/brands/create", trendlyapis.CreateBrand)
 
+	// ── Organizations (top-level tenant above Brand) ──────────────────────────
+	managerApisV1.POST("/organizations", trendlyapis.CreateOrganization)
+	managerApisV1.GET("/organizations", trendlyapis.ListMyOrganizations)
+	managerApisV1.GET("/organizations/:id", trendlyapis.GetOrganization)
+	managerApisV1.POST("/organizations/:id/brands", trendlyapis.AddBrandToOrganization)
+	managerApisV1.DELETE("/organizations/:id", trendlyapis.DeleteOrganization)
+	// Move a brand into an organization the caller owns (cap-enforced).
+	managerApisV1.POST("/organizations/:id/brands/:brandId/transfer", trendlyapis.TransferBrand)
+	// Soft-delete a brand (blocked while it has active contracts).
+	managerApisV1.DELETE("/brands/:brandId", trendlyapis.DeleteBrand)
+
 	// ── Brand member management (team assignment) ─────────────────────────────
 	managerApisV1.GET("/brands/:brandId/members", trendlyapis.ListBrandMembers)
 	managerApisV1.PATCH("/brands/:brandId/members/:managerId", trendlyapis.UpdateBrandMember)

@@ -1,10 +1,14 @@
 package webhook
 
 type SubscriptionNotes struct {
-	BrandID     string `json:"brandId"`
-	PlanKey     string `json:"planKey"`
-	PlanCycle   string `json:"planCycle"`
-	PlanVersion string `json:"planVersion"`
+	BrandID string `json:"brandId"`
+	// OrganizationID is the billing target after billing moved Brand -> Org.
+	// New subscriptions carry it; legacy ones carry only BrandID (the webhook
+	// handler falls back to the brand's organizationId for those).
+	OrganizationID string `json:"organizationId"`
+	PlanKey        string `json:"planKey"`
+	PlanCycle      string `json:"planCycle"`
+	PlanVersion    string `json:"planVersion"`
 }
 
 type SubscriptionEntity struct {
