@@ -125,3 +125,32 @@ func GetPosts(pageID, accessToken string, params IFBPostsParams) ([]IPostData, e
 	}
 	return data.Data, nil
 }
+
+// GetPostByID fetches a single Facebook Page post with its engagement summaries
+// (likes/comments/shares). Used for per-post basic analytics.
+func GetPostByID(postID, accessToken string) (*IPostData, error) {
+	iParam := url.Values{}
+	iParam.Set("fields", "message,full_picture,id,permalink_url,created_time,likes.summary(true),comments.summary(true),shares")
+	iParam.Set("access_token", accessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?%s", BaseURL, ApiVersion, postID, iParam.Encode())
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
+	}
+
+	post := IPostData{}
+	if err := json.Unmarshal(body, &post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
