@@ -59,11 +59,6 @@ type SocialAccount struct {
 	FollowingCount int64 `json:"followingCount" firestore:"followingCount"`
 	MediaCount     int64 `json:"mediaCount" firestore:"mediaCount"` // posts/videos
 
-	// TeamID scopes a brand-connected social to a team. Only meaningful for
-	// brand social accounts (brands/{brandId}/socialAccounts); empty for
-	// user-level accounts. Defaults to the brand's default team on connect.
-	TeamID string `json:"teamId,omitempty" firestore:"teamId,omitempty"`
-
 	// Connection metadata
 	ConnectedAt int64 `json:"connectedAt" firestore:"connectedAt"` // Unix timestamp
 	UpdatedAt   int64 `json:"updatedAt" firestore:"updatedAt"`     // last profile sync
@@ -286,17 +281,6 @@ func GetBrandSocialAccount(brandID, id string) (*SocialAccount, error) {
 		return nil, err
 	}
 	return &a, nil
-}
-
-// AssignBrandSocialTeam moves a brand-connected social account to a team.
-func AssignBrandSocialTeam(brandID, socialID, teamID string, now int64) (*firestore.WriteResult, error) {
-	return firestoredb.Client.
-		Collection(fmt.Sprintf("brands/%s/socialAccounts", brandID)).
-		Doc(socialID).
-		Update(context.Background(), []firestore.Update{
-			{Path: "teamId", Value: teamID},
-			{Path: "updatedAt", Value: now},
-		})
 }
 
 // DeleteBrandSocialAccount atomically removes both the SocialAccount and its

@@ -6,13 +6,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
 // GET /api/v2/brands/:brandId/inbox
 // Returns connected Meta accounts + unified conversations (read-through cached).
 func GetInbox(c *gin.Context) {
 	brandID := c.Param("brandId")
-	if _, ok := middlewares.RequireBrandMembership(c, brandID); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
 		return
 	}
 
@@ -44,7 +45,7 @@ func GetInbox(c *gin.Context) {
 // Forces a fresh read-through sync from Meta, then returns conversations.
 func SyncInbox(c *gin.Context) {
 	brandID := c.Param("brandId")
-	if _, ok := middlewares.RequireBrandMembership(c, brandID); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
 		return
 	}
 	if err := SyncFromMeta(brandID); err != nil {
@@ -67,7 +68,7 @@ type replyRequest struct {
 func ReplyToConversation(c *gin.Context) {
 	brandID := c.Param("brandId")
 	convID := c.Param("id")
-	if _, ok := middlewares.RequireBrandMembership(c, brandID); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
 		return
 	}
 	var req replyRequest
@@ -91,7 +92,7 @@ type hideRequest struct {
 func HideComment(c *gin.Context) {
 	brandID := c.Param("brandId")
 	convID := c.Param("id")
-	if _, ok := middlewares.RequireBrandMembership(c, brandID); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
 		return
 	}
 	var req hideRequest
@@ -111,7 +112,7 @@ func HideComment(c *gin.Context) {
 func DeleteConversation(c *gin.Context) {
 	brandID := c.Param("brandId")
 	convID := c.Param("id")
-	if _, ok := middlewares.RequireBrandMembership(c, brandID); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
 		return
 	}
 	if err := DeleteComment(brandID, convID); err != nil {
@@ -126,7 +127,7 @@ func DeleteConversation(c *gin.Context) {
 func ReadConversation(c *gin.Context) {
 	brandID := c.Param("brandId")
 	convID := c.Param("id")
-	if _, ok := middlewares.RequireBrandMembership(c, brandID); !ok {
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
 		return
 	}
 	if err := MarkRead(brandID, convID); err != nil {

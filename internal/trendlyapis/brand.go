@@ -85,14 +85,9 @@ type IBrandMember struct {
 	BrandID string  `json:"brandId" binding:"required"`
 	Email   string  `json:"email" binding:"required"`
 	Name    *string `json:"name"`
-	// Role to assign the invited member. Defaults to viewer (least privilege)
-	// when omitted.
-	Role *string `json:"role"`
-	// Teams to scope the member to. Empty assigns the brand's default team.
-	TeamIDs []string `json:"teamIds"`
-	// Overrides are optional per-member capability toggles (keys are Capability
-	// strings); only overridable capabilities are honoured.
-	Overrides map[string]bool `json:"overrides"`
+	// TeamID is the single team to add the invited member to. Empty assigns the
+	// brand's default team. The member inherits that team's feature privileges.
+	TeamID *string `json:"teamId"`
 }
 
 func CreateBrandMember(c *gin.Context) {
@@ -117,42 +112,35 @@ func CreateBrandMember(c *gin.Context) {
 		return
 	}
 
-	// Inviter must be allowed to manage members. Legacy members (pre-RBAC
-	// migration) carry an invalid role and are permitted through during the
-	// transition — remove this fallback once the role backfill has run.
-	if cUser.Role.IsValid() && !cUser.HasCapability(trendlymodels.CapManageMembers) {
+	// Inviter must be allowed to manage members (brand_admin:members). Legacy
+	// members (pre-migration, no team) are permitted through during the
+	// transition — remove this fallback once scripts/migrate-teams-v2 has run.
+	cTeam, terr := cUser.ResolveTeam(req.BrandID)
+	if terr != nil {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Unable to resolve your team", "error": terr.Error()})
+		return
+	}
+	if cTeam != nil && !cTeam.HasPrivilege(trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminMembers) {
 		c.JSON(http.StatusForbidden, gin.H{"message": "You don't have permission to manage members"})
 		return
 	}
 
-	// Resolve the role to assign (default: least-privilege viewer).
-	newRole := trendlymodels.RoleViewer
-	if req.Role != nil {
-		r := trendlymodels.BrandRole(*req.Role)
-		if !r.IsValid() {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid role"})
+	// Resolve the team to add the member to (default: the brand's default team).
+	var teamID string
+	if req.TeamID != nil && *req.TeamID != "" {
+		target := &trendlymodels.Team{}
+		if err := target.Get(req.BrandID, *req.TeamID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Target team not found"})
 			return
 		}
-		newRole = r
-	}
-
-	// Resolve teams (default: the brand's default team).
-	teamIDs := req.TeamIDs
-	if len(teamIDs) == 0 {
+		teamID = *req.TeamID
+	} else {
 		defTeam, derr := trendlymodels.EnsureDefaultTeam(req.BrandID, userId, time.Now().UnixMilli())
 		if derr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": derr.Error(), "message": "Unable to resolve default team"})
 			return
 		}
-		teamIDs = []string{defTeam}
-	}
-
-	// Keep only overridable capability toggles.
-	overrides := map[string]bool{}
-	for k, v := range req.Overrides {
-		if trendlymodels.Capability(k).IsOverridable() {
-			overrides[k] = v
-		}
+		teamID = defTeam
 	}
 
 	brand := &trendlymodels.Brand{}
@@ -179,10 +167,8 @@ func CreateBrandMember(c *gin.Context) {
 
 	bManager := &trendlymodels.BrandMember{
 		ManagerID: userRecord.UID,
-		Role:      newRole,
 		Status:    0,
-		TeamIDs:   teamIDs,
-		Overrides: overrides,
+		TeamID:    teamID,
 	}
 	_, err = bManager.Set(req.BrandID)
 	if err != nil {

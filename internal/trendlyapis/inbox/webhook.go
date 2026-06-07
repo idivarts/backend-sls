@@ -89,7 +89,7 @@ func IngestMessaging(platformAccountID string, m *instainterfaces.Messaging) {
 		conv.Messages = kept
 		if len(kept) > 0 {
 			last := kept[len(kept)-1]
-			conv.Preview = last.Text
+			conv.Preview = inboxMsgPreview(last)
 			conv.LastActivityAt = last.SentAt
 		}
 		conv.UpdatedAt = time.Now().UnixMilli()
@@ -104,10 +104,11 @@ func IngestMessaging(platformAccountID string, m *instainterfaces.Messaging) {
 		author = trendlymodels.InboxAuthorBusiness
 	}
 	newMsg := trendlymodels.InboxMessage{
-		ID:     m.Message.Mid,
-		Author: author,
-		Text:   m.Message.Text,
-		SentAt: ts,
+		ID:            m.Message.Mid,
+		Author:        author,
+		Text:          m.Message.Text,
+		SentAt:        ts,
+		AttachmentURL: firstAttachmentURL(m.Message),
 	}
 
 	conv, err := trendlymodels.GetInboxConversation(brandID, convID)
@@ -131,7 +132,7 @@ func IngestMessaging(platformAccountID string, m *instainterfaces.Messaging) {
 		}
 	}
 	conv.Messages = append(conv.Messages, newMsg)
-	conv.Preview = newMsg.Text
+	conv.Preview = inboxMsgPreview(newMsg)
 	conv.LastActivityAt = ts
 	conv.UpdatedAt = time.Now().UnixMilli()
 	if !isEcho {
@@ -183,9 +184,11 @@ func IngestComment(platformAccountID string, ch *instainterfaces.Change) {
 		return
 	}
 
-	// Replies to our own comments are part of an existing thread — skip creating
-	// a new top-level conversation for them.
+	// Replies are part of an existing thread — append to the parent conversation
+	// rather than creating a new top-level conversation. (IG comment threads are
+	// one level deep: a reply's parent_id is always the top-level comment.)
 	if ch.Value.IsReply() {
+		ingestCommentReply(brandID, acc, ch)
 		return
 	}
 
@@ -221,4 +224,80 @@ func IngestComment(platformAccountID string, ch *instainterfaces.Change) {
 	if err := conv.Upsert(brandID); err != nil {
 		log.Printf("inbox webhook: comment upsert failed %s: %v", convID, err)
 	}
+}
+
+// ingestCommentReply appends an inbound reply to the parent comment thread. The
+// parent conversation must already be cached (it was created when the top-level
+// comment arrived); replies whose parent we don't track are ignored.
+func ingestCommentReply(brandID string, acc *trendlymodels.SocialAccount, ch *instainterfaces.Change) {
+	parentConvID := "cmt_" + ch.Value.ParentID
+	conv, err := trendlymodels.GetInboxConversation(brandID, parentConvID)
+	if err != nil || conv == nil || conv.Comment == nil {
+		return
+	}
+
+	replyID := ch.Value.CommentExternalID()
+	// Dedupe a reply we already stored (e.g. our own optimistic reply).
+	for _, r := range conv.Comment.Replies {
+		if r.ID == replyID && replyID != "" {
+			return
+		}
+	}
+
+	now := time.Now().UnixMilli()
+	author := trendlymodels.InboxAuthorContact
+	if isSelfAuthor(acc, ch.Value.From.ID) {
+		author = trendlymodels.InboxAuthorBusiness
+	}
+	reply := trendlymodels.InboxMessage{
+		ID:     replyID,
+		Author: author,
+		Text:   ch.Value.CommentText(),
+		SentAt: now,
+	}
+	conv.Comment.Replies = append(conv.Comment.Replies, reply)
+	conv.Preview = reply.Text
+	conv.LastActivityAt = now
+	if author == trendlymodels.InboxAuthorContact {
+		conv.Unread = true
+	}
+	conv.UpdatedAt = now
+	if err := conv.Upsert(brandID); err != nil {
+		log.Printf("inbox webhook: comment reply upsert failed %s: %v", parentConvID, err)
+	}
+}
+
+// isSelfAuthor reports whether a comment/reply author is the connected account
+// itself (so it surfaces as a "business" reply rather than an inbound contact).
+func isSelfAuthor(acc *trendlymodels.SocialAccount, fromID string) bool {
+	if fromID == "" {
+		return false
+	}
+	return fromID == acc.PlatformAccountID ||
+		(acc.InstagramBusinessID != "" && fromID == acc.InstagramBusinessID)
+}
+
+// firstAttachmentURL returns the URL of the first usable attachment on a DM, if any.
+func firstAttachmentURL(msg *instainterfaces.Message) string {
+	if msg == nil || msg.Attachments == nil {
+		return ""
+	}
+	for _, a := range *msg.Attachments {
+		if a.Payload.URL != "" {
+			return a.Payload.URL
+		}
+	}
+	return ""
+}
+
+// inboxMsgPreview returns a one-line list preview for a DM, falling back to an
+// attachment placeholder when the message carries media but no text.
+func inboxMsgPreview(m trendlymodels.InboxMessage) string {
+	if m.Text != "" {
+		return m.Text
+	}
+	if m.AttachmentURL != "" {
+		return "📎 Attachment"
+	}
+	return ""
 }

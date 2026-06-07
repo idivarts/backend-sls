@@ -107,6 +107,16 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Analytics cache + daily snapshots. Written/read server-side only —
+      // the dashboard reads analytics through the backend API, never directly.
+      // Admin SDK bypasses these rules.
+      match /analyticsCache/{cacheId} {
+        allow read, write: if false;
+      }
+      match /analyticsSnapshots/{snapshotId} {
+        allow read, write: if false;
+      }
+
       // Inbox conversations (DMs + comments). Read: any brand member. Writes go
       // through the backend (Admin SDK), so clients never write directly.
       match /inbox/{conversationId} {
@@ -207,9 +217,9 @@ service cloud.firestore {
       }
 
       // ── Teams ────────────────────────────────────────────────────────────
-      // Organizational units within a brand (socials/members are scoped here).
-      // Any brand member may read; only owner/admin may mutate (manage_teams is
-      // not an overridable capability, so role alone decides write access).
+      // Access units within a brand: each team holds a feature→privileges map
+      // its members inherit. Any brand member may read; only members whose team
+      // grants brand_admin:teams may mutate.
       match /teams/{teamId} {
         allow read:  if isAuthenticated() && isBrandMember(brandId);
         allow write: if isAuthenticated() && canManageBrandTeams(brandId);
@@ -320,50 +330,70 @@ service cloud.firestore {
     }
 
     /**
-     * Returns the calling user's role string within the given brand, or null if
-     * they are not a member. Mirrors BrandRole in the backend.
+     * The calling user's member doc data within the given brand.
      */
-    function getBrandRole(brandId) {
+    function brandMemberData(brandId) {
       return get(
         /databases/$(database)/documents/brands/$(brandId)/members/$(request.auth.uid)
-      ).data.role;
+      ).data;
     }
 
     /**
-     * Returns true if the caller may manage the brand's teams (owner/admin).
-     * manage_teams is not an overridable capability, so role alone decides.
+     * True while the member has no team assigned (pre-migration legacy member).
+     * Such members are allowed through until scripts/migrate-teams-v2 runs —
+     * mirrors the backend's transition shim. Remove once migration completes.
      */
+    function isLegacyBrandMember(brandId) {
+      return !('teamId' in brandMemberData(brandId))
+        || brandMemberData(brandId).teamId == null
+        || brandMemberData(brandId).teamId == '';
+    }
+
+    /**
+     * The privileges map (feature -> [privilege]) of the team the caller belongs
+     * to. Only call when the member has a team (guard with isLegacyBrandMember).
+     */
+    function callerTeamPrivileges(brandId) {
+      return get(
+        /databases/$(database)/documents/brands/$(brandId)/teams/$(brandMemberData(brandId).teamId)
+      ).data.privileges;
+    }
+
+    /**
+     * Returns true if the caller's team grants `priv` under `feature`. Legacy
+     * members (no team) are allowed through during the migration window.
+     * Relies on Firestore rules' short-circuit evaluation so the team get() is
+     * skipped for legacy members.
+     */
+    function hasFeaturePrivilege(brandId, feature, priv) {
+      return isBrandMember(brandId) && (
+        isLegacyBrandMember(brandId) || (
+          feature in callerTeamPrivileges(brandId) &&
+          priv in callerTeamPrivileges(brandId)[feature]
+        )
+      );
+    }
+
+    // Team administration: brand_admin:teams.
     function canManageBrandTeams(brandId) {
-      return isBrandMember(brandId) && (getBrandRole(brandId) in ['owner', 'admin']);
+      return hasFeaturePrivilege(brandId, 'brand_admin', 'teams');
     }
 
-    /**
-     * True while the member still carries a pre-RBAC legacy role (e.g. "user",
-     * "manager"). Such members are allowed through until the role backfill runs
-     * — mirrors the backend's transition shim. Remove once migration completes.
-     */
-    function isLegacyBrandRole(brandId) {
-      return !(getBrandRole(brandId) in
-        ['owner', 'admin', 'campaign_manager', 'content_manager', 'content_creator', 'viewer']);
-    }
-
-    // Content-strategy mutations: owner / admin / content_manager.
+    // Content-strategy mutations: strategy admin (create + edit) or editor.
     function canManageContentStrategy(brandId) {
-      return isBrandMember(brandId) &&
-        (isLegacyBrandRole(brandId) || getBrandRole(brandId) in ['owner', 'admin', 'content_manager']);
+      return hasFeaturePrivilege(brandId, 'strategy', 'admin')
+        || hasFeaturePrivilege(brandId, 'strategy', 'editor');
     }
 
-    // Content create/update: owner / admin / content_manager / content_creator.
+    // Content create/update: content create_edit or editor.
     function canManageContent(brandId) {
-      return isBrandMember(brandId) &&
-        (isLegacyBrandRole(brandId) ||
-         getBrandRole(brandId) in ['owner', 'admin', 'content_manager', 'content_creator']);
+      return hasFeaturePrivilege(brandId, 'content', 'create_edit')
+        || hasFeaturePrivilege(brandId, 'content', 'editor');
     }
 
-    // Content delete: owner / admin / content_manager (creators cannot delete).
+    // Content delete: content create_edit (editors/viewers cannot delete).
     function canDeleteContent(brandId) {
-      return isBrandMember(brandId) &&
-        (isLegacyBrandRole(brandId) || getBrandRole(brandId) in ['owner', 'admin', 'content_manager']);
+      return hasFeaturePrivilege(brandId, 'content', 'create_edit');
     }
 
     /**

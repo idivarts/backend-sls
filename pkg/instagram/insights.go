@@ -1,6 +1,7 @@
 package instagram
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -8,8 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
 // InsightMetric is a valid value for the `metric` query parameter on the
@@ -18,21 +17,21 @@ import (
 type InsightMetric string
 
 const (
-	MetricAccountsEngaged              InsightMetric = "accounts_engaged"
-	MetricComments                     InsightMetric = "comments"
-	MetricEngagedAudienceDemographics  InsightMetric = "engaged_audience_demographics"
-	MetricFollowsAndUnfollows          InsightMetric = "follows_and_unfollows"
-	MetricFollowerDemographics         InsightMetric = "follower_demographics"
-	MetricImpressions                  InsightMetric = "impressions" // deprecated v22.0+
-	MetricLikes                        InsightMetric = "likes"
-	MetricProfileLinksTaps             InsightMetric = "profile_links_taps"
-	MetricReach                        InsightMetric = "reach"
-	MetricReplies                      InsightMetric = "replies"
-	MetricReposts                      InsightMetric = "reposts"
-	MetricSaves                        InsightMetric = "saves"
-	MetricShares                       InsightMetric = "shares"
-	MetricTotalInteractions            InsightMetric = "total_interactions"
-	MetricViews                        InsightMetric = "views"
+	MetricAccountsEngaged             InsightMetric = "accounts_engaged"
+	MetricComments                    InsightMetric = "comments"
+	MetricEngagedAudienceDemographics InsightMetric = "engaged_audience_demographics"
+	MetricFollowsAndUnfollows         InsightMetric = "follows_and_unfollows"
+	MetricFollowerDemographics        InsightMetric = "follower_demographics"
+	MetricImpressions                 InsightMetric = "impressions" // deprecated v22.0+
+	MetricLikes                       InsightMetric = "likes"
+	MetricProfileLinksTaps            InsightMetric = "profile_links_taps"
+	MetricReach                       InsightMetric = "reach"
+	MetricReplies                     InsightMetric = "replies"
+	MetricReposts                     InsightMetric = "reposts"
+	MetricSaves                       InsightMetric = "saves"
+	MetricShares                      InsightMetric = "shares"
+	MetricTotalInteractions           InsightMetric = "total_interactions"
+	MetricViews                       InsightMetric = "views"
 )
 
 // InsightPeriod is a valid value for the `period` query parameter.
@@ -86,6 +85,85 @@ type InsightParams struct {
 	StopTime   string
 }
 
+// ─── Response types ───────────────────────────────────────────────────────────
+//
+// The IG insights endpoint returns one of two shapes per metric depending on
+// metric_type:
+//   - time_series : a `values` array of {value, end_time} points
+//   - total_value : a single `total_value.value`, optionally with `breakdowns`
+//     (used for demographics — follower_demographics / engaged_audience_demographics)
+
+// InsightTimeSeriesValue is one point in a time_series metric.
+type InsightTimeSeriesValue struct {
+	Value   int64  `json:"value"`
+	EndTime string `json:"end_time"`
+}
+
+// InsightBreakdownResult is one demographic bucket (e.g. age "18-24" → 1200).
+type InsightBreakdownResult struct {
+	DimensionValues []string `json:"dimension_values"`
+	Value           int64    `json:"value"`
+}
+
+// InsightBreakdownGroup groups results under a set of dimension keys (e.g. ["age"]).
+type InsightBreakdownGroup struct {
+	DimensionKeys []string                 `json:"dimension_keys"`
+	Results       []InsightBreakdownResult `json:"results"`
+}
+
+// InsightTotalValue is the total_value object — either a scalar `value` or
+// `breakdowns` for demographic metrics.
+type InsightTotalValue struct {
+	Value      int64                   `json:"value"`
+	Breakdowns []InsightBreakdownGroup `json:"breakdowns,omitempty"`
+}
+
+// InsightDatum is a single metric entry in the response.
+type InsightDatum struct {
+	Name        string                   `json:"name"`
+	Period      string                   `json:"period"`
+	Title       string                   `json:"title"`
+	Description string                   `json:"description"`
+	Values      []InsightTimeSeriesValue `json:"values,omitempty"`
+	TotalValue  *InsightTotalValue       `json:"total_value,omitempty"`
+	ID          string                   `json:"id"`
+}
+
+// InsightResponse is the top-level insights API response.
+type InsightResponse struct {
+	Data []InsightDatum `json:"data"`
+}
+
+// Find returns the datum for the given metric name, or nil if absent.
+func (r *InsightResponse) Find(metric InsightMetric) *InsightDatum {
+	if r == nil {
+		return nil
+	}
+	for i := range r.Data {
+		if r.Data[i].Name == string(metric) {
+			return &r.Data[i]
+		}
+	}
+	return nil
+}
+
+// Total returns the scalar total for a metric: the total_value if present,
+// otherwise the sum of the time series. Returns 0 if the metric is absent.
+func (r *InsightResponse) Total(metric InsightMetric) int64 {
+	d := r.Find(metric)
+	if d == nil {
+		return 0
+	}
+	if d.TotalValue != nil {
+		return d.TotalValue.Value
+	}
+	var sum int64
+	for _, v := range d.Values {
+		sum += v.Value
+	}
+	return sum
+}
+
 // joinMetrics joins a slice of metrics with commas
 func joinMetrics(items []InsightMetric) string {
 	s := make([]string, len(items))
@@ -101,7 +179,7 @@ func GetInsights(
 	metrics []InsightMetric,
 	period InsightPeriod,
 	params InsightParams,
-) (*messenger.InstagramBriefProfile, error) {
+) (*InsightResponse, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
@@ -129,7 +207,6 @@ func GetInsights(
 	iParam.Set("access_token", accessToken)
 
 	allParams := iParam.Encode()
-	log.Println("All Params:", allParams)
 
 	// Combine base URL and query parameters
 	apiURL = fmt.Sprintf("%s?%s", apiURL, allParams)
@@ -151,12 +228,10 @@ func GetInsights(
 		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
 	}
 
-	// Print the response body
-	fmt.Println(string(body))
-	// data := messenger.InstagramBriefProfile{}
-	// err = json.Unmarshal(body, &data)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	return nil, nil
+	data := InsightResponse{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		log.Printf("instagram.GetInsights: failed to unmarshal response: %v", err)
+		return nil, err
+	}
+	return &data, nil
 }

@@ -24,18 +24,18 @@ func ListBrandMembers(c *gin.Context) {
 }
 
 type IUpdateMember struct {
-	Role      *string          `json:"role"`
-	TeamIDs   *[]string        `json:"teamIds"`
-	Overrides *map[string]bool `json:"overrides"`
+	// TeamID is the single team to move the member to. Must be a team of this brand.
+	TeamID *string `json:"teamId"`
 }
 
-// UpdateBrandMember updates a member's role, teams, and/or override toggles.
-// Requires manage_members. The last Owner cannot be downgraded.
+// UpdateBrandMember moves a member to a different team. The member inherits that
+// team's feature privileges. Requires brand_admin:members. The brand must always
+// retain at least one member who can manage members.
 // PATCH /api/v2/brands/:brandId/members/:managerId
 func UpdateBrandMember(c *gin.Context) {
 	brandID := c.Param("brandId")
 	targetID := c.Param("managerId")
-	if _, ok := requireBrandCapability(c, brandID, trendlymodels.CapManageMembers); !ok {
+	if _, ok := requireFeaturePrivilege(c, brandID, trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminMembers); !ok {
 		return
 	}
 	var req IUpdateMember
@@ -50,39 +50,26 @@ func UpdateBrandMember(c *gin.Context) {
 		return
 	}
 
-	if req.Role != nil {
-		newRole := trendlymodels.BrandRole(*req.Role)
-		if !newRole.IsValid() {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid role"})
+	if req.TeamID != nil {
+		newTeam := &trendlymodels.Team{}
+		if err := newTeam.Get(brandID, *req.TeamID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Target team not found"})
 			return
 		}
-		// Guard the last Owner from being downgraded.
-		if member.Role == trendlymodels.RoleOwner && newRole != trendlymodels.RoleOwner {
-			owners, err := countBrandOwners(brandID)
+		// Guard: don't strip the last members-admin by moving them to a team that
+		// can't manage members.
+		if !newTeam.HasPrivilege(trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminMembers) {
+			admins, err := countMembersWithPrivilege(brandID, trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminMembers)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			if owners <= 1 {
-				c.JSON(http.StatusBadRequest, gin.H{"message": "Cannot remove the last owner — transfer ownership first"})
+			if admins <= 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "Cannot move the last member who can manage members to a team without that access"})
 				return
 			}
 		}
-		member.Role = newRole
-	}
-
-	if req.TeamIDs != nil {
-		member.TeamIDs = *req.TeamIDs
-	}
-
-	if req.Overrides != nil {
-		overrides := map[string]bool{}
-		for k, v := range *req.Overrides {
-			if trendlymodels.Capability(k).IsOverridable() {
-				overrides[k] = v
-			}
-		}
-		member.Overrides = overrides
+		member.TeamID = *req.TeamID
 	}
 
 	if _, err := member.Set(brandID); err != nil {
@@ -92,13 +79,13 @@ func UpdateBrandMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member updated", "member": member})
 }
 
-// RemoveBrandMember removes a member from the brand. Requires manage_members.
-// The last Owner cannot be removed.
+// RemoveBrandMember removes a member from the brand. Requires brand_admin:members.
+// The last member who can manage members cannot be removed.
 // DELETE /api/v2/brands/:brandId/members/:managerId
 func RemoveBrandMember(c *gin.Context) {
 	brandID := c.Param("brandId")
 	targetID := c.Param("managerId")
-	if _, ok := requireBrandCapability(c, brandID, trendlymodels.CapManageMembers); !ok {
+	if _, ok := requireFeaturePrivilege(c, brandID, trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminMembers); !ok {
 		return
 	}
 
@@ -107,14 +94,21 @@ func RemoveBrandMember(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Member not found"})
 		return
 	}
-	if member.Role == trendlymodels.RoleOwner {
-		owners, err := countBrandOwners(brandID)
+	// Guard: the brand must always keep at least one member who can manage members.
+	team, terr := member.ResolveTeam(brandID)
+	if terr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": terr.Error(), "message": "Unable to resolve member's team"})
+		return
+	}
+	targetIsAdmin := team == nil || team.HasPrivilege(trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminMembers)
+	if targetIsAdmin {
+		admins, err := countMembersWithPrivilege(brandID, trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminMembers)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if owners <= 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "Cannot remove the last owner — transfer ownership first"})
+		if admins <= 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "Cannot remove the last member who can manage members"})
 			return
 		}
 	}

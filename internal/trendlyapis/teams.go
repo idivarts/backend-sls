@@ -25,13 +25,34 @@ func ListTeams(c *gin.Context) {
 
 type ITeamUpsert struct {
 	Name string `json:"name" binding:"required"`
+	// Privileges maps feature → granted privilege keys. Validated against the
+	// feature/privilege taxonomy; unknown features/privileges are dropped.
+	Privileges map[string][]string `json:"privileges"`
 }
 
-// CreateTeam creates a new (non-default) team. Requires manage_teams.
+// sanitizePrivileges keeps only known features and, within each, only valid
+// privileges for that feature.
+func sanitizePrivileges(in map[string][]string) map[string][]string {
+	out := map[string][]string{}
+	for feature, privs := range in {
+		f := trendlymodels.Feature(feature)
+		if !f.IsValid() {
+			continue
+		}
+		valid := trendlymodels.FilterValidPrivileges(f, privs)
+		if len(valid) > 0 {
+			out[feature] = valid
+		}
+	}
+	return out
+}
+
+// CreateTeam creates a new (non-default) team with its feature privileges.
+// Requires brand_admin:teams.
 // POST /api/v2/brands/:brandId/teams
 func CreateTeam(c *gin.Context) {
 	brandID := c.Param("brandId")
-	member, ok := requireBrandCapability(c, brandID, trendlymodels.CapManageTeams)
+	member, ok := requireFeaturePrivilege(c, brandID, trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminTeams)
 	if !ok {
 		return
 	}
@@ -48,6 +69,7 @@ func CreateTeam(c *gin.Context) {
 		IsDefault:    false,
 		CreatedBy:    member.ManagerID,
 		CreationTime: time.Now().UnixMilli(),
+		Privileges:   sanitizePrivileges(req.Privileges),
 	}
 	if _, err := team.Set(brandID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to create team"})
@@ -56,12 +78,14 @@ func CreateTeam(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Team created", "team": team})
 }
 
-// UpdateTeam renames a team. Requires manage_teams.
+// UpdateTeam renames a team and/or updates its feature privileges.
+// Requires brand_admin:teams. The default team always retains full access — its
+// privileges cannot be reduced.
 // PATCH /api/v2/brands/:brandId/teams/:teamId
 func UpdateTeam(c *gin.Context) {
 	brandID := c.Param("brandId")
 	teamID := c.Param("teamId")
-	if _, ok := requireBrandCapability(c, brandID, trendlymodels.CapManageTeams); !ok {
+	if _, ok := requireFeaturePrivilege(c, brandID, trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminTeams); !ok {
 		return
 	}
 	var req ITeamUpsert
@@ -76,6 +100,13 @@ func UpdateTeam(c *gin.Context) {
 		return
 	}
 	team.Name = req.Name
+	// The default team always keeps full access; only non-default teams can have
+	// their privileges edited.
+	if !team.IsDefault && req.Privileges != nil {
+		team.Privileges = sanitizePrivileges(req.Privileges)
+	} else if team.IsDefault {
+		team.Privileges = trendlymodels.AllFeaturePrivilegesMap()
+	}
 	if _, err := team.Set(brandID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to update team"})
 		return
@@ -83,12 +114,12 @@ func UpdateTeam(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Team updated", "team": team})
 }
 
-// DeleteTeam removes a non-default team. Requires manage_teams.
+// DeleteTeam removes a non-default team. Requires brand_admin:teams.
 // DELETE /api/v2/brands/:brandId/teams/:teamId
 func DeleteTeam(c *gin.Context) {
 	brandID := c.Param("brandId")
 	teamID := c.Param("teamId")
-	if _, ok := requireBrandCapability(c, brandID, trendlymodels.CapManageTeams); !ok {
+	if _, ok := requireFeaturePrivilege(c, brandID, trendlymodels.FeatureBrandAdmin, trendlymodels.PrivAdminTeams); !ok {
 		return
 	}
 
@@ -101,40 +132,32 @@ func DeleteTeam(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "The default team cannot be deleted"})
 		return
 	}
+
+	// Reassign any members on this team to the default team so they aren't
+	// orphaned (an orphaned teamId would lock the member out).
+	defTeamID, derr := trendlymodels.EnsureDefaultTeam(brandID, "", time.Now().UnixMilli())
+	if derr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": derr.Error(), "message": "Unable to resolve default team"})
+		return
+	}
+	members, merr := trendlymodels.GetAllBrandMembers(brandID)
+	if merr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": merr.Error(), "message": "Unable to list members"})
+		return
+	}
+	for i := range members {
+		if members[i].TeamID == teamID {
+			members[i].TeamID = defTeamID
+			if _, err := members[i].Set(brandID); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to reassign team members"})
+				return
+			}
+		}
+	}
+
 	if err := trendlymodels.DeleteTeam(brandID, teamID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to delete team"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Team deleted"})
-}
-
-type IAssignSocialTeam struct {
-	TeamID string `json:"teamId" binding:"required"`
-}
-
-// AssignSocialTeam moves a connected brand social to a team. Requires manage_teams.
-// POST /api/v2/brands/:brandId/socials/:id/team
-func AssignSocialTeam(c *gin.Context) {
-	brandID := c.Param("brandId")
-	socialID := c.Param("id")
-	if _, ok := requireBrandCapability(c, brandID, trendlymodels.CapManageTeams); !ok {
-		return
-	}
-	var req IAssignSocialTeam
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Validate the target team exists in this brand.
-	team := trendlymodels.Team{}
-	if err := team.Get(brandID, req.TeamID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Target team not found"})
-		return
-	}
-	if _, err := trendlymodels.AssignBrandSocialTeam(brandID, socialID, req.TeamID, time.Now().UnixMilli()); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to assign social to team"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "Social assigned to team"})
 }

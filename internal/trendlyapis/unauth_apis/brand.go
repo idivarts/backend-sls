@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
@@ -37,11 +38,12 @@ func ValidateFirebaseCallback(c *gin.Context) {
 		return
 	}
 
-	// Preserve the role/teams assigned at invite time — only flip the status to
-	// accepted. Fall back to a viewer membership if no pending invite exists.
+	// Preserve the team assigned at invite time — only flip the status to
+	// accepted. Fall back to the brand's default team if no pending invite exists.
 	bmember := trendlymodels.BrandMember{}
 	if err = bmember.Get(req.BrandID, uid); err != nil {
-		bmember = trendlymodels.BrandMember{ManagerID: uid, Role: trendlymodels.RoleViewer}
+		defTeam, _ := trendlymodels.EnsureDefaultTeam(req.BrandID, uid, time.Now().UnixMilli())
+		bmember = trendlymodels.BrandMember{ManagerID: uid, TeamID: defTeam}
 	}
 	bmember.ManagerID = uid
 	bmember.Status = 1

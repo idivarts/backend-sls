@@ -23,15 +23,25 @@ func RequireBrandMembership(c *gin.Context, brandID string) (*trendlymodels.Bran
 	return member, true
 }
 
-// RequireBrandCapability loads the caller's membership and enforces that they
-// hold cap. Legacy members (pre-RBAC backfill, invalid role) are allowed through
-// during the transition — remove the fallback once the role migration has run.
-func RequireBrandCapability(c *gin.Context, brandID string, cap trendlymodels.Capability) (*trendlymodels.BrandMember, bool) {
+// RequireFeaturePrivilege loads the caller's membership, resolves their team,
+// and enforces that the team grants priv under feature. Members not yet migrated
+// to the team-privilege model (no team assigned) are allowed through during the
+// transition — remove the fallback once scripts/migrate-teams-v2 has run.
+func RequireFeaturePrivilege(c *gin.Context, brandID string, feature trendlymodels.Feature, priv trendlymodels.Privilege) (*trendlymodels.BrandMember, bool) {
 	member, ok := RequireBrandMembership(c, brandID)
 	if !ok {
 		return nil, false
 	}
-	if member.Role.IsValid() && !member.HasCapability(cap) {
+	team, err := member.ResolveTeam(brandID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Unable to resolve your team", "error": err.Error()})
+		return nil, false
+	}
+	// Legacy member (pre-migration, no team) — allow through during transition.
+	if team == nil {
+		return member, true
+	}
+	if !team.HasPrivilege(feature, priv) {
 		c.JSON(http.StatusForbidden, gin.H{"message": "You don't have permission to perform this action"})
 		return nil, false
 	}
