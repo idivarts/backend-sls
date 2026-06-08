@@ -157,10 +157,6 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
-	if brand.Credits.Collaboration <= 0 {
-		collab.Status = "deleted"
-	}
-
 	valid, filters := evaluateCollab(collab, &brand)
 
 	throwError := false
@@ -179,7 +175,6 @@ func PostCollaboration(c *gin.Context) {
 	}
 
 	if collab.Status == "active" && !myutil.Includes(brand.PostedCollaborations, collabId) {
-		brand.Credits.Collaboration -= 1
 		brand.PostedCollaborations = append(brand.PostedCollaborations, collabId)
 	}
 	collab.IsLive = !myutil.IsDevEnvironment()

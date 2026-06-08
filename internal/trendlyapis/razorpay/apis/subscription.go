@@ -57,11 +57,18 @@ func CreateSubscription(c *gin.Context) {
 		trialDays = 0
 	}
 
-	_, link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, map[string]interface{}{
+	notes := map[string]interface{}{
 		"brandId":      req.BrandID,
 		"planName":     planName,
 		"isGrowthPlan": req.IsGrowthPlan,
-	}, "")
+	}
+	// Billing lives on the Organization now — carry organizationId so the webhook
+	// writes org billing. Legacy brands without an org still carry only brandId.
+	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+		notes["organizationId"] = *brand.OrganizationID
+	}
+
+	_, link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, notes, "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to create subscription link"})
 		return

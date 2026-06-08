@@ -37,14 +37,10 @@ func InfluencerUnlocked(c *gin.Context) {
 		return
 	}
 
-	brand.UnlockedInfluencers, b = myutil.AppendUnique(brand.UnlockedInfluencers, influenerId)
-	if b {
-		if brand.Credits.Influencer <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient-credits", "message": "Insufficient Credits"})
-			return
-		}
-		brand.Credits.Influencer -= 1
-	}
+	// Unlock is no longer credit-gated (old credit system removed). We still
+	// track unlocked influencers for UI/state; access is unrestricted until the
+	// new org token wallet lands (Credit ticket).
+	brand.UnlockedInfluencers, _ = myutil.AppendUnique(brand.UnlockedInfluencers, influenerId)
 
 	_, err = brand.Insert(req.BrandId)
 	if err != nil {

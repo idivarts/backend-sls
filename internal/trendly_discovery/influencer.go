@@ -409,15 +409,12 @@ func FetchInfluencer(c *gin.Context) {
 		return
 	}
 
+	// Discovery is no longer credit-gated (old credit system removed). Track the
+	// discovered influencer for state; access is unrestricted until the new org
+	// token wallet lands (Credit ticket).
 	var appended bool
 	brand.DiscoveredInfluencers, appended = myutil.AppendUnique(brand.DiscoveredInfluencers, influencerId)
 	if appended {
-		if brand.Credits.Discovery <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no-discovery-credits", "message": "No Discovery Credits Available"})
-			return
-		}
-
-		brand.Credits.Discovery -= 1
 		_, err = brand.Insert(brandId)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
@@ -658,7 +655,6 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 	results := []inviteResult{}
 	createdInvites := []trendlymodels.Invitation{}
 	agencyBlocked := 0
-	connectionCredits := brand.Credits.Connection
 
 	for _, infId := range req.Influencers {
 		s, ok := socialMap[infId]
@@ -680,9 +676,6 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 
 			anyCreated := false
 			for _, collabId := range req.Collaborations {
-				if connectionCredits <= 0 {
-					break
-				}
 				inviteSocial := s
 				invite := trendlymodels.Invitation{
 					UserID:          infId,
@@ -698,7 +691,6 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 					log.Println("Error sending discover invite:", err.Error())
 					continue
 				}
-				connectionCredits--
 				anyCreated = true
 				createdInvites = append(createdInvites, invite)
 			}
@@ -797,19 +789,8 @@ func InviteInfluencerOnDiscover(c *gin.Context) {
 		return
 	}
 
-	// Persist connection-credit usage (consumed only by discover-only invites).
-	creditUtilized := brand.Credits.Connection - connectionCredits
-	if creditUtilized > 0 {
-		brand.Credits.Connection = connectionCredits
-		if _, err = brand.Insert(brandId); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error Updating brand"})
-			return
-		}
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"message":         "api is functional",
-		"creditsUsed":     creditUtilized,
 		"invitationsSent": createdInvites,
 		"results":         results,
 		"agencyRequired":  agencyBlocked > 0,

@@ -48,21 +48,29 @@ func CreateBrand(c *gin.Context) {
 
 	brand.OnboardingComplete = true
 	brand.IsBillingDisabled = false
-	brand.Billing = &trendlymodels.BrandBilling{
-		BillingStatus: myutil.StrPtr("active"),
-		PlanKey:       myutil.StrPtr("starter"),
-		PlanCycle:     myutil.StrPtr("yearly"),
-		Status:        myutil.IntPtr(1),
-		IsOnTrial:     myutil.BoolPtr(false),
+
+	// Billing lives on the Organization now. If this brand already belongs to an
+	// org, inherit the org's billing (mirror) instead of stamping a per-brand
+	// plan. Legacy brands with no org keep the starter stamp for back-compat
+	// until migration attaches them to an org.
+	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+		org := &trendlymodels.Organization{}
+		if err := org.Get(*brand.OrganizationID); err == nil && org.Billing != nil {
+			brand.Billing = org.Billing
+		}
+	}
+	if brand.Billing == nil {
+		brand.Billing = &trendlymodels.BrandBilling{
+			BillingStatus: myutil.StrPtr("active"),
+			PlanKey:       myutil.StrPtr("starter"),
+			PlanCycle:     myutil.StrPtr("yearly"),
+			Status:        myutil.IntPtr(1),
+			IsOnTrial:     myutil.BoolPtr(false),
+		}
 	}
 
-	brand.Credits = trendlymodels.BrandCredits{
-		Influencer:    5,
-		Discovery:     1,
-		Connection:    0,
-		Collaboration: 1,
-		Contract:      1,
-	}
+	// Old per-brand credits removed — no credit stamping on provisioning. The
+	// new org-level token wallet is seeded by the Credit System ticket.
 	brand.HasPayWall = false
 
 	_, err = brand.Insert(req.BrandID)

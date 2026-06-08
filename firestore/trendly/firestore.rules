@@ -231,6 +231,21 @@ service cloud.firestore {
       }
     }
 
+    // Stores organizations — the top-level tenant above brands. Billing /
+    // subscription lives here; each brand references its org via organizationId.
+    match /organizations/{orgId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+
+      // Org membership + role. Named "orgMembers" (NOT "members") on purpose so
+      // it does not collide with the brands/{brandId}/members collection-group
+      // queries used by the brand switcher.
+      match /orgMembers/{managerId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
+      }
+    }
+
     // Stores all collaborations
     match /collaborations/{collaborationId} {
       allow read: if isAuthenticated();

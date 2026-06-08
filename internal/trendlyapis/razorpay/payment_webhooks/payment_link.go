@@ -3,7 +3,6 @@ package paymentwebhooks
 import (
 	"errors"
 
-	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
@@ -14,62 +13,44 @@ func handlePaymentLink(event *webhook.Event) error {
 	}
 
 	paymentLink := event.Payload.PaymentLink.Entity
-	if paymentLink.Notes.BrandID == "" {
-		return errors.New("brandid-null")
+	if paymentLink.Notes.BrandID == "" && paymentLink.Notes.OrganizationID == "" {
+		return errors.New("billing-target-null")
 	}
 
-	brand := &trendlymodels.Brand{}
-	err := brand.Get(paymentLink.Notes.BrandID)
+	// Billing lives on the Organization now; resolve the org (preferred) + brand
+	// (mirror) the webhook applies to.
+	target, err := resolveBillingTarget(paymentLink.Notes)
 	if err != nil {
 		return err
 	}
-	if brand.Billing == nil {
-		brand.Billing = &trendlymodels.BrandBilling{}
-	}
+	billing := target.currentBilling()
 
-	if brand.Billing.PaymentLinkId != nil && brand.Billing.PaymentLinkId != &paymentLink.ID &&
+	if billing.PaymentLinkId != nil && billing.PaymentLinkId != &paymentLink.ID &&
 		paymentLink.Status != "paid" &&
-		brand.Billing.Status != nil && *brand.Billing.Status == 1 {
+		billing.Status != nil && *billing.Status == 1 {
 		return errors.New("payment-link-cant-be-replaced-unless-active")
 	}
 
-	brand.Billing.PaymentLinkId = &paymentLink.ID
-	brand.Billing.BillingStatus = myutil.StrPtr("active")
+	billing.PaymentLinkId = &paymentLink.ID
+	billing.BillingStatus = myutil.StrPtr("active")
 	if paymentLink.Notes.PlanKey != "" {
-		brand.Billing.PlanKey = &paymentLink.Notes.PlanKey
+		billing.PlanKey = &paymentLink.Notes.PlanKey
 	}
 	if paymentLink.Notes.PlanCycle != "" {
-		brand.Billing.PlanCycle = &paymentLink.Notes.PlanCycle
+		billing.PlanCycle = &paymentLink.Notes.PlanCycle
 	}
 
 	switch paymentLink.Status {
 	case "paid":
-		brand.Billing.IsOnTrial = myutil.BoolPtr(false)
-		brand.Billing.Status = myutil.IntPtr(1)
+		billing.IsOnTrial = myutil.BoolPtr(false)
+		billing.Status = myutil.IntPtr(1)
 	default:
-		brand.Billing.IsOnTrial = myutil.BoolPtr(true)
-		brand.Billing.Status = myutil.IntPtr(0)
+		billing.IsOnTrial = myutil.BoolPtr(true)
+		billing.Status = myutil.IntPtr(0)
 	}
 
-	if event.Event == "payment_link.paid" {
-		bCredit, b := trendlymodels.PlanCreditsMap[*brand.Billing.PlanKey]
-		if b {
-			mult := 1
-			if *brand.Billing.PlanKey == "yearly" {
-				mult = 12
-			}
-			brand.Credits.Discovery += (bCredit.Discovery * mult)
-			brand.Credits.Collaboration += (bCredit.Collaboration * mult)
-			brand.Credits.Connection += (bCredit.Connection * mult)
-			brand.Credits.Contract += (bCredit.Contract * mult)
-			brand.Credits.Influencer += (bCredit.Influencer * mult)
-		}
-	}
+	// Old per-brand credit top-up on payment_link.paid removed — the new org
+	// token wallet is handled by the Credit ticket's billing engine, not here.
 
-	_, err = brand.Insert(paymentLink.Notes.BrandID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return target.save(billing)
 }
