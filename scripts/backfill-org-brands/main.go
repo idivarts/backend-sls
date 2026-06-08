@@ -7,8 +7,7 @@
 //     brand never showed up in the creator's switcher): ensures every org
 //     member (and the org owner) has an ACTIVE BrandMember on the brand;
 //     existing memberships are never clobbered,
-//   - for org-linked brands, inherits the org's billing when the brand has none
-//     and ensures a default team exists.
+//   - ensures a default team exists for org-linked brands.
 //
 // Idempotent. Dry-run by default; set APPLY=1 to write.
 //
@@ -42,7 +41,7 @@ func main() {
 	now := time.Now().UnixMilli()
 	var (
 		processed, skippedDeleted, skippedNoOrgDoc, failed int
-		onboardingSet, membersAdded, billingSet            int
+		onboardingSet, membersAdded                        int
 	)
 
 	iter := firestoredb.Client.Collection("brands").Documents(ctx)
@@ -73,11 +72,10 @@ func main() {
 		needsOnboarding := !brand.OnboardingComplete
 
 		var (
-			hasOrg      = brand.OrganizationID != nil && *brand.OrganizationID != ""
-			orgID       string
-			org         trendlymodels.Organization
-			missing     []string
-			needBilling bool
+			hasOrg  = brand.OrganizationID != nil && *brand.OrganizationID != ""
+			orgID   string
+			org     trendlymodels.Organization
+			missing []string
 		)
 		if hasOrg {
 			orgID = *brand.OrganizationID
@@ -123,26 +121,21 @@ func main() {
 					missing = append(missing, managerID)
 				}
 			}
-
-			needBilling = brand.Billing == nil && org.Billing != nil
 		}
 
-		if !needsOnboarding && len(missing) == 0 && !needBilling {
+		if !needsOnboarding && len(missing) == 0 {
 			processed++
 			continue // already healthy
 		}
 
 		if !apply {
-			log.Printf("[DRY] brand %q (%s) hasOrg=%v → setOnboarding=%v, add %d member(s) %v, inheritBilling=%v",
-				brand.Name, brandID, hasOrg, needsOnboarding, len(missing), missing, needBilling)
+			log.Printf("[DRY] brand %q (%s) hasOrg=%v → setOnboarding=%v, add %d member(s) %v",
+				brand.Name, brandID, hasOrg, needsOnboarding, len(missing), missing)
 			processed++
 			if needsOnboarding {
 				onboardingSet++
 			}
 			membersAdded += len(missing)
-			if needBilling {
-				billingSet++
-			}
 			continue
 		}
 
@@ -173,24 +166,16 @@ func main() {
 		if needsOnboarding {
 			brandUpdates = append(brandUpdates, firestore.Update{Path: "onboardingComplete", Value: true})
 		}
-		if needBilling {
-			brandUpdates = append(brandUpdates, firestore.Update{Path: "billing", Value: org.Billing})
-		}
 		if len(brandUpdates) > 0 {
 			if _, err := firestoredb.Client.Collection("brands").Doc(brandID).Update(ctx, brandUpdates); err != nil {
 				log.Printf("[WARN] %s: update brand fields: %v", brandID, err)
-			} else {
-				if needsOnboarding {
-					onboardingSet++
-				}
-				if needBilling {
-					billingSet++
-				}
+			} else if needsOnboarding {
+				onboardingSet++
 			}
 		}
 
-		log.Printf("[OK] brand %q (%s) hasOrg=%v → setOnboarding=%v, +%d member(s), billing=%v",
-			brand.Name, brandID, hasOrg, needsOnboarding, len(missing), needBilling)
+		log.Printf("[OK] brand %q (%s) hasOrg=%v → setOnboarding=%v, +%d member(s)",
+			brand.Name, brandID, hasOrg, needsOnboarding, len(missing))
 		processed++
 	}
 
@@ -198,7 +183,6 @@ func main() {
 	log.Printf("  brands processed:            %d", processed)
 	log.Printf("  onboardingComplete set:      %d", onboardingSet)
 	log.Printf("  brand memberships added:     %d", membersAdded)
-	log.Printf("  billing inherited:           %d", billingSet)
 	log.Printf("  skipped (deleted):           %d", skippedDeleted)
 	log.Printf("  skipped (org doc missing):   %d", skippedNoOrgDoc)
 	log.Printf("  failed:                      %d", failed)

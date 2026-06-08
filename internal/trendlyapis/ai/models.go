@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -18,8 +19,11 @@ func ListModels(c *gin.Context) {
 	brandID := c.Query("brandId")
 	tier := openrouter.TierStarter
 	if brandID != "" && verifyBrandAccess(brandID, managerID) {
-		if brand, err := loadBrand(brandID); err == nil && brand.Billing != nil && brand.Billing.PlanKey != nil {
-			tier = openrouter.TierFromPlanKey(*brand.Billing.PlanKey)
+		if brand, err := loadBrand(brandID); err == nil && brand.OrganizationID != nil && *brand.OrganizationID != "" {
+			org := &trendlymodels.Organization{}
+			if err := org.Get(*brand.OrganizationID); err == nil && org.Billing != nil && org.Billing.PlanKey != nil {
+				tier = openrouter.TierFromPlanKey(*org.Billing.PlanKey)
+			}
 		}
 	}
 	out := make([]modelListItem, 0, len(openrouter.Models))

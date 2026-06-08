@@ -38,8 +38,10 @@ type Brand struct {
 	Backend *BrandBackend `json:"backend,omitempty" firestore:"backend,omitempty"`
 	Survey  *BrandSurvey  `json:"survey,omitempty" firestore:"survey,omitempty"`
 
-	IsBillingDisabled bool          `json:"isBillingDisabled" firestore:"isBillingDisabled"`
-	Billing           *BrandBilling `json:"billing,omitempty" firestore:"billing,omitempty"`
+	// Billing/subscription lives on the Organization (see Organization.Billing).
+	// Read it via brand.OrganizationID → Organization.Get → Organization.Billing.
+	// Legacy Firestore docs may still carry `billing` and `isBillingDisabled`;
+	// those fields are ignored.
 
 	UnlockedInfluencers   []string               `json:"unlockedInfluencers,omitempty" firestore:"unlockedInfluencers,omitempty"`
 	DiscoveredInfluencers []string               `json:"discoveredInfluencers,omitempty" firestore:"discoveredInfluencers,omitempty"`

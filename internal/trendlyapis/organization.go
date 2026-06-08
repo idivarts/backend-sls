@@ -191,6 +191,7 @@ func AddBrandToOrganization(c *gin.Context) {
 			"onboardingComplete": false,
 			"creationTime":       now,
 		}
+		// Billing lives on the org only — nothing to stamp on the brand.
 		if err := tx.Set(brandRef, brandData, firestore.MergeAll); err != nil {
 			return err
 		}
@@ -207,9 +208,17 @@ func AddBrandToOrganization(c *gin.Context) {
 	}
 
 	// Every brand gets a default team that owns its socials, and the creator is
-	// added as a member (mirrors CreateBrand). Done post-transaction.
-	if _, err := trendlymodels.EnsureDefaultTeam(brandRef.ID, userId, now); err != nil {
+	// added as an active member. The brand switcher / brand-context list keys off
+	// brands/{brandId}/members/{managerId}, so WITHOUT this membership the new
+	// brand would never appear in the creator's switcher. Done post-transaction.
+	defTeam, err := trendlymodels.EnsureDefaultTeam(brandRef.ID, userId, now)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Brand created but default team failed"})
+		return
+	}
+	member := trendlymodels.BrandMember{ManagerID: userId, Status: 1, TeamID: defTeam}
+	if _, err := member.Set(brandRef.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Brand created but membership failed"})
 		return
 	}
 
