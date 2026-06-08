@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type Brand struct {
@@ -137,6 +138,82 @@ func (u *Brand) Get(brandId string) error {
 		return err
 	}
 	return err
+}
+
+// HardDeleteBrand permanently removes the brand document and every nested
+// subcollection beneath it. Walks subcollections recursively because brands
+// own a large fan-out (members, teams, socials, strategies/*, contents/*,
+// inbox, analytics caches, calendar comments, etc.) and the Firestore SDK has
+// no built-in recursive delete. Uses a BulkWriter so each level's deletes run
+// in parallel.
+func HardDeleteBrand(brandId string) error {
+	ctx := context.Background()
+	docRef := firestoredb.Client.Collection("brands").Doc(brandId)
+	if err := deleteDocRecursive(ctx, docRef); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteDocRecursive(ctx context.Context, doc *firestore.DocumentRef) error {
+	subIter := doc.Collections(ctx)
+	for {
+		sub, err := subIter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := deleteCollectionRecursive(ctx, sub); err != nil {
+			return err
+		}
+	}
+	_, err := doc.Delete(ctx)
+	return err
+}
+
+func deleteCollectionRecursive(ctx context.Context, col *firestore.CollectionRef) error {
+	bw := firestoredb.Client.BulkWriter(ctx)
+	iter := col.Documents(ctx)
+	defer iter.Stop()
+	for {
+		snap, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			bw.End()
+			return err
+		}
+		if err := deleteDocChildren(ctx, snap.Ref); err != nil {
+			bw.End()
+			return err
+		}
+		if _, err := bw.Delete(snap.Ref); err != nil {
+			bw.End()
+			return err
+		}
+	}
+	bw.End()
+	return nil
+}
+
+func deleteDocChildren(ctx context.Context, doc *firestore.DocumentRef) error {
+	subIter := doc.Collections(ctx)
+	for {
+		sub, err := subIter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := deleteCollectionRecursive(ctx, sub); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (b *Brand) Insert(brandId string) (*firestore.WriteResult, error) {

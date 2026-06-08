@@ -16,8 +16,10 @@ import (
 // ── Organization CRUD + brand lifecycle (delete / org-delete / transfer) ──────
 //
 // Decisions (see the Organization ticket §4b):
-//   - Delete brand     → soft-delete; blocked while the brand has active
-//                        contracts; removed from its org's brandIds.
+//   - Delete brand     → HARD delete (doc + every subcollection); blocked while
+//                        the brand has active contracts; removed from its org's
+//                        brandIds. Frontend forces a typed-name confirmation
+//                        before calling this — the action is irreversible.
 //   - Delete org       → soft-delete; blocked while it still owns active brands
 //                        or holds a paid (non-free) subscription.
 //   - Transfer brand   → only into an org the caller OWNS, and only if that org
@@ -282,9 +284,11 @@ func DeleteOrganization(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Organization deleted"})
 }
 
-// DeleteBrand soft-deletes a brand. Blocked while the brand has active
-// contracts. Removes the brand from its org's brandIds so it stops counting
-// against the cap. Allowed for a brand member or the org owner/admin.
+// DeleteBrand hard-deletes a brand: the doc and every subcollection beneath
+// it are permanently removed. Blocked while the brand has active contracts.
+// Also removes the brand from its org's brandIds so it stops counting against
+// the cap. Allowed for a brand member or the org owner/admin. The frontend
+// gates this behind a typed-name confirmation since it is irreversible.
 func DeleteBrand(c *gin.Context) {
 	userId, ok := middlewares.GetUserId(c)
 	if !ok {
@@ -296,10 +300,6 @@ func DeleteBrand(c *gin.Context) {
 	brand := trendlymodels.Brand{}
 	if err := brand.Get(brandId); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Brand not found"})
-		return
-	}
-	if brand.DeletedAt != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "Brand already deleted"})
 		return
 	}
 
@@ -318,16 +318,16 @@ func DeleteBrand(c *gin.Context) {
 		return
 	}
 
-	now := time.Now().UnixMilli()
-	if _, err := firestoredb.Client.Collection("brands").Doc(brandId).
-		Update(context.Background(), []firestore.Update{{Path: "deletedAt", Value: now}}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to delete brand"})
-		return
-	}
-
+	// Detach from the parent org first so a partial subcollection wipe still
+	// leaves the brand off the org's switcher / cap counter.
 	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
 		_, _ = firestoredb.Client.Collection("organizations").Doc(*brand.OrganizationID).
 			Update(context.Background(), []firestore.Update{{Path: "brandIds", Value: firestore.ArrayRemove(brandId)}})
+	}
+
+	if err := trendlymodels.HardDeleteBrand(brandId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to delete brand"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Brand deleted"})
