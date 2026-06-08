@@ -3,8 +3,9 @@
 // For every onboarded, non-deleted brand that has no organizationId yet, it:
 //   - creates one Organization per brand (v1 grouping rule — safest, preserves
 //     each brand's billing 1:1; consolidation can be a follow-up),
-//   - copies Brand.Billing -> Org.Billing (BILLING ONLY; the old credit buckets
-//     are intentionally dropped, not migrated),
+//   - copies any legacy brand `billing` (read straight from the raw Firestore
+//     map, since the Brand struct no longer has the field) -> Org.Billing.
+//     The old credit buckets are intentionally dropped, not migrated,
 //   - resolves maxBrands from the plan,
 //   - seeds org membership from the brand's members (owner -> org_owner, rest
 //     -> member),
@@ -19,6 +20,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"time"
@@ -30,6 +32,26 @@ import (
 
 	"google.golang.org/api/iterator"
 )
+
+// decodeLegacyBilling pulls the legacy `billing` map (written before billing
+// moved to the org) out of a raw Firestore brand document and decodes it into
+// BrandBilling. Returns nil when no legacy billing is present or it cannot be
+// decoded.
+func decodeLegacyBilling(data map[string]interface{}) *trendlymodels.BrandBilling {
+	raw, ok := data["billing"]
+	if !ok || raw == nil {
+		return nil
+	}
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	bb := &trendlymodels.BrandBilling{}
+	if err := json.Unmarshal(b, bb); err != nil {
+		return nil
+	}
+	return bb
+}
 
 func main() {
 	apply := os.Getenv("MIGRATE_APPLY") == "1"
@@ -96,10 +118,12 @@ func main() {
 			ownerID = members[0].ManagerID
 		}
 
-		// Resolve plan + cap. Default to free when no plan is set.
+		// Resolve plan + cap from the legacy raw `billing` map (the Brand struct
+		// no longer has a Billing field — billing lives on the org now).
+		legacyBilling := decodeLegacyBilling(doc.Data())
 		planKey := "free"
-		if brand.Billing != nil && brand.Billing.PlanKey != nil && *brand.Billing.PlanKey != "" {
-			planKey = *brand.Billing.PlanKey
+		if legacyBilling != nil && legacyBilling.PlanKey != nil && *legacyBilling.PlanKey != "" {
+			planKey = *legacyBilling.PlanKey
 		}
 		maxBrands := trendlymodels.ResolveMaxBrands(planKey)
 
@@ -108,7 +132,7 @@ func main() {
 			Image:        brand.Image,
 			OwnerID:      ownerID,
 			BrandIds:     []string{brandID},
-			Billing:      brand.Billing, // billing only — credits dropped
+			Billing:      legacyBilling, // billing only — credits dropped
 			PlanKey:      &planKey,
 			MaxBrands:    maxBrands,
 			CreationTime: now,

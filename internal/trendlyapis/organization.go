@@ -16,8 +16,10 @@ import (
 // ── Organization CRUD + brand lifecycle (delete / org-delete / transfer) ──────
 //
 // Decisions (see the Organization ticket §4b):
-//   - Delete brand     → soft-delete; blocked while the brand has active
-//                        contracts; removed from its org's brandIds.
+//   - Delete brand     → HARD delete (doc + every subcollection); blocked while
+//                        the brand has active contracts; removed from its org's
+//                        brandIds. Frontend forces a typed-name confirmation
+//                        before calling this — the action is irreversible.
 //   - Delete org       → soft-delete; blocked while it still owns active brands
 //                        or holds a paid (non-free) subscription.
 //   - Transfer brand   → only into an org the caller OWNS, and only if that org
@@ -70,67 +72,9 @@ func CreateOrganization(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Organization created", "organization": trendlymodels.OrganizationWithID{ID: orgId, Organization: org}})
 }
 
-// ListMyOrganizations returns every org the caller belongs to (across all orgs),
-// so the app can render an Organizations hub + grouped brand switcher.
-func ListMyOrganizations(c *gin.Context) {
-	userId, ok := middlewares.GetUserId(c)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
-		return
-	}
-
-	orgs, err := trendlymodels.GetMyOrganizations(userId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to list organizations"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"organizations": orgs})
-}
-
-// GetOrganization returns one org plus its (non-deleted) brands.
-func GetOrganization(c *gin.Context) {
-	userId, ok := middlewares.GetUserId(c)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
-		return
-	}
-	orgId := c.Param("id")
-
-	if _, found := getOrgRole(orgId, userId); !found {
-		c.JSON(http.StatusForbidden, gin.H{"message": "You are not a member of this organization"})
-		return
-	}
-
-	org := trendlymodels.Organization{}
-	if err := org.Get(orgId); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Organization not found"})
-		return
-	}
-	if org.DeletedAt != nil {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Organization not found"})
-		return
-	}
-
-	brands := []gin.H{}
-	for _, brandId := range org.BrandIds {
-		b := trendlymodels.Brand{}
-		if err := b.Get(brandId); err != nil {
-			continue
-		}
-		if b.DeletedAt != nil {
-			continue
-		}
-		brands = append(brands, gin.H{"id": brandId, "name": b.Name, "image": b.Image})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"organization": trendlymodels.OrganizationWithID{ID: orgId, Organization: org},
-		"brands":       brands,
-		"maxBrands":    org.MaxBrands,
-		"brandCount":   len(org.BrandIds),
-	})
-}
+// Reads for "my organizations" and "organization detail" used to live here;
+// they now come straight from Firestore on the client. See
+// contexts/organization-context.provider.tsx for the equivalent queries.
 
 type IAddBrand struct {
 	Name  string  `json:"name" binding:"required"`
@@ -191,6 +135,7 @@ func AddBrandToOrganization(c *gin.Context) {
 			"onboardingComplete": false,
 			"creationTime":       now,
 		}
+		// Billing lives on the org only — nothing to stamp on the brand.
 		if err := tx.Set(brandRef, brandData, firestore.MergeAll); err != nil {
 			return err
 		}
@@ -207,9 +152,17 @@ func AddBrandToOrganization(c *gin.Context) {
 	}
 
 	// Every brand gets a default team that owns its socials, and the creator is
-	// added as a member (mirrors CreateBrand). Done post-transaction.
-	if _, err := trendlymodels.EnsureDefaultTeam(brandRef.ID, userId, now); err != nil {
+	// added as an active member. The brand switcher / brand-context list keys off
+	// brands/{brandId}/members/{managerId}, so WITHOUT this membership the new
+	// brand would never appear in the creator's switcher. Done post-transaction.
+	defTeam, err := trendlymodels.EnsureDefaultTeam(brandRef.ID, userId, now)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Brand created but default team failed"})
+		return
+	}
+	member := trendlymodels.BrandMember{ManagerID: userId, Status: 1, TeamID: defTeam}
+	if _, err := member.Set(brandRef.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Brand created but membership failed"})
 		return
 	}
 
@@ -273,9 +226,11 @@ func DeleteOrganization(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Organization deleted"})
 }
 
-// DeleteBrand soft-deletes a brand. Blocked while the brand has active
-// contracts. Removes the brand from its org's brandIds so it stops counting
-// against the cap. Allowed for a brand member or the org owner/admin.
+// DeleteBrand hard-deletes a brand: the doc and every subcollection beneath
+// it are permanently removed. Blocked while the brand has active contracts.
+// Also removes the brand from its org's brandIds so it stops counting against
+// the cap. Allowed for a brand member or the org owner/admin. The frontend
+// gates this behind a typed-name confirmation since it is irreversible.
 func DeleteBrand(c *gin.Context) {
 	userId, ok := middlewares.GetUserId(c)
 	if !ok {
@@ -287,10 +242,6 @@ func DeleteBrand(c *gin.Context) {
 	brand := trendlymodels.Brand{}
 	if err := brand.Get(brandId); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Brand not found"})
-		return
-	}
-	if brand.DeletedAt != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "Brand already deleted"})
 		return
 	}
 
@@ -309,16 +260,16 @@ func DeleteBrand(c *gin.Context) {
 		return
 	}
 
-	now := time.Now().UnixMilli()
-	if _, err := firestoredb.Client.Collection("brands").Doc(brandId).
-		Update(context.Background(), []firestore.Update{{Path: "deletedAt", Value: now}}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to delete brand"})
-		return
-	}
-
+	// Detach from the parent org first so a partial subcollection wipe still
+	// leaves the brand off the org's switcher / cap counter.
 	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
 		_, _ = firestoredb.Client.Collection("organizations").Doc(*brand.OrganizationID).
 			Update(context.Background(), []firestore.Update{{Path: "brandIds", Value: firestore.ArrayRemove(brandId)}})
+	}
+
+	if err := trendlymodels.HardDeleteBrand(brandId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to delete brand"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Brand deleted"})

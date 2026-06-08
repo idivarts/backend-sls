@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type Brand struct {
@@ -38,8 +39,10 @@ type Brand struct {
 	Backend *BrandBackend `json:"backend,omitempty" firestore:"backend,omitempty"`
 	Survey  *BrandSurvey  `json:"survey,omitempty" firestore:"survey,omitempty"`
 
-	IsBillingDisabled bool          `json:"isBillingDisabled" firestore:"isBillingDisabled"`
-	Billing           *BrandBilling `json:"billing,omitempty" firestore:"billing,omitempty"`
+	// Billing/subscription lives on the Organization (see Organization.Billing).
+	// Read it via brand.OrganizationID → Organization.Get → Organization.Billing.
+	// Legacy Firestore docs may still carry `billing` and `isBillingDisabled`;
+	// those fields are ignored.
 
 	UnlockedInfluencers   []string               `json:"unlockedInfluencers,omitempty" firestore:"unlockedInfluencers,omitempty"`
 	DiscoveredInfluencers []string               `json:"discoveredInfluencers,omitempty" firestore:"discoveredInfluencers,omitempty"`
@@ -135,6 +138,109 @@ func (u *Brand) Get(brandId string) error {
 		return err
 	}
 	return err
+}
+
+// HardDeleteBrand permanently removes the brand document, every nested
+// subcollection beneath it, AND every collaboration owned by the brand
+// (collaborations live at the top level, keyed by brandId, with their own
+// applications/invitations subcollections). Walks subcollections recursively
+// because brands own a large fan-out (members, teams, socials, strategies/*,
+// contents/*, inbox, analytics caches, calendar comments, etc.) and the
+// Firestore SDK has no built-in recursive delete. Uses a BulkWriter so each
+// level's deletes run in parallel. The caller must have already verified the
+// brand has no active contracts — terminal contracts are intentionally left
+// as historical records.
+func HardDeleteBrand(brandId string) error {
+	ctx := context.Background()
+
+	if err := deleteCollaborationsForBrand(ctx, brandId); err != nil {
+		return err
+	}
+
+	docRef := firestoredb.Client.Collection("brands").Doc(brandId)
+	return deleteDocRecursive(ctx, docRef)
+}
+
+// deleteCollaborationsForBrand wipes every top-level collaboration owned by
+// the brand, including the applications/invitations subcollections under each.
+func deleteCollaborationsForBrand(ctx context.Context, brandId string) error {
+	iter := firestoredb.Client.Collection("collaborations").
+		Where("brandId", "==", brandId).Documents(ctx)
+	defer iter.Stop()
+	for {
+		snap, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := deleteDocRecursive(ctx, snap.Ref); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteDocRecursive(ctx context.Context, doc *firestore.DocumentRef) error {
+	subIter := doc.Collections(ctx)
+	for {
+		sub, err := subIter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := deleteCollectionRecursive(ctx, sub); err != nil {
+			return err
+		}
+	}
+	_, err := doc.Delete(ctx)
+	return err
+}
+
+func deleteCollectionRecursive(ctx context.Context, col *firestore.CollectionRef) error {
+	bw := firestoredb.Client.BulkWriter(ctx)
+	iter := col.Documents(ctx)
+	defer iter.Stop()
+	for {
+		snap, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			bw.End()
+			return err
+		}
+		if err := deleteDocChildren(ctx, snap.Ref); err != nil {
+			bw.End()
+			return err
+		}
+		if _, err := bw.Delete(snap.Ref); err != nil {
+			bw.End()
+			return err
+		}
+	}
+	bw.End()
+	return nil
+}
+
+func deleteDocChildren(ctx context.Context, doc *firestore.DocumentRef) error {
+	subIter := doc.Collections(ctx)
+	for {
+		sub, err := subIter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := deleteCollectionRecursive(ctx, sub); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (b *Brand) Insert(brandId string) (*firestore.WriteResult, error) {

@@ -184,7 +184,7 @@ func CreateSubscriptionV2(c *gin.Context) {
 
 	if req.AdminData != nil && req.AdminData.IsOnTrial {
 		tEndTime := time.Now().Add(time.Duration(trialDays * 24 * int(time.Hour))).UnixMilli()
-		brand.Billing = &trendlymodels.BrandBilling{
+		billing := &trendlymodels.BrandBilling{
 			Subscription:    &id,
 			SubscriptionUrl: &link,
 			BillingStatus:   myutil.StrPtr("created"),
@@ -194,16 +194,30 @@ func CreateSubscriptionV2(c *gin.Context) {
 			TrialEnds:       &tEndTime,
 			Status:          myutil.IntPtr(0),
 		}
-		if req.AdminData != nil && req.AdminData.OneTimePayment != nil {
-			brand.Billing.Subscription = nil
-			brand.Billing.PaymentLinkId = &id
+		if req.AdminData.OneTimePayment != nil {
+			billing.Subscription = nil
+			billing.PaymentLinkId = &id
+		}
+
+		// Billing lives on the org — write the trial billing there.
+		if brand.OrganizationID == nil || *brand.OrganizationID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no-organization", "message": "Brand is not linked to an organization"})
+			return
+		}
+		org := &trendlymodels.Organization{}
+		if err := org.Get(*brand.OrganizationID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to load organization"})
+			return
+		}
+		if err := org.SetBilling(*brand.OrganizationID, billing); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Organization Subscription"})
+			return
 		}
 
 		brand.HasPayWall = true
-
 		_, err = brand.Insert(req.BrandID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Brand Subscription"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Brand"})
 			return
 		}
 	}
