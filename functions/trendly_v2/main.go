@@ -36,6 +36,8 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/organizations", trendlyapis.CreateOrganization)
 	managerApisV1.POST("/organizations/:id/brands", trendlyapis.AddBrandToOrganization)
 	managerApisV1.DELETE("/organizations/:id", trendlyapis.DeleteOrganization)
+	// Remove a member from the org entirely (strips them from every brand in it).
+	managerApisV1.DELETE("/organizations/:id/members/:managerId", trendlyapis.RemoveOrganizationMember)
 	// Move a brand into an organization the caller owns (cap-enforced).
 	managerApisV1.POST("/organizations/:id/brands/:brandId/transfer", trendlyapis.TransferBrand)
 	// Soft-delete a brand (blocked while it has active contracts).

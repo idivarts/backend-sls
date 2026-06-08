@@ -154,6 +154,23 @@ func CreateBrandMember(c *gin.Context) {
 		}
 	}
 
+	// Adding someone to a brand also makes them a member of that brand's
+	// organization (as OrgRoleMember). Do this BEFORE creating the brand-member
+	// doc so a seat-capped org rejects the invite instead of half-adding the
+	// member. No-op if the brand has no org or they're already an org member.
+	orgId := ""
+	if brand.OrganizationID != nil {
+		orgId = *brand.OrganizationID
+	}
+	if err := EnsureOrgMembership(orgId, userRecord.UID); err != nil {
+		if err == errSeatLimit {
+			c.JSON(http.StatusConflict, gin.H{"error": "org-seat-limit-reached", "message": "Your organization has reached its plan's member limit. Upgrade to add more members."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Unable to add member to organization"})
+		return
+	}
+
 	bManager := &trendlymodels.BrandMember{
 		ManagerID: userRecord.UID,
 		Status:    0,

@@ -375,6 +375,111 @@ type capError struct{}
 
 func (e *capError) Error() string { return "brand-limit-reached" }
 
+// errSeatLimit is a sentinel returned by EnsureOrgMembership when adding a member
+// would push the org over its plan's MaxSeats cap. Callers map it to a 409.
+var errSeatLimit = &seatError{}
+
+type seatError struct{}
+
+func (e *seatError) Error() string { return "org-seat-limit-reached" }
+
+// EnsureOrgMembership adds managerId to the org as an OrgRoleMember when they are
+// not already a member, enforcing the org's plan seat cap. Whenever someone is
+// added to a brand they must also become a member of that brand's organization —
+// this is the single chokepoint for that rule.
+//
+// It is a no-op (returns nil) when orgId is empty (legacy brand with no org) or
+// the manager is already a member (no new seat consumed). It returns errSeatLimit
+// when the org is already at its MaxSeats cap.
+func EnsureOrgMembership(orgId, managerId string) error {
+	if orgId == "" {
+		return nil
+	}
+
+	// Already a member → no new seat consumed, regardless of role/status.
+	existing := trendlymodels.OrganizationMember{}
+	if err := existing.Get(orgId, managerId); err == nil {
+		return nil
+	}
+
+	org := trendlymodels.Organization{}
+	if err := org.Get(orgId); err != nil {
+		return err
+	}
+
+	maxSeats := trendlymodels.ResolveMaxSeats(myutil.DerefString(org.PlanKey))
+	count, err := trendlymodels.CountOrgMembers(orgId)
+	if err != nil {
+		return err
+	}
+	if count >= maxSeats {
+		return errSeatLimit
+	}
+
+	member := trendlymodels.OrganizationMember{ManagerID: managerId, Role: trendlymodels.OrgRoleMember, Status: 1}
+	if _, err := member.Set(orgId); err != nil {
+		return err
+	}
+	return nil
+}
+
+// RemoveOrganizationMember removes a manager from the org entirely: they are
+// stripped from EVERY brand in the org and their orgMembers doc is deleted.
+// Owner/admin only. The org owner cannot be removed (transfer ownership first).
+// DELETE /api/v2/organizations/:id/members/:managerId
+func RemoveOrganizationMember(c *gin.Context) {
+	userId, ok := middlewares.GetUserId(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	orgId := c.Param("id")
+	targetId := c.Param("managerId")
+
+	// Only an org owner/admin can manage org members.
+	if role, found := getOrgRole(orgId, userId); !found || (role != trendlymodels.OrgRoleOwner && role != trendlymodels.OrgRoleAdmin) {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Only an org owner/admin can manage members"})
+		return
+	}
+
+	target := trendlymodels.OrganizationMember{}
+	if err := target.Get(orgId, targetId); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Member not found in this organization"})
+		return
+	}
+	// The owner anchors the org; they must transfer ownership before leaving.
+	if target.Role == trendlymodels.OrgRoleOwner {
+		c.JSON(http.StatusConflict, gin.H{"error": "cannot-remove-owner", "message": "The organization owner can't be removed. Transfer ownership first."})
+		return
+	}
+
+	org := trendlymodels.Organization{}
+	if err := org.Get(orgId); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Organization not found"})
+		return
+	}
+
+	// Remove the manager from every brand in the org. Best-effort per brand: a
+	// member who was never on a given brand simply has no doc to delete.
+	for _, brandId := range org.BrandIds {
+		bm := trendlymodels.BrandMember{}
+		if err := bm.Get(brandId, targetId); err != nil {
+			continue // not a member of this brand — nothing to remove
+		}
+		if err := trendlymodels.DeleteBrandMember(brandId, targetId); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to remove member from a brand"})
+			return
+		}
+	}
+
+	if err := trendlymodels.DeleteOrgMember(orgId, targetId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to remove organization member"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Member removed from organization"})
+}
+
 // getOrgRole returns the caller's role in the org and whether they are a member.
 func getOrgRole(orgId, managerId string) (trendlymodels.OrgRole, bool) {
 	m := trendlymodels.OrganizationMember{}
