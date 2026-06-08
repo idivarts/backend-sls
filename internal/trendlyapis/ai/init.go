@@ -18,6 +18,10 @@ func RegisterRoutes(engine *gin.Engine) {
 	g.PATCH("/conversations/:conversationId", RenameConversation)
 	g.POST("/conversations/:conversationId/message", HTTPMessage)
 
+	// Onboarding seeding — one-shot setup for the /onboarding "what next" branch.
+	g.POST("/onboarding/strategy-init", HTTPOnboardingStrategyInit)
+	g.POST("/onboarding/calendar-init", HTTPOnboardingCalendarInit)
+
 	g.POST("/quick-edit", HTTPQuickEdit)
 
 	g.POST("/content/caption", HTTPCaption)
