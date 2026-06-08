@@ -1,19 +1,8 @@
 package constants
 
-import (
-	"fmt"
-
-	"github.com/idivarts/backend-sls/pkg/myutil"
-)
-
-func getStage() string {
-	if myutil.IsDevEnvironment() {
-		return "/dev"
-	}
-	return ""
-}
-
-var INSTAGRAM_REDIRECT = fmt.Sprintf("%s%s%s", TRENDLY_BE, getStage(), "/instagram/auth")
+// INSTAGRAM_REDIRECT is the stage-aware Instagram OAuth redirect endpoint.
+// GetTrendlyBE() adds the "/dev" API Gateway stage in dev.
+var INSTAGRAM_REDIRECT = GetTrendlyBE() + "/instagram/auth"
 
 type IInstaAuth struct {
 	Code         string `json:"code"`
