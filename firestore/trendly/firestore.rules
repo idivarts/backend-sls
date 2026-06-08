@@ -15,6 +15,9 @@ service cloud.firestore {
     match /{path=**}/members/{memberId} {
       allow read: if isAuthenticated();
     }
+    match /{path=**}/orgMembers/{memberId} {
+      allow read: if isAuthenticated();
+    }
 
     match /scrapped-socials/{socialId} {
       allow read: if isAuthenticated();
