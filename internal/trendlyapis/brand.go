@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
@@ -274,7 +274,9 @@ func getRedirectLink(brandId, uid string) string {
 	if err != nil {
 		panic("Error Creating custom token")
 	}
-	link := fmt.Sprintf("%s/firebase/brands/members/add?brandId=%s&token=%s", os.Getenv("SELF_BASE_URL"), url.QueryEscape(brandId), url.QueryEscape(token))
+	// Use the stage-aware backend base (adds the "/dev" API Gateway stage in dev)
+	// so invite-acceptance links resolve to the correct environment.
+	link := fmt.Sprintf("%s/firebase/brands/members/add?brandId=%s&token=%s", constants.GetTrendlyBE(), url.QueryEscape(brandId), url.QueryEscape(token))
 
 	return link
 }

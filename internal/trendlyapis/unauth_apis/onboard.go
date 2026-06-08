@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/myemail"
-	"github.com/idivarts/backend-sls/pkg/myutil"
 
 	"github.com/idivarts/backend-sls/internal/constants"
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
@@ -57,12 +56,9 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	dev := ""
-	if myutil.IsDevEnvironment() {
-		dev = "/dev"
-	}
-	// Build the verification link pointing to our email-redirection endpoint
-	verificationLink := fmt.Sprintf("%s%s/onboard/email-redirection?token=%s", os.Getenv("SELF_BASE_URL"), dev, url.QueryEscape(token))
+	// Build the verification link pointing to our email-redirection endpoint.
+	// GetTrendlyBE() is stage-aware (adds the "/dev" API Gateway stage in dev).
+	verificationLink := fmt.Sprintf("%s/onboard/email-redirection?token=%s", constants.GetTrendlyBE(), url.QueryEscape(token))
 
 	// Send custom verification email via SendGrid
 	data := map[string]interface{}{
