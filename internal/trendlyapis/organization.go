@@ -72,67 +72,9 @@ func CreateOrganization(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Organization created", "organization": trendlymodels.OrganizationWithID{ID: orgId, Organization: org}})
 }
 
-// ListMyOrganizations returns every org the caller belongs to (across all orgs),
-// so the app can render an Organizations hub + grouped brand switcher.
-func ListMyOrganizations(c *gin.Context) {
-	userId, ok := middlewares.GetUserId(c)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
-		return
-	}
-
-	orgs, err := trendlymodels.GetMyOrganizations(userId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to list organizations"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"organizations": orgs})
-}
-
-// GetOrganization returns one org plus its (non-deleted) brands.
-func GetOrganization(c *gin.Context) {
-	userId, ok := middlewares.GetUserId(c)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
-		return
-	}
-	orgId := c.Param("id")
-
-	if _, found := getOrgRole(orgId, userId); !found {
-		c.JSON(http.StatusForbidden, gin.H{"message": "You are not a member of this organization"})
-		return
-	}
-
-	org := trendlymodels.Organization{}
-	if err := org.Get(orgId); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error(), "message": "Organization not found"})
-		return
-	}
-	if org.DeletedAt != nil {
-		c.JSON(http.StatusNotFound, gin.H{"message": "Organization not found"})
-		return
-	}
-
-	brands := []gin.H{}
-	for _, brandId := range org.BrandIds {
-		b := trendlymodels.Brand{}
-		if err := b.Get(brandId); err != nil {
-			continue
-		}
-		if b.DeletedAt != nil {
-			continue
-		}
-		brands = append(brands, gin.H{"id": brandId, "name": b.Name, "image": b.Image})
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"organization": trendlymodels.OrganizationWithID{ID: orgId, Organization: org},
-		"brands":       brands,
-		"maxBrands":    org.MaxBrands,
-		"brandCount":   len(org.BrandIds),
-	})
-}
+// Reads for "my organizations" and "organization detail" used to live here;
+// they now come straight from Firestore on the client. See
+// contexts/organization-context.provider.tsx for the equivalent queries.
 
 type IAddBrand struct {
 	Name  string  `json:"name" binding:"required"`

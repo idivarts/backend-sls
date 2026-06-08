@@ -30,9 +30,10 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/create", trendlyapis.CreateBrand)
 
 	// ── Organizations (top-level tenant above Brand) ──────────────────────────
+	// Reads (list my orgs + org detail) go straight to Firestore from the app —
+	// see contexts/organization-context.provider.tsx. Mutations stay here
+	// because they need transactions and plan-cap / active-contract guards.
 	managerApisV1.POST("/organizations", trendlyapis.CreateOrganization)
-	managerApisV1.GET("/organizations", trendlyapis.ListMyOrganizations)
-	managerApisV1.GET("/organizations/:id", trendlyapis.GetOrganization)
 	managerApisV1.POST("/organizations/:id/brands", trendlyapis.AddBrandToOrganization)
 	managerApisV1.DELETE("/organizations/:id", trendlyapis.DeleteOrganization)
 	// Move a brand into an organization the caller owns (cap-enforced).

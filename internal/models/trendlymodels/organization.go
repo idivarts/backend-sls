@@ -5,7 +5,6 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"google.golang.org/api/iterator"
 )
 
 // Organization is the new top-level tenant that sits ABOVE Brand. An org owns a
@@ -144,40 +143,3 @@ func (m *OrganizationMember) Get(orgID, managerID string) error {
 	return res.DataTo(m)
 }
 
-// GetMyOrganizations returns every non-deleted organization the manager is a
-// member of (across all orgs), each with its doc id.
-func GetMyOrganizations(managerID string) ([]OrganizationWithID, error) {
-	orgs := []OrganizationWithID{}
-
-	iter := firestoredb.Client.CollectionGroup("orgMembers").
-		Where("managerId", "==", managerID).Documents(context.Background())
-	defer iter.Stop()
-
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, err
-		}
-
-		orgID := doc.Ref.Parent.Parent.ID
-		orgDoc, err := firestoredb.Client.Collection(orgCollection).Doc(orgID).Get(context.Background())
-		if err != nil {
-			// Membership doc orphaned (org hard-deleted) — skip rather than fail.
-			continue
-		}
-
-		var org Organization
-		if err := orgDoc.DataTo(&org); err != nil {
-			return nil, err
-		}
-		if org.DeletedAt != nil {
-			continue
-		}
-		orgs = append(orgs, OrganizationWithID{ID: orgID, Organization: org})
-	}
-
-	return orgs, nil
-}
