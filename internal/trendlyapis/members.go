@@ -7,21 +7,8 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
-// ListBrandMembers returns all members of a brand with their roles. Any brand
-// member may read.
-// GET /api/v2/brands/:brandId/members
-func ListBrandMembers(c *gin.Context) {
-	brandID := c.Param("brandId")
-	if _, ok := requireBrandMembership(c, brandID); !ok {
-		return
-	}
-	members, err := trendlymodels.GetAllBrandMembers(brandID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to list members"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"members": members})
-}
+// Brand members are read directly from Firestore by the apps
+// (brands/{brandId}/members); only mutations live here.
 
 type IUpdateMember struct {
 	// TeamID is the single team to move the member to. Must be a team of this brand.

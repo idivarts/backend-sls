@@ -109,16 +109,53 @@ func FilterValidPrivileges(feature Feature, privs []string) []string {
 }
 
 // AllFeaturePrivilegesMap returns every feature mapped to all of its privileges
-// (as the Firestore map[string][]string shape). Used to seed the default team,
-// which always holds full access.
+// (as the Firestore map[string][]string shape). Used to seed the default Admin
+// team, which always holds full access.
 func AllFeaturePrivilegesMap() map[string][]string {
+	return FeaturePrivilegesMapExcept()
+}
+
+// FeaturePrivilegesMapExcept returns every feature (except the excluded ones)
+// mapped to all of its privileges, in the Firestore map[string][]string shape.
+// Used to seed the default Editor team, which holds full access to everything
+// except brand administration.
+func FeaturePrivilegesMapExcept(exclude ...Feature) map[string][]string {
+	skip := map[Feature]bool{}
+	for _, f := range exclude {
+		skip[f] = true
+	}
 	out := map[string][]string{}
 	for feature, privs := range validFeaturePrivileges {
+		if skip[feature] {
+			continue
+		}
 		list := make([]string, len(privs))
 		for i, p := range privs {
 			list[i] = string(p)
 		}
 		out[string(feature)] = list
+	}
+	return out
+}
+
+// viewPrivileges maps each feature to its read-only ("view") privilege, where one
+// exists. Features whose privilege set has no pure view/observer grant
+// (Influencer Marketing, Growth, Brand Admin) are intentionally absent, so a
+// view-only team receives no access to them.
+var viewPrivileges = map[Feature]Privilege{
+	FeatureStrategy:        PrivStrategyViewer,
+	FeatureContentCalendar: PrivCalendarView,
+	FeatureContent:         PrivContentView,
+	FeatureSocialAccounts:  PrivSocialView,
+}
+
+// ViewOnlyFeaturePrivilegesMap returns each viewable feature mapped to only its
+// view privilege, in the Firestore map[string][]string shape. Used to seed the
+// default Viewer team.
+func ViewOnlyFeaturePrivilegesMap() map[string][]string {
+	out := map[string][]string{}
+	for feature, priv := range viewPrivileges {
+		out[string(feature)] = []string{string(priv)}
 	}
 	return out
 }

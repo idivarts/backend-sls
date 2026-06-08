@@ -8,20 +8,9 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
-// ListTeams returns all teams for a brand. Any brand member may read.
-// GET /api/v2/brands/:brandId/teams
-func ListTeams(c *gin.Context) {
-	brandID := c.Param("brandId")
-	if _, ok := requireBrandMembership(c, brandID); !ok {
-		return
-	}
-	teams, err := trendlymodels.GetAllTeams(brandID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to list teams"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"teams": teams})
-}
+// Teams are read directly from Firestore by the apps (brands/{brandId}/teams);
+// only mutations live here so privilege and default-team invariants stay
+// enforced server-side.
 
 type ITeamUpsert struct {
 	Name string `json:"name" binding:"required"`
@@ -135,11 +124,12 @@ func DeleteTeam(c *gin.Context) {
 
 	// Reassign any members on this team to the default team so they aren't
 	// orphaned (an orphaned teamId would lock the member out).
-	defTeamID, derr := trendlymodels.EnsureDefaultTeam(brandID, "", time.Now().UnixMilli())
+	defTeams, derr := trendlymodels.EnsureDefaultTeam(brandID, "", time.Now().UnixMilli())
 	if derr != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": derr.Error(), "message": "Unable to resolve default team"})
 		return
 	}
+	defTeamID := defTeams[0].ID
 	members, merr := trendlymodels.GetAllBrandMembers(brandID)
 	if merr != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": merr.Error(), "message": "Unable to list members"})

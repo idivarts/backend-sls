@@ -155,12 +155,12 @@ func AddBrandToOrganization(c *gin.Context) {
 	// added as an active member. The brand switcher / brand-context list keys off
 	// brands/{brandId}/members/{managerId}, so WITHOUT this membership the new
 	// brand would never appear in the creator's switcher. Done post-transaction.
-	defTeam, err := trendlymodels.EnsureDefaultTeam(brandRef.ID, userId, now)
+	defTeams, err := trendlymodels.EnsureDefaultTeam(brandRef.ID, userId, now)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Brand created but default team failed"})
 		return
 	}
-	member := trendlymodels.BrandMember{ManagerID: userId, Status: 1, TeamID: defTeam}
+	member := trendlymodels.BrandMember{ManagerID: userId, Status: 1, TeamID: defTeams[0].ID}
 	if _, err := member.Set(brandRef.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Brand created but membership failed"})
 		return

@@ -42,12 +42,12 @@ func handleManagerAPIs() {
 	managerApisV1.DELETE("/brands/:brandId", trendlyapis.DeleteBrand)
 
 	// ── Brand member management (team assignment) ─────────────────────────────
-	managerApisV1.GET("/brands/:brandId/members", trendlyapis.ListBrandMembers)
+	// Reads (list members) are served directly from Firestore by the apps.
 	managerApisV1.PATCH("/brands/:brandId/members/:managerId", trendlyapis.UpdateBrandMember)
 	managerApisV1.DELETE("/brands/:brandId/members/:managerId", trendlyapis.RemoveBrandMember)
 
 	// ── Teams (brands/{brandId}/teams) ────────────────────────────────────────
-	managerApisV1.GET("/brands/:brandId/teams", trendlyapis.ListTeams)
+	// Reads (list teams) are served directly from Firestore by the apps.
 	managerApisV1.POST("/brands/:brandId/teams", trendlyapis.CreateTeam)
 	managerApisV1.PATCH("/brands/:brandId/teams/:teamId", trendlyapis.UpdateTeam)
 	managerApisV1.DELETE("/brands/:brandId/teams/:teamId", trendlyapis.DeleteTeam)

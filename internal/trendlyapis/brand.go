@@ -124,12 +124,12 @@ func CreateBrandMember(c *gin.Context) {
 		}
 		teamID = *req.TeamID
 	} else {
-		defTeam, derr := trendlymodels.EnsureDefaultTeam(req.BrandID, userId, time.Now().UnixMilli())
+		defTeams, derr := trendlymodels.EnsureDefaultTeam(req.BrandID, userId, time.Now().UnixMilli())
 		if derr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": derr.Error(), "message": "Unable to resolve default team"})
 			return
 		}
-		teamID = defTeam
+		teamID = defTeams[0].ID
 	}
 
 	brand := &trendlymodels.Brand{}

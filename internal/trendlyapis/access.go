@@ -6,13 +6,8 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
-// requireBrandMembership / requireFeaturePrivilege are thin package-local aliases
-// over the canonical guards in middlewares, kept so handlers in this package
-// read cleanly.
-func requireBrandMembership(c *gin.Context, brandID string) (*trendlymodels.BrandMember, bool) {
-	return middlewares.RequireBrandMembership(c, brandID)
-}
-
+// requireFeaturePrivilege is a thin package-local alias over the canonical guard
+// in middlewares, kept so handlers in this package read cleanly.
 func requireFeaturePrivilege(c *gin.Context, brandID string, feature trendlymodels.Feature, priv trendlymodels.Privilege) (*trendlymodels.BrandMember, bool) {
 	return middlewares.RequireFeaturePrivilege(c, brandID, feature, priv)
 }

@@ -145,15 +145,16 @@ func main() {
 			if teamCreator == "" {
 				teamCreator = missing[0]
 			}
-			defTeam, err := trendlymodels.EnsureDefaultTeam(brandID, teamCreator, now)
+			defTeams, err := trendlymodels.EnsureDefaultTeam(brandID, teamCreator, now)
 			if err != nil {
 				log.Printf("[FAIL] %s: ensure default team: %v", brandID, err)
 				failed++
 				continue
 			}
+			defTeamID := defTeams[0].ID
 
 			for _, managerID := range missing {
-				m := trendlymodels.BrandMember{ManagerID: managerID, Status: 1, TeamID: defTeam}
+				m := trendlymodels.BrandMember{ManagerID: managerID, Status: 1, TeamID: defTeamID}
 				if _, err := m.Set(brandID); err != nil {
 					log.Printf("[WARN] %s: add member %s: %v", brandID, managerID, err)
 					continue
