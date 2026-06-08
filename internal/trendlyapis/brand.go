@@ -54,6 +54,23 @@ func CreateBrand(c *gin.Context) {
 	// new org-level token wallet is seeded by the Credit System ticket.
 	brand.HasPayWall = false
 
+	creator, _ := middlewares.GetUserId(c)
+
+	// Auto-provision a personal organization for any brand finalized without
+	// one, so billing/plan/credits (which live on the Organization) always have
+	// a home and the paywall gate has a billing entity to read. Guarded on
+	// OrganizationID so re-finalize is idempotent and brands created inside an
+	// org (AddBrandToOrganization) keep their existing org.
+	if brand.OrganizationID == nil || *brand.OrganizationID == "" {
+		orgName := "My Organization"
+		orgId, _, perr := provisionPersonalOrg(creator, orgName, brand.Image, []string{req.BrandID})
+		if perr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": perr.Error(), "message": "Error provisioning organization"})
+			return
+		}
+		brand.OrganizationID = &orgId
+	}
+
 	_, err = brand.Insert(req.BrandID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in inserting"})
@@ -61,7 +78,6 @@ func CreateBrand(c *gin.Context) {
 	}
 
 	// Every brand gets a default team that owns all connected socials initially.
-	creator, _ := middlewares.GetUserId(c)
 	if _, err := trendlymodels.EnsureDefaultTeam(req.BrandID, creator, time.Now().UnixMilli()); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error creating default team"})
 		return

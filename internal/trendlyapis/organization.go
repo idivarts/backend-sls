@@ -30,6 +30,37 @@ type ICreateOrganization struct {
 	Image *string `json:"image"`
 }
 
+// provisionPersonalOrg creates a forever-free org owned by userId, pre-seeded
+// with the given brandIds, and seeds the owner membership. Returns the new org
+// id and the created org. Shared by CreateOrganization (explicit org creation
+// from the Organizations hub) and CreateBrand (auto-provisioning a personal org
+// when a brand is finalized without one).
+func provisionPersonalOrg(userId, name string, image *string, brandIds []string) (string, *trendlymodels.Organization, error) {
+	planKey := "free"
+	org := trendlymodels.Organization{
+		Name:         name,
+		Image:        image,
+		OwnerID:      userId,
+		BrandIds:     brandIds,
+		PlanKey:      myutil.StrPtr(planKey),
+		MaxBrands:    trendlymodels.ResolveMaxBrands(planKey),
+		Billing:      &trendlymodels.OrgBilling{PlanKey: myutil.StrPtr(planKey), BillingStatus: myutil.StrPtr("active")},
+		CreationTime: time.Now().UnixMilli(),
+	}
+
+	orgId, err := org.Insert()
+	if err != nil {
+		return "", nil, err
+	}
+
+	owner := trendlymodels.OrganizationMember{ManagerID: userId, Role: trendlymodels.OrgRoleOwner, Status: 1}
+	if _, err := owner.Set(orgId); err != nil {
+		return "", nil, err
+	}
+
+	return orgId, &org, nil
+}
+
 // CreateOrganization creates a new org owned by the caller and seeds the owner
 // membership. New orgs start on the forever-free plan (cap = 1 brand).
 func CreateOrganization(c *gin.Context) {
@@ -45,31 +76,13 @@ func CreateOrganization(c *gin.Context) {
 		return
 	}
 
-	planKey := "free"
-	org := trendlymodels.Organization{
-		Name:         req.Name,
-		Image:        req.Image,
-		OwnerID:      userId,
-		BrandIds:     []string{},
-		PlanKey:      myutil.StrPtr(planKey),
-		MaxBrands:    trendlymodels.ResolveMaxBrands(planKey),
-		Billing:      &trendlymodels.OrgBilling{PlanKey: myutil.StrPtr(planKey), BillingStatus: myutil.StrPtr("active")},
-		CreationTime: time.Now().UnixMilli(),
-	}
-
-	orgId, err := org.Insert()
+	orgId, org, err := provisionPersonalOrg(userId, req.Name, req.Image, []string{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to create organization"})
 		return
 	}
 
-	owner := trendlymodels.OrganizationMember{ManagerID: userId, Role: trendlymodels.OrgRoleOwner, Status: 1}
-	if _, err := owner.Set(orgId); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to seed owner membership"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Organization created", "organization": trendlymodels.OrganizationWithID{ID: orgId, Organization: org}})
+	c.JSON(http.StatusOK, gin.H{"message": "Organization created", "organization": trendlymodels.OrganizationWithID{ID: orgId, Organization: *org}})
 }
 
 // Reads for "my organizations" and "organization detail" used to live here;
