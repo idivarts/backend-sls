@@ -42,8 +42,12 @@ func ValidateFirebaseCallback(c *gin.Context) {
 	// accepted. Fall back to the brand's default team if no pending invite exists.
 	bmember := trendlymodels.BrandMember{}
 	if err = bmember.Get(req.BrandID, uid); err != nil {
-		defTeam, _ := trendlymodels.EnsureDefaultTeam(req.BrandID, uid, time.Now().UnixMilli())
-		bmember = trendlymodels.BrandMember{ManagerID: uid, TeamID: defTeam}
+		defTeams, _ := trendlymodels.EnsureDefaultTeam(req.BrandID, uid, time.Now().UnixMilli())
+		var defTeamID string
+		if len(defTeams) > 0 {
+			defTeamID = defTeams[0].ID
+		}
+		bmember = trendlymodels.BrandMember{ManagerID: uid, TeamID: defTeamID}
 	}
 	bmember.ManagerID = uid
 	bmember.Status = 1

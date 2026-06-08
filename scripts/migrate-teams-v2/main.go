@@ -49,11 +49,12 @@ func main() {
 		brandID := bDoc.Ref.ID
 
 		// 1. Ensure default team + grant it full access.
-		defaultTeamID, err := trendlymodels.EnsureDefaultTeam(brandID, "", now)
+		defTeams, err := trendlymodels.EnsureDefaultTeam(brandID, "", now)
 		if err != nil {
 			log.Printf("[brand %s] could not ensure default team: %v", brandID, err)
 			continue
 		}
+		defaultTeamID := defTeams[0].ID
 		defTeam := &trendlymodels.Team{}
 		if err := defTeam.Get(brandID, defaultTeamID); err != nil {
 			log.Printf("[brand %s] could not load default team: %v", brandID, err)

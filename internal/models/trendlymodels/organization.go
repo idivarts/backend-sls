@@ -101,6 +101,15 @@ func ResolveMaxBrands(planKey string) int {
 	return 1
 }
 
+// ResolveMaxSeats returns the org member (seat) cap for a plan key, defaulting
+// to 1 (the free-tier cap) for unknown/empty keys.
+func ResolveMaxSeats(planKey string) int {
+	if v, ok := PlanLimitsMap[planKey]; ok {
+		return v.MaxSeats
+	}
+	return 1
+}
+
 const orgCollection = "organizations"
 
 func (o *Organization) Get(orgID string) error {
@@ -141,5 +150,24 @@ func (m *OrganizationMember) Get(orgID, managerID string) error {
 		return err
 	}
 	return res.DataTo(m)
+}
+
+// CountOrgMembers returns the number of member docs in the org's orgMembers
+// subcollection. Every doc (any role/status) holds a seat, so this is the count
+// the plan's MaxSeats cap is enforced against.
+func CountOrgMembers(orgID string) (int, error) {
+	docs, err := firestoredb.Client.Collection(orgCollection).Doc(orgID).
+		Collection("orgMembers").Documents(context.Background()).GetAll()
+	if err != nil {
+		return 0, err
+	}
+	return len(docs), nil
+}
+
+// DeleteOrgMember removes a manager's membership from the org.
+func DeleteOrgMember(orgID, managerID string) error {
+	_, err := firestoredb.Client.Collection(orgCollection).Doc(orgID).
+		Collection("orgMembers").Doc(managerID).Delete(context.Background())
+	return err
 }
 

@@ -93,31 +93,75 @@ func DeleteTeam(brandID, teamID string) error {
 	return err
 }
 
-// EnsureDefaultTeam returns the brand's default team ID, creating it if none
-// exists yet. It is idempotent and safe to call on every brand-setup path.
-func EnsureDefaultTeam(brandID, createdBy string, now int64) (string, error) {
+// defaultTeamSpec describes one of the teams seeded for every new brand. The
+// first spec (Admin) is the team used wherever a single team is needed for
+// auto-assignment (the brand creator, invited members, etc.).
+type defaultTeamSpec struct {
+	name       string
+	privileges map[string][]string
+}
+
+// defaultTeamSpecs is the ordered set of default teams a new brand receives:
+//   - Admin  — full access (all features + privileges).
+//   - Editor — full access except brand administration.
+//   - Viewer — view-only access.
+//
+// Admin must stay first; callers rely on teams[0] for auto-assignment.
+func defaultTeamSpecs() []defaultTeamSpec {
+	return []defaultTeamSpec{
+		{name: "Admin", privileges: AllFeaturePrivilegesMap()},
+		{name: "Editor", privileges: FeaturePrivilegesMapExcept(FeatureBrandAdmin)},
+		{name: "Viewer", privileges: ViewOnlyFeaturePrivilegesMap()},
+	}
+}
+
+// EnsureDefaultTeam returns the brand's default teams, creating them if none
+// exist yet. New brands get three default teams — Admin, Editor and Viewer (see
+// defaultTeamSpecs) — and the Admin team is always returned first, so callers
+// that need a single team for auto-assignment should use teams[0].
+//
+// It is idempotent and safe to call on every brand-setup path: if any default
+// team already exists (e.g. older brands seeded with a single default team), the
+// existing default teams are returned untouched and nothing new is created — no
+// backfill happens here.
+func EnsureDefaultTeam(brandID, createdBy string, now int64) ([]Team, error) {
 	teams, err := GetAllTeams(brandID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	var existing []Team
 	for _, t := range teams {
 		if t.IsDefault {
-			return t.ID, nil
+			existing = append(existing, t)
 		}
 	}
+	if len(existing) > 0 {
+		// Keep the Admin team first so callers can rely on teams[0] for
+		// auto-assignment, regardless of Firestore iteration order.
+		for i := range existing {
+			if existing[i].Name == "Admin" && i != 0 {
+				existing[0], existing[i] = existing[i], existing[0]
+				break
+			}
+		}
+		return existing, nil
+	}
 
-	ref := teamsCol(brandID).NewDoc()
-	team := Team{
-		ID:           ref.ID,
-		Name:         "Default",
-		IsDefault:    true,
-		CreatedBy:    createdBy,
-		CreationTime: now,
-		// The default team always holds full access.
-		Privileges: AllFeaturePrivilegesMap(),
+	var created []Team
+	for _, spec := range defaultTeamSpecs() {
+		ref := teamsCol(brandID).NewDoc()
+		team := Team{
+			ID:           ref.ID,
+			Name:         spec.name,
+			IsDefault:    true,
+			CreatedBy:    createdBy,
+			CreationTime: now,
+			Privileges:   spec.privileges,
+		}
+		if _, err := team.Set(brandID); err != nil {
+			return nil, err
+		}
+		created = append(created, team)
 	}
-	if _, err := team.Set(brandID); err != nil {
-		return "", err
-	}
-	return ref.ID, nil
+	return created, nil
 }

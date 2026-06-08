@@ -36,18 +36,20 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/organizations", trendlyapis.CreateOrganization)
 	managerApisV1.POST("/organizations/:id/brands", trendlyapis.AddBrandToOrganization)
 	managerApisV1.DELETE("/organizations/:id", trendlyapis.DeleteOrganization)
+	// Remove a member from the org entirely (strips them from every brand in it).
+	managerApisV1.DELETE("/organizations/:id/members/:managerId", trendlyapis.RemoveOrganizationMember)
 	// Move a brand into an organization the caller owns (cap-enforced).
 	managerApisV1.POST("/organizations/:id/brands/:brandId/transfer", trendlyapis.TransferBrand)
 	// Soft-delete a brand (blocked while it has active contracts).
 	managerApisV1.DELETE("/brands/:brandId", trendlyapis.DeleteBrand)
 
 	// ── Brand member management (team assignment) ─────────────────────────────
-	managerApisV1.GET("/brands/:brandId/members", trendlyapis.ListBrandMembers)
+	// Reads (list members) are served directly from Firestore by the apps.
 	managerApisV1.PATCH("/brands/:brandId/members/:managerId", trendlyapis.UpdateBrandMember)
 	managerApisV1.DELETE("/brands/:brandId/members/:managerId", trendlyapis.RemoveBrandMember)
 
 	// ── Teams (brands/{brandId}/teams) ────────────────────────────────────────
-	managerApisV1.GET("/brands/:brandId/teams", trendlyapis.ListTeams)
+	// Reads (list teams) are served directly from Firestore by the apps.
 	managerApisV1.POST("/brands/:brandId/teams", trendlyapis.CreateTeam)
 	managerApisV1.PATCH("/brands/:brandId/teams/:teamId", trendlyapis.UpdateTeam)
 	managerApisV1.DELETE("/brands/:brandId/teams/:teamId", trendlyapis.DeleteTeam)
