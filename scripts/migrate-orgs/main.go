@@ -64,7 +64,9 @@ func main() {
 	ctx := context.Background()
 	now := time.Now().UnixMilli()
 	created, skippedLinked, skippedDraft, skippedDeleted, failed := 0, 0, 0, 0, 0
+	processed := 0
 
+	log.Printf("fetching brands from Firestore…")
 	iter := firestoredb.Client.Collection("brands").Documents(ctx)
 	defer iter.Stop()
 
@@ -77,7 +79,10 @@ func main() {
 			log.Fatalf("brand iteration error: %v", err)
 		}
 
+		processed++
 		brandID := doc.Ref.ID
+		log.Printf("[%d] processing brand %s", processed, brandID)
+
 		var brand trendlymodels.Brand
 		if err := doc.DataTo(&brand); err != nil {
 			log.Printf("[FAIL] %s: decode brand: %v", brandID, err)
@@ -87,19 +92,23 @@ func main() {
 
 		// Idempotency: already linked to an org.
 		if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+			log.Printf("[SKIP] %s: already linked to org %s", brandID, *brand.OrganizationID)
 			skippedLinked++
 			continue
 		}
 		if brand.DeletedAt != nil {
+			log.Printf("[SKIP] %s: brand is deleted", brandID)
 			skippedDeleted++
 			continue
 		}
-		// Skip abandoned draft brands (onboarding never finished).
-		if !brand.OnboardingComplete {
+		// Skip already onboarding organizations since they should have already been linked to an org;
+		if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+			log.Printf("[SKIP] %s: onboarding complete (expected to already be linked)", brandID)
 			skippedDraft++
 			continue
 		}
 
+		log.Printf("    loading members for %s…", brandID)
 		// Resolve owner from brand members (prefer an active member).
 		members, err := trendlymodels.GetAllBrandMembers(brandID)
 		if err != nil {
@@ -145,12 +154,14 @@ func main() {
 			continue
 		}
 
+		log.Printf("    creating org for brand %s…", brandID)
 		orgID, err := org.Insert()
 		if err != nil {
 			log.Printf("[FAIL] %s: create org: %v", brandID, err)
 			failed++
 			continue
 		}
+		log.Printf("    created org %s; seeding %d members…", orgID, len(members))
 
 		// Seed org membership from brand members.
 		for _, m := range members {
@@ -164,6 +175,7 @@ func main() {
 			}
 		}
 
+		log.Printf("    linking brand %s -> org %s…", brandID, orgID)
 		// Link the brand to its new org.
 		if _, err := firestoredb.Client.Collection("brands").Doc(brandID).
 			Update(ctx, []firestore.Update{{Path: "organizationId", Value: orgID}}); err != nil {
@@ -178,6 +190,7 @@ func main() {
 	}
 
 	log.Printf("migrate-orgs done — %s", mode)
+	log.Printf("  total processed: %d", processed)
 	log.Printf("  created/would-create: %d", created)
 	log.Printf("  skipped (already linked): %d", skippedLinked)
 	log.Printf("  skipped (draft/not onboarded): %d", skippedDraft)
