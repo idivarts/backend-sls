@@ -140,17 +140,44 @@ func (u *Brand) Get(brandId string) error {
 	return err
 }
 
-// HardDeleteBrand permanently removes the brand document and every nested
-// subcollection beneath it. Walks subcollections recursively because brands
-// own a large fan-out (members, teams, socials, strategies/*, contents/*,
-// inbox, analytics caches, calendar comments, etc.) and the Firestore SDK has
-// no built-in recursive delete. Uses a BulkWriter so each level's deletes run
-// in parallel.
+// HardDeleteBrand permanently removes the brand document, every nested
+// subcollection beneath it, AND every collaboration owned by the brand
+// (collaborations live at the top level, keyed by brandId, with their own
+// applications/invitations subcollections). Walks subcollections recursively
+// because brands own a large fan-out (members, teams, socials, strategies/*,
+// contents/*, inbox, analytics caches, calendar comments, etc.) and the
+// Firestore SDK has no built-in recursive delete. Uses a BulkWriter so each
+// level's deletes run in parallel. The caller must have already verified the
+// brand has no active contracts — terminal contracts are intentionally left
+// as historical records.
 func HardDeleteBrand(brandId string) error {
 	ctx := context.Background()
-	docRef := firestoredb.Client.Collection("brands").Doc(brandId)
-	if err := deleteDocRecursive(ctx, docRef); err != nil {
+
+	if err := deleteCollaborationsForBrand(ctx, brandId); err != nil {
 		return err
+	}
+
+	docRef := firestoredb.Client.Collection("brands").Doc(brandId)
+	return deleteDocRecursive(ctx, docRef)
+}
+
+// deleteCollaborationsForBrand wipes every top-level collaboration owned by
+// the brand, including the applications/invitations subcollections under each.
+func deleteCollaborationsForBrand(ctx context.Context, brandId string) error {
+	iter := firestoredb.Client.Collection("collaborations").
+		Where("brandId", "==", brandId).Documents(ctx)
+	defer iter.Stop()
+	for {
+		snap, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := deleteDocRecursive(ctx, snap.Ref); err != nil {
+			return err
+		}
 	}
 	return nil
 }
