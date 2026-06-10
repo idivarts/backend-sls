@@ -77,7 +77,7 @@ func HTTPPushToCalendar(c *gin.Context) {
 		return
 	}
 
-	items, err := generateCalendarItems(ctx, html, duration)
+	items, err := generateCalendarItems(ctx, req.BrandID, html, duration)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -149,7 +149,7 @@ func HTTPPushToCalendar(c *gin.Context) {
 	})
 }
 
-func generateCalendarItems(ctx context.Context, html string, duration int) ([]generatedItem, error) {
+func generateCalendarItems(ctx context.Context, brandID, html string, duration int) ([]generatedItem, error) {
 	sys := "You convert a content-strategy document into a concrete posting schedule. " +
 		"Read the strategy and produce one content item per planned post across the campaign. " +
 		"Spread items sensibly over the window using dayOffset (0-based, from 0 to " +
@@ -160,8 +160,12 @@ func generateCalendarItems(ctx context.Context, html string, duration int) ([]ge
 		"and nothing else."
 	user := fmt.Sprintf("Campaign length: %d days.\n\nStrategy document (HTML):\n%s", duration, html)
 
+	model, locked := pickModel(ctx, brandID, openrouter.TaskStrategy, "")
+	if locked {
+		return nil, fmt.Errorf("upgrade_required")
+	}
 	resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
-		Model:          openrouter.ResolveModel(openrouter.TaskStrategy, ""),
+		Model:          model,
 		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
 		Messages: []openrouter.Message{
 			{Role: "system", Content: sys},
@@ -218,7 +222,7 @@ func HTTPRecheckDuration(c *gin.Context) {
 		return
 	}
 
-	days, confidence := deriveDuration(ctx, html)
+	days, confidence := deriveDuration(ctx, req.BrandID, html)
 	if days <= 0 {
 		c.JSON(http.StatusOK, gin.H{"strategyId": strategyID, "durationDays": nil, "confidence": confidence})
 		return
@@ -239,12 +243,16 @@ func HTTPRecheckDuration(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"strategyId": strategyID, "durationDays": days, "confidence": confidence})
 }
 
-func deriveDuration(ctx context.Context, html string) (int, float64) {
+func deriveDuration(ctx context.Context, brandID, html string) (int, float64) {
 	sys := "Read the content-strategy document and determine how many days the campaign is intended to run. " +
 		"Respond with ONLY a JSON object {\"durationDays\":number,\"confidence\":number} where confidence is 0–1. " +
 		"If the document does not clearly state or imply a length, set durationDays to 0."
+	model, locked := pickModel(ctx, brandID, openrouter.TaskStrategy, "")
+	if locked {
+		return 0, 0
+	}
 	resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
-		Model:          openrouter.ResolveModel(openrouter.TaskStrategy, ""),
+		Model:          model,
 		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
 		Messages: []openrouter.Message{
 			{Role: "system", Content: sys},

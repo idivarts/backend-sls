@@ -59,7 +59,11 @@ func HTTPCaption(c *gin.Context) {
 	}
 
 	sys := buildSystemPrompt(brand, "content", req.BrandID, req.ContextID, "")
-	model := openrouter.ResolveModel(openrouter.TaskCaption, req.Model)
+	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskCaption, req.Model)
+	if locked {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskCaption})
+		return
+	}
 
 	user := fmt.Sprintf(
 		"Write 3 caption options for a %s %s post. Topic: %s. Tone: %s.\n\nReturn STRICTLY a JSON array of 3 objects with keys \"length\" (\"short\"|\"medium\"|\"long\") and \"text\". No markdown, no commentary.",
@@ -136,7 +140,11 @@ func HTTPHashtags(c *gin.Context) {
 	}
 
 	sys := buildSystemPrompt(brand, "content", req.BrandID, req.ContextID, "")
-	model := openrouter.ResolveModel(openrouter.TaskHashtag, req.Model)
+	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskHashtag, req.Model)
+	if locked {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskHashtag})
+		return
+	}
 
 	user := fmt.Sprintf(
 		"Suggest hashtags for a %s post on the topic: %s. Use up-to-date trending hashtags when possible.\n\nReturn STRICTLY a JSON array of 3 objects with keys \"tier\" (\"broad\"|\"niche\"|\"brand\") and \"tags\" (array of strings, no # prefix). 5-7 tags per tier. No markdown, no commentary.",
@@ -207,7 +215,11 @@ func handleScriptGenWS(req WSRequest) {
 		return
 	}
 	sys := buildSystemPrompt(brand, "content", p.BrandID, p.ContextID, "")
-	model := openrouter.ResolveModel(openrouter.TaskScript, req.Model)
+	model, locked := pickModel(context.Background(), p.BrandID, openrouter.TaskScript, req.Model)
+	if locked {
+		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskScript)})
+		return
+	}
 
 	user := fmt.Sprintf(
 		"Write a video script for a %s. Topic: %s. Key message: %s. Tone: %s.\n\nReturn structured markdown with these sections:\n## Hook (first 3 seconds)\n## Body (3-4 scenes with cues)\n## CTA",
@@ -278,7 +290,11 @@ func handleImageGenWS(req WSRequest) {
 	}
 
 	size := aspectToSize(p.AspectRatio)
-	model := openrouter.ResolveModel(openrouter.TaskImage, req.Model)
+	model, locked := pickModel(context.Background(), p.BrandID, openrouter.TaskImage, req.Model)
+	if locked {
+		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskImage)})
+		return
+	}
 
 	prompt := p.Description
 	if p.Style != "" {

@@ -27,7 +27,11 @@ func CreateConversation(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
-	model := openrouter.ResolveModel(openrouter.TaskChat, req.Model)
+	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskChat, req.Model)
+	if locked {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskChat})
+		return
+	}
 	title := req.Title
 	if title == "" {
 		title = "New chat"

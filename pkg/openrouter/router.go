@@ -1,5 +1,9 @@
 package openrouter
 
+// TaskType identifies an AI task/module. Each task maps to an ordered list of
+// allowed models in the registry (see models.go). The model data + per-task
+// lists now live in Firestore (collection "ai_config"); this file only declares
+// the task identifiers used across the AI handlers.
 type TaskType string
 
 const (
@@ -14,24 +18,8 @@ const (
 	TaskImage      TaskType = "image"
 )
 
-var DefaultModelFor = map[TaskType]string{
-	TaskChat:       "openai/gpt-4o",
-	TaskQuickEdit:  "openai/gpt-4o",
-	TaskCaption:    "openai/gpt-4o",
-	TaskHashtag:    "openai/gpt-4o",
-	TaskStrategy:   "anthropic/claude-opus-4",
-	TaskScript:     "anthropic/claude-opus-4",
-	TaskMultimodal: "google/gemini-2.5-pro",
-	TaskReasoning:  "openai/o3",
-	TaskImage:      "google/gemini-2.5-flash-image-preview",
-}
-
-func ResolveModel(task TaskType, requested string) string {
-	if requested != "" && IsKnownModel(requested) {
-		return requested
-	}
-	if def, ok := DefaultModelFor[task]; ok {
-		return def
-	}
-	return "openai/gpt-4o"
+// AllTaskTypes is the canonical list of tasks, used when seeding/validating config.
+var AllTaskTypes = []TaskType{
+	TaskChat, TaskQuickEdit, TaskCaption, TaskHashtag, TaskStrategy,
+	TaskScript, TaskMultimodal, TaskReasoning, TaskImage,
 }
