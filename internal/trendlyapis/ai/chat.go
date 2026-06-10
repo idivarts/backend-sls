@@ -69,7 +69,15 @@ func handleMessageWS(req WSRequest) {
 		_ = openrouter.UpdateConversationTitle(ctx, conv.ID, title)
 	}
 
-	model := openrouter.ResolveModel(openrouter.TaskChat, req.Model)
+	model, locked := pickModel(ctx, conv.BrandID, openrouter.TaskChat, req.Model)
+	if locked {
+		wsSend(req.ConnectionID, map[string]any{
+			"type":           "upgrade_required",
+			"conversationId": conv.ID,
+			"task":           string(openrouter.TaskChat),
+		})
+		return
+	}
 	if model != conv.CurrentModel {
 		_ = openrouter.UpdateConversationModel(ctx, conv.ID, model)
 	}
@@ -301,7 +309,11 @@ func HTTPMessage(c *gin.Context) {
 	msgs = append(msgs, openrouter.ToOpenRouterMessages(history)...)
 	msgs = append(msgs, openrouter.Message{Role: "user", Content: req.Content})
 
-	model := openrouter.ResolveModel(openrouter.TaskChat, req.Model)
+	model, locked := pickModel(ctx, conv.BrandID, openrouter.TaskChat, req.Model)
+	if locked {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskChat})
+		return
+	}
 
 	resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
 		Model:    model,

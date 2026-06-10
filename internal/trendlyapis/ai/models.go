@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
-	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -14,27 +13,30 @@ type modelListItem struct {
 	Unlocked bool `json:"unlocked"`
 }
 
+// ListModels returns the model catalog with per-model unlock flags for the
+// brand's current plan. The brand app primarily reads ai_config directly from
+// Firestore; this endpoint is kept for backward-compat / server-side callers.
 func ListModels(c *gin.Context) {
 	managerID, _ := middlewares.GetUserId(c)
 	brandID := c.Query("brandId")
-	tier := openrouter.TierStarter
+
+	openrouter.EnsureRegistry(c.Request.Context())
+
+	plan := openrouter.PlanFree
 	if brandID != "" && verifyBrandAccess(brandID, managerID) {
-		if brand, err := loadBrand(brandID); err == nil && brand.OrganizationID != nil && *brand.OrganizationID != "" {
-			org := &trendlymodels.Organization{}
-			if err := org.Get(*brand.OrganizationID); err == nil && org.Billing != nil && org.Billing.PlanKey != nil {
-				tier = openrouter.TierFromPlanKey(*org.Billing.PlanKey)
-			}
-		}
+		plan = brandPlan(brandID)
 	}
-	out := make([]modelListItem, 0, len(openrouter.Models))
-	for _, m := range openrouter.Models {
+
+	models := openrouter.ListModels()
+	out := make([]modelListItem, 0, len(models))
+	for _, m := range models {
 		out = append(out, modelListItem{
 			ModelInfo: m,
-			Unlocked:  openrouter.IsUnlockedFor(m, tier),
+			Unlocked:  openrouter.Unlocked(m, plan),
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"tier":   tier,
+		"plan":   plan,
 		"models": out,
 	})
 }

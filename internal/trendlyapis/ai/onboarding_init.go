@@ -69,7 +69,11 @@ func HTTPOnboardingStrategyInit(c *gin.Context) {
 	strategyID := stratRef.ID
 
 	// 2. Create the strategy-scoped conversation.
-	model := openrouter.ResolveModel(openrouter.TaskChat, req.Model)
+	model, locked := pickModel(ctx, req.BrandID, openrouter.TaskChat, req.Model)
+	if locked {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskChat})
+		return
+	}
 	conv, err := openrouter.CreateConversation(ctx, req.BrandID, managerID, moduleStrategy, strategyID, model, "Content strategy")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -130,7 +134,11 @@ func HTTPOnboardingCalendarInit(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	model := openrouter.ResolveModel(openrouter.TaskChat, req.Model)
+	model, locked := pickModel(ctx, req.BrandID, openrouter.TaskChat, req.Model)
+	if locked {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskChat})
+		return
+	}
 
 	// 1. Create a template content item on today (midnight UTC, mirroring how the
 	//    client places new calendar items).
