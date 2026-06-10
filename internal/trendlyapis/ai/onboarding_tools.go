@@ -79,7 +79,15 @@ func onboardingServerTools() []openrouter.Tool {
 	}
 }
 
-// dispatchServerTool runs a server tool. It returns a JSON result string (fed
+// dispatchServerTool runs a server tool. Server tools execute their
+// action **entirely on the backend** — they write Firestore directly via the
+// Admin SDK and never require a follow-up API call from the client. (The app
+// only reacts to the resulting Firestore change via its live subscription, or
+// to a WS navigation signal like strategy_ready/onboarding_complete.) This is
+// the deliberate "no frontend round-trip for actions" contract; client tools
+// (ask_options/ask_input in controls.go) are the only ones that defer to the UI.
+//
+// It returns a JSON result string (fed
 // back to the model), a completion flag (onboarding complete / strategy doc
 // ready — chat.go turns this into the matching WS signal), and any hard error.
 // contextID is the conversation's ContextID (e.g. the strategyId) and managerID
