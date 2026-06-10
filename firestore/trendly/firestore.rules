@@ -47,6 +47,23 @@ service cloud.firestore {
                         canManageContentStrategy(resource.data.brandId));
     }
 
+    // ── AI chat conversations ─────────────────────────────────────────────
+    // Author-only. The app subscribes directly to these for first load +
+    // pagination (Firestore is the source of truth for displayed chat content);
+    // the WebSocket only drives the live typing feel. All writes are performed
+    // server-side via the Admin SDK, so clients get read-only access. userId is
+    // denormalized onto each message doc so the messages rule needs no parent
+    // get().
+    match /ai_conversations/{conversationId} {
+      allow read:  if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read:  if isAuthenticated() && resource.data.userId == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
     match /collaborations-invites/{collabUserId} {
       allow read, write: if isAuthenticated() && isAdmin();
     }
