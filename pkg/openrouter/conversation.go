@@ -91,48 +91,23 @@ func DeleteConversation(ctx context.Context, conversationID string) error {
 	return err
 }
 
-func ListConversations(ctx context.Context, brandID, userID, module, contextID string, limit int) ([]trendlymodels.AIConversation, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	q := conversationsRef().
-		Where("brandId", "==", brandID).
-		Where("userId", "==", userID)
-	if module != "" {
-		q = q.Where("module", "==", module)
-	}
-	// Only filter when a contextId is supplied. The contextId field is omitted
-	// for empty values (firestore:"contextId,omitempty"), so an `== ""` filter
-	// would wrongly match nothing for context-less modules (e.g. "general").
-	if contextID != "" {
-		q = q.Where("contextId", "==", contextID)
-	}
-	q = q.OrderBy("updatedAt", firestore.Desc).Limit(limit)
-
-	iter := q.Documents(ctx)
-	defer iter.Stop()
-
-	var out []trendlymodels.AIConversation
-	for {
-		doc, err := iter.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		var conv trendlymodels.AIConversation
-		if err := doc.DataTo(&conv); err == nil {
-			conv.ID = doc.Ref.ID
-			out = append(out, conv)
-		}
-	}
-	return out, nil
-}
-
 func AppendMessage(ctx context.Context, conversationID string, msg trendlymodels.AIMessage) (string, error) {
 	if msg.Timestamp == 0 {
 		msg.Timestamp = time.Now().UnixMilli()
+	}
+	// Every message carries the owning userId/brandId so the Firestore client
+	// read rules can authorize it without a parent get(). Hot callers stamp
+	// these directly (no extra read); fall back to the conversation doc only
+	// when a caller left them empty.
+	if msg.UserID == "" || msg.BrandID == "" {
+		if conv, err := GetConversation(ctx, conversationID); err == nil {
+			if msg.UserID == "" {
+				msg.UserID = conv.UserID
+			}
+			if msg.BrandID == "" {
+				msg.BrandID = conv.BrandID
+			}
+		}
 	}
 	doc, _, err := messagesRef(conversationID).Add(ctx, msg)
 	if err != nil {

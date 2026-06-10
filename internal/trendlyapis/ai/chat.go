@@ -51,6 +51,9 @@ func handleMessageWS(req WSRequest) {
 
 	if _, err := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
 		Role:        "user",
+		UserID:      conv.UserID,
+		BrandID:     conv.BrandID,
+		ClientMsgID: req.ClientMsgID,
 		Content:     req.Content,
 		FocusedText: req.FocusedText,
 		Timestamp:   time.Now().UnixMilli(),
@@ -196,8 +199,10 @@ func handleMessageWS(req WSRequest) {
 	if finalUsage != nil {
 		tokens = finalUsage.TotalTokens
 	}
-	_, _ = openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
+	assistantMsgID, _ := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
 		Role:       "assistant",
+		UserID:     conv.UserID,
+		BrandID:    conv.BrandID,
 		Content:    fullText.String(),
 		Model:      model,
 		TokenCount: tokens,
@@ -223,9 +228,14 @@ func handleMessageWS(req WSRequest) {
 		})
 	}
 
+	// The client reconciles its optimistic bubbles against Firestore using these
+	// ids: messageId = the committed assistant doc, clientMsgId = the user's
+	// optimistic bubble it can now drop in favor of the synced doc.
 	wsSend(req.ConnectionID, map[string]any{
 		"type":           "done",
 		"conversationId": conv.ID,
+		"messageId":      assistantMsgID,
+		"clientMsgId":    req.ClientMsgID,
 		"usage":          finalUsage,
 	})
 }

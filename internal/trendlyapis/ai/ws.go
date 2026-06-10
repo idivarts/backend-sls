@@ -15,6 +15,7 @@ type WSRequest struct {
 
 	BrandID        string
 	ConversationID string
+	ClientMsgID    string
 	Content        string
 	FocusedText    string
 	Model          string

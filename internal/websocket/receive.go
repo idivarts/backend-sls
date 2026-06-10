@@ -17,6 +17,7 @@ type Envelope struct {
 
 	BrandID        string         `json:"brandId,omitempty"`
 	ConversationID string         `json:"conversationId,omitempty"`
+	ClientMsgID    string         `json:"clientMsgId,omitempty"`
 	Content        string         `json:"content,omitempty"`
 	FocusedText    string         `json:"focusedText,omitempty"`
 	Model          string         `json:"model,omitempty"`

@@ -13,7 +13,16 @@ type AIConversation struct {
 }
 
 type AIMessage struct {
-	Role        string     `json:"role" firestore:"role"`
+	Role string `json:"role" firestore:"role"`
+	// UserID/BrandID are denormalized onto every message doc so the Firestore
+	// security rules can authorize a client read without a get() on the parent
+	// conversation. Stamped by AppendMessage (falls back to the conversation's
+	// own values when a caller leaves them empty).
+	UserID  string `json:"userId,omitempty" firestore:"userId,omitempty"`
+	BrandID string `json:"brandId,omitempty" firestore:"brandId,omitempty"`
+	// ClientMsgID echoes the id the client generated for an optimistic user
+	// bubble, so the Firestore snapshot can reconcile (dedupe) it on arrival.
+	ClientMsgID string     `json:"clientMsgId,omitempty" firestore:"clientMsgId,omitempty"`
 	Content     string     `json:"content" firestore:"content"`
 	Model       string     `json:"model,omitempty" firestore:"model,omitempty"`
 	FocusedText string     `json:"focusedText,omitempty" firestore:"focusedText,omitempty"`
