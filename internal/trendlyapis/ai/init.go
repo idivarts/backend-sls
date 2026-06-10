@@ -11,9 +11,10 @@ func RegisterRoutes(engine *gin.Engine) {
 		middlewares.TrendlyMiddleware("managers"),
 	)
 
+	// Reads (thread list + message history) come straight from Firestore via the
+	// client SDK — Firestore is the source of truth for displayed chat content.
+	// The backend only owns writes (create/delete/rename) + the streaming WS.
 	g.POST("/conversations", CreateConversation)
-	g.GET("/conversations", ListConversations)
-	g.GET("/conversations/:conversationId", GetConversation)
 	g.DELETE("/conversations/:conversationId", DeleteConversation)
 	g.PATCH("/conversations/:conversationId", RenameConversation)
 	g.POST("/conversations/:conversationId/message", HTTPMessage)
