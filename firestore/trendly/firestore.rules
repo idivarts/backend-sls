@@ -64,6 +64,17 @@ service cloud.firestore {
       }
     }
 
+    // ── AI model config ───────────────────────────────────────────────────
+    // Public catalog of available AI models + per-task allowed-model lists
+    // (docs: ai_config/models, ai_config/tasks). Readable by ANY authenticated
+    // user, including Firebase anonymous sessions (so pre-auth screens can load
+    // the model list without an API call). Seeded/edited server-side via the
+    // Admin SDK (scripts/seed_ai_config) — clients never write.
+    match /ai_config/{document} {
+      allow read:  if isAuthenticated();
+      allow write: if false;
+    }
+
     match /collaborations-invites/{collabUserId} {
       allow read, write: if isAuthenticated() && isAdmin();
     }
