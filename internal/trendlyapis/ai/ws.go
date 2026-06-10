@@ -42,6 +42,8 @@ func HandleWS(req WSRequest) {
 		handleQuickEditWS(req)
 	case "content_gen":
 		handleContentGenWS(req)
+	case "push_to_calendar":
+		handlePushToCalendarWS(req)
 	default:
 		wsErrorTo(req.ConnectionID, "unknown type: "+req.Type)
 	}

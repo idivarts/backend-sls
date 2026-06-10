@@ -38,56 +38,71 @@ type generatedItem struct {
 	DayOffset     int    `json:"dayOffset"`
 }
 
-// HTTPPushToCalendar expands a finalized strategy into scheduled content items
-// under brands/{brandId}/contents, placed within [startDate, startDate+duration).
-func HTTPPushToCalendar(c *gin.Context) {
-	strategyID := c.Param("strategyId")
-	managerID, _ := middlewares.GetUserId(c)
+// pushProgressFn receives staged progress while a push-to-calendar job runs.
+// The HTTP path passes a no-op; the WebSocket path streams these to the client.
+// `extra` carries optional structured fields (e.g. total/index/title).
+type pushProgressFn func(phase, message string, extra map[string]any)
 
-	var req pushToCalendarReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if !verifyBrandAccess(req.BrandID, managerID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
+// pushResult is the outcome of a push-to-calendar run, shared by both transports.
+type pushResult struct {
+	CreatedItemIds []string
+	RemovedItemIds []string
+	StartDateStr   string
+	EndDateStr     string
+}
+
+// runPushToCalendar is the shared core that expands a finalized strategy into
+// scheduled content items under brands/{brandId}/contents, placed within
+// [startDate, startDate+duration). The heavy step (generateCalendarItems) is an
+// AI call that can exceed the API Gateway 30s HTTP limit, so the WebSocket path
+// runs this with a progress callback while HTTP passes nil.
+//
+// Errors are returned with stable messages so the HTTP wrapper can map them to
+// status codes: "startDate must be YYYY-MM-DD", "strategy not found",
+// "strategy has no content to convert".
+func runPushToCalendar(
+	ctx context.Context,
+	brandID, strategyID, managerID, startDate string,
+	durationDays int,
+	overrideExisting bool,
+	progress pushProgressFn,
+) (*pushResult, error) {
+	if progress == nil {
+		progress = func(string, string, map[string]any) {}
 	}
 
-	startMs, err := parseStartDateMs(req.StartDate)
+	startMs, err := parseStartDateMs(startDate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "startDate must be YYYY-MM-DD"})
-		return
+		return nil, fmt.Errorf("startDate must be YYYY-MM-DD")
 	}
-	duration := req.DurationDays
+	duration := durationDays
 	if duration <= 0 {
 		duration = 30
 	}
 	endExclusiveMs := startMs + int64(duration)*dayMs
 
-	ctx := c.Request.Context()
-	doc, err := strategyDocRef(req.BrandID, strategyID).Get(ctx)
+	progress("reading", "Reading your strategy…", nil)
+	doc, err := strategyDocRef(brandID, strategyID).Get(ctx)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "strategy not found"})
-		return
+		return nil, fmt.Errorf("strategy not found")
 	}
 	html, _ := doc.Data()["markdownContent"].(string)
 	if strings.TrimSpace(html) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "strategy has no content to convert"})
-		return
+		return nil, fmt.Errorf("strategy has no content to convert")
 	}
 
-	items, err := generateCalendarItems(ctx, req.BrandID, html, duration)
+	progress("planning", "Designing your posting schedule with AI…", nil)
+	items, err := generateCalendarItems(ctx, brandID, html, duration)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
+		return nil, err
 	}
 
-	contentsCol := firestoredb.Client.Collection("brands").Doc(req.BrandID).Collection("contents")
+	contentsCol := firestoredb.Client.Collection("brands").Doc(brandID).Collection("contents")
 
 	// Replace existing: delete every content item whose date falls in the window.
 	removedItemIds := []string{}
-	if req.OverrideExisting {
+	if overrideExisting {
+		progress("clearing", "Clearing existing items in the window…", nil)
 		iter := contentsCol.
 			Where("postingTimeStamp", ">=", startMs).
 			Where("postingTimeStamp", "<", endExclusiveMs).
@@ -104,9 +119,11 @@ func HTTPPushToCalendar(c *gin.Context) {
 		iter.Stop()
 	}
 
+	progress("scheduling", fmt.Sprintf("Scheduling %d posts…", len(items)), map[string]any{"total": len(items)})
+
 	now := time.Now().UnixMilli()
 	createdItemIds := []string{}
-	for _, it := range items {
+	for idx, it := range items {
 		off := it.DayOffset
 		if off < 0 {
 			off = 0
@@ -122,8 +139,9 @@ func HTTPPushToCalendar(c *gin.Context) {
 		if platform == "" {
 			platform = "Instagram"
 		}
+		title := strings.TrimSpace(it.Title)
 		ref, _, e := contentsCol.Add(ctx, map[string]any{
-			"title":            strings.TrimSpace(it.Title),
+			"title":            title,
 			"managerId":        managerID,
 			"strategyId":       strategyID,
 			"platform":         platform,
@@ -137,15 +155,61 @@ func HTTPPushToCalendar(c *gin.Context) {
 		})
 		if e == nil {
 			createdItemIds = append(createdItemIds, ref.ID)
+			progress("item", "Scheduled: "+title, map[string]any{
+				"index": idx + 1,
+				"total": len(items),
+				"title": title,
+			})
 		}
+	}
+
+	return &pushResult{
+		CreatedItemIds: createdItemIds,
+		RemovedItemIds: removedItemIds,
+		StartDateStr:   startDate,
+		EndDateStr:     msToDateStr(startMs + int64(duration-1)*dayMs),
+	}, nil
+}
+
+// HTTPPushToCalendar is the synchronous transport over runPushToCalendar. Kept
+// as a fallback; the apps drive this over the WebSocket (see handlePushToCalendarWS)
+// because the AI step can exceed the 30s HTTP limit.
+func HTTPPushToCalendar(c *gin.Context) {
+	strategyID := c.Param("strategyId")
+	managerID, _ := middlewares.GetUserId(c)
+
+	var req pushToCalendarReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !verifyBrandAccess(req.BrandID, managerID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	res, err := runPushToCalendar(
+		c.Request.Context(), req.BrandID, strategyID, managerID,
+		req.StartDate, req.DurationDays, req.OverrideExisting, nil,
+	)
+	if err != nil {
+		switch err.Error() {
+		case "startDate must be YYYY-MM-DD", "strategy has no content to convert":
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case "strategy not found":
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		}
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"strategyId":     strategyID,
-		"createdItemIds": createdItemIds,
-		"removedItemIds": removedItemIds,
-		"startDate":      req.StartDate,
-		"endDate":        msToDateStr(startMs + int64(duration-1)*dayMs),
+		"createdItemIds": res.CreatedItemIds,
+		"removedItemIds": res.RemovedItemIds,
+		"startDate":      res.StartDateStr,
+		"endDate":        res.EndDateStr,
 	})
 }
 
