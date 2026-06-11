@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
@@ -14,6 +15,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/templates"
@@ -69,6 +71,49 @@ func CreateBrand(c *gin.Context) {
 			return
 		}
 		brand.OrganizationID = &orgId
+	} else {
+		// Brand already references an org (e.g. AddBrandToOrganization, or an AI
+		// onboarding draft that picked an existing org). Re-attach to the org's
+		// BrandIds idempotently — the draft step may not have updated the org.
+		// Enforce maxBrands inside a transaction so concurrent finalize/add calls
+		// can't slip past the cap; mirrors AddBrandToOrganization semantics.
+		orgId := *brand.OrganizationID
+		ctx := context.Background()
+		orgRef := firestoredb.Client.Collection("organizations").Doc(orgId)
+		txErr := firestoredb.Client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+			orgSnap, err := tx.Get(orgRef)
+			if err != nil {
+				return err
+			}
+			var org trendlymodels.Organization
+			if err := orgSnap.DataTo(&org); err != nil {
+				return err
+			}
+			if org.DeletedAt != nil {
+				return errBrandLimit
+			}
+			for _, id := range org.BrandIds {
+				if id == req.BrandID {
+					return nil
+				}
+			}
+			limit := org.MaxBrands
+			if limit <= 0 {
+				limit = trendlymodels.ResolveMaxBrands(myutil.DerefString(org.PlanKey))
+			}
+			if len(org.BrandIds) >= limit {
+				return errBrandLimit
+			}
+			return tx.Update(orgRef, []firestore.Update{{Path: "brandIds", Value: firestore.ArrayUnion(req.BrandID)}})
+		})
+		if txErr == errBrandLimit {
+			c.JSON(http.StatusConflict, gin.H{"error": "brand-limit-reached", "message": "Your organization has reached its plan's brand limit. Upgrade to add more brands."})
+			return
+		}
+		if txErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": txErr.Error(), "message": "Error attaching brand to organization"})
+			return
+		}
 	}
 
 	_, err = brand.Insert(req.BrandID)
