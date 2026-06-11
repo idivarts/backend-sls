@@ -21,6 +21,14 @@ var validContentFormats = map[string]bool{
 	"reel": true, "post": true, "story": true, "carousel": true, "live": true,
 }
 
+// Strategy lifecycle status values written to a strategy's `status` field.
+// Mirrors the StrategyStatus enum in the frontend shared-libs model
+// (trendly-pro/models/strategies.ts) — keep the two in sync.
+const (
+	StrategyStatusActive    = "active"
+	StrategyStatusFinalized = "finalized" // pushed to calendar → doc + chat locked
+)
+
 // ── Push to Calendar ─────────────────────────────────────────────────────────
 
 type pushToCalendarReq struct {
@@ -162,6 +170,16 @@ func runPushToCalendar(
 			})
 		}
 	}
+
+	// A successful push finalizes the strategy: the document is now driving live
+	// scheduled content, so the apps lock it (read-only doc + chat) and offer a
+	// "Duplicate" path for further iteration. Best-effort — a failed status write
+	// shouldn't fail the push the user already saw succeed.
+	progress("finalizing", "Finalizing your strategy…", nil)
+	_, _ = strategyDocRef(brandID, strategyID).Update(ctx, []firestore.Update{
+		{Path: "status", Value: StrategyStatusFinalized},
+		{Path: "updatedAt", Value: time.Now().UnixMilli()},
+	})
 
 	return &pushResult{
 		CreatedItemIds: createdItemIds,
