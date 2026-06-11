@@ -203,8 +203,11 @@ func generateStrategyDoc(ctx context.Context, brandID, strategyID, arguments str
 		{Path: "updatedAt", Value: now},
 		{Path: "lastEditedAt", Value: now},
 		// The doc was (re)written wholesale by the AI — invalidate the CRDT
-		// baseline so the live web editor re-bootstraps from this HTML.
+		// baseline so the live web editor re-bootstraps from this HTML, and
+		// bump the generation so any yupdates from the old generation that
+		// haven't been pruned yet are ignored by the re-bootstrapped editor.
 		{Path: "crdtInitialized", Value: false},
+		{Path: "crdtGeneration", Value: firestore.Increment(1)},
 	}
 	if a.Name != nil && strings.TrimSpace(*a.Name) != "" {
 		updates = append(updates, firestore.Update{Path: "name", Value: strings.TrimSpace(*a.Name)})
@@ -272,6 +275,7 @@ func applyStrategyEdit(ctx context.Context, brandID, strategyID, arguments strin
 		{Path: "updatedAt", Value: now},
 		{Path: "lastEditedAt", Value: now},
 		{Path: "crdtInitialized", Value: false},
+		{Path: "crdtGeneration", Value: firestore.Increment(1)},
 	}
 	if _, err := strategyDocRef(brandID, strategyID).Update(ctx, updates); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to save: " + err.Error()}), false, err
@@ -292,11 +296,10 @@ func timelineFromDays(days float64) map[string]any {
 	}
 }
 
-// resetStrategyCRDT prunes the Yjs update log so a live web editor re-bootstraps
-// the CRDT from the freshly-written markdownContent (mirrors the frontend's
-// releaseEditLock reset). crdtInitialized is cleared in the doc Update by the
-// caller. Best-effort: a failure here just leaves stale yupdates that the next
-// reset clears.
+// resetStrategyCRDT prunes the Yjs update log after an AI rewrite. The new
+// editor mount ignores stale yupdates on its own (it only applies yupdates
+// whose `generation` matches the post-bump crdtGeneration), so this is just
+// storage hygiene — best-effort, no correctness depends on it.
 func resetStrategyCRDT(ctx context.Context, brandID, strategyID string) {
 	iter := strategyDocRef(brandID, strategyID).Collection("yupdates").Documents(ctx)
 	defer iter.Stop()
