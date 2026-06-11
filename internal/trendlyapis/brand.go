@@ -2,6 +2,7 @@ package trendlyapis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -21,8 +22,23 @@ import (
 	"github.com/idivarts/backend-sls/templates"
 )
 
+// IBrand is the request body for POST /api/v2/brands/create.
+//
+// It serves three flows through a single endpoint:
+//   - Create + finalize a brand in one shot: send Brand fields, omit BrandID,
+//     leave Draft=false. Used by the onboarding form and landing create-brand.
+//   - Create a draft (Firestore-only, no provisioning): send Brand fields,
+//     omit BrandID, set Draft=true. Used by the AI onboarding chat which needs
+//     a brandId to scope its conversation before the user has finished.
+//   - Finalize an existing draft: send BrandID, leave Draft=false. Used by the
+//     AI onboarding chat at the end of the conversation.
+//
+// The response is always { brandId, message }, so callers can read the new id
+// for create flows and fetch the brand document from Firestore client-side.
 type IBrand struct {
-	BrandID string `json:"brandId" binding:"required"`
+	BrandID *string              `json:"brandId,omitempty"`
+	Brand   *trendlymodels.Brand `json:"brand,omitempty"`
+	Draft   bool                 `json:"draft,omitempty"`
 }
 
 func CreateBrand(c *gin.Context) {
@@ -32,9 +48,131 @@ func CreateBrand(c *gin.Context) {
 		return
 	}
 
+	creator, ok := middlewares.GetUserId(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	brandID := ""
+	if req.BrandID != nil {
+		brandID = *req.BrandID
+	}
+
+	// Path A: no brandId — create a fresh brand document (+ member doc) from
+	// the supplied Brand fields. Frontend never touches Firestore for brand
+	// creation anymore; the id is allocated server-side and returned.
+	if brandID == "" {
+		if req.Brand == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Either brandId or brand fields are required"})
+			return
+		}
+
+		newBrand := *req.Brand
+		// Server controls lifecycle/derived fields regardless of what the
+		// client sent. A freshly created brand is always a draft; finalize
+		// (below) is what flips OnboardingComplete to true.
+		newBrand.OnboardingComplete = false
+		newBrand.HasPayWall = false
+		newBrand.UnlockedInfluencers = nil
+		newBrand.DiscoveredInfluencers = nil
+		newBrand.PostedCollaborations = nil
+		newBrand.Backend = nil
+
+		brandDocRef := firestoredb.Client.Collection("brands").NewDoc()
+		brandID = brandDocRef.ID
+		memberDocRef := brandDocRef.Collection("members").Doc(creator)
+		member := trendlymodels.BrandMember{
+			ManagerID: creator,
+			Status:    0,
+		}
+
+		// Marshal Brand the same way Brand.Insert does, so json tags (and
+		// `omitempty`) are honoured inside the transaction's tx.Set.
+		brandBytes, err := json.Marshal(&newBrand)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error encoding brand"})
+			return
+		}
+		var brandData map[string]interface{}
+		if err := json.Unmarshal(brandBytes, &brandData); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error encoding brand"})
+			return
+		}
+
+		if newBrand.OrganizationID != nil && *newBrand.OrganizationID != "" {
+			// Brand is being created INSIDE an existing organization. Enforce
+			// the org's brand limit ATOMICALLY with the brand+member writes —
+			// otherwise a failed limit check would leave an orphan brand doc
+			// behind. Same transaction also pre-reserves the slot in
+			// org.brandIds so the later finalize step is a no-op for it.
+			orgId := *newBrand.OrganizationID
+			ctx := context.Background()
+			orgRef := firestoredb.Client.Collection("organizations").Doc(orgId)
+			txErr := firestoredb.Client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+				orgSnap, err := tx.Get(orgRef)
+				if err != nil {
+					return err
+				}
+				var org trendlymodels.Organization
+				if err := orgSnap.DataTo(&org); err != nil {
+					return err
+				}
+				if org.DeletedAt != nil {
+					return errBrandLimit
+				}
+				limit := org.MaxBrands
+				if limit <= 0 {
+					limit = trendlymodels.ResolveMaxBrands(myutil.DerefString(org.PlanKey))
+				}
+				if len(org.BrandIds) >= limit {
+					return errBrandLimit
+				}
+				if err := tx.Set(brandDocRef, brandData, firestore.MergeAll); err != nil {
+					return err
+				}
+				if err := tx.Set(memberDocRef, member); err != nil {
+					return err
+				}
+				return tx.Update(orgRef, []firestore.Update{
+					{Path: "brandIds", Value: firestore.ArrayUnion(brandID)},
+				})
+			})
+			if txErr == errBrandLimit {
+				c.JSON(http.StatusConflict, gin.H{"error": "brand-limit-reached", "message": "Your organization has reached its plan's brand limit. Upgrade to add more brands."})
+				return
+			}
+			if txErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": txErr.Error(), "message": "Error creating brand"})
+				return
+			}
+		} else {
+			// No explicit org attachment — finalize will provision a personal
+			// org for this brand later. Brand + member writes happen serially
+			// (no org limit to coordinate against here).
+			if _, err := newBrand.Insert(brandID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error creating brand"})
+				return
+			}
+			if _, err := member.Set(brandID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error creating brand member"})
+				return
+			}
+		}
+	}
+
+	// Path B: caller asked for a draft only — skip provisioning. The AI chat
+	// will call back with finalize (Draft=false) when the conversation ends.
+	if req.Draft {
+		c.JSON(http.StatusOK, gin.H{"brandId": brandID, "message": "Draft brand created"})
+		return
+	}
+
+	// Path C: finalize. Provision the org, default team, and flip
+	// OnboardingComplete. Same logic the endpoint had before the create-mode
+	// was folded in — just gated on Draft now.
 	brand := trendlymodels.Brand{}
-	err := brand.Get(req.BrandID)
-	if err != nil {
+	if err := brand.Get(brandID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Invalid Input"})
 		return
 	}
@@ -44,7 +182,7 @@ func CreateBrand(c *gin.Context) {
 	// creates a draft first and calls this once at the end, so guard against any
 	// duplicate finalize call.
 	if brand.OnboardingComplete {
-		c.JSON(http.StatusOK, gin.H{"message": "Brand already initiated"})
+		c.JSON(http.StatusOK, gin.H{"brandId": brandID, "message": "Brand already initiated"})
 		return
 	}
 
@@ -56,8 +194,6 @@ func CreateBrand(c *gin.Context) {
 	// new org-level token wallet is seeded by the Credit System ticket.
 	brand.HasPayWall = false
 
-	creator, _ := middlewares.GetUserId(c)
-
 	// Auto-provision a personal organization for any brand finalized without
 	// one, so billing/plan/credits (which live on the Organization) always have
 	// a home and the paywall gate has a billing entity to read. Guarded on
@@ -65,70 +201,29 @@ func CreateBrand(c *gin.Context) {
 	// org (AddBrandToOrganization) keep their existing org.
 	if brand.OrganizationID == nil || *brand.OrganizationID == "" {
 		orgName := "My Organization"
-		orgId, _, perr := provisionPersonalOrg(creator, orgName, brand.Image, []string{req.BrandID})
+		orgId, _, perr := provisionPersonalOrg(creator, orgName, brand.Image, []string{brandID})
 		if perr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": perr.Error(), "message": "Error provisioning organization"})
 			return
 		}
 		brand.OrganizationID = &orgId
-	} else {
-		// Brand already references an org (e.g. AddBrandToOrganization, or an AI
-		// onboarding draft that picked an existing org). Re-attach to the org's
-		// BrandIds idempotently — the draft step may not have updated the org.
-		// Enforce maxBrands inside a transaction so concurrent finalize/add calls
-		// can't slip past the cap; mirrors AddBrandToOrganization semantics.
-		orgId := *brand.OrganizationID
-		ctx := context.Background()
-		orgRef := firestoredb.Client.Collection("organizations").Doc(orgId)
-		txErr := firestoredb.Client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-			orgSnap, err := tx.Get(orgRef)
-			if err != nil {
-				return err
-			}
-			var org trendlymodels.Organization
-			if err := orgSnap.DataTo(&org); err != nil {
-				return err
-			}
-			if org.DeletedAt != nil {
-				return errBrandLimit
-			}
-			for _, id := range org.BrandIds {
-				if id == req.BrandID {
-					return nil
-				}
-			}
-			limit := org.MaxBrands
-			if limit <= 0 {
-				limit = trendlymodels.ResolveMaxBrands(myutil.DerefString(org.PlanKey))
-			}
-			if len(org.BrandIds) >= limit {
-				return errBrandLimit
-			}
-			return tx.Update(orgRef, []firestore.Update{{Path: "brandIds", Value: firestore.ArrayUnion(req.BrandID)}})
-		})
-		if txErr == errBrandLimit {
-			c.JSON(http.StatusConflict, gin.H{"error": "brand-limit-reached", "message": "Your organization has reached its plan's brand limit. Upgrade to add more brands."})
-			return
-		}
-		if txErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": txErr.Error(), "message": "Error attaching brand to organization"})
-			return
-		}
 	}
+	// If OrganizationID is already set, the writer that set it (Path A above or
+	// AddBrandToOrganization) atomically added brandID to org.BrandIds in the
+	// same transaction, so no re-attach is needed here.
 
-	_, err = brand.Insert(req.BrandID)
-	if err != nil {
+	if _, err := brand.Insert(brandID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in inserting"})
 		return
 	}
 
 	// Every brand gets a default team that owns all connected socials initially.
-	if _, err := trendlymodels.EnsureDefaultTeam(req.BrandID, creator, time.Now().UnixMilli()); err != nil {
+	if _, err := trendlymodels.EnsureDefaultTeam(brandID, creator, time.Now().UnixMilli()); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error creating default team"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully iniated the brand"})
+	c.JSON(http.StatusOK, gin.H{"brandId": brandID, "message": "Successfully iniated the brand"})
 }
 
 type IBrandMember struct {
