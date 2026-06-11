@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -30,28 +30,20 @@ func calendarPosts() Registered {
 			}
 			start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC).UnixMilli()
 			end := time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.UTC).UnixMilli()
-			iter := firestoredb.Client.
-				Collection("brands").Doc(brandID).
-				Collection("contents").
-				Where("postingTimeStamp", ">=", start).
-				Where("postingTimeStamp", "<", end).
-				Documents(ctx)
-			defer iter.Stop()
+			contents, err := trendlymodels.ListContentInRange(ctx, brandID, start, end, true)
+			if err != nil {
+				return nil, err
+			}
 
 			var out []map[string]any
-			for {
-				doc, err := iter.Next()
-				if err != nil {
-					break
-				}
-				d := doc.Data()
+			for _, ct := range contents {
 				out = append(out, map[string]any{
-					"id":               doc.Ref.ID,
-					"title":            d["title"],
-					"platform":         d["platform"],
-					"contentFormat":    d["contentFormat"],
-					"status":           d["status"],
-					"postingTimeStamp": d["postingTimeStamp"],
+					"id":               ct.ID,
+					"title":            ct.Title,
+					"platform":         ct.Platform,
+					"contentFormat":    ct.ContentFormat,
+					"status":           ct.Status,
+					"postingTimeStamp": ct.PostingTimeStamp,
 				})
 			}
 			return out, nil

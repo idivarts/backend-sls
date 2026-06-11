@@ -2,37 +2,12 @@ package trendlyunauth
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
-	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"google.golang.org/api/iterator"
 )
-
-// shareLinkDoc mirrors the top-level shareLinks/{token} document written by the
-// brand app. Only the fields the public endpoint needs are modelled.
-type shareLinkDoc struct {
-	Type       string `firestore:"type"`
-	BrandID    string `firestore:"brandId"`
-	ResourceID string `firestore:"resourceId"`
-	Month      string `firestore:"month"`
-	Enabled    bool   `firestore:"enabled"`
-}
-
-// pubContentDoc is the subset of a content document exposed publicly.
-type pubContentDoc struct {
-	Title            string                            `firestore:"title"`
-	ContentFormat    string                            `firestore:"contentFormat"`
-	Platform         string                            `firestore:"platform"`
-	Status           string                            `firestore:"status"`
-	PostingTimeStamp int64                             `firestore:"postingTimeStamp"`
-	IsArchived       bool                              `firestore:"isArchived"`
-	Attachments      []trendlymodels.ContentAttachment `firestore:"attachments"`
-}
 
 type publicCalendarItem struct {
 	ID               string `json:"id"`
@@ -66,13 +41,8 @@ func PublicShareResolve(c *gin.Context) {
 	ctx := context.Background()
 
 	// 1. Resolve + validate the share link.
-	linkSnap, err := firestoredb.Client.Collection("shareLinks").Doc(token).Get(ctx)
+	link, err := trendlymodels.GetShareLink(ctx, token)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "link not found"})
-		return
-	}
-	var link shareLinkDoc
-	if err := linkSnap.DataTo(&link); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "link not found"})
 		return
 	}
@@ -101,29 +71,14 @@ func PublicShareResolve(c *gin.Context) {
 	end := monthStart.AddDate(0, 1, 0).UnixMilli()
 
 	// 4. Query the month's (non-archived) content items.
-	iter := firestoredb.Client.
-		Collection(fmt.Sprintf("brands/%s/contents", link.BrandID)).
-		Where("isArchived", "==", false).
-		Where("postingTimeStamp", ">=", start).
-		Where("postingTimeStamp", "<", end).
-		OrderBy("postingTimeStamp", firestore.Asc).
-		Documents(ctx)
-	defer iter.Stop()
+	contents, err := trendlymodels.ListContentInRange(ctx, link.BrandID, start, end, false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load calendar"})
+		return
+	}
 
 	items := []publicCalendarItem{}
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load calendar"})
-			return
-		}
-		var ct pubContentDoc
-		if err := doc.DataTo(&ct); err != nil {
-			continue
-		}
+	for _, ct := range contents {
 		imageURL := ""
 		for _, a := range ct.Attachments {
 			if a.ImageURL != "" {
@@ -132,7 +87,7 @@ func PublicShareResolve(c *gin.Context) {
 			}
 		}
 		items = append(items, publicCalendarItem{
-			ID:               doc.Ref.ID,
+			ID:               ct.ID,
 			Title:            ct.Title,
 			ContentFormat:    ct.ContentFormat,
 			Platform:         ct.Platform,

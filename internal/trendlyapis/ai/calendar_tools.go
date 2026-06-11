@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -130,14 +130,6 @@ func dispatchCalendarTool(ctx context.Context, brandID, managerID, name, argumen
 	}
 }
 
-func contentsCollection(brandID string) *firestore.CollectionRef {
-	return firestoredb.Client.Collection("brands").Doc(brandID).Collection("contents")
-}
-
-func contentDocRef(brandID, contentID string) *firestore.DocumentRef {
-	return contentsCollection(brandID).Doc(contentID)
-}
-
 // contentMovable reports whether a content item can be rescheduled. Scheduled or
 // already-posted items are locked (mirrors handleMoveItem on the calendar UI).
 func contentLocked(status string) bool {
@@ -176,7 +168,7 @@ func createContentTool(ctx context.Context, brandID, managerID, arguments string
 		platform = "Instagram"
 	}
 	now := time.Now().UnixMilli()
-	ref, _, err := contentsCollection(brandID).Add(ctx, map[string]any{
+	id, err := trendlymodels.CreateContent(ctx, brandID, map[string]any{
 		"title":            title,
 		"managerId":        managerID,
 		"platform":         platform,
@@ -191,7 +183,7 @@ func createContentTool(ctx context.Context, brandID, managerID, arguments string
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to create: " + err.Error()}), false, err
 	}
-	return jsonResult(map[string]any{"ok": true, "contentId": ref.ID, "date": msToDateStr(postingTs)}), false, nil
+	return jsonResult(map[string]any{"ok": true, "contentId": id, "date": msToDateStr(postingTs)}), false, nil
 }
 
 // ── update (title / idea / date / type only) ──────────────────────────────────
@@ -212,11 +204,11 @@ func updateContentTool(ctx context.Context, brandID, arguments string) (string, 
 	if strings.TrimSpace(a.ContentID) == "" {
 		return jsonResult(map[string]any{"ok": false, "error": "contentId is required"}), false, nil
 	}
-	snap, err := contentDocRef(brandID, a.ContentID).Get(ctx)
+	existing, err := trendlymodels.GetContent(brandID, a.ContentID)
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "content not found"}), false, nil
 	}
-	status, _ := snap.Data()["status"].(string)
+	status := existing.Status
 
 	var updates []firestore.Update
 	var changed []string
@@ -253,8 +245,7 @@ func updateContentTool(ctx context.Context, brandID, arguments string) (string, 
 	if len(updates) == 0 {
 		return jsonResult(map[string]any{"ok": false, "error": "nothing to update — pass at least one of title, idea, date, type"}), false, nil
 	}
-	updates = append(updates, firestore.Update{Path: "updatedAt", Value: time.Now().UnixMilli()})
-	if _, err := contentDocRef(brandID, a.ContentID).Update(ctx, updates); err != nil {
+	if err := trendlymodels.UpdateContent(ctx, brandID, a.ContentID, updates); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to update: " + err.Error()}), false, err
 	}
 	return jsonResult(map[string]any{"ok": true, "changed": changed}), false, nil
@@ -279,17 +270,16 @@ func moveContentTool(ctx context.Context, brandID, arguments string) (string, bo
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "date must be YYYY-MM-DD"}), false, nil
 	}
-	snap, err := contentDocRef(brandID, a.ContentID).Get(ctx)
+	existing, err := trendlymodels.GetContent(brandID, a.ContentID)
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "content not found"}), false, nil
 	}
-	status, _ := snap.Data()["status"].(string)
+	status := existing.Status
 	if contentLocked(status) {
 		return jsonResult(map[string]any{"ok": false, "reason": "this post is " + status + " — it can't be moved. Unschedule it first."}), false, nil
 	}
-	if _, err := contentDocRef(brandID, a.ContentID).Update(ctx, []firestore.Update{
+	if err := trendlymodels.UpdateContent(ctx, brandID, a.ContentID, []firestore.Update{
 		{Path: "postingTimeStamp", Value: ts},
-		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	}); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to move: " + err.Error()}), false, err
 	}
@@ -310,9 +300,8 @@ func removeContentTool(ctx context.Context, brandID, arguments string) (string, 
 	if strings.TrimSpace(a.ContentID) == "" {
 		return jsonResult(map[string]any{"ok": false, "error": "contentId is required"}), false, nil
 	}
-	if _, err := contentDocRef(brandID, a.ContentID).Update(ctx, []firestore.Update{
+	if err := trendlymodels.UpdateContent(ctx, brandID, a.ContentID, []firestore.Update{
 		{Path: "isArchived", Value: true},
-		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	}); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to remove: " + err.Error()}), false, err
 	}
@@ -345,29 +334,19 @@ func listCalendarTool(ctx context.Context, brandID, arguments string) (string, b
 	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC).UnixMilli()
 	end := time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.UTC).UnixMilli()
 
-	iter := contentsCollection(brandID).
-		Where("postingTimeStamp", ">=", start).
-		Where("postingTimeStamp", "<", end).
-		Documents(ctx)
-	defer iter.Stop()
+	contents, err := trendlymodels.ListContentInRange(ctx, brandID, start, end, false)
+	if err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "failed to list: " + err.Error()}), false, err
+	}
 
 	out := []map[string]any{}
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			break
-		}
-		d := doc.Data()
-		if archived, _ := d["isArchived"].(bool); archived {
-			continue
-		}
-		when, _ := toInt64(d["postingTimeStamp"])
+	for _, ct := range contents {
 		out = append(out, map[string]any{
-			"id":     doc.Ref.ID,
-			"title":  d["title"],
-			"date":   msToDateStr(when),
-			"type":   d["contentFormat"],
-			"status": d["status"],
+			"id":     ct.ID,
+			"title":  ct.Title,
+			"date":   msToDateStr(ct.PostingTimeStamp),
+			"type":   ct.ContentFormat,
+			"status": ct.Status,
 		})
 	}
 	return jsonResult(map[string]any{"ok": true, "month": fmt.Sprintf("%04d-%02d", year, month), "posts": out}), false, nil

@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -21,20 +21,16 @@ func strategyContent() Registered {
 			if id == "" {
 				return nil, nil
 			}
-			doc, err := firestoredb.Client.
-				Collection("brands").Doc(brandID).
-				Collection("strategies").Doc(id).
-				Get(ctx)
+			strat, err := trendlymodels.GetStrategy(ctx, brandID, id)
 			if err != nil {
 				return nil, err
 			}
-			d := doc.Data()
 			return map[string]any{
-				"id":              id,
-				"name":            d["name"],
-				"objective":       d["objective"],
-				"markdownContent": d["markdownContent"],
-				"status":          d["status"],
+				"id":              strat.ID,
+				"name":            strat.Name,
+				"objective":       strat.Objective,
+				"markdownContent": strat.MarkdownContent,
+				"status":          strat.Status,
 			}, nil
 		},
 	}

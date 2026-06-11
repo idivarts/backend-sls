@@ -11,7 +11,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -90,11 +90,11 @@ func runPushToCalendar(
 	endExclusiveMs := startMs + int64(duration)*dayMs
 
 	progress("reading", "Reading your strategy…", nil)
-	doc, err := strategyDocRef(brandID, strategyID).Get(ctx)
+	strat, err := trendlymodels.GetStrategy(ctx, brandID, strategyID)
 	if err != nil {
 		return nil, fmt.Errorf("strategy not found")
 	}
-	html, _ := doc.Data()["markdownContent"].(string)
+	html := strat.MarkdownContent
 	if strings.TrimSpace(html) == "" {
 		return nil, fmt.Errorf("strategy has no content to convert")
 	}
@@ -105,26 +105,11 @@ func runPushToCalendar(
 		return nil, err
 	}
 
-	contentsCol := firestoredb.Client.Collection("brands").Doc(brandID).Collection("contents")
-
 	// Replace existing: delete every content item whose date falls in the window.
 	removedItemIds := []string{}
 	if overrideExisting {
 		progress("clearing", "Clearing existing items in the window…", nil)
-		iter := contentsCol.
-			Where("postingTimeStamp", ">=", startMs).
-			Where("postingTimeStamp", "<", endExclusiveMs).
-			Documents(ctx)
-		for {
-			d, e := iter.Next()
-			if e != nil {
-				break
-			}
-			if _, e := d.Ref.Delete(ctx); e == nil {
-				removedItemIds = append(removedItemIds, d.Ref.ID)
-			}
-		}
-		iter.Stop()
+		removedItemIds, _ = trendlymodels.DeleteContentInRange(ctx, brandID, startMs, endExclusiveMs)
 	}
 
 	progress("scheduling", fmt.Sprintf("Scheduling %d posts…", len(items)), map[string]any{"total": len(items)})
@@ -148,7 +133,7 @@ func runPushToCalendar(
 			platform = "Instagram"
 		}
 		title := strings.TrimSpace(it.Title)
-		ref, _, e := contentsCol.Add(ctx, map[string]any{
+		id, e := trendlymodels.CreateContent(ctx, brandID, map[string]any{
 			"title":            title,
 			"managerId":        managerID,
 			"strategyId":       strategyID,
@@ -162,7 +147,7 @@ func runPushToCalendar(
 			"updatedAt":        now,
 		})
 		if e == nil {
-			createdItemIds = append(createdItemIds, ref.ID)
+			createdItemIds = append(createdItemIds, id)
 			progress("item", "Scheduled: "+title, map[string]any{
 				"index": idx + 1,
 				"total": len(items),
@@ -176,7 +161,7 @@ func runPushToCalendar(
 	// "Duplicate" path for further iteration. Best-effort — a failed status write
 	// shouldn't fail the push the user already saw succeed.
 	progress("finalizing", "Finalizing your strategy…", nil)
-	_, _ = strategyDocRef(brandID, strategyID).Update(ctx, []firestore.Update{
+	_ = trendlymodels.UpdateStrategy(ctx, brandID, strategyID, []firestore.Update{
 		{Path: "status", Value: StrategyStatusFinalized},
 		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	})
@@ -293,12 +278,12 @@ func HTTPRecheckDuration(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	doc, err := strategyDocRef(req.BrandID, strategyID).Get(ctx)
+	strat, err := trendlymodels.GetStrategy(ctx, req.BrandID, strategyID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "strategy not found"})
 		return
 	}
-	html, _ := doc.Data()["markdownContent"].(string)
+	html := strat.MarkdownContent
 	if strings.TrimSpace(html) == "" {
 		c.JSON(http.StatusOK, gin.H{"strategyId": strategyID, "durationDays": nil})
 		return
@@ -312,13 +297,11 @@ func HTTPRecheckDuration(c *gin.Context) {
 
 	// Persist the corrected window — keep the existing startDate if present.
 	startMs := time.Now().UnixMilli()
-	if tl, ok := doc.Data()["timeline"].(map[string]any); ok {
-		if s, ok := toInt64(tl["startDate"]); ok && s > 0 {
-			startMs = s
-		}
+	if strat.Timeline != nil && strat.Timeline.StartDate > 0 {
+		startMs = strat.Timeline.StartDate
 	}
-	_, _ = strategyDocRef(req.BrandID, strategyID).Update(ctx, []firestore.Update{
-		{Path: "timeline", Value: map[string]any{"startDate": startMs, "endDate": startMs + int64(days)*dayMs}},
+	_ = trendlymodels.UpdateStrategy(ctx, req.BrandID, strategyID, []firestore.Update{
+		{Path: "timeline", Value: trendlymodels.StrategyTimeline{StartDate: startMs, EndDate: startMs + int64(days)*dayMs}},
 		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	})
 
@@ -381,16 +364,4 @@ func extractJSON(s string) string {
 		return s[start : end+1]
 	}
 	return s
-}
-
-func toInt64(v any) (int64, bool) {
-	switch n := v.(type) {
-	case int64:
-		return n, true
-	case float64:
-		return int64(n), true
-	case int:
-		return int64(n), true
-	}
-	return 0, false
 }

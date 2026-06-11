@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -18,7 +18,7 @@ import (
 const moduleOnboarding = "onboarding"
 
 const (
-	toolSetBrandFields    = "set_brand_fields"
+	toolSetBrandFields     = "set_brand_fields"
 	toolCompleteOnboarding = "complete_onboarding"
 )
 
@@ -41,10 +41,10 @@ func onboardingServerTools() []openrouter.Tool {
 				"set up. Call this as soon as you learn a value — pass only the fields you "+
 				"just learned. Values are validated; if a value is rejected, ask the user again.",
 			openrouter.ObjectSchema(map[string]any{
-				"name":        openrouter.StringProp("The brand name."),
-				"about":       openrouter.StringProp("A short description of the brand."),
-				"phone":       openrouter.StringProp("Contact phone number (with country code if given)."),
-				"website":     openrouter.StringProp("Brand website URL."),
+				"name":    openrouter.StringProp("The brand name."),
+				"about":   openrouter.StringProp("A short description of the brand."),
+				"phone":   openrouter.StringProp("Contact phone number (with country code if given)."),
+				"website": openrouter.StringProp("Brand website URL."),
 				"industries": map[string]any{
 					"type":        "array",
 					"description": "Industries / categories the brand operates in.",
@@ -205,7 +205,7 @@ func setBrandFields(ctx context.Context, brandID, arguments string) (string, boo
 	}
 
 	if len(updates) > 0 {
-		if _, err := firestoredb.Client.Collection("brands").Doc(brandID).Update(ctx, updates); err != nil {
+		if err := trendlymodels.UpdateBrandFields(ctx, brandID, updates); err != nil {
 			return jsonResult(map[string]any{"ok": false, "error": "failed to save: " + err.Error()}), false, err
 		}
 	}
@@ -218,24 +218,29 @@ func setBrandFields(ctx context.Context, brandID, arguments string) (string, boo
 }
 
 func completeOnboarding(ctx context.Context, brandID string) (string, bool, error) {
-	snap, err := firestoredb.Client.Collection("brands").Doc(brandID).Get(ctx)
-	if err != nil {
+	var brand trendlymodels.Brand
+	if err := brand.Get(brandID); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "brand not found"}), false, err
 	}
-	data := snap.Data()
+
+	deref := func(p *string) string {
+		if p == nil {
+			return ""
+		}
+		return *p
+	}
 
 	var missing []string
-	if strings.TrimSpace(getString(data, "name")) == "" {
+	if strings.TrimSpace(brand.Name) == "" {
 		missing = append(missing, "brand name")
 	}
-	profile, _ := data["profile"].(map[string]any)
-	if profile == nil || strings.TrimSpace(getString(profile, "phone")) == "" {
+	if brand.Profile == nil || strings.TrimSpace(deref(brand.Profile.PhoneNumber)) == "" {
 		missing = append(missing, "phone number")
 	}
-	if profile == nil || len(toSlice(profile["industries"])) == 0 {
+	if brand.Profile == nil || len(brand.Profile.Industries) == 0 {
 		missing = append(missing, "at least one industry")
 	}
-	if !validAges[strings.TrimSpace(getString(data, "age"))] {
+	if !validAges[strings.TrimSpace(deref(brand.Age))] {
 		missing = append(missing, "brand age")
 	}
 
@@ -271,17 +276,4 @@ func cleanStrings(in []string) []string {
 		}
 	}
 	return out
-}
-
-func getString(m map[string]any, key string) string {
-	if m == nil {
-		return ""
-	}
-	s, _ := m[key].(string)
-	return s
-}
-
-func toSlice(v any) []any {
-	s, _ := v.([]any)
-	return s
 }

@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -19,28 +19,20 @@ func campaignPerformance() Registered {
 		),
 		Handler: func(ctx context.Context, brandID string, args map[string]any) (any, error) {
 			// Aggregate metrics across the brand's contents collection that are posted
-			iter := firestoredb.Client.
-				Collection("brands").Doc(brandID).
-				Collection("contents").
-				Where("status", "==", "posted").
-				Documents(ctx)
-			defer iter.Stop()
+			contents, err := trendlymodels.ListContentByStatus(ctx, brandID, "posted")
+			if err != nil {
+				return nil, err
+			}
 
 			var totalViews, totalLikes, totalComments, totalShares, count int64
-			for {
-				doc, err := iter.Next()
-				if err != nil {
-					break
-				}
-				data := doc.Data()
-				metrics, ok := data["metrics"].(map[string]any)
-				if !ok {
+			for _, ct := range contents {
+				if ct.Metrics == nil {
 					continue
 				}
-				totalViews += toInt64(metrics["views"])
-				totalLikes += toInt64(metrics["likes"])
-				totalComments += toInt64(metrics["comments"])
-				totalShares += toInt64(metrics["shares"])
+				totalViews += toInt64(ct.Metrics["views"])
+				totalLikes += toInt64(ct.Metrics["likes"])
+				totalComments += toInt64(ct.Metrics["comments"])
+				totalShares += toInt64(ct.Metrics["shares"])
 				count++
 			}
 			return map[string]any{
