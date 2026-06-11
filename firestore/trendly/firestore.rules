@@ -122,7 +122,13 @@ service cloud.firestore {
     // Stores all brands
     match /brands/{brandId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      // Brand documents are created server-side only via /api/v2/brands/create
+      // (Admin SDK bypasses rules). Clients used to call addDoc() directly
+      // during onboarding; that path no longer exists. Updates remain client-
+      // writable for brand members; deletion is backend-only (HardDeleteBrand).
+      allow create: if false;
+      allow update: if isAuthenticated();
+      allow delete: if false;
 
       match /socials/{socialId} {
         allow read: if isAuthenticated();
@@ -244,7 +250,15 @@ service cloud.firestore {
 
       match /members/{managerId} {
         allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
+        // Brand-member docs are seeded server-side together with the brand
+        // (CreateBrand handler) and managed by CreateBrandMember /
+        // DeleteBrandMember on the backend. Clients can update an existing
+        // member (e.g. status), but cannot create or delete one directly —
+        // creation must go through the backend so org seat limits and team
+        // assignment stay consistent.
+        allow create: if false;
+        allow update: if isAuthenticated();
+        allow delete: if false;
       }
 
       // ── Teams ────────────────────────────────────────────────────────────
