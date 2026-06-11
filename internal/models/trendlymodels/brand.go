@@ -140,6 +140,14 @@ func (u *Brand) Get(brandId string) error {
 	return err
 }
 
+// UpdateBrandFields applies a partial update to a brand document. Callers build
+// the []firestore.Update (supports nested FieldPath updates like
+// "profile.phone"); the Firestore call itself lives here in the model.
+func UpdateBrandFields(ctx context.Context, brandID string, updates []firestore.Update) error {
+	_, err := firestoredb.Client.Collection("brands").Doc(brandID).Update(ctx, updates)
+	return err
+}
+
 // HardDeleteBrand permanently removes the brand document, every nested
 // subcollection beneath it, AND every collaboration owned by the brand
 // (collaborations live at the top level, keyed by brandId, with their own

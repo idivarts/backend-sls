@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	wshandler "github.com/idivarts/backend-sls/pkg/ws_handler"
 )
 
@@ -61,16 +62,7 @@ func messageHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequ
 }
 
 func lookupUserID(connectionID string) (string, bool) {
-	doc, err := firestoreClient.Collection("websockets").Doc(connectionID).Get(context.Background())
-	if err != nil {
-		return "", false
-	}
-	data := doc.Data()
-	uid, ok := data["userId"].(string)
-	if !ok || uid == "" {
-		return "", false
-	}
-	return uid, true
+	return trendlymodels.GetWebsocketUserID(connectionID)
 }
 
 func sendError(connectionID string, message string) {

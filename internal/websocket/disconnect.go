@@ -5,20 +5,13 @@ import (
 	"log"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
 func disconnectHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
 	connectionID := event.RequestContext.ConnectionID
 
-	_, err := firestoreClient.Collection("websockets").Doc(connectionID).Delete(context.Background())
-	// DeleteItem(&dynamodb.DeleteItemInput{
-	// 	TableName: aws.String(tableName),
-	// 	Key: map[string]*dynamodb.AttributeValue{
-	// 		"connectionId": {
-	// 			S: aws.String(connectionID),
-	// 		},
-	// 	},
-	// })
+	err := trendlymodels.DeleteWebsocketConnection(connectionID)
 	if err != nil {
 		log.Printf("Failed to disconnect: %v", err)
 		return events.APIGatewayProxyResponse{StatusCode: 500, Body: "Failed to disconnect."}, nil

@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -50,23 +49,19 @@ func HTTPOnboardingStrategyInit(c *gin.Context) {
 	// 1. Create an empty strategy (mirrors the frontend toIStrategy shape so the
 	//    strategies list + detail page render it identically to a hand-created one).
 	now := time.Now().UnixMilli()
-	stratRef, _, err := firestoredb.Client.
-		Collection("brands").Doc(req.BrandID).
-		Collection("strategies").
-		Add(ctx, map[string]any{
-			"name":            "My Content Strategy",
-			"managerId":       managerID,
-			"status":          "active",
-			"markdownContent": "",
-			"reviewStatus":    "draft",
-			"createdAt":       now,
-			"updatedAt":       now,
-		})
+	strategyID, err := trendlymodels.CreateStrategy(ctx, req.BrandID, map[string]any{
+		"name":            "My Content Strategy",
+		"managerId":       managerID,
+		"status":          "active",
+		"markdownContent": "",
+		"reviewStatus":    "draft",
+		"createdAt":       now,
+		"updatedAt":       now,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	strategyID := stratRef.ID
 
 	// 2. Create the strategy-scoped conversation.
 	model, locked := pickModel(ctx, req.BrandID, openrouter.TaskChat, req.Model)
@@ -145,21 +140,18 @@ func HTTPOnboardingCalendarInit(c *gin.Context) {
 	now := time.Now()
 	todayTs := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).UnixMilli()
 	nowMs := now.UnixMilli()
-	contentRef, _, err := firestoredb.Client.
-		Collection("brands").Doc(req.BrandID).
-		Collection("contents").
-		Add(ctx, map[string]any{
-			"title":            "My first content idea",
-			"managerId":        managerID,
-			"description":      "A starter idea to show how your calendar works — edit it, or ask the AI to plan more.",
-			"platform":         "Instagram",
-			"contentFormat":    "post",
-			"status":           "draft",
-			"isArchived":       false,
-			"postingTimeStamp": todayTs,
-			"createdAt":        nowMs,
-			"updatedAt":        nowMs,
-		})
+	contentID, err := trendlymodels.CreateContent(ctx, req.BrandID, map[string]any{
+		"title":            "My first content idea",
+		"managerId":        managerID,
+		"description":      "A starter idea to show how your calendar works — edit it, or ask the AI to plan more.",
+		"platform":         "Instagram",
+		"contentFormat":    "post",
+		"status":           "draft",
+		"isArchived":       false,
+		"postingTimeStamp": todayTs,
+		"createdAt":        nowMs,
+		"updatedAt":        nowMs,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -180,7 +172,7 @@ func HTTPOnboardingCalendarInit(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"conversationId": conv.ID,
-		"contentId":      contentRef.ID,
+		"contentId":      contentID,
 	})
 }
 

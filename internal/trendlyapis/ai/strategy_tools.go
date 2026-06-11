@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -122,10 +122,6 @@ func dispatchStrategyTool(ctx context.Context, brandID, strategyID, name, argume
 	}
 }
 
-func strategyDocRef(brandID, strategyID string) *firestore.DocumentRef {
-	return firestoredb.Client.Collection("brands").Doc(brandID).Collection("strategies").Doc(strategyID)
-}
-
 type setStrategyBriefArgs struct {
 	Name           *string  `json:"name"`
 	Objective      *string  `json:"objective"`
@@ -173,7 +169,7 @@ func setStrategyBrief(ctx context.Context, brandID, strategyID, arguments string
 
 	if len(updates) > 0 {
 		updates = append(updates, firestore.Update{Path: "updatedAt", Value: time.Now().UnixMilli()})
-		if _, err := strategyDocRef(brandID, strategyID).Update(ctx, updates); err != nil {
+		if err := trendlymodels.UpdateStrategy(ctx, brandID, strategyID, updates); err != nil {
 			return jsonResult(map[string]any{"ok": false, "error": "failed to save: " + err.Error()}), false, err
 		}
 	}
@@ -219,10 +215,10 @@ func generateStrategyDoc(ctx context.Context, brandID, strategyID, arguments str
 		updates = append(updates, firestore.Update{Path: "timeline", Value: timelineFromDays(*a.DurationDays)})
 	}
 
-	if _, err := strategyDocRef(brandID, strategyID).Update(ctx, updates); err != nil {
+	if err := trendlymodels.UpdateStrategy(ctx, brandID, strategyID, updates); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to save: " + err.Error()}), false, err
 	}
-	resetStrategyCRDT(ctx, brandID, strategyID)
+	trendlymodels.PruneStrategyYUpdates(ctx, brandID, strategyID)
 
 	return jsonResult(map[string]any{"ok": true, "strategyId": strategyID}), true, nil
 }
@@ -253,11 +249,11 @@ func applyStrategyEdit(ctx context.Context, brandID, strategyID, arguments strin
 		}
 		// Read the full, untruncated body so we never apply edits against the
 		// possibly-truncated copy injected into the prompt context.
-		snap, err := strategyDocRef(brandID, strategyID).Get(ctx)
+		strat, err := trendlymodels.GetStrategy(ctx, brandID, strategyID)
 		if err != nil {
 			return jsonResult(map[string]any{"ok": false, "error": "strategy not found"}), false, err
 		}
-		current, _ := snap.Data()["markdownContent"].(string)
+		current := strat.MarkdownContent
 		if !strings.Contains(current, a.OldText) {
 			return jsonResult(map[string]any{
 				"ok":     false,
@@ -277,10 +273,10 @@ func applyStrategyEdit(ctx context.Context, brandID, strategyID, arguments strin
 		{Path: "crdtInitialized", Value: false},
 		{Path: "crdtGeneration", Value: firestore.Increment(1)},
 	}
-	if _, err := strategyDocRef(brandID, strategyID).Update(ctx, updates); err != nil {
+	if err := trendlymodels.UpdateStrategy(ctx, brandID, strategyID, updates); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to save: " + err.Error()}), false, err
 	}
-	resetStrategyCRDT(ctx, brandID, strategyID)
+	trendlymodels.PruneStrategyYUpdates(ctx, brandID, strategyID)
 
 	return jsonResult(map[string]any{"ok": true}), false, nil
 }
@@ -294,22 +290,4 @@ func timelineFromDays(days float64) map[string]any {
 		"startDate": start,
 		"endDate":   start + int64(days)*dayMs,
 	}
-}
-
-// resetStrategyCRDT prunes the Yjs update log after an AI rewrite. The new
-// editor mount ignores stale yupdates on its own (it only applies yupdates
-// whose `generation` matches the post-bump crdtGeneration), so this is just
-// storage hygiene — best-effort, no correctness depends on it.
-func resetStrategyCRDT(ctx context.Context, brandID, strategyID string) {
-	iter := strategyDocRef(brandID, strategyID).Collection("yupdates").Documents(ctx)
-	defer iter.Stop()
-	bw := firestoredb.Client.BulkWriter(ctx)
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			break
-		}
-		_, _ = bw.Delete(doc.Ref)
-	}
-	bw.End()
 }

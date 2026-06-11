@@ -1,34 +1,13 @@
 package wshandler
 
 import (
-	"context"
-	"errors"
 	"log"
 
-	"google.golang.org/api/iterator"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
 func GetUserConnections(userID string) ([]string, error) {
-	if userID == "" {
-		return nil, errors.New("userID is empty")
-	}
-	iter := firestoreClient.Collection("websockets").
-		Where("userId", "==", userID).
-		Documents(context.Background())
-	defer iter.Stop()
-
-	var ids []string
-	for {
-		doc, err := iter.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		ids = append(ids, doc.Ref.ID)
-	}
-	return ids, nil
+	return trendlymodels.WebsocketConnectionIDsByUser(userID)
 }
 
 func SendToUser(userID string, data string) {

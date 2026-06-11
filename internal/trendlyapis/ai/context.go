@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 const maxContextChars = 8000
@@ -28,11 +27,8 @@ func verifyBrandAccess(brandID, managerID string) bool {
 	if brandID == "" || managerID == "" {
 		return false
 	}
-	_, err := firestoredb.Client.
-		Collection("brands").Doc(brandID).
-		Collection("members").Doc(managerID).
-		Get(context.Background())
-	return err == nil
+	var member trendlymodels.BrandMember
+	return member.Get(brandID, managerID) == nil
 }
 
 func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, focusedText string) string {
@@ -132,23 +128,19 @@ func loadModuleContext(module, brandID, contextID string) string {
 		if contextID == "" {
 			return ""
 		}
-		doc, err := firestoredb.Client.
-			Collection("brands").Doc(brandID).
-			Collection("strategies").Doc(contextID).
-			Get(ctx)
+		strat, err := trendlymodels.GetStrategy(ctx, brandID, contextID)
 		if err != nil {
 			return ""
 		}
-		data := doc.Data()
 		var parts []string
-		if name, ok := data["name"].(string); ok && name != "" {
-			parts = append(parts, "Strategy: "+name)
+		if strat.Name != "" {
+			parts = append(parts, "Strategy: "+strat.Name)
 		}
-		if obj, ok := data["objective"].(string); ok && obj != "" {
-			parts = append(parts, "Objective: "+obj)
+		if strat.Objective != "" {
+			parts = append(parts, "Objective: "+strat.Objective)
 		}
-		if md, ok := data["markdownContent"].(string); ok && md != "" {
-			parts = append(parts, "Document:\n"+md)
+		if strat.MarkdownContent != "" {
+			parts = append(parts, "Document:\n"+strat.MarkdownContent)
 		}
 		return strings.Join(parts, "\n\n")
 
@@ -173,13 +165,10 @@ func loadModuleContext(module, brandID, contextID string) string {
 // loadOnboardingState summarises which brand fields are already saved on the
 // draft brand, so the onboarding model knows what is left to ask.
 func loadOnboardingState(brandID string) string {
-	doc, err := firestoredb.Client.Collection("brands").Doc(brandID).Get(context.Background())
-	if err != nil {
+	var brand trendlymodels.Brand
+	if err := brand.Get(brandID); err != nil {
 		return "Nothing saved yet."
 	}
-	data := doc.Data()
-	profile, _ := data["profile"].(map[string]any)
-	survey, _ := data["survey"].(map[string]any)
 
 	var saved []string
 	add := func(label, val string) {
@@ -187,26 +176,26 @@ func loadOnboardingState(brandID string) string {
 			saved = append(saved, label+": "+val)
 		}
 	}
-	add("Brand name", getString(data, "name"))
-	if profile != nil {
-		add("About", getString(profile, "about"))
-		add("Phone", getString(profile, "phone"))
-		add("Website", getString(profile, "website"))
-		if inds := toSlice(profile["industries"]); len(inds) > 0 {
-			parts := make([]string, 0, len(inds))
-			for _, v := range inds {
-				if s, ok := v.(string); ok {
-					parts = append(parts, s)
-				}
-			}
-			add("Industries", strings.Join(parts, ", "))
+	deref := func(p *string) string {
+		if p == nil {
+			return ""
+		}
+		return *p
+	}
+	add("Brand name", brand.Name)
+	if brand.Profile != nil {
+		add("About", deref(brand.Profile.About))
+		add("Phone", deref(brand.Profile.PhoneNumber))
+		add("Website", deref(brand.Profile.Website))
+		if len(brand.Profile.Industries) > 0 {
+			add("Industries", strings.Join(brand.Profile.Industries, ", "))
 		}
 	}
-	add("Brand age", getString(data, "age"))
-	if survey != nil {
-		add("Survey source", getString(survey, "source"))
-		add("Survey purpose", getString(survey, "purpose"))
-		add("Survey content volume", getString(survey, "collaborationValue"))
+	add("Brand age", deref(brand.Age))
+	if brand.Survey != nil {
+		add("Survey source", deref(brand.Survey.Source))
+		add("Survey purpose", deref(brand.Survey.Purpose))
+		add("Survey content volume", deref(brand.Survey.CollaborationValue))
 	}
 
 	if len(saved) == 0 {
@@ -216,37 +205,33 @@ func loadOnboardingState(brandID string) string {
 }
 
 func loadContentBrief(brandID, contentID string) string {
-	doc, err := firestoredb.Client.
-		Collection("brands").Doc(brandID).
-		Collection("contents").Doc(contentID).
-		Get(context.Background())
+	ct, err := trendlymodels.GetContent(brandID, contentID)
 	if err != nil {
 		return ""
 	}
-	data := doc.Data()
 	var parts []string
-	if title, ok := data["title"].(string); ok && title != "" {
-		parts = append(parts, "Title: "+title)
+	if ct.Title != "" {
+		parts = append(parts, "Title: "+ct.Title)
 	}
-	if platform, ok := data["platform"].(string); ok && platform != "" {
-		parts = append(parts, "Platform: "+platform)
+	if ct.Platform != "" {
+		parts = append(parts, "Platform: "+ct.Platform)
 	}
-	if format, ok := data["contentFormat"].(string); ok && format != "" {
-		parts = append(parts, "Format: "+format)
+	if ct.ContentFormat != "" {
+		parts = append(parts, "Format: "+ct.ContentFormat)
 	}
-	if desc, ok := data["description"].(string); ok && desc != "" {
-		parts = append(parts, "Brief: "+desc)
+	if ct.Description != "" {
+		parts = append(parts, "Brief: "+ct.Description)
 	}
-	if caption, ok := data["caption"].(string); ok && caption != "" {
-		parts = append(parts, "Caption: "+caption)
+	if ct.Caption != "" {
+		parts = append(parts, "Caption: "+ct.Caption)
 	}
-	if hashtags, ok := data["hashtags"].(string); ok && hashtags != "" {
-		parts = append(parts, "Hashtags: "+hashtags)
+	if ct.Hashtags != "" {
+		parts = append(parts, "Hashtags: "+ct.Hashtags)
 	}
-	if script, ok := data["script"].(string); ok && script != "" {
-		parts = append(parts, "Script: "+script)
+	if ct.Script != "" {
+		parts = append(parts, "Script: "+ct.Script)
 	}
-	if summary := summariseAttachments(data["attachments"]); summary != "" {
+	if summary := summariseAttachments(ct.Attachments); summary != "" {
 		parts = append(parts, summary)
 	}
 	return strings.Join(parts, "\n")
@@ -254,25 +239,20 @@ func loadContentBrief(brandID, contentID string) string {
 
 // summariseAttachments produces a short, model-friendly description of the media
 // currently on a content piece so the AI chat knows what visuals/video exist.
-func summariseAttachments(raw any) string {
-	list, ok := raw.([]any)
-	if !ok || len(list) == 0 {
+func summariseAttachments(list []trendlymodels.ContentAttachment) string {
+	if len(list) == 0 {
 		return ""
 	}
 	images, videos := 0, 0
 	var urls []string
-	for _, item := range list {
-		att, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		switch t, _ := att["type"].(string); t {
+	for _, att := range list {
+		switch att.Type {
 		case "video", "reel":
 			videos++
 		default:
 			images++
-			if u, ok := att["imageUrl"].(string); ok && u != "" {
-				urls = append(urls, u)
+			if att.ImageURL != "" {
+				urls = append(urls, att.ImageURL)
 			}
 		}
 	}
@@ -298,35 +278,18 @@ func loadCalendarMonth(brandID string) string {
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).UnixMilli()
 	end := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()
 
-	iter := firestoredb.Client.
-		Collection("brands").Doc(brandID).
-		Collection("contents").
-		Where("postingTimeStamp", ">=", start).
-		Where("postingTimeStamp", "<", end).
-		Documents(context.Background())
-	defer iter.Stop()
+	contents, err := trendlymodels.ListContentInRange(context.Background(), brandID, start, end, false)
+	if err != nil {
+		return "No scheduled posts this month."
+	}
 
 	var lines []string
-	count := 0
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			break
-		}
-		data := doc.Data()
-		if archived, _ := data["isArchived"].(bool); archived {
-			continue
-		}
-		title, _ := data["title"].(string)
-		format, _ := data["contentFormat"].(string)
-		status, _ := data["status"].(string)
-		when, _ := toInt64(data["postingTimeStamp"])
-		t := time.UnixMilli(when).Format("2006-01-02")
+	for _, ct := range contents {
+		t := time.UnixMilli(ct.PostingTimeStamp).Format("2006-01-02")
 		// The [id:…] prefix lets the calendar tools target the exact post the
 		// user references without re-stating its title.
-		lines = append(lines, fmt.Sprintf("- [id:%s] [%s] %s — %s (%s)", doc.Ref.ID, t, title, format, status))
-		count++
-		if count >= 50 {
+		lines = append(lines, fmt.Sprintf("- [id:%s] [%s] %s — %s (%s)", ct.ID, t, ct.Title, ct.ContentFormat, ct.Status))
+		if len(lines) >= 50 {
 			break
 		}
 	}

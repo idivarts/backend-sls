@@ -114,6 +114,34 @@ backend-sls/
 - **Dependency injection**: Clients are initialized per-package (e.g., `pkg/firebase/init.go`) and referenced globally within that package. No constructor injection.
 - **No DynamoDB for new code**: Use Firestore for new models. DynamoDB references in the codebase are legacy.
 
+### ⭐ STANDING RULE — All Firestore access goes through a model (NEVER raw queries in handlers)
+
+**Never call `firestoredb.Client.Collection(...)` (or `.Doc/.Where/.Set/.Update/
+.Delete/.Add/.CollectionGroup`) directly from a handler, AI tool, websocket
+handler, middleware, or any non-model package.** Every Firestore
+collection/subcollection MUST have a model struct in
+`internal/models/trendlymodels/` that owns all of its reads, writes, and deletes
+behind wrapped functions. Callers use those functions only.
+
+When you add or touch a collection:
+1. **Model first.** Create/extend the struct in `internal/models/trendlymodels/`
+   with `json:"..."` + `firestore:"..."` tags on every field, and an
+   `ID string `firestore:"-"`` populated from `doc.Ref.ID` on reads.
+2. **Wrap every operation** as a function/method on that file:
+   - typed read → returns the struct (`Get…`, `List…`),
+   - create → `Create…(parentID, …)` (a `map[string]any` payload is fine when
+     many ad-hoc fields are stamped — the `.Add`/`.Set` call still lives in the model),
+   - partial update → accept `[]firestore.Update` (matches `contract.Update`,
+     `social_v2`), and the `.Update` call lives in the model,
+   - delete / range-delete → `Delete…` in the model.
+3. **`firestoredb.Client` may only appear inside `internal/models/trendlymodels/`
+   files** (plus the already-encapsulated `pkg/openrouter` wrapper). If you find
+   yourself reaching for it elsewhere, add the missing model function instead.
+4. Keep the Firestore rules & indexes in sync (see §3 in the root CLAUDE.md).
+
+Existing examples to copy: `content.go`, `strategy.go`, `websocket.go`,
+`share_link.go`, `social_account_index.go`.
+
 ### Route Pattern
 ```go
 // functions/<name>/main.go
