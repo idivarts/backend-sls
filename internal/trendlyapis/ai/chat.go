@@ -78,6 +78,16 @@ func handleMessageWS(req WSRequest) {
 		})
 		return
 	}
+	orgID, _ := orgIDForBrand(conv.BrandID)
+	if aiTokensExhausted(orgID) {
+		wsSend(req.ConnectionID, map[string]any{
+			"type":           "upgrade_required",
+			"reason":         "tokens_exhausted",
+			"conversationId": conv.ID,
+			"task":           string(openrouter.TaskChat),
+		})
+		return
+	}
 	if model != conv.CurrentModel {
 		_ = openrouter.UpdateConversationModel(ctx, conv.ID, model)
 	}
@@ -207,6 +217,7 @@ func handleMessageWS(req WSRequest) {
 	if finalUsage != nil {
 		tokens = finalUsage.TotalTokens
 	}
+	meterAIUsage(orgID, finalUsage)
 	assistantMsgID, _ := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
 		Role:       "assistant",
 		UserID:     conv.UserID,
@@ -315,6 +326,12 @@ func HTTPMessage(c *gin.Context) {
 		return
 	}
 
+	orgID, _ := orgIDForBrand(conv.BrandID)
+	if aiTokensExhausted(orgID) {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "reason": "tokens_exhausted", "task": openrouter.TaskChat})
+		return
+	}
+
 	resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
 		Model:    model,
 		Messages: msgs,
@@ -323,6 +340,7 @@ func HTTPMessage(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
+	meterAIUsage(orgID, resp.Usage)
 
 	answer := ""
 	if len(resp.Choices) > 0 {

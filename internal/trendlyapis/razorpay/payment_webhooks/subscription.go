@@ -3,7 +3,9 @@ package paymentwebhooks
 import (
 	"errors"
 	"log"
+	"time"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments"
 	"github.com/idivarts/backend-sls/pkg/payments/webhook"
@@ -72,9 +74,33 @@ func HandleSubscription(event *webhook.Event) error {
 		billing.Status = myutil.IntPtr(3)
 	}
 
+	// Drive OUR app-level access state + fund the org token wallet. Each "active"
+	// webhook (subscription.activated + each monthly subscription.charged) refills
+	// the wallet to the plan's monthly allotment and refreshes entitlements.
+	switch subscription.Status {
+	case "active":
+		reset := trendlymodels.NextMonthlyReset(time.Now())
+		billing.AccessState = myutil.StrPtr("active")
+		billing.BillingMode = myutil.StrPtr("recurring")
+		billing.BillingAnchorDay = myutil.IntPtr(1)
+		billing.Provider = myutil.StrPtr("razorpay")
+		billing.PeriodEnd = &reset
+		planKey := subscription.Notes.PlanKey
+		if planKey == "" && billing.PlanKey != nil {
+			planKey = *billing.PlanKey
+		}
+		if planKey != "" {
+			if err := trendlymodels.ApplyPlanToOrg(target.orgID, planKey, reset); err != nil {
+				log.Println("apply plan / wallet refill failed", target.orgID, err)
+			}
+		}
+	case "halted":
+		billing.AccessState = myutil.StrPtr("past_due")
+	case "cancelled":
+		billing.AccessState = myutil.StrPtr("canceled")
+	}
+
 	log.Println("Updating Subscription Status to", event.Event, *billing.BillingStatus, billing.PlanKey)
-	// Old per-brand credit allotment on charge/auth removed — the new org token
-	// wallet is refilled by the Credit ticket's billing engine, not here.
 
 	return target.save(billing)
 }

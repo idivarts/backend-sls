@@ -64,6 +64,11 @@ func HTTPCaption(c *gin.Context) {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskCaption})
 		return
 	}
+	orgID, _ := orgIDForBrand(req.BrandID)
+	if aiTokensExhausted(orgID) {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "reason": "tokens_exhausted", "task": openrouter.TaskCaption})
+		return
+	}
 
 	user := fmt.Sprintf(
 		"Write 3 caption options for a %s %s post. Topic: %s. Tone: %s.\n\nReturn STRICTLY a JSON array of 3 objects with keys \"length\" (\"short\"|\"medium\"|\"long\") and \"text\". No markdown, no commentary.",
@@ -78,6 +83,7 @@ func HTTPCaption(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
+	meterAIUsage(orgID, resp.Usage)
 
 	raw := ""
 	if len(resp.Choices) > 0 {
@@ -145,6 +151,11 @@ func HTTPHashtags(c *gin.Context) {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskHashtag})
 		return
 	}
+	orgID, _ := orgIDForBrand(req.BrandID)
+	if aiTokensExhausted(orgID) {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "reason": "tokens_exhausted", "task": openrouter.TaskHashtag})
+		return
+	}
 
 	user := fmt.Sprintf(
 		"Suggest hashtags for a %s post on the topic: %s. Use up-to-date trending hashtags when possible.\n\nReturn STRICTLY a JSON array of 3 objects with keys \"tier\" (\"broad\"|\"niche\"|\"brand\") and \"tags\" (array of strings, no # prefix). 5-7 tags per tier. No markdown, no commentary.",
@@ -160,6 +171,7 @@ func HTTPHashtags(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
+	meterAIUsage(orgID, resp.Usage)
 	raw := ""
 	if len(resp.Choices) > 0 {
 		raw = resp.Choices[0].Message.Content
@@ -220,6 +232,11 @@ func handleScriptGenWS(req WSRequest) {
 		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskScript)})
 		return
 	}
+	orgID, _ := orgIDForBrand(p.BrandID)
+	if aiTokensExhausted(orgID) {
+		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "reason": "tokens_exhausted", "task": string(openrouter.TaskScript)})
+		return
+	}
 
 	user := fmt.Sprintf(
 		"Write a video script for a %s. Topic: %s. Key message: %s. Tone: %s.\n\nReturn structured markdown with these sections:\n## Hook (first 3 seconds)\n## Body (3-4 scenes with cues)\n## CTA",
@@ -246,6 +263,7 @@ func handleScriptGenWS(req WSRequest) {
 					}
 				}
 			}
+			meterAIUsage(orgID, u)
 			wsSend(req.ConnectionID, map[string]any{"type": "done", "usage": u})
 		},
 		OnError: func(e error) {
@@ -295,6 +313,11 @@ func handleImageGenWS(req WSRequest) {
 		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskImage)})
 		return
 	}
+	orgID, _ := orgIDForBrand(p.BrandID)
+	if aiTokensExhausted(orgID) {
+		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "reason": "tokens_exhausted", "task": string(openrouter.TaskImage)})
+		return
+	}
 
 	prompt := p.Description
 	if p.Style != "" {
@@ -324,13 +347,14 @@ func handleImageGenWS(req WSRequest) {
 
 	completed := 0
 	var firstErr error
+	var imgCost float64
 	for i := 0; i < p.Count; i++ {
 		wsSend(req.ConnectionID, map[string]any{
 			"type":  "image_status",
 			"index": i,
 			"state": "generating",
 		})
-		resp, err := openrouter.GenerateImage(context.Background(), openrouter.ImageRequest{
+		resp, usage, err := openrouter.GenerateImage(context.Background(), openrouter.ImageRequest{
 			Model:  model,
 			Prompt: prompt,
 			Size:   size,
@@ -342,6 +366,9 @@ func handleImageGenWS(req WSRequest) {
 			}
 			wsErrorTo(req.ConnectionID, fmt.Sprintf("image %d failed: %v", i, err))
 			continue
+		}
+		if usage != nil {
+			imgCost += usage.Cost
 		}
 
 		url := ""
@@ -382,6 +409,8 @@ func handleImageGenWS(req WSRequest) {
 			"s3Url": url,
 		})
 	}
+
+	meterAIUsage(orgID, &openrouter.Usage{Cost: imgCost})
 
 	if completed == 0 {
 		msg := "image generation failed"

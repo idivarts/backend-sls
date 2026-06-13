@@ -2,7 +2,10 @@ package paymentwebhooks
 
 import (
 	"errors"
+	"log"
+	"time"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
@@ -49,8 +52,26 @@ func handlePaymentLink(event *webhook.Event) error {
 		billing.Status = myutil.IntPtr(0)
 	}
 
-	// Old per-brand credit top-up on payment_link.paid removed — the new org
-	// token wallet is handled by the Credit ticket's billing engine, not here.
+	// The invoice / manual-pay fallback: a PAID payment-link grants exactly one
+	// month of access (billingMode=invoice) and funds the wallet. The cron
+	// re-locks the org when this paid month lapses unless another invoice is paid.
+	if paymentLink.Status == "paid" {
+		reset := trendlymodels.NextMonthlyReset(time.Now())
+		billing.AccessState = myutil.StrPtr("active")
+		billing.BillingMode = myutil.StrPtr("invoice")
+		billing.BillingAnchorDay = myutil.IntPtr(1)
+		billing.Provider = myutil.StrPtr("razorpay")
+		billing.PeriodEnd = &reset
+		planKey := paymentLink.Notes.PlanKey
+		if planKey == "" && billing.PlanKey != nil {
+			planKey = *billing.PlanKey
+		}
+		if planKey != "" {
+			if err := trendlymodels.ApplyPlanToOrg(target.orgID, planKey, reset); err != nil {
+				log.Println("apply plan / wallet refill (invoice) failed", target.orgID, err)
+			}
+		}
+	}
 
 	return target.save(billing)
 }
