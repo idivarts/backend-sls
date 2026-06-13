@@ -69,6 +69,11 @@ func HTTPOnboardingStrategyInit(c *gin.Context) {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskChat})
 		return
 	}
+	orgID, _ := orgIDForBrand(req.BrandID)
+	if aiTokensExhausted(orgID) {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "reason": "tokens_exhausted", "task": openrouter.TaskChat})
+		return
+	}
 	conv, err := openrouter.CreateConversation(ctx, req.BrandID, managerID, moduleStrategy, strategyID, model, "Content strategy")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -85,8 +90,11 @@ func HTTPOnboardingStrategyInit(c *gin.Context) {
 	}
 
 	answer := ""
-	if resp, cErr := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{Model: model, Messages: msgs}); cErr == nil && len(resp.Choices) > 0 {
-		answer = resp.Choices[0].Message.Content
+	if resp, cErr := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{Model: model, Messages: msgs}); cErr == nil {
+		if len(resp.Choices) > 0 {
+			answer = resp.Choices[0].Message.Content
+		}
+		meterAIUsage(orgID, resp.Usage)
 	}
 
 	// 4. Persist the opening turn so the panel shows it immediately on first load.

@@ -239,7 +239,7 @@ type ImageData struct {
 // request and pull the image off the assistant message. The result is mapped
 // back onto ImageResponse so callers stay agnostic to the transport: data-URI
 // images populate B64JSON, hosted images populate URL.
-func GenerateImage(ctx context.Context, req ImageRequest) (*ImageResponse, error) {
+func GenerateImage(ctx context.Context, req ImageRequest) (*ImageResponse, *Usage, error) {
 	prompt := req.Prompt
 	if req.Size != "" {
 		prompt = fmt.Sprintf("%s\n\nGenerate the image at %s resolution (matching that aspect ratio).", prompt, req.Size)
@@ -251,7 +251,7 @@ func GenerateImage(ctx context.Context, req ImageRequest) (*ImageResponse, error
 		Modalities: []string{"image", "text"},
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	out := &ImageResponse{}
@@ -272,9 +272,9 @@ func GenerateImage(ctx context.Context, req ImageRequest) (*ImageResponse, error
 		}
 	}
 	if len(out.Data) == 0 {
-		return nil, fmt.Errorf("model %q returned no image", req.Model)
+		return nil, nil, fmt.Errorf("model %q returned no image", req.Model)
 	}
-	return out, nil
+	return out, chatResp.Usage, nil
 }
 
 func doRequest(ctx context.Context, path string, payload interface{}) (io.ReadCloser, error) {

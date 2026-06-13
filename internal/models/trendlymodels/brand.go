@@ -87,6 +87,18 @@ type BrandBilling struct {
 	TrialEnds *int64  `json:"trialEnds,omitempty" firestore:"trialEnds,omitempty"`
 	EndsAt    *int64  `json:"endsAt,omitempty" firestore:"endsAt,omitempty"`
 	Status    *int    `json:"status,omitempty" firestore:"status,omitempty"`
+
+	// ── Org-level USD billing state machine (Credit ticket §5a/§6) ──
+	// These layer the new access-control shape on top of the legacy Razorpay
+	// fields above without breaking existing webhook code. `BillingStatus` still
+	// holds the raw Razorpay status; `AccessState` is OUR app-level state that the
+	// paywall/lock + cron drive.
+	Provider           *string `json:"provider,omitempty" firestore:"provider,omitempty"`                     // "razorpay" now; future MoR
+	AccessState        *string `json:"accessState,omitempty" firestore:"accessState,omitempty"`               // "active" | "past_due" | "locked" | "canceled"
+	BillingMode        *string `json:"billingMode,omitempty" firestore:"billingMode,omitempty"`               // "recurring" | "invoice"
+	BillingAnchorDay   *int    `json:"billingAnchorDay,omitempty" firestore:"billingAnchorDay,omitempty"`     // always 1
+	PeriodEnd          *int64  `json:"periodEnd,omitempty" firestore:"periodEnd,omitempty"`                   // end of current paid month (next 1st)
+	ProratedFirstMonth *bool   `json:"proratedFirstMonth,omitempty" firestore:"proratedFirstMonth,omitempty"`
 }
 
 type BrandProfile struct {

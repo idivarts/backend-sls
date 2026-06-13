@@ -231,6 +231,10 @@ func generateCalendarItems(ctx context.Context, brandID, html string, duration i
 	if locked {
 		return nil, fmt.Errorf("upgrade_required")
 	}
+	orgID, _ := orgIDForBrand(brandID)
+	if aiTokensExhausted(orgID) {
+		return nil, fmt.Errorf("upgrade_required")
+	}
 	resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
 		Model:          model,
 		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
@@ -242,6 +246,7 @@ func generateCalendarItems(ctx context.Context, brandID, html string, duration i
 	if err != nil {
 		return nil, err
 	}
+	meterAIUsage(orgID, resp.Usage)
 	raw := ""
 	if len(resp.Choices) > 0 {
 		raw = resp.Choices[0].Message.Content
@@ -316,6 +321,10 @@ func deriveDuration(ctx context.Context, brandID, html string) (int, float64) {
 	if locked {
 		return 0, 0
 	}
+	orgID, _ := orgIDForBrand(brandID)
+	if aiTokensExhausted(orgID) {
+		return 0, 0
+	}
 	resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
 		Model:          model,
 		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
@@ -327,6 +336,7 @@ func deriveDuration(ctx context.Context, brandID, html string) (int, float64) {
 	if err != nil || len(resp.Choices) == 0 {
 		return 0, 0
 	}
+	meterAIUsage(orgID, resp.Usage)
 	var parsed struct {
 		DurationDays float64 `json:"durationDays"`
 		Confidence   float64 `json:"confidence"`

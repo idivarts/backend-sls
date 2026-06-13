@@ -45,6 +45,11 @@ func handleQuickEditWS(req WSRequest) {
 		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskQuickEdit)})
 		return
 	}
+	orgID, _ := orgIDForBrand(req.BrandID)
+	if aiTokensExhausted(orgID) {
+		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "reason": "tokens_exhausted", "task": string(openrouter.TaskQuickEdit)})
+		return
+	}
 
 	msgs := []openrouter.Message{
 		{Role: "system", Content: systemPrompt},
@@ -62,6 +67,7 @@ func handleQuickEditWS(req WSRequest) {
 			})
 		},
 		OnDone: func(u *openrouter.Usage) {
+			meterAIUsage(orgID, u)
 			wsSend(req.ConnectionID, map[string]any{
 				"type":  "done",
 				"usage": u,
@@ -109,6 +115,11 @@ func HTTPQuickEdit(c *gin.Context) {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskQuickEdit})
 		return
 	}
+	orgID, _ := orgIDForBrand(req.BrandID)
+	if aiTokensExhausted(orgID) {
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "reason": "tokens_exhausted", "task": openrouter.TaskQuickEdit})
+		return
+	}
 
 	resp, err := openrouter.ChatCompletion(c.Request.Context(), openrouter.ChatRequest{
 		Model: model,
@@ -121,6 +132,7 @@ func HTTPQuickEdit(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
+	meterAIUsage(orgID, resp.Usage)
 	result := ""
 	if len(resp.Choices) > 0 {
 		result = strings.TrimSpace(resp.Choices[0].Message.Content)

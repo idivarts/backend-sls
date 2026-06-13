@@ -280,7 +280,14 @@ service cloud.firestore {
     // subscription lives here; each brand references its org via organizationId.
     match /organizations/{orgId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      // Clients may edit org profile fields (e.g. name/image) but NEVER billing,
+      // the token wallet, entitlements, or plan caps — those are written only by
+      // the backend (Admin SDK, which bypasses rules). This stops a client from
+      // self-granting tokens or flipping their own subscription to "active".
+      allow create, delete: if isAuthenticated();
+      allow update: if isAuthenticated()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['billing', 'tokenWallet', 'entitlements', 'planKey', 'maxBrands']);
 
       // Org membership + role. Named "orgMembers" (NOT "members") on purpose so
       // it does not collide with the brands/{brandId}/members collection-group

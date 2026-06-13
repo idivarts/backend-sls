@@ -158,6 +158,19 @@ functions:
             - cron(30 2 * * ? *)   # 8:00 AM IST daily
             - cron(30 14 * * ? *)  # 8:00 PM IST daily
           enabled: ${self:custom.isProd.${self:provider.stage}}
+  billing_cron:
+    handler: scripts/billing-cron/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+    timeout: 900  # 15 min — scans all orgs to renew wallets + advance billing state
+    memorySize: 256
+    description: "1st-of-month org billing: token-wallet renewal + lock/invoice state machine"
+    events:
+      - schedule:
+          rate: cron(0 2 1 * ? *)  # 02:00 UTC on the 1st of every month
+          enabled: ${self:custom.isProd.${self:provider.stage}}
   social_token_refresh:
     handler: functions/trendly_social_refresh/main.go
     package:
