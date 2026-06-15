@@ -12,6 +12,7 @@ func main() {
 	onboard.POST("/signup", trendlyunauth.Signup)
 	onboard.GET("/email-redirection", trendlyunauth.EmailRedirection)
 	onboard.POST("/reset-password", trendlyunauth.ResetPassword)
+	onboard.POST("/check-email", trendlyunauth.CheckEmail)
 
 	instaApi := apihandler.GinEngine.Group("/instagram")
 
