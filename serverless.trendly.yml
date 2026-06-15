@@ -10,6 +10,7 @@ provider:
   environment:
     STAGE: ${self:provider.stage}
     GIN_MODE: ${self:custom.ginMode.${self:provider.stage}}
+    FIRESTORE_DATABASE_ID: ${env:FIRESTORE_DATABASE_ID, '(default)'}
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
