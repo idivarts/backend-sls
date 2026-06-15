@@ -27,6 +27,10 @@ type ResetPasswordRequest struct {
 	Email string `json:"email" binding:"required"`
 }
 
+type CheckEmailRequest struct {
+	Email string `json:"email" binding:"required"`
+}
+
 // Signup creates a new Firebase Auth account with email and password,
 // then sends a custom verification email via SendGrid.
 func Signup(c *gin.Context) {
@@ -145,4 +149,29 @@ func ResetPassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent successfully. Please check your inbox."})
+}
+
+// CheckEmail reports whether a brand-manager account already exists for the given
+// email. Firebase Auth is the source of truth (a manager Firestore doc is only
+// created on first successful sign-in, so a signed-up-but-never-logged-in account
+// would be missed by a Firestore query). The pre-signin screen uses this to route
+// the user to login (exists) vs create-new-account (does not exist).
+func CheckEmail(c *gin.Context) {
+	var req CheckEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := fauth.Client.GetUserByEmail(context.Background(), req.Email)
+	if err != nil {
+		if auth.IsUserNotFound(err) {
+			c.JSON(http.StatusOK, gin.H{"exists": false})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error checking email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"exists": true})
 }
