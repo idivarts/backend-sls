@@ -18,6 +18,9 @@ var linkedinScopesRequired = strings.Join([]string{
 	linkedin.ScopeOpenID,
 	linkedin.ScopeProfile,
 	linkedin.ScopeEmail,
+	// w_member_social lets the brand publish scheduled posts to the connected
+	// personal profile (granted by the "Share on LinkedIn" product).
+	linkedin.ScopeMemberSocial,
 }, " ")
 
 // LinkedInInit redirects to LinkedIn's OAuth consent screen.

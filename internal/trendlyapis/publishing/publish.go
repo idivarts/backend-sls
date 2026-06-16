@@ -8,6 +8,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
+	"github.com/idivarts/backend-sls/pkg/linkedin"
 	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
@@ -160,6 +161,16 @@ func publishToFacebook(pageID, pageToken string, ct *trendlymodels.Content) (str
 	return res.ID, nil
 }
 
+// publishToLinkedIn posts to a member's personal LinkedIn profile. The member
+// URN was stored in the account's raw profile (`sub`) at connect time.
+func publishToLinkedIn(account *trendlymodels.SocialAccount, accessToken string, ct *trendlymodels.Content) (string, error) {
+	authorURN, _ := account.RawProfile["sub"].(string)
+	if authorURN == "" {
+		return "", fmt.Errorf("linkedin account %s has no member urn", account.ID)
+	}
+	return linkedin.CreateMemberPost(accessToken, authorURN, buildCaption(ct), firstImageURL(ct))
+}
+
 // PublishContent loads a content doc and publishes it to each destination,
 // recording per-platform published ids and a final status on the document.
 func PublishContent(brandID, contentID string) error {
@@ -209,6 +220,15 @@ func PublishContent(brandID, contentID string) error {
 				continue
 			}
 			publishedIds["facebook"] = id
+		case "linkedin":
+			id, perr := publishToLinkedIn(account, token.AccessToken, ct)
+			if perr != nil {
+				if firstErr == nil {
+					firstErr = perr
+				}
+				continue
+			}
+			publishedIds["linkedin"] = id
 		default:
 			log.Printf("publishing: unsupported platform %q for content %s", dest.Platform, contentID)
 		}
