@@ -209,6 +209,16 @@ func loadContentBrief(brandID, contentID string) string {
 	if err != nil {
 		return ""
 	}
+	return contentBriefText(ct)
+}
+
+// contentBriefText renders a content doc into the compact brief the AI prompts
+// use. Shared by the persisted-doc path (loadContentBrief) and the live-edits
+// path (briefFromFields) so both produce an identical shape.
+func contentBriefText(ct *trendlymodels.Content) string {
+	if ct == nil {
+		return ""
+	}
 	var parts []string
 	if ct.Title != "" {
 		parts = append(parts, "Title: "+ct.Title)
@@ -235,6 +245,23 @@ func loadContentBrief(brandID, contentID string) string {
 		parts = append(parts, summary)
 	}
 	return strings.Join(parts, "\n")
+}
+
+// briefFromFields builds the content brief from the live editor fields the app
+// sends with a generation request. These reflect the user's current, possibly
+// unsaved, edits — so the AI works against what's on screen now rather than the
+// last-saved Firestore doc. Returns "" when nothing usable is supplied.
+func briefFromFields(title, platform, format, description, caption, hashtags, script string) string {
+	ct := &trendlymodels.Content{
+		Title:         strings.TrimSpace(title),
+		Platform:      strings.TrimSpace(platform),
+		ContentFormat: strings.TrimSpace(format),
+		Description:   strings.TrimSpace(description),
+		Caption:       strings.TrimSpace(caption),
+		Hashtags:      strings.TrimSpace(hashtags),
+		Script:        strings.TrimSpace(script),
+	}
+	return contentBriefText(ct)
 }
 
 // summariseAttachments produces a short, model-friendly description of the media
