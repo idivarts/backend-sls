@@ -34,6 +34,15 @@ type captionReq struct {
 	Tone      string `json:"tone"`
 	ContextID string `json:"contextId"`
 	Model     string `json:"model"`
+
+	// Live editor content — the current, possibly-unsaved state of the piece the
+	// user is working on. When present it overrides the persisted-doc context so
+	// the AI writes with what's on screen now.
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Caption     string `json:"caption"`
+	Hashtags    string `json:"hashtags"`
+	Script      string `json:"script"`
 }
 
 type captionVariant struct {
@@ -58,7 +67,8 @@ func HTTPCaption(c *gin.Context) {
 		return
 	}
 
-	sys := buildSystemPrompt(brand, "content", req.BrandID, req.ContextID, "")
+	liveBrief := briefFromFields(req.Title, req.Platform, req.Format, req.Description, req.Caption, req.Hashtags, req.Script)
+	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief)
 	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskCaption, req.Model)
 	if locked {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskCaption})
@@ -121,6 +131,14 @@ type hashtagReq struct {
 	Platform  string `json:"platform"`
 	ContextID string `json:"contextId"`
 	Model     string `json:"model"`
+
+	// Live editor content (see captionReq).
+	Title       string `json:"title"`
+	Format      string `json:"format"`
+	Description string `json:"description"`
+	Caption     string `json:"caption"`
+	Hashtags    string `json:"hashtags"`
+	Script      string `json:"script"`
 }
 
 type hashtagGroup struct {
@@ -145,7 +163,8 @@ func HTTPHashtags(c *gin.Context) {
 		return
 	}
 
-	sys := buildSystemPrompt(brand, "content", req.BrandID, req.ContextID, "")
+	liveBrief := briefFromFields(req.Title, req.Platform, req.Format, req.Description, req.Caption, req.Hashtags, req.Script)
+	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief)
 	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskHashtag, req.Model)
 	if locked {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskHashtag})
@@ -206,6 +225,31 @@ type scriptPayload struct {
 	Topic      string `json:"topic"`
 	KeyMessage string `json:"keyMessage"`
 	Tone       string `json:"tone"`
+
+	// Live editor content (see captionReq).
+	Title       string `json:"title"`
+	Platform    string `json:"platform"`
+	Format      string `json:"format"`
+	Description string `json:"description"`
+	Caption     string `json:"caption"`
+	Hashtags    string `json:"hashtags"`
+	Script      string `json:"script"`
+}
+
+// systemPromptWithLiveContent builds the content-module system prompt, preferring
+// the live (possibly unsaved) editor brief over the last-saved Firestore doc.
+// When a live brief is supplied we suppress the persisted-doc load (contextID)
+// so the AI doesn't get two conflicting versions of the same piece.
+func systemPromptWithLiveContent(brand *trendlymodels.Brand, brandID, contextID, liveBrief string) string {
+	ctxID := contextID
+	if liveBrief != "" {
+		ctxID = ""
+	}
+	sys := buildSystemPrompt(brand, "content", brandID, ctxID, "")
+	if liveBrief != "" {
+		sys += "\nThe content the user is working on right now (may include unsaved edits — treat this as the current state of the piece):\n" + liveBrief + "\n"
+	}
+	return sys
 }
 
 func handleScriptGenWS(req WSRequest) {
@@ -226,7 +270,8 @@ func handleScriptGenWS(req WSRequest) {
 		wsErrorTo(req.ConnectionID, "brand not found")
 		return
 	}
-	sys := buildSystemPrompt(brand, "content", p.BrandID, p.ContextID, "")
+	liveBrief := briefFromFields(p.Title, p.Platform, p.Format, p.Description, p.Caption, p.Hashtags, p.Script)
+	sys := systemPromptWithLiveContent(brand, p.BrandID, p.ContextID, liveBrief)
 	model, locked := pickModel(context.Background(), p.BrandID, openrouter.TaskScript, req.Model)
 	if locked {
 		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskScript)})
