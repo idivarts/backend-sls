@@ -18,7 +18,7 @@ import (
 // validContentFormats are the formats the content calendar understands (it casts
 // IContent.contentFormat straight to its lowercase ContentType union).
 var validContentFormats = map[string]bool{
-	"reel": true, "post": true, "story": true, "carousel": true, "live": true,
+	"reel": true, "post": true, "story": true, "carousel": true, "live": true, "text": true,
 }
 
 // Strategy lifecycle status values written to a strategy's `status` field.
@@ -220,7 +220,8 @@ func generateCalendarItems(ctx context.Context, brandID, html string, duration i
 	sys := "You convert a content-strategy document into a concrete posting schedule. " +
 		"Read the strategy and produce one content item per planned post across the campaign. " +
 		"Spread items sensibly over the window using dayOffset (0-based, from 0 to " +
-		fmt.Sprintf("%d", duration-1) + " inclusive). contentFormat MUST be one of: reel, post, story, carousel, live. " +
+		fmt.Sprintf("%d", duration-1) + " inclusive). contentFormat MUST be one of: reel, post, story, carousel, live, text " +
+		"(text = a plain-text post for Facebook / LinkedIn / X, no media). " +
 		"description is a short idea-level brief for the post. " +
 		"Respond with ONLY a JSON object of the form " +
 		`{"items":[{"title":string,"platform":string,"contentFormat":string,"description":string,"dayOffset":number}]} ` +

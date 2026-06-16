@@ -119,6 +119,9 @@ func publishToInstagram(igUserID, accessToken string, ct *trendlymodels.Content)
 		if err != nil {
 			return "", err
 		}
+	case "text":
+		// Instagram has no plain-text post format; these target FB / LinkedIn / X.
+		return "", fmt.Errorf("instagram does not support text-only posts")
 	default: // post
 		img := firstImageURL(ct)
 		if img == "" {

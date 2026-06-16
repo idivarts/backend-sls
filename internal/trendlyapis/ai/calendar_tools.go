@@ -34,7 +34,8 @@ const calendarInstructions = "\n\nYou are the brand's AI Content Expert for the 
 	"What you can do:\n" +
 	"- move_content: reschedule a post to a new date (juggle the plan). You CANNOT move a post whose status is " +
 	"'scheduled' or 'posted' — tell the user it must be unscheduled first.\n" +
-	"- create_content: add a new post (title, idea, date YYYY-MM-DD, and type — one of reel, post, story, carousel, live).\n" +
+	"- create_content: add a new post (title, idea, date YYYY-MM-DD, and type — one of reel, post, story, carousel, live, text). " +
+	"'text' is a plain-text post (no media) for Facebook / LinkedIn / X.\n" +
 	"- update_content: change a post's title, idea, date, or type ONLY. These are the only things editable from the " +
 	"calendar — if asked to change the caption, script, hashtags, attachments or other inner details, politely say those " +
 	"are edited on the content page, not here.\n" +
@@ -67,7 +68,7 @@ func calendarServerTools() []openrouter.Tool {
 				"title":    openrouter.StringProp("Short title for the post."),
 				"idea":     openrouter.StringProp("A one-line idea / brief for the post."),
 				"date":     openrouter.StringProp("The date to place it on, as YYYY-MM-DD."),
-				"type":     openrouter.EnumProp("The content format.", []string{"reel", "post", "story", "carousel", "live"}),
+				"type":     openrouter.EnumProp("The content format. 'text' is a plain-text post (no media).", []string{"reel", "post", "story", "carousel", "live", "text"}),
 				"platform": openrouter.StringProp("Target platform (defaults to Instagram)."),
 			}, []string{"title", "date"}),
 		),
@@ -80,7 +81,7 @@ func calendarServerTools() []openrouter.Tool {
 				"title":     openrouter.StringProp("New title."),
 				"idea":      openrouter.StringProp("New idea / brief."),
 				"date":      openrouter.StringProp("New date as YYYY-MM-DD."),
-				"type":      openrouter.EnumProp("New content format.", []string{"reel", "post", "story", "carousel", "live"}),
+				"type":      openrouter.EnumProp("New content format. 'text' is a plain-text post (no media).", []string{"reel", "post", "story", "carousel", "live", "text"}),
 			}, []string{"contentId"}),
 		),
 		openrouter.NewFunctionTool(
@@ -225,7 +226,7 @@ func updateContentTool(ctx context.Context, brandID, arguments string) (string, 
 	if a.Type != nil {
 		format := strings.ToLower(strings.TrimSpace(*a.Type))
 		if !validContentFormats[format] {
-			return jsonResult(map[string]any{"ok": false, "error": "type must be one of reel, post, story, carousel, live"}), false, nil
+			return jsonResult(map[string]any{"ok": false, "error": "type must be one of reel, post, story, carousel, live, text"}), false, nil
 		}
 		updates = append(updates, firestore.Update{Path: "contentFormat", Value: format})
 		changed = append(changed, "type")
