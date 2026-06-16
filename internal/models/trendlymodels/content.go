@@ -152,8 +152,20 @@ func ListContentInRange(ctx context.Context, brandID string, start, end int64, i
 	return out, nil
 }
 
-// DeleteContentInRange deletes every content document whose postingTimeStamp
-// falls in [start, end) and returns the deleted document ids. Used by
+// protectedContentStatuses are content lifecycle states that push-to-calendar's
+// "replace existing window" path must NEVER delete. Anything the user has already
+// committed to publishing — scheduled, approved-for-scheduling, or already
+// posted — is preserved; only unscheduled drafts get cleared.
+var protectedContentStatuses = map[string]bool{
+	"scheduled": true,
+	"approved":  true,
+	"posted":    true,
+}
+
+// DeleteContentInRange deletes content documents whose postingTimeStamp falls in
+// [start, end), skipping any item the user has already committed to publishing
+// (scheduled / approved / posted, or anything with an active schedule execution
+// or published platform ids). Returns the deleted document ids. Used by
 // push-to-calendar's "replace existing window" path.
 func DeleteContentInRange(ctx context.Context, brandID string, start, end int64) ([]string, error) {
 	iter := contentsCollection(brandID).
@@ -167,6 +179,15 @@ func DeleteContentInRange(ctx context.Context, brandID string, start, end int64)
 		doc, err := iter.Next()
 		if err != nil {
 			break
+		}
+		var ct Content
+		if err := doc.DataTo(&ct); err != nil {
+			// Couldn't decode — err on the safe side and leave it untouched.
+			continue
+		}
+		// Never delete content that's scheduled or already posted.
+		if protectedContentStatuses[ct.Status] || ct.ScheduleExecutionArn != "" || len(ct.PublishedIds) > 0 {
+			continue
 		}
 		if _, e := doc.Ref.Delete(ctx); e == nil {
 			removed = append(removed, doc.Ref.ID)
