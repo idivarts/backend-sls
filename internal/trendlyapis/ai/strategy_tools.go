@@ -62,7 +62,7 @@ func strategyServerTools() []openrouter.Tool {
 				"name":           openrouter.StringProp("A short title for the strategy."),
 				"objective":      openrouter.StringProp("The primary marketing goal (e.g. awareness, sales, engagement)."),
 				"platforms":      arrayOfStrings("Platforms the strategy targets (e.g. Instagram, YouTube)."),
-				"contentFormats": arrayOfStrings("Content formats planned (e.g. Reel, Story, Post, Carousel)."),
+				"contentFormats": arrayOfStrings("Content formats planned (e.g. Reel, Story, Post, Carousel, Text Post)."),
 				"durationDays":   openrouter.NumberProp("How many days the strategy runs (e.g. 30 for one month)."),
 			}, []string{}),
 		),
