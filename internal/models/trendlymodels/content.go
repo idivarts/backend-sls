@@ -48,8 +48,14 @@ type Content struct {
 	Script               string                  `json:"script,omitempty" firestore:"script"`
 	Description          string                  `json:"description,omitempty" firestore:"description"`
 	Status               string                  `json:"status" firestore:"status"`
-	ContentFormat        string                  `json:"contentFormat" firestore:"contentFormat"`
-	Platform             string                  `json:"platform,omitempty" firestore:"platform"`
+	ContentFormat        ContentFormat           `json:"contentFormat" firestore:"contentFormat"`
+	// Platforms this content is planned for (the publishing INTENT). Each
+	// Destination below must target one of these platforms.
+	Platforms []Platform `json:"platforms,omitempty" firestore:"platforms"`
+	// Platform is the deprecated legacy single-platform field (capitalised
+	// string, e.g. "Instagram"). Superseded by Platforms; read for back-compat
+	// coercion of old docs only — never written by new code.
+	Platform string `json:"platform,omitempty" firestore:"platform"`
 	ManagerID            string                  `json:"managerId,omitempty" firestore:"managerId"`
 	StrategyID           string                  `json:"strategyId,omitempty" firestore:"strategyId"`
 	PostingTimeStamp     int64                   `json:"postingTimeStamp,omitempty" firestore:"postingTimeStamp"`
@@ -72,6 +78,20 @@ func contentsCollection(brandID string) *firestore.CollectionRef {
 	return firestoredb.Client.Collection(fmt.Sprintf("brands/%s/contents", brandID))
 }
 
+// normalize back-fills the new shape from legacy fields on read so old
+// documents (which stored a single capitalised `platform` string) behave like
+// new ones. Mutates the receiver in place.
+func (ct *Content) normalize() {
+	if len(ct.Platforms) == 0 && ct.Platform != "" {
+		if p, ok := NormalizePlatform(ct.Platform); ok {
+			ct.Platforms = []Platform{p}
+		}
+	}
+	if ct.ContentFormat != "" {
+		ct.ContentFormat = NormalizeContentFormat(ct.ContentFormat)
+	}
+}
+
 // GetContent reads a single content document for a brand, populating ID.
 func GetContent(brandID, contentID string) (*Content, error) {
 	doc, err := contentsCollection(brandID).Doc(contentID).Get(context.Background())
@@ -83,6 +103,7 @@ func GetContent(brandID, contentID string) (*Content, error) {
 		return nil, err
 	}
 	ct.ID = doc.Ref.ID
+	ct.normalize()
 	return &ct, nil
 }
 
@@ -147,6 +168,7 @@ func ListContentInRange(ctx context.Context, brandID string, start, end int64, i
 			continue
 		}
 		ct.ID = doc.Ref.ID
+		ct.normalize()
 		out = append(out, ct)
 	}
 	return out, nil
@@ -215,6 +237,7 @@ func ListContentByStatus(ctx context.Context, brandID, status string) ([]Content
 			continue
 		}
 		ct.ID = doc.Ref.ID
+		ct.normalize()
 		out = append(out, ct)
 	}
 	return out, nil

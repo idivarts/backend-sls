@@ -34,9 +34,10 @@ const calendarInstructions = "\n\nYou are the brand's AI Content Expert for the 
 	"What you can do:\n" +
 	"- move_content: reschedule a post to a new date (juggle the plan). You CANNOT move a post whose status is " +
 	"'scheduled' or 'posted' — tell the user it must be unscheduled first.\n" +
-	"- create_content: add a new post (title, idea, date YYYY-MM-DD, and type — one of reel, post, story, carousel, live, text). " +
-	"'text' is a plain-text post (no media) for Facebook / LinkedIn / X.\n" +
-	"- update_content: change a post's title, idea, date, or type ONLY. These are the only things editable from the " +
+	"- create_content: add a new post (title, idea, date YYYY-MM-DD, type, and platforms). type is one of post, reel, video, " +
+	"story, carousel, live, text ('text' = plain-text post with no media; 'reel' = portrait short video; 'video' = landscape " +
+	"video). platforms is the target platform set — every platform you choose MUST support the chosen type.\n" +
+	"- update_content: change a post's title, idea, date, type, or platforms ONLY. These are the only things editable from the " +
 	"calendar — if asked to change the caption, script, hashtags, attachments or other inner details, politely say those " +
 	"are edited on the content page, not here.\n" +
 	"- remove_content: take a post off the calendar (it is archived, so it can be restored).\n" +
@@ -65,11 +66,11 @@ func calendarServerTools() []openrouter.Tool {
 			toolCreateContent,
 			"Add a new content item to the calendar.",
 			openrouter.ObjectSchema(map[string]any{
-				"title":    openrouter.StringProp("Short title for the post."),
-				"idea":     openrouter.StringProp("A one-line idea / brief for the post."),
-				"date":     openrouter.StringProp("The date to place it on, as YYYY-MM-DD."),
-				"type":     openrouter.EnumProp("The content format. 'text' is a plain-text post (no media).", []string{"reel", "post", "story", "carousel", "live", "text"}),
-				"platform": openrouter.StringProp("Target platform (defaults to Instagram)."),
+				"title":     openrouter.StringProp("Short title for the post."),
+				"idea":      openrouter.StringProp("A one-line idea / brief for the post."),
+				"date":      openrouter.StringProp("The date to place it on, as YYYY-MM-DD."),
+				"type":      openrouter.EnumProp("The content format. 'reel' = portrait short video, 'video' = landscape video, 'text' = plain-text post (no media).", []string{"post", "reel", "video", "story", "carousel", "live", "text"}),
+				"platforms": openrouter.ArrayProp("Target platforms — each must support the chosen type. Defaults to Instagram when omitted.", openrouter.EnumProp("A social platform.", []string{"instagram", "facebook", "youtube", "linkedin", "twitter"})),
 			}, []string{"title", "date"}),
 		),
 		openrouter.NewFunctionTool(
@@ -81,7 +82,8 @@ func calendarServerTools() []openrouter.Tool {
 				"title":     openrouter.StringProp("New title."),
 				"idea":      openrouter.StringProp("New idea / brief."),
 				"date":      openrouter.StringProp("New date as YYYY-MM-DD."),
-				"type":      openrouter.EnumProp("New content format. 'text' is a plain-text post (no media).", []string{"reel", "post", "story", "carousel", "live", "text"}),
+				"type":      openrouter.EnumProp("New content format. 'reel' = portrait short video, 'video' = landscape video, 'text' = plain-text post (no media).", []string{"post", "reel", "video", "story", "carousel", "live", "text"}),
+				"platforms": openrouter.ArrayProp("New target platforms — each must support the post's format.", openrouter.EnumProp("A social platform.", []string{"instagram", "facebook", "youtube", "linkedin", "twitter"})),
 			}, []string{"contentId"}),
 		),
 		openrouter.NewFunctionTool(
@@ -140,11 +142,27 @@ func contentLocked(status string) bool {
 // ── create ───────────────────────────────────────────────────────────────────
 
 type createContentArgs struct {
-	Title    string `json:"title"`
-	Idea     string `json:"idea"`
-	Date     string `json:"date"`
-	Type     string `json:"type"`
-	Platform string `json:"platform"`
+	Title     string   `json:"title"`
+	Idea      string   `json:"idea"`
+	Date      string   `json:"date"`
+	Type      string   `json:"type"`
+	Platforms []string `json:"platforms"`
+}
+
+// defaultPlatforms resolves a content item's `platforms` for the calendar chat:
+// keep the requested platforms that support the format; otherwise default to
+// Instagram when it supports the format, else the first supported platform.
+func defaultPlatforms(format trendlymodels.ContentFormat, requested []string) []trendlymodels.Platform {
+	if c := compatiblePlatforms(format, trendlymodels.NormalizePlatforms(requested)); len(c) > 0 {
+		return c
+	}
+	if trendlymodels.IsFormatPlatformCompatible(format, trendlymodels.PlatformInstagram) {
+		return []trendlymodels.Platform{trendlymodels.PlatformInstagram}
+	}
+	if sup := trendlymodels.PlatformsForFormat(format); len(sup) > 0 {
+		return sup[:1]
+	}
+	return []trendlymodels.Platform{}
 }
 
 func createContentTool(ctx context.Context, brandID, managerID, arguments string) (string, bool, error) {
@@ -160,19 +178,13 @@ func createContentTool(ctx context.Context, brandID, managerID, arguments string
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "date must be YYYY-MM-DD"}), false, nil
 	}
-	format := strings.ToLower(strings.TrimSpace(a.Type))
-	if !validContentFormats[format] {
-		format = "post"
-	}
-	platform := strings.TrimSpace(a.Platform)
-	if platform == "" {
-		platform = "Instagram"
-	}
+	format := trendlymodels.NormalizeContentFormat(a.Type)
+	platforms := defaultPlatforms(format, a.Platforms)
 	now := time.Now().UnixMilli()
 	id, err := trendlymodels.CreateContent(ctx, brandID, map[string]any{
 		"title":            title,
 		"managerId":        managerID,
-		"platform":         platform,
+		"platforms":        platforms,
 		"contentFormat":    format,
 		"status":           "draft",
 		"description":      strings.TrimSpace(a.Idea),
@@ -190,11 +202,12 @@ func createContentTool(ctx context.Context, brandID, managerID, arguments string
 // ── update (title / idea / date / type only) ──────────────────────────────────
 
 type updateContentArgs struct {
-	ContentID string  `json:"contentId"`
-	Title     *string `json:"title"`
-	Idea      *string `json:"idea"`
-	Date      *string `json:"date"`
-	Type      *string `json:"type"`
+	ContentID string    `json:"contentId"`
+	Title     *string   `json:"title"`
+	Idea      *string   `json:"idea"`
+	Date      *string   `json:"date"`
+	Type      *string   `json:"type"`
+	Platforms *[]string `json:"platforms"`
 }
 
 func updateContentTool(ctx context.Context, brandID, arguments string) (string, bool, error) {
@@ -223,13 +236,35 @@ func updateContentTool(ctx context.Context, brandID, arguments string) (string, 
 		updates = append(updates, firestore.Update{Path: "description", Value: strings.TrimSpace(*a.Idea)})
 		changed = append(changed, "idea")
 	}
+	// Resolve the effective format (new type if provided, else current) so the
+	// platform list can be validated against the right format.
+	effectiveFormat := existing.ContentFormat
 	if a.Type != nil {
-		format := strings.ToLower(strings.TrimSpace(*a.Type))
-		if !validContentFormats[format] {
-			return jsonResult(map[string]any{"ok": false, "error": "type must be one of reel, post, story, carousel, live, text"}), false, nil
+		f := strings.ToLower(strings.TrimSpace(*a.Type))
+		if !trendlymodels.IsValidContentFormat(f) {
+			return jsonResult(map[string]any{"ok": false, "error": "type must be one of post, reel, video, story, carousel, live, text"}), false, nil
 		}
-		updates = append(updates, firestore.Update{Path: "contentFormat", Value: format})
+		effectiveFormat = f
+		updates = append(updates, firestore.Update{Path: "contentFormat", Value: f})
 		changed = append(changed, "type")
+	}
+	if a.Platforms != nil {
+		req := trendlymodels.NormalizePlatforms(*a.Platforms)
+		if len(req) == 0 {
+			return jsonResult(map[string]any{"ok": false, "error": "platforms must be a non-empty list of: instagram, facebook, youtube, linkedin, twitter"}), false, nil
+		}
+		if bad := trendlymodels.IncompatiblePlatforms(effectiveFormat, req); len(bad) > 0 {
+			return jsonResult(map[string]any{"ok": false, "error": fmt.Sprintf("these platforms don't support a %s: %s", effectiveFormat, strings.Join(bad, ", "))}), false, nil
+		}
+		updates = append(updates, firestore.Update{Path: "platforms", Value: req})
+		changed = append(changed, "platforms")
+	} else if a.Type != nil {
+		// Type changed without an explicit platform list — clamp existing
+		// platforms to those that support the new format so the doc stays valid.
+		if clamped := compatiblePlatforms(effectiveFormat, existing.Platforms); len(clamped) != len(existing.Platforms) {
+			updates = append(updates, firestore.Update{Path: "platforms", Value: clamped})
+			changed = append(changed, "platforms")
+		}
 	}
 	if a.Date != nil {
 		if contentLocked(status) {
@@ -244,7 +279,7 @@ func updateContentTool(ctx context.Context, brandID, arguments string) (string, 
 	}
 
 	if len(updates) == 0 {
-		return jsonResult(map[string]any{"ok": false, "error": "nothing to update — pass at least one of title, idea, date, type"}), false, nil
+		return jsonResult(map[string]any{"ok": false, "error": "nothing to update — pass at least one of title, idea, date, type, platforms"}), false, nil
 	}
 	if err := trendlymodels.UpdateContent(ctx, brandID, a.ContentID, updates); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to update: " + err.Error()}), false, err
@@ -343,11 +378,12 @@ func listCalendarTool(ctx context.Context, brandID, arguments string) (string, b
 	out := []map[string]any{}
 	for _, ct := range contents {
 		out = append(out, map[string]any{
-			"id":     ct.ID,
-			"title":  ct.Title,
-			"date":   msToDateStr(ct.PostingTimeStamp),
-			"type":   ct.ContentFormat,
-			"status": ct.Status,
+			"id":        ct.ID,
+			"title":     ct.Title,
+			"date":      msToDateStr(ct.PostingTimeStamp),
+			"type":      ct.ContentFormat,
+			"platforms": ct.Platforms,
+			"status":    ct.Status,
 		})
 	}
 	return jsonResult(map[string]any{"ok": true, "month": fmt.Sprintf("%04d-%02d", year, month), "posts": out}), false, nil

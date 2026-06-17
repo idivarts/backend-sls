@@ -223,7 +223,9 @@ func contentBriefText(ct *trendlymodels.Content) string {
 	if ct.Title != "" {
 		parts = append(parts, "Title: "+ct.Title)
 	}
-	if ct.Platform != "" {
+	if len(ct.Platforms) > 0 {
+		parts = append(parts, "Platforms: "+strings.Join(ct.Platforms, ", "))
+	} else if ct.Platform != "" {
 		parts = append(parts, "Platform: "+ct.Platform)
 	}
 	if ct.ContentFormat != "" {

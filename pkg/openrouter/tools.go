@@ -41,3 +41,9 @@ func NumberProp(description string) map[string]any {
 func EnumProp(description string, values []string) map[string]any {
 	return map[string]any{"type": "string", "description": description, "enum": values}
 }
+
+// ArrayProp builds a JSON-schema array property whose elements use the given
+// item schema (e.g. StringProp / EnumProp).
+func ArrayProp(description string, items map[string]any) map[string]any {
+	return map[string]any{"type": "array", "description": description, "items": items}
+}

@@ -15,12 +15,6 @@ import (
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
-// validContentFormats are the formats the content calendar understands (it casts
-// IContent.contentFormat straight to its lowercase ContentType union).
-var validContentFormats = map[string]bool{
-	"reel": true, "post": true, "story": true, "carousel": true, "live": true, "text": true,
-}
-
 // Strategy lifecycle status values written to a strategy's `status` field.
 // Mirrors the StrategyStatus enum in the frontend shared-libs model
 // (trendly-pro/models/strategies.ts) — keep the two in sync.
@@ -39,11 +33,41 @@ type pushToCalendarReq struct {
 }
 
 type generatedItem struct {
-	Title         string `json:"title"`
-	Platform      string `json:"platform"`
-	ContentFormat string `json:"contentFormat"`
-	Description   string `json:"description"`
-	DayOffset     int    `json:"dayOffset"`
+	Title         string   `json:"title"`
+	Platforms     []string `json:"platforms"`
+	ContentFormat string   `json:"contentFormat"`
+	Description   string   `json:"description"`
+	DayOffset     int      `json:"dayOffset"`
+}
+
+// compatiblePlatforms keeps only the candidate platforms that support the given
+// content format, de-duplicated and order-preserving.
+func compatiblePlatforms(format trendlymodels.ContentFormat, candidates []trendlymodels.Platform) []trendlymodels.Platform {
+	out := []trendlymodels.Platform{}
+	for _, p := range candidates {
+		if trendlymodels.IsFormatPlatformCompatible(format, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// resolveItemPlatforms decides the final `platforms` array for a generated item:
+// prefer the AI's choice, fall back to the strategy's platforms, always clamp to
+// platforms that actually support the chosen format, and never return empty.
+func resolveItemPlatforms(format trendlymodels.ContentFormat, itemPlatforms, stratPlatforms []trendlymodels.Platform) []trendlymodels.Platform {
+	chosen := itemPlatforms
+	if len(chosen) == 0 {
+		chosen = stratPlatforms
+	}
+	if r := compatiblePlatforms(format, chosen); len(r) > 0 {
+		return r
+	}
+	if r := compatiblePlatforms(format, stratPlatforms); len(r) > 0 {
+		return r
+	}
+	// Last resort: every platform that supports this format.
+	return trendlymodels.PlatformsForFormat(format)
 }
 
 // pushProgressFn receives staged progress while a push-to-calendar job runs.
@@ -114,6 +138,9 @@ func runPushToCalendar(
 
 	progress("scheduling", fmt.Sprintf("Scheduling %d posts…", len(items)), map[string]any{"total": len(items)})
 
+	// The strategy's own platforms are the default target set for every item.
+	stratPlatforms := trendlymodels.NormalizePlatforms(strat.Platforms)
+
 	now := time.Now().UnixMilli()
 	createdItemIds := []string{}
 	for idx, it := range items {
@@ -124,20 +151,14 @@ func runPushToCalendar(
 		if off > duration-1 {
 			off = duration - 1
 		}
-		format := strings.ToLower(strings.TrimSpace(it.ContentFormat))
-		if !validContentFormats[format] {
-			format = "post"
-		}
-		platform := strings.TrimSpace(it.Platform)
-		if platform == "" {
-			platform = "Instagram"
-		}
+		format := trendlymodels.NormalizeContentFormat(it.ContentFormat)
+		platforms := resolveItemPlatforms(format, trendlymodels.NormalizePlatforms(it.Platforms), stratPlatforms)
 		title := strings.TrimSpace(it.Title)
 		id, e := trendlymodels.CreateContent(ctx, brandID, map[string]any{
 			"title":            title,
 			"managerId":        managerID,
 			"strategyId":       strategyID,
-			"platform":         platform,
+			"platforms":        platforms,
 			"contentFormat":    format,
 			"status":           "draft",
 			"description":      strings.TrimSpace(it.Description),
@@ -220,11 +241,17 @@ func generateCalendarItems(ctx context.Context, brandID, html string, duration i
 	sys := "You convert a content-strategy document into a concrete posting schedule. " +
 		"Read the strategy and produce one content item per planned post across the campaign. " +
 		"Spread items sensibly over the window using dayOffset (0-based, from 0 to " +
-		fmt.Sprintf("%d", duration-1) + " inclusive). contentFormat MUST be one of: reel, post, story, carousel, live, text " +
-		"(text = a plain-text post for Facebook / LinkedIn / X, no media). " +
+		fmt.Sprintf("%d", duration-1) + " inclusive). " +
+		"contentFormat MUST be one of: post, reel, video, story, carousel, live, text. " +
+		"reel = portrait/short-form vertical video (IG & FB Reels, YouTube Shorts); " +
+		"video = landscape/long-form 16:9 video; text = a plain-text post (no media). " +
+		"platforms MUST be a NON-EMPTY array drawn from: instagram, facebook, youtube, linkedin, twitter — " +
+		"and EVERY platform you list MUST support the chosen contentFormat per these rules: " +
+		"post → not youtube; story → instagram & facebook only; carousel → instagram, facebook, linkedin; " +
+		"live → not twitter; text → facebook, linkedin, twitter only (NOT instagram); reel & video → any platform. " +
 		"description is a short idea-level brief for the post. " +
 		"Respond with ONLY a JSON object of the form " +
-		`{"items":[{"title":string,"platform":string,"contentFormat":string,"description":string,"dayOffset":number}]} ` +
+		`{"items":[{"title":string,"platforms":string[],"contentFormat":string,"description":string,"dayOffset":number}]} ` +
 		"and nothing else."
 	user := fmt.Sprintf("Campaign length: %d days.\n\nStrategy document (HTML):\n%s", duration, html)
 
