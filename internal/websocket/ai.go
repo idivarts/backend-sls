@@ -13,6 +13,7 @@ func dispatchAI(connectionID, userID string, env Envelope) {
 		ConversationID: env.ConversationID,
 		ClientMsgID:    env.ClientMsgID,
 		Content:        env.Content,
+		Images:         env.Images,
 		FocusedText:    env.FocusedText,
 		Model:          env.Model,
 		Module:         env.Module,

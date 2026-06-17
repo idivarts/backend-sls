@@ -41,37 +41,41 @@ type ContentImageGeneration struct {
 }
 
 type Content struct {
-	ID                   string                  `json:"id,omitempty" firestore:"-"`
-	Title                string                  `json:"title" firestore:"title"`
-	Caption              string                  `json:"caption,omitempty" firestore:"caption"`
-	Hashtags             string                  `json:"hashtags,omitempty" firestore:"hashtags"`
-	Script               string                  `json:"script,omitempty" firestore:"script"`
-	Description          string                  `json:"description,omitempty" firestore:"description"`
-	Status               string                  `json:"status" firestore:"status"`
-	ContentFormat        ContentFormat           `json:"contentFormat" firestore:"contentFormat"`
+	ID            string        `json:"id,omitempty" firestore:"-"`
+	Title         string        `json:"title" firestore:"title"`
+	Caption       string        `json:"caption,omitempty" firestore:"caption"`
+	Hashtags      string        `json:"hashtags,omitempty" firestore:"hashtags"`
+	Script        string        `json:"script,omitempty" firestore:"script"`
+	Description   string        `json:"description,omitempty" firestore:"description"`
+	Status        string        `json:"status" firestore:"status"`
+	ContentFormat ContentFormat `json:"contentFormat" firestore:"contentFormat"`
 	// Platforms this content is planned for (the publishing INTENT). Each
 	// Destination below must target one of these platforms.
 	Platforms []Platform `json:"platforms,omitempty" firestore:"platforms"`
 	// Platform is the deprecated legacy single-platform field (capitalised
 	// string, e.g. "Instagram"). Superseded by Platforms; read for back-compat
 	// coercion of old docs only — never written by new code.
-	Platform string `json:"platform,omitempty" firestore:"platform"`
-	ManagerID            string                  `json:"managerId,omitempty" firestore:"managerId"`
-	StrategyID           string                  `json:"strategyId,omitempty" firestore:"strategyId"`
-	PostingTimeStamp     int64                   `json:"postingTimeStamp,omitempty" firestore:"postingTimeStamp"`
-	IsArchived           bool                    `json:"isArchived,omitempty" firestore:"isArchived"`
-	Attachments          []ContentAttachment     `json:"attachments,omitempty" firestore:"attachments"`
-	Destinations         []ContentDestination    `json:"destinations,omitempty" firestore:"destinations"`
-	ImageGeneration      *ContentImageGeneration `json:"imageGeneration,omitempty" firestore:"imageGeneration"`
-	ScheduleMode         string                  `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
-	ScheduledAt          int64                   `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
-	ScheduleExecutionArn string                  `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
-	PublishedIds         map[string]string       `json:"publishedIds,omitempty" firestore:"publishedIds"`
-	PublishError         string                  `json:"publishError,omitempty" firestore:"publishError"`
-	PostedURL            string                  `json:"postedUrl,omitempty" firestore:"postedUrl"`
-	Metrics              map[string]interface{}  `json:"metrics,omitempty" firestore:"metrics"`
-	CreatedAt            int64                   `json:"createdAt,omitempty" firestore:"createdAt"`
-	UpdatedAt            int64                   `json:"updatedAt,omitempty" firestore:"updatedAt"`
+	Platform         string                  `json:"platform,omitempty" firestore:"platform"`
+	ManagerID        string                  `json:"managerId,omitempty" firestore:"managerId"`
+	StrategyID       string                  `json:"strategyId,omitempty" firestore:"strategyId"`
+	PostingTimeStamp int64                   `json:"postingTimeStamp,omitempty" firestore:"postingTimeStamp"`
+	IsArchived       bool                    `json:"isArchived,omitempty" firestore:"isArchived"`
+	Attachments      []ContentAttachment     `json:"attachments,omitempty" firestore:"attachments"`
+	Destinations     []ContentDestination    `json:"destinations,omitempty" firestore:"destinations"`
+	ImageGeneration  *ContentImageGeneration `json:"imageGeneration,omitempty" firestore:"imageGeneration"`
+	// MediaConversationID is the dedicated AI thread (ai_conversations doc,
+	// module="media") for this content's image generate/enhance iterations.
+	// Stamped on first generation, loaded directly on enhance (no index needed).
+	MediaConversationID  string                 `json:"mediaConversationId,omitempty" firestore:"mediaConversationId,omitempty"`
+	ScheduleMode         string                 `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
+	ScheduledAt          int64                  `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
+	ScheduleExecutionArn string                 `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
+	PublishedIds         map[string]string      `json:"publishedIds,omitempty" firestore:"publishedIds"`
+	PublishError         string                 `json:"publishError,omitempty" firestore:"publishError"`
+	PostedURL            string                 `json:"postedUrl,omitempty" firestore:"postedUrl"`
+	Metrics              map[string]interface{} `json:"metrics,omitempty" firestore:"metrics"`
+	CreatedAt            int64                  `json:"createdAt,omitempty" firestore:"createdAt"`
+	UpdatedAt            int64                  `json:"updatedAt,omitempty" firestore:"updatedAt"`
 }
 
 func contentsCollection(brandID string) *firestore.CollectionRef {

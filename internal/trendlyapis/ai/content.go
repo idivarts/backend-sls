@@ -322,6 +322,11 @@ func handleScriptGenWS(req WSRequest) {
 
 // ───────────────────────── Image (single + carousel, async via WS) ─────────────────────────
 
+// moduleMedia is the dedicated AI thread for a content's image generate/enhance
+// iterations (one conversation per content, contextId = contentId). Isolated
+// from the content text chat (module="content").
+const moduleMedia = "media"
+
 type imagePayload struct {
 	BrandID     string `json:"brandId"`
 	ContextID   string `json:"contextId"` // content doc id — where results + status are persisted
@@ -330,8 +335,16 @@ type imagePayload struct {
 	AspectRatio string `json:"aspectRatio"`
 	Count       int    `json:"count"`
 	Multi       bool   `json:"multi"` // carousel: append; single: replace the image
+	// FocusedSlideIndex is the carousel slide the user focused (0-based), if any.
+	// Used as the edit target / base slide. nil → no focus (implicit 0 for single).
+	FocusedSlideIndex *int `json:"focusedSlideIndex"`
 }
 
+// handleImageGenWS runs a stateful media generation turn. The first time (no
+// image and no media thread) it does text-to-image ("Generate"); once an image
+// exists (AI-generated OR user-uploaded) it does image-to-image with the media
+// thread's context ("Enhance"). For carousels the model decides edit-focused-slide
+// vs add-new-slide. Disconnect-proof: status + results persist on the content doc.
 func handleImageGenWS(req WSRequest) {
 	var p imagePayload
 	if err := decodePayload(req.Payload, &p); err != nil {
@@ -352,7 +365,6 @@ func handleImageGenWS(req WSRequest) {
 		p.Count = 10
 	}
 
-	size := aspectToSize(p.AspectRatio)
 	model, locked := pickModel(context.Background(), p.BrandID, openrouter.TaskImage, req.Model)
 	if locked {
 		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskImage)})
@@ -364,13 +376,37 @@ func handleImageGenWS(req WSRequest) {
 		return
 	}
 
-	prompt := p.Description
-	if p.Style != "" {
-		prompt = fmt.Sprintf("%s. Style: %s.", p.Description, p.Style)
+	// Load the content doc — its attachments are the source of truth for base
+	// images, and it stores the media-thread id.
+	var content *trendlymodels.Content
+	if p.ContextID != "" {
+		if ct, err := trendlymodels.GetContent(p.BrandID, p.ContextID); err == nil {
+			content = ct
+		}
+	}
+	var existing []trendlymodels.ContentAttachment
+	if content != nil {
+		existing = content.Attachments
+	}
+	baseImages := imageAttachmentURLs(existing)
+
+	// Generate (no image and no prior thread) vs Enhance (image exists or thread
+	// exists). Uploaded bases count as "image exists" → enhance.
+	mediaConvID := ""
+	if content != nil {
+		mediaConvID = content.MediaConversationID
+	}
+	isEnhance := len(baseImages) > 0 || mediaConvID != ""
+
+	// Get or create the dedicated media thread, then append the user's prompt.
+	convID, history := ensureMediaConversation(p.BrandID, req.UserID, p.ContextID, content, model)
+	if convID != "" {
+		_, _ = openrouter.AppendMessage(context.Background(), convID, trendlymodels.AIMessage{
+			Role: "user", UserID: req.UserID, BrandID: p.BrandID,
+			Content: p.Description, Timestamp: time.Now().UnixMilli(),
+		})
 	}
 
-	// Mark the job running on the content doc up-front so the brand app shows
-	// progress immediately and can recover the result even if this socket drops.
 	setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
 		"status":         "generating",
 		"prompt":         p.Description,
@@ -380,30 +416,31 @@ func handleImageGenWS(req WSRequest) {
 		"startedAt":      time.Now().UnixMilli(),
 	})
 
-	// Snapshot existing attachments once so generated images can be appended
-	// (carousel) or replace the image (single) and persisted incrementally.
-	var existing []trendlymodels.ContentAttachment
-	if p.ContextID != "" {
-		if ct, err := trendlymodels.GetContent(p.BrandID, p.ContextID); err == nil && ct != nil {
-			existing = ct.Attachments
-		}
+	if isEnhance {
+		runMediaEnhance(req, p, model, orgID, convID, existing, baseImages, history)
+		return
 	}
-	generated := make([]trendlymodels.ContentAttachment, 0, p.Count)
+	runMediaGenerate(req, p, model, orgID, convID, existing)
+}
 
+// runMediaGenerate is the first-time, text-to-image path. Single types replace
+// the image; carousels append each generated slide. Persisted incrementally so
+// the result survives a socket drop.
+func runMediaGenerate(req WSRequest, p imagePayload, model, orgID, convID string, existing []trendlymodels.ContentAttachment) {
+	size := aspectToSize(p.AspectRatio)
+	prompt := p.Description
+	if p.Style != "" {
+		prompt = fmt.Sprintf("%s. Style: %s.", p.Description, p.Style)
+	}
+
+	generated := make([]trendlymodels.ContentAttachment, 0, p.Count)
 	completed := 0
 	var firstErr error
 	var imgCost float64
 	for i := 0; i < p.Count; i++ {
-		wsSend(req.ConnectionID, map[string]any{
-			"type":  "image_status",
-			"index": i,
-			"state": "generating",
-		})
+		wsSend(req.ConnectionID, map[string]any{"type": "image_status", "index": i, "state": "generating"})
 		resp, usage, err := openrouter.GenerateImage(context.Background(), openrouter.ImageRequest{
-			Model:  model,
-			Prompt: prompt,
-			Size:   size,
-			N:      1,
+			Model: model, Prompt: prompt, Size: size, N: 1,
 		})
 		if err != nil {
 			if firstErr == nil {
@@ -415,66 +452,306 @@ func handleImageGenWS(req WSRequest) {
 		if usage != nil {
 			imgCost += usage.Cost
 		}
-
-		url := ""
-		if len(resp.Data) > 0 {
-			if resp.Data[0].URL != "" {
-				if s3url, uerr := uploadFromURL(resp.Data[0].URL, p.BrandID); uerr == nil {
-					url = s3url
-				} else if firstErr == nil {
-					firstErr = uerr
-				}
-			} else if resp.Data[0].B64JSON != "" {
-				if s3url, uerr := uploadBase64Image(resp.Data[0].B64JSON, p.BrandID); uerr == nil {
-					url = s3url
-				} else if firstErr == nil {
-					firstErr = uerr
-				}
-			}
-		}
+		url, uerr := uploadFirstImage(resp, p.BrandID)
 		if url == "" {
+			if firstErr == nil {
+				firstErr = uerr
+			}
 			wsErrorTo(req.ConnectionID, fmt.Sprintf("image %d: upload failed", i))
 			continue
 		}
-
 		generated = append(generated, trendlymodels.ContentAttachment{Type: "image", ImageURL: url})
 		completed++
-
-		// Persist incrementally: the image lands on the content doc regardless of
-		// whether the originating socket is still connected.
 		persistGeneratedImages(p.BrandID, p.ContextID, existing, generated, p.Multi)
-		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
-			"status":         "generating",
-			"completedCount": completed,
-		})
-
-		wsSend(req.ConnectionID, map[string]any{
-			"type":  "image",
-			"index": i,
-			"s3Url": url,
-		})
+		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{"status": "generating", "completedCount": completed})
+		wsSend(req.ConnectionID, map[string]any{"type": "image", "index": i, "s3Url": url})
 	}
 
 	meterAIUsage(orgID, &openrouter.Usage{Cost: imgCost})
+	finishMediaTurn(req, p, convID, completed, firstErr, generated, "Generated")
+}
 
+// runMediaEnhance is the image-to-image iteration path. It uses the current
+// image(s) as visual input plus the thread's textual history, and for carousels
+// decides between editing the focused slide (replace at index) and adding a new
+// slide (append). Single types always edit/replace.
+func runMediaEnhance(req WSRequest, p imagePayload, model, orgID, convID string, existing []trendlymodels.ContentAttachment, baseImages []string, history []trendlymodels.AIMessage) {
+	size := aspectToSize(p.AspectRatio)
+
+	// Provenance: a user-uploaded base has no prior assistant image message.
+	provenance := "The current image was generated by AI in this thread."
+	if !historyHasAssistantImage(history) && len(baseImages) > 0 {
+		provenance = "The current image was uploaded by the user (not AI-generated). Treat it as the base to edit."
+	}
+
+	// Decide edit vs add (carousel) and the target slide.
+	action := "edit"
+	targetIndex := 0
+	if p.FocusedSlideIndex != nil {
+		targetIndex = *p.FocusedSlideIndex
+	}
+	var inputImages []string
+	if p.Multi {
+		action, targetIndex = classifyCarouselIntent(model, p.Description, p.FocusedSlideIndex, len(baseImages))
+		if action == "add" {
+			// Keep all existing slides as visual context for a style-consistent new slide.
+			inputImages = baseImages
+		} else {
+			if targetIndex < 0 || targetIndex >= len(baseImages) {
+				targetIndex = 0
+			}
+			inputImages = []string{baseImages[targetIndex]}
+		}
+	} else {
+		// Single post/story: edit/replace the one image.
+		action = "edit"
+		targetIndex = 0
+		if len(baseImages) > 0 {
+			inputImages = []string{baseImages[0]}
+		}
+	}
+
+	prompt := buildEnhancePrompt(p.Description, p.Style, provenance, history)
+
+	wsSend(req.ConnectionID, map[string]any{"type": "image_status", "index": targetIndex, "state": "generating"})
+	resp, usage, err := openrouter.GenerateImage(context.Background(), openrouter.ImageRequest{
+		Model: model, Prompt: prompt, Size: size, N: 1, InputImages: inputImages,
+	})
+	if err != nil {
+		meterAIUsage(orgID, nil)
+		finishMediaTurn(req, p, convID, 0, err, nil, "Enhanced")
+		wsErrorTo(req.ConnectionID, "enhance failed: "+err.Error())
+		return
+	}
+	if usage != nil {
+		meterAIUsage(orgID, &openrouter.Usage{Cost: usage.Cost})
+	}
+	url, uerr := uploadFirstImage(resp, p.BrandID)
+	if url == "" {
+		finishMediaTurn(req, p, convID, 0, uerr, nil, "Enhanced")
+		wsErrorTo(req.ConnectionID, "enhance: upload failed")
+		return
+	}
+
+	att := trendlymodels.ContentAttachment{Type: "image", ImageURL: url}
+	var next []trendlymodels.ContentAttachment
+	if p.Multi && action == "add" {
+		next = append(append([]trendlymodels.ContentAttachment{}, existing...), att)
+	} else if p.Multi {
+		next = replaceAttachmentAt(existing, targetIndex, att)
+	} else {
+		next = []trendlymodels.ContentAttachment{att}
+	}
+	if p.ContextID != "" {
+		if err := trendlymodels.UpdateContentFields(p.BrandID, p.ContextID, map[string]any{"attachments": next}); err != nil {
+			log.Printf("ai media enhance persist: %v", err)
+		}
+	}
+	wsSend(req.ConnectionID, map[string]any{"type": "image", "index": targetIndex, "s3Url": url})
+
+	note := "Enhanced"
+	if p.Multi && action == "add" {
+		note = "Added a new slide"
+	} else if p.Multi {
+		note = fmt.Sprintf("Edited slide %d", targetIndex+1)
+	}
+	finishMediaTurn(req, p, convID, 1, nil, []trendlymodels.ContentAttachment{att}, note)
+}
+
+// finishMediaTurn writes the terminal status, appends the assistant message to
+// the media thread (with the resulting image URLs), and signals done.
+func finishMediaTurn(req WSRequest, p imagePayload, convID string, completed int, firstErr error, generated []trendlymodels.ContentAttachment, verb string) {
 	if completed == 0 {
 		msg := "image generation failed"
 		if firstErr != nil {
 			msg = firstErr.Error()
 		}
-		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
-			"status": "error",
-			"error":  msg,
-		})
-	} else {
-		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{
-			"status":         "done",
-			"error":          "",
-			"completedCount": completed,
+		setImageGenStatus(p.BrandID, p.ContextID, map[string]any{"status": "error", "error": msg})
+		wsSend(req.ConnectionID, map[string]any{"type": "done"})
+		return
+	}
+	setImageGenStatus(p.BrandID, p.ContextID, map[string]any{"status": "done", "error": "", "completedCount": completed})
+
+	if convID != "" {
+		urls := imageAttachmentURLs(generated)
+		_, _ = openrouter.AppendMessage(context.Background(), convID, trendlymodels.AIMessage{
+			Role: "assistant", UserID: req.UserID, BrandID: p.BrandID,
+			Content: fmt.Sprintf("%s %d image(s).", verb, completed),
+			Images:  urls, Timestamp: time.Now().UnixMilli(),
 		})
 	}
-
 	wsSend(req.ConnectionID, map[string]any{"type": "done"})
+}
+
+// ensureMediaConversation returns the content's media thread id (creating it and
+// stamping it on the content doc on first use) plus its message history. Returns
+// "" when there is no content context (ad-hoc generation not tied to a piece).
+func ensureMediaConversation(brandID, userID, contentID string, content *trendlymodels.Content, model string) (string, []trendlymodels.AIMessage) {
+	if contentID == "" {
+		return "", nil
+	}
+	ctx := context.Background()
+	if content != nil && content.MediaConversationID != "" {
+		hist, _ := openrouter.LoadHistory(ctx, content.MediaConversationID)
+		return content.MediaConversationID, hist
+	}
+	title := "Media"
+	if content != nil && content.Title != "" {
+		title = content.Title
+	}
+	conv, err := openrouter.CreateConversation(ctx, brandID, userID, moduleMedia, contentID, model, title)
+	if err != nil || conv == nil {
+		log.Printf("ai media conversation create: %v", err)
+		return "", nil
+	}
+	if err := trendlymodels.UpdateContentFields(brandID, contentID, map[string]any{
+		"mediaConversationId": conv.ID,
+	}); err != nil {
+		log.Printf("ai media conversation stamp: %v", err)
+	}
+	return conv.ID, nil
+}
+
+// classifyCarouselIntent asks the model whether the prompt wants to edit an
+// existing slide or add a new one, and which slide to target. Best-effort: on
+// any failure it falls back to edit-the-focused-slide (or add when unfocused).
+func classifyCarouselIntent(_ string, prompt string, focused *int, slideCount int) (action string, targetIndex int) {
+	fallbackAction := "add"
+	fallbackIndex := 0
+	if focused != nil {
+		fallbackAction = "edit"
+		fallbackIndex = *focused
+	}
+
+	classModel, locked := pickModel(context.Background(), "", openrouter.TaskChat, "")
+	if locked || classModel == "" {
+		return fallbackAction, fallbackIndex
+	}
+	focusDesc := "no specific slide"
+	if focused != nil {
+		focusDesc = fmt.Sprintf("slide index %d", *focused)
+	}
+	sys := "You classify a carousel image instruction. Respond with ONLY JSON, no prose."
+	user := fmt.Sprintf(
+		"The carousel has %d slide(s), 0-indexed. The user focused: %s. Instruction: %q.\n"+
+			"Decide if they want to EDIT an existing slide or ADD a new slide. "+
+			"Return JSON {\"action\":\"edit\"|\"add\",\"targetIndex\":<int 0-based slide to edit, or the focused slide>}.",
+		slideCount, focusDesc, prompt,
+	)
+	resp, err := openrouter.ChatCompletion(context.Background(), openrouter.ChatRequest{
+		Model:          classModel,
+		Messages:       []openrouter.Message{{Role: "system", Content: sys}, {Role: "user", Content: user}},
+		ResponseFormat: &openrouter.ResponseFormat{Type: "json_object"},
+	})
+	if err != nil || len(resp.Choices) == 0 {
+		return fallbackAction, fallbackIndex
+	}
+	var parsed struct {
+		Action      string `json:"action"`
+		TargetIndex int    `json:"targetIndex"`
+	}
+	raw := jsonObjectRe.FindString(resp.Choices[0].Message.Content)
+	if raw == "" || json.Unmarshal([]byte(raw), &parsed) != nil {
+		return fallbackAction, fallbackIndex
+	}
+	if parsed.Action != "edit" && parsed.Action != "add" {
+		return fallbackAction, fallbackIndex
+	}
+	return parsed.Action, parsed.TargetIndex
+}
+
+var jsonObjectRe = regexp.MustCompile(`(?s)\{.*\}`)
+
+// buildEnhancePrompt folds the provenance note, a short thread-history summary
+// and the user's edit instruction into a single image prompt. The base image(s)
+// are passed separately as InputImages (the visual channel).
+func buildEnhancePrompt(userPrompt, style, provenance string, history []trendlymodels.AIMessage) string {
+	var sb strings.Builder
+	sb.WriteString(provenance)
+	if h := summariseMediaHistory(history); h != "" {
+		sb.WriteString("\n\nEarlier in this image thread:\n")
+		sb.WriteString(h)
+	}
+	sb.WriteString("\n\nApply this change to the provided image, keeping everything else consistent: ")
+	sb.WriteString(userPrompt)
+	if style != "" {
+		sb.WriteString(fmt.Sprintf(" (Style: %s.)", style))
+	}
+	return sb.String()
+}
+
+// summariseMediaHistory renders the last few thread turns into a compact textual
+// recap so the image model has the iteration context.
+func summariseMediaHistory(history []trendlymodels.AIMessage) string {
+	if len(history) == 0 {
+		return ""
+	}
+	start := 0
+	if len(history) > 6 {
+		start = len(history) - 6
+	}
+	var lines []string
+	for _, m := range history[start:] {
+		txt := strings.TrimSpace(m.Content)
+		if txt == "" {
+			continue
+		}
+		who := "User"
+		if m.Role == "assistant" {
+			who = "AI"
+		}
+		lines = append(lines, fmt.Sprintf("- %s: %s", who, txt))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// historyHasAssistantImage reports whether the thread already contains an
+// AI-generated image (used to tell uploaded vs generated bases apart).
+func historyHasAssistantImage(history []trendlymodels.AIMessage) bool {
+	for _, m := range history {
+		if m.Role == "assistant" && len(m.Images) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// imageAttachmentURLs returns the image URLs of the given attachments, in order.
+func imageAttachmentURLs(atts []trendlymodels.ContentAttachment) []string {
+	var out []string
+	for _, a := range atts {
+		if a.Type == "image" && a.ImageURL != "" {
+			out = append(out, a.ImageURL)
+		}
+	}
+	return out
+}
+
+// replaceAttachmentAt returns existing with index idx replaced by att (appended
+// when idx is out of range).
+func replaceAttachmentAt(existing []trendlymodels.ContentAttachment, idx int, att trendlymodels.ContentAttachment) []trendlymodels.ContentAttachment {
+	next := append([]trendlymodels.ContentAttachment{}, existing...)
+	if idx >= 0 && idx < len(next) {
+		next[idx] = att
+		return next
+	}
+	return append(next, att)
+}
+
+// uploadFirstImage uploads the first image off a GenerateImage response to S3 and
+// returns its CloudFront URL (hosted URL or base64, whichever the model returned).
+func uploadFirstImage(resp *openrouter.ImageResponse, brandID string) (string, error) {
+	if resp == nil || len(resp.Data) == 0 {
+		return "", fmt.Errorf("no image returned")
+	}
+	d := resp.Data[0]
+	if d.URL != "" {
+		return uploadFromURL(d.URL, brandID)
+	}
+	if d.B64JSON != "" {
+		return uploadBase64Image(d.B64JSON, brandID)
+	}
+	return "", fmt.Errorf("empty image data")
 }
 
 // setImageGenStatus merge-updates the imageGeneration block on the content doc.

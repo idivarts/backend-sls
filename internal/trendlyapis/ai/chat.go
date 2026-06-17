@@ -47,7 +47,12 @@ func handleMessageWS(req WSRequest) {
 	msgs := make([]openrouter.Message, 0, len(history)+2)
 	msgs = append(msgs, openrouter.Message{Role: "system", Content: systemPrompt})
 	msgs = append(msgs, openrouter.ToOpenRouterMessages(history)...)
-	msgs = append(msgs, openrouter.Message{Role: "user", Content: req.Content})
+	// When the user attached images, send the turn as multimodal vision input.
+	if len(req.Images) > 0 {
+		msgs = append(msgs, openrouter.UserMessageWithImages(req.Content, req.Images))
+	} else {
+		msgs = append(msgs, openrouter.Message{Role: "user", Content: req.Content})
+	}
 
 	if _, err := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
 		Role:        "user",
@@ -55,6 +60,7 @@ func handleMessageWS(req WSRequest) {
 		BrandID:     conv.BrandID,
 		ClientMsgID: req.ClientMsgID,
 		Content:     req.Content,
+		Images:      req.Images,
 		FocusedText: req.FocusedText,
 		Timestamp:   time.Now().UnixMilli(),
 	}); err != nil {
@@ -69,12 +75,18 @@ func handleMessageWS(req WSRequest) {
 		_ = openrouter.UpdateConversationTitle(ctx, conv.ID, title)
 	}
 
-	model, locked := pickModel(ctx, conv.BrandID, openrouter.TaskChat, req.Model)
+	// Image-bearing turns must run on a vision-capable model — route them through
+	// the multimodal task (its allowed models are all vision-capable).
+	chatTask := openrouter.TaskChat
+	if len(req.Images) > 0 {
+		chatTask = openrouter.TaskMultimodal
+	}
+	model, locked := pickModel(ctx, conv.BrandID, chatTask, req.Model)
 	if locked {
 		wsSend(req.ConnectionID, map[string]any{
 			"type":           "upgrade_required",
 			"conversationId": conv.ID,
-			"task":           string(openrouter.TaskChat),
+			"task":           string(chatTask),
 		})
 		return
 	}
@@ -84,7 +96,7 @@ func handleMessageWS(req WSRequest) {
 			"type":           "upgrade_required",
 			"reason":         "tokens_exhausted",
 			"conversationId": conv.ID,
-			"task":           string(openrouter.TaskChat),
+			"task":           string(chatTask),
 		})
 		return
 	}
@@ -97,6 +109,9 @@ func handleMessageWS(req WSRequest) {
 	var fullText strings.Builder // cumulative across steps — matches what the client accumulates
 	var finalUsage *openrouter.Usage
 	var pendingControl *trendlymodels.AIControl
+	// Images produced by generate_image tool calls this turn — attached to the
+	// committed assistant message so the chat bubble renders them from Firestore.
+	var genImages []string
 	// completed is set by a terminal server tool (complete_onboarding /
 	// generate_strategy_doc); the matching WS signal is chosen by module below.
 	completed := false
@@ -169,7 +184,16 @@ func handleMessageWS(req WSRequest) {
 				ToolCalls: echo,
 			})
 			for _, sc := range serverCalls {
-				result, complete, derr := dispatchServerTool(ctx, conv.BrandID, conv.UserID, conv.ContextID, sc.Function.Name, sc.Function.Arguments)
+				var result string
+				var complete bool
+				var derr error
+				if sc.Function.Name == toolGenerateImage {
+					var urls []string
+					result, urls, derr = runChatImageTool(ctx, conv.BrandID, orgID, req.ConnectionID, conv.ID, req.Model, sc.Function.Arguments)
+					genImages = append(genImages, urls...)
+				} else {
+					result, complete, derr = dispatchServerTool(ctx, conv.BrandID, conv.UserID, conv.ContextID, sc.Function.Name, sc.Function.Arguments)
+				}
 				if derr != nil {
 					log.Printf("ai server tool %s: %v", sc.Function.Name, derr)
 				}
@@ -223,6 +247,7 @@ func handleMessageWS(req WSRequest) {
 		UserID:     conv.UserID,
 		BrandID:    conv.BrandID,
 		Content:    fullText.String(),
+		Images:     genImages,
 		Model:      model,
 		TokenCount: tokens,
 		Control:    pendingControl,
@@ -255,6 +280,7 @@ func handleMessageWS(req WSRequest) {
 		"conversationId": conv.ID,
 		"messageId":      assistantMsgID,
 		"clientMsgId":    req.ClientMsgID,
+		"images":         genImages,
 		"usage":          finalUsage,
 	})
 }
@@ -272,6 +298,10 @@ func toolsForModule(module string) []openrouter.Tool {
 	}
 	if module == moduleCalendar {
 		tools = append(tools, calendarServerTools()...)
+	}
+	// Image generation is offered on the content-creation chat surfaces.
+	if moduleHasImageGen(module) {
+		tools = append(tools, imageGenServerTools()...)
 	}
 	return tools
 }
