@@ -176,9 +176,16 @@ func publishToFacebook(pageID, pageToken string, ct *trendlymodels.Content) (str
 // publishToLinkedIn posts to a member's personal LinkedIn profile. The member
 // URN was stored in the account's raw profile (`sub`) at connect time.
 func publishToLinkedIn(account *trendlymodels.SocialAccount, accessToken string, ct *trendlymodels.Content) (string, error) {
-	authorURN, _ := account.RawProfile["sub"].(string)
-	if authorURN == "" {
-		return "", fmt.Errorf("linkedin account %s has no member urn", account.ID)
+	sub, _ := account.RawProfile["sub"].(string)
+	if sub == "" {
+		return "", fmt.Errorf("linkedin account %s has no member id", account.ID)
+	}
+	// LinkedIn's OIDC /userinfo returns `sub` as a bare member id (e.g.
+	// "Au3Lx1cikz"), but the Posts API requires a full member URN. Wrap it
+	// unless it's already a urn:... value.
+	authorURN := sub
+	if !strings.HasPrefix(authorURN, "urn:") {
+		authorURN = "urn:li:person:" + sub
 	}
 	return linkedin.CreateMemberPost(accessToken, authorURN, buildCaption(ct), firstImageURL(ct))
 }
