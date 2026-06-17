@@ -83,13 +83,26 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 	if module == moduleCalendar {
 		sb.WriteString(calendarInstructions)
 		sb.WriteString(controlsInstructions)
+		sb.WriteString(imageGenInstructions)
 		return sb.String()
 	}
 
 	sb.WriteString("\nAnswer concisely. Match the brand voice. If a question is ambiguous, ask one clarifying question.")
 	sb.WriteString(controlsInstructions)
+	if moduleHasImageGen(module) {
+		sb.WriteString(imageGenInstructions)
+	}
 	return sb.String()
 }
+
+// imageGenInstructions tells the model it can both SEE images the user attaches
+// and CREATE images with the generate_image tool (content/calendar modules).
+const imageGenInstructions = "\n\nYou can see images the user attaches and you can create images with the " +
+	"generate_image tool. When the user asks you to create, generate, draw, design, or edit an " +
+	"image/visual/graphic, call generate_image with a detailed visual prompt. To edit or transform " +
+	"an existing image (one the user attached this turn, or an image already on the content), pass " +
+	"its URL(s) as inputImages for image-to-image. After it returns, refer to the new image " +
+	"naturally — it is shown to the user automatically. Never call it for non-visual requests."
 
 // controlsInstructions tells the model how to use the answer-control tools that
 // are available in every module.

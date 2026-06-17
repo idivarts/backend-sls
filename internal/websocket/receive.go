@@ -20,6 +20,7 @@ type Envelope struct {
 	ConversationID string         `json:"conversationId,omitempty"`
 	ClientMsgID    string         `json:"clientMsgId,omitempty"`
 	Content        string         `json:"content,omitempty"`
+	Images         []string       `json:"images,omitempty"`
 	FocusedText    string         `json:"focusedText,omitempty"`
 	Model          string         `json:"model,omitempty"`
 	Module         string         `json:"module,omitempty"`

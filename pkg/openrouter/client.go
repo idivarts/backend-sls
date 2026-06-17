@@ -23,15 +23,121 @@ var (
 )
 
 type Message struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content,omitempty"`
-	Name       string     `json:"name,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Role string `json:"-"`
+	// Content is the plain-text body. When ContentParts is non-empty it takes
+	// precedence on the wire (the OpenAI-compatible multimodal array); Content is
+	// still kept populated with the flattened text so text-only consumers and
+	// history persistence keep working unchanged.
+	Content string `json:"-"`
+	// ContentParts carries multimodal content (text + image_url parts). When set,
+	// MarshalJSON serializes `content` as the parts array; otherwise it falls back
+	// to the plain Content string. This is the SINGLE shared multimodal path —
+	// both chat vision input and image-to-image generation build ContentParts
+	// (see UserMessageWithImages). Do not add a separate private parts path.
+	ContentParts []ContentPart `json:"-"`
+	Name         string        `json:"-"`
+	ToolCalls    []ToolCall    `json:"-"`
+	ToolCallID   string        `json:"-"`
 	// Images is populated on assistant responses from image-generation models
 	// (modalities: ["image","text"]). Each entry's image_url.url is either a
 	// data URI ("data:image/png;base64,…") or an https URL.
-	Images []OutputImage `json:"images,omitempty"`
+	Images []OutputImage `json:"-"`
+}
+
+// ContentPart is one element of a multimodal message body. Type is "text" (Text
+// set) or "image_url" (ImageURL set), matching the OpenAI/OpenRouter chat schema.
+type ContentPart struct {
+	Type     string        `json:"type"`
+	Text     string        `json:"text,omitempty"`
+	ImageURL *ImageURLData `json:"image_url,omitempty"`
+}
+
+// messageWire is the on-the-wire shape of a Message. `content` is `any` so it
+// can be a plain string or a parts array depending on the message.
+type messageWire struct {
+	Role       string        `json:"role"`
+	Content    any           `json:"content,omitempty"`
+	Name       string        `json:"name,omitempty"`
+	ToolCalls  []ToolCall    `json:"tool_calls,omitempty"`
+	ToolCallID string        `json:"tool_call_id,omitempty"`
+	Images     []OutputImage `json:"images,omitempty"`
+}
+
+// MarshalJSON emits the multimodal parts array when ContentParts is set, else
+// the plain content string. Keeps every other field intact.
+func (m Message) MarshalJSON() ([]byte, error) {
+	w := messageWire{
+		Role:       m.Role,
+		Name:       m.Name,
+		ToolCalls:  m.ToolCalls,
+		ToolCallID: m.ToolCallID,
+		Images:     m.Images,
+	}
+	if len(m.ContentParts) > 0 {
+		w.Content = m.ContentParts
+	} else if m.Content != "" {
+		w.Content = m.Content
+	}
+	return json.Marshal(w)
+}
+
+// UnmarshalJSON accepts `content` as either a string (the usual response shape)
+// or a parts array. Text parts are flattened into Content so existing callers
+// that read Message.Content keep working.
+func (m *Message) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Role       string          `json:"role"`
+		Content    json.RawMessage `json:"content"`
+		Name       string          `json:"name"`
+		ToolCalls  []ToolCall      `json:"tool_calls"`
+		ToolCallID string          `json:"tool_call_id"`
+		Images     []OutputImage   `json:"images"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	m.Role = raw.Role
+	m.Name = raw.Name
+	m.ToolCalls = raw.ToolCalls
+	m.ToolCallID = raw.ToolCallID
+	m.Images = raw.Images
+	m.Content = ""
+	m.ContentParts = nil
+	if len(raw.Content) > 0 {
+		var s string
+		if err := json.Unmarshal(raw.Content, &s); err == nil {
+			m.Content = s
+		} else {
+			var parts []ContentPart
+			if err := json.Unmarshal(raw.Content, &parts); err == nil {
+				m.ContentParts = parts
+				for _, p := range parts {
+					if p.Type == "text" {
+						m.Content += p.Text
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// UserMessageWithImages builds a user message whose body is a multimodal parts
+// array (optional leading text, then one image_url part per URL). Content is
+// also set to the text so text-only paths and history reads stay correct. Used
+// by both chat vision input and image-to-image generation.
+func UserMessageWithImages(text string, imageURLs []string) Message {
+	parts := make([]ContentPart, 0, len(imageURLs)+1)
+	if strings.TrimSpace(text) != "" {
+		parts = append(parts, ContentPart{Type: "text", Text: text})
+	}
+	for _, u := range imageURLs {
+		if u = strings.TrimSpace(u); u == "" {
+			continue
+		}
+		parts = append(parts, ContentPart{Type: "image_url", ImageURL: &ImageURLData{URL: u}})
+	}
+	return Message{Role: "user", Content: text, ContentParts: parts}
 }
 
 type OutputImage struct {
@@ -221,6 +327,11 @@ type ImageRequest struct {
 	Prompt string `json:"prompt"`
 	Size   string `json:"size,omitempty"`
 	N      int    `json:"n,omitempty"`
+	// InputImages are URLs (https or data URI) of base/reference images. When
+	// non-empty the request becomes image-to-image: the prompt + these images are
+	// sent as a multimodal user message (via the shared Message.ContentParts
+	// path). Empty → plain text-to-image, behaviour unchanged.
+	InputImages []string `json:"-"`
 }
 
 type ImageResponse struct {
@@ -245,9 +356,15 @@ func GenerateImage(ctx context.Context, req ImageRequest) (*ImageResponse, *Usag
 		prompt = fmt.Sprintf("%s\n\nGenerate the image at %s resolution (matching that aspect ratio).", prompt, req.Size)
 	}
 
+	// Image-to-image when base images are supplied, else plain text-to-image.
+	userMsg := Message{Role: "user", Content: prompt}
+	if len(req.InputImages) > 0 {
+		userMsg = UserMessageWithImages(prompt, req.InputImages)
+	}
+
 	chatResp, err := ChatCompletion(ctx, ChatRequest{
 		Model:      req.Model,
-		Messages:   []Message{{Role: "user", Content: prompt}},
+		Messages:   []Message{userMsg},
 		Modalities: []string{"image", "text"},
 	})
 	if err != nil {

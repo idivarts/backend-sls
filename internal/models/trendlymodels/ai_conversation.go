@@ -22,14 +22,20 @@ type AIMessage struct {
 	BrandID string `json:"brandId,omitempty" firestore:"brandId,omitempty"`
 	// ClientMsgID echoes the id the client generated for an optimistic user
 	// bubble, so the Firestore snapshot can reconcile (dedupe) it on arrival.
-	ClientMsgID string     `json:"clientMsgId,omitempty" firestore:"clientMsgId,omitempty"`
-	Content     string     `json:"content" firestore:"content"`
-	Model       string     `json:"model,omitempty" firestore:"model,omitempty"`
-	FocusedText string     `json:"focusedText,omitempty" firestore:"focusedText,omitempty"`
-	ImageURL    string     `json:"imageUrl,omitempty" firestore:"imageUrl,omitempty"`
-	TokenCount  int        `json:"tokenCount,omitempty" firestore:"tokenCount,omitempty"`
-	Timestamp   int64      `json:"timestamp" firestore:"timestamp"`
-	Control     *AIControl `json:"control,omitempty" firestore:"control,omitempty"`
+	ClientMsgID string `json:"clientMsgId,omitempty" firestore:"clientMsgId,omitempty"`
+	Content     string `json:"content" firestore:"content"`
+	Model       string `json:"model,omitempty" firestore:"model,omitempty"`
+	FocusedText string `json:"focusedText,omitempty" firestore:"focusedText,omitempty"`
+	// ImageURL is the legacy single-image field (kept for back-compat). New code
+	// uses Images (multi). On a user message Images are vision input the user
+	// attached; on an assistant message they are generated/referenced image URLs.
+	// Shared by the AIChatPanel-images and MediaStage threaded-generation flows —
+	// always CloudFront/S3 URLs, never base64.
+	ImageURL   string     `json:"imageUrl,omitempty" firestore:"imageUrl,omitempty"`
+	Images     []string   `json:"images,omitempty" firestore:"images,omitempty"`
+	TokenCount int        `json:"tokenCount,omitempty" firestore:"tokenCount,omitempty"`
+	Timestamp  int64      `json:"timestamp" firestore:"timestamp"`
+	Control    *AIControl `json:"control,omitempty" firestore:"control,omitempty"`
 }
 
 // AIControl is an optional structured answer control attached to an assistant

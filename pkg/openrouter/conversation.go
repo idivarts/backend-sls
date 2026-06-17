@@ -159,6 +159,13 @@ func UpdateConversationModel(ctx context.Context, conversationID, model string) 
 func ToOpenRouterMessages(history []trendlymodels.AIMessage) []Message {
 	out := make([]Message, 0, len(history))
 	for _, m := range history {
+		// Replay a user turn's attached images as multimodal vision input so the
+		// model keeps visual context across the thread. Assistant/tool turns stay
+		// text-only (their generated images are surfaced as URLs in the prose).
+		if m.Role == "user" && len(m.Images) > 0 {
+			out = append(out, UserMessageWithImages(m.Content, m.Images))
+			continue
+		}
 		out = append(out, Message{Role: m.Role, Content: m.Content})
 	}
 	return out
