@@ -40,7 +40,7 @@ func calendarPosts() Registered {
 				out = append(out, map[string]any{
 					"id":               ct.ID,
 					"title":            ct.Title,
-					"platform":         ct.Platform,
+					"platforms":        ct.Platforms,
 					"contentFormat":    ct.ContentFormat,
 					"status":           ct.Status,
 					"postingTimeStamp": ct.PostingTimeStamp,

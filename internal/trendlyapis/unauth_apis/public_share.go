@@ -10,13 +10,14 @@ import (
 )
 
 type publicCalendarItem struct {
-	ID               string `json:"id"`
-	Title            string `json:"title"`
-	ContentFormat    string `json:"contentFormat,omitempty"`
-	Platform         string `json:"platform,omitempty"`
-	Status           string `json:"status,omitempty"`
-	PostingTimeStamp int64  `json:"postingTimeStamp,omitempty"`
-	ImageURL         string `json:"imageUrl,omitempty"`
+	ID               string   `json:"id"`
+	Title            string   `json:"title"`
+	ContentFormat    string   `json:"contentFormat,omitempty"`
+	Platforms        []string `json:"platforms,omitempty"`
+	Platform         string   `json:"platform,omitempty"` // deprecated: kept one release for old public web view
+	Status           string   `json:"status,omitempty"`
+	PostingTimeStamp int64    `json:"postingTimeStamp,omitempty"`
+	ImageURL         string   `json:"imageUrl,omitempty"`
 }
 
 type publicBrandInfo struct {
@@ -86,11 +87,16 @@ func PublicShareResolve(c *gin.Context) {
 				break
 			}
 		}
+		platform := ct.Platform
+		if platform == "" && len(ct.Platforms) > 0 {
+			platform = ct.Platforms[0]
+		}
 		items = append(items, publicCalendarItem{
 			ID:               ct.ID,
 			Title:            ct.Title,
 			ContentFormat:    ct.ContentFormat,
-			Platform:         ct.Platform,
+			Platforms:        ct.Platforms,
+			Platform:         platform,
 			Status:           ct.Status,
 			PostingTimeStamp: ct.PostingTimeStamp,
 			ImageURL:         imageURL,

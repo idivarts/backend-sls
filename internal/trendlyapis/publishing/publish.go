@@ -12,6 +12,16 @@ import (
 	"github.com/idivarts/backend-sls/pkg/messenger"
 )
 
+// platformTargeted reports whether p is among the content's targeted platforms.
+func platformTargeted(p trendlymodels.Platform, list []trendlymodels.Platform) bool {
+	for _, x := range list {
+		if x == p {
+			return true
+		}
+	}
+	return false
+}
+
 // buildCaption merges caption + hashtags into the post body.
 func buildCaption(ct *trendlymodels.Content) string {
 	parts := []string{}
@@ -82,10 +92,12 @@ func publishToInstagram(igUserID, accessToken string, ct *trendlymodels.Content)
 	var err error
 
 	switch format {
-	case "reel":
+	case "reel", "video":
+		// Instagram publishes all feed video (portrait Reel or landscape video)
+		// through the REELS container — the aspect ratio lives in the asset.
 		video := firstVideoURL(ct)
 		if video == "" {
-			return "", fmt.Errorf("reel has no video attachment")
+			return "", fmt.Errorf("video content has no video attachment")
 		}
 		creationID, err = instagram.CreateReelContainer(igUserID, video, caption, "REELS", accessToken)
 		if err != nil {
@@ -186,6 +198,12 @@ func PublishContent(brandID, contentID string) error {
 	var firstErr error
 
 	for _, dest := range ct.Destinations {
+		// Never publish to a platform the content isn't targeting. (Legacy docs
+		// with no `platforms` set skip this guard.)
+		if len(ct.Platforms) > 0 && !platformTargeted(dest.Platform, ct.Platforms) {
+			log.Printf("publishing: destination platform %q not in content %s targeted platforms; skipping", dest.Platform, contentID)
+			continue
+		}
 		account, aerr := trendlymodels.GetBrandSocialAccount(brandID, dest.SocialAccountID)
 		if aerr != nil {
 			if firstErr == nil {
