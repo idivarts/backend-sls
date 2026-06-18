@@ -290,6 +290,9 @@ func handleMessageWS(req WSRequest) {
 // brand-building server tools.
 func toolsForModule(module string) []openrouter.Tool {
 	tools := clientTools()
+	// The brand-memory tool is available in every module so the AI can capture
+	// durable brand facts from any conversation.
+	tools = append(tools, memoryServerTools()...)
 	if module == moduleOnboarding {
 		tools = append(tools, onboardingServerTools()...)
 	}

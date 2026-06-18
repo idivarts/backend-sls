@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
@@ -67,6 +68,17 @@ type Brand struct {
 	OnboardingComplete bool `json:"onboardingComplete" firestore:"onboardingComplete"`
 
 	AIVoice *string `json:"aiVoice,omitempty" firestore:"aiVoice,omitempty"`
+
+	// AIMemory is a per-brand, AI-maintained note of durable brand facts the user
+	// has shared in chat (positioning, audience, voice, products, do's & don'ts,
+	// recurring preferences). It is pre-fed into the system prompt of EVERY AI
+	// conversation for this brand so the user never re-explains context. The AI
+	// appends to it via the update_brand_memory tool; the user can also edit it
+	// directly on the brand-profile page. Scoped strictly to this brand (never
+	// shared across brands or organizations) and kept under a char cap via LLM
+	// compaction when it grows too large.
+	AIMemory          *string `json:"aiMemory,omitempty" firestore:"aiMemory,omitempty"`
+	AIMemoryUpdatedAt *int64  `json:"aiMemoryUpdatedAt,omitempty" firestore:"aiMemoryUpdatedAt,omitempty"`
 
 	// Members       []BrandMember  `json:"members" firestore:"members"`
 	// Notifications []Notification `json:"notifications" firestore:"notifications"`
@@ -158,6 +170,16 @@ func (u *Brand) Get(brandId string) error {
 func UpdateBrandFields(ctx context.Context, brandID string, updates []firestore.Update) error {
 	_, err := firestoredb.Client.Collection("brands").Doc(brandID).Update(ctx, updates)
 	return err
+}
+
+// SetBrandMemory replaces the brand's AI memory blob and stamps the update time.
+// Used by the update_brand_memory AI tool; the user-facing direct edit on the
+// brand-profile page goes through the client Firestore write path instead.
+func SetBrandMemory(ctx context.Context, brandID, memory string) error {
+	return UpdateBrandFields(ctx, brandID, []firestore.Update{
+		{Path: "aiMemory", Value: memory},
+		{Path: "aiMemoryUpdatedAt", Value: time.Now().UnixMilli()},
+	})
 }
 
 // HardDeleteBrand permanently removes the brand document, every nested

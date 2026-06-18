@@ -48,6 +48,18 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		sb.WriteString(*brand.AIVoice)
 		sb.WriteString("\n")
 	}
+	// Pre-feed the brand's long-term memory. Because buildSystemPrompt runs fresh
+	// on every message against a freshly loaded brand, every conversation — new or
+	// old — always sees the latest memory the moment the user sends a message.
+	if brand != nil && brand.AIMemory != nil && strings.TrimSpace(*brand.AIMemory) != "" {
+		mem := strings.TrimSpace(*brand.AIMemory)
+		if len(mem) > maxContextChars {
+			mem = mem[:maxContextChars]
+		}
+		sb.WriteString("Brand memory (durable facts the user has shared before — always honor these and do not re-ask for anything already stated here):\n")
+		sb.WriteString(mem)
+		sb.WriteString("\n")
+	}
 	if module != "" {
 		sb.WriteString("Module: ")
 		sb.WriteString(module)
@@ -68,6 +80,10 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		sb.WriteString(focusedText)
 		sb.WriteString("\"\n")
 	}
+
+	// Memory-writing capability is available in every module — appended here,
+	// before the per-module instruction blocks that return early below.
+	sb.WriteString(memoryInstructions)
 
 	if module == moduleOnboarding {
 		sb.WriteString(onboardingInstructions)
