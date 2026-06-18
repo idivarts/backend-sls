@@ -105,6 +105,15 @@ func runChatImageTool(ctx context.Context, brandID, orgID, connID, convID, reque
 		}), nil, nil
 	}
 
+	// Heartbeat before the slow, silent image-gen call: it lets the client show
+	// "generating an image…" and keeps its streaming watchdog from tripping
+	// during the gap (no token deltas flow while the image renders).
+	wsSend(connID, map[string]any{
+		"type":           "image_status",
+		"conversationId": convID,
+		"state":          "generating",
+	})
+
 	size := aspectToSize(a.AspectRatio)
 	resp, usage, err := openrouter.GenerateImage(ctx, openrouter.ImageRequest{
 		Model:       model,

@@ -840,8 +840,14 @@ func uploadBase64Image(b64, brandID string) (string, error) {
 	return uploadBytes(data, "image/png", brandID, "png")
 }
 
+// imageDownloadClient fetches hosted image results. It has an explicit timeout
+// so a stalled download can't hang the synchronous WS chat turn until the lambda
+// itself times out (which would drop the turn's `done` frame and leave the
+// client stuck "streaming").
+var imageDownloadClient = &http.Client{Timeout: 60 * time.Second}
+
 func uploadFromURL(url, brandID string) (string, error) {
-	httpResp, err := http.Get(url)
+	httpResp, err := imageDownloadClient.Get(url)
 	if err != nil {
 		return "", err
 	}
