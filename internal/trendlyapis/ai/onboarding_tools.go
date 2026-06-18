@@ -96,6 +96,8 @@ func onboardingServerTools() []openrouter.Tool {
 // result content (not errors) so the model can recover by re-asking.
 func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name, arguments string) (string, bool, error) {
 	switch name {
+	case toolUpdateBrandMemory:
+		return updateBrandMemory(ctx, brandID, arguments)
 	case toolSetBrandFields:
 		return setBrandFields(ctx, brandID, arguments)
 	case toolCompleteOnboarding:
