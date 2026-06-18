@@ -12,6 +12,12 @@ import (
 
 const maxContextChars = 8000
 
+// maxModuleContextChars is a deliberately larger budget than maxContextChars
+// (which caps brand memory). The module context carries the things AI decisions
+// hinge on most — the full latest strategy document or the complete content
+// object — so it gets its own, roomier cap rather than sharing memory's budget.
+const maxModuleContextChars = 16000
+
 func loadBrand(brandID string) (*trendlymodels.Brand, error) {
 	if brandID == "" {
 		return nil, errors.New("brandId is required")
@@ -68,8 +74,8 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 
 	if ctxStr := loadModuleContext(module, brandID, contextID); ctxStr != "" {
 		sb.WriteString("Module context:\n")
-		if len(ctxStr) > maxContextChars {
-			ctxStr = ctxStr[:maxContextChars] + "\n…(truncated)"
+		if len(ctxStr) > maxModuleContextChars {
+			ctxStr = ctxStr[:maxModuleContextChars] + "\n…(truncated)"
 		}
 		sb.WriteString(ctxStr)
 		sb.WriteString("\n")
@@ -153,9 +159,11 @@ func loadModuleContext(module, brandID, contextID string) string {
 	}
 	ctx := context.Background()
 	switch module {
-	case "strategy":
+	case moduleStrategy:
+		// No specific strategy open → give the AI a compact overview of the
+		// brand's strategies (the strategy list view) so it still has context.
 		if contextID == "" {
-			return ""
+			return loadStrategyList(brandID)
 		}
 		strat, err := trendlymodels.GetStrategy(ctx, brandID, contextID)
 		if err != nil {
@@ -173,13 +181,13 @@ func loadModuleContext(module, brandID, contextID string) string {
 		}
 		return strings.Join(parts, "\n\n")
 
-	case "calendar":
+	case moduleCalendar:
 		if contextID != "" {
 			return loadContentBrief(brandID, contextID)
 		}
-		return loadCalendarMonth(brandID)
+		return loadCalendarWindow(brandID)
 
-	case "content":
+	case moduleContent:
 		if contextID == "" {
 			return ""
 		}
@@ -295,6 +303,41 @@ func briefFromFields(title, platform, format, description, caption, hashtags, sc
 	return contentBriefText(ct)
 }
 
+// liveContentPayload carries the current (possibly unsaved) content-editor state
+// the brand app sends alongside a chat message in the content module. It mirrors
+// the live-editor fields used by content generation, plus the on-screen
+// attachments, so the chat AI reasons about exactly what's on screen now rather
+// than the last-saved Firestore doc.
+type liveContentPayload struct {
+	Title       string                            `json:"title"`
+	Platform    string                            `json:"platform"`
+	Platforms   []string                          `json:"platforms"`
+	Format      string                            `json:"format"`
+	Description string                            `json:"description"`
+	Caption     string                            `json:"caption"`
+	Hashtags    string                            `json:"hashtags"`
+	Script      string                            `json:"script"`
+	Attachments []trendlymodels.ContentAttachment `json:"attachments"`
+}
+
+// briefFromLiveContent renders the live editor payload into the same compact
+// brief shape used elsewhere (contentBriefText), including a media summary built
+// from the current on-screen attachments. Returns "" when nothing usable is set.
+func briefFromLiveContent(p liveContentPayload) string {
+	ct := &trendlymodels.Content{
+		Title:         strings.TrimSpace(p.Title),
+		Platform:      strings.TrimSpace(p.Platform),
+		Platforms:     p.Platforms,
+		ContentFormat: strings.TrimSpace(p.Format),
+		Description:   strings.TrimSpace(p.Description),
+		Caption:       strings.TrimSpace(p.Caption),
+		Hashtags:      strings.TrimSpace(p.Hashtags),
+		Script:        strings.TrimSpace(p.Script),
+		Attachments:   p.Attachments,
+	}
+	return contentBriefText(ct)
+}
+
 // summariseAttachments produces a short, model-friendly description of the media
 // currently on a content piece so the AI chat knows what visuals/video exist.
 func summariseAttachments(list []trendlymodels.ContentAttachment) string {
@@ -331,14 +374,91 @@ func summariseAttachments(list []trendlymodels.ContentAttachment) string {
 	return line
 }
 
-func loadCalendarMonth(brandID string) string {
+// loadStrategyList renders a compact overview of the brand's strategies for the
+// strategy list view (no single strategy open). Title + objective + status only
+// — never the full markdown body (that's reserved for the focused-strategy
+// context) so the list stays within budget.
+func loadStrategyList(brandID string) string {
+	strategies, err := trendlymodels.ListStrategies(context.Background(), brandID, 25)
+	if err != nil || len(strategies) == 0 {
+		return "No strategies created yet."
+	}
+	var lines []string
+	for _, s := range strategies {
+		line := fmt.Sprintf("- [id:%s] %s", s.ID, s.Name)
+		if s.Objective != "" {
+			line += " — " + s.Objective
+		}
+		if s.Status != "" {
+			line += fmt.Sprintf(" (%s)", s.Status)
+		}
+		lines = append(lines, line)
+	}
+	return "The brand's strategies (most recently updated first):\n" + strings.Join(lines, "\n")
+}
+
+// calendarWindowPast is how far back the calendar context reaches; everything
+// from this point into the future is in scope so the AI sees recent history and
+// all upcoming plans.
+const calendarWindowPast = 30 * 24 * time.Hour
+
+// calendarWindowFuture bounds the forward edge so the range query stays finite.
+const calendarWindowFuture = 365 * 24 * time.Hour
+
+// maxCalendarItems caps how many calendar items are injected per message. When a
+// brand exceeds this, the closest-to-now items are kept and the overflow count
+// is disclosed (never silently dropped).
+const maxCalendarItems = 150
+
+// loadCalendarWindow lists the brand's content across a window of roughly the
+// last 30 days plus all upcoming scheduled posts. Per the ticket it includes the
+// scheduled date, idea/title and other light details (format, status) but NEVER
+// caption, hashtags or attachments. Output stays chronological; if the window
+// holds more than maxCalendarItems, items closest to now are kept and the
+// dropped count is disclosed.
+func loadCalendarWindow(brandID string) string {
 	now := time.Now()
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).UnixMilli()
-	end := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()
+	start := now.Add(-calendarWindowPast).UnixMilli()
+	end := now.Add(calendarWindowFuture).UnixMilli()
 
 	contents, err := trendlymodels.ListContentInRange(context.Background(), brandID, start, end, false)
 	if err != nil {
-		return "No scheduled posts this month."
+		return "No content scheduled in the current window."
+	}
+	if len(contents) == 0 {
+		return "No content scheduled in the current window."
+	}
+
+	// ListContentInRange returns ascending by postingTimeStamp. If we're over
+	// budget, keep the items closest to now (upcoming + most recent past) and
+	// disclose how many we dropped.
+	dropped := 0
+	if len(contents) > maxCalendarItems {
+		nowMs := now.UnixMilli()
+		pivot := 0
+		for i, ct := range contents {
+			if ct.PostingTimeStamp >= nowMs {
+				pivot = i
+				break
+			}
+			pivot = i + 1
+		}
+		// Center the kept window on `pivot` (the first upcoming item).
+		half := maxCalendarItems / 2
+		lo := pivot - half
+		if lo < 0 {
+			lo = 0
+		}
+		hi := lo + maxCalendarItems
+		if hi > len(contents) {
+			hi = len(contents)
+			lo = hi - maxCalendarItems
+			if lo < 0 {
+				lo = 0
+			}
+		}
+		dropped = len(contents) - (hi - lo)
+		contents = contents[lo:hi]
 	}
 
 	var lines []string
@@ -347,12 +467,10 @@ func loadCalendarMonth(brandID string) string {
 		// The [id:…] prefix lets the calendar tools target the exact post the
 		// user references without re-stating its title.
 		lines = append(lines, fmt.Sprintf("- [id:%s] [%s] %s — %s (%s)", ct.ID, t, ct.Title, ct.ContentFormat, ct.Status))
-		if len(lines) >= 50 {
-			break
-		}
 	}
-	if len(lines) == 0 {
-		return "No scheduled posts this month."
+	out := "Content calendar (recent + upcoming; dates are scheduled posting dates):\n" + strings.Join(lines, "\n")
+	if dropped > 0 {
+		out += fmt.Sprintf("\n…(%d more items in this window not shown)", dropped)
 	}
-	return "Scheduled posts this month:\n" + strings.Join(lines, "\n")
+	return out
 }

@@ -80,6 +80,39 @@ func GetStrategy(ctx context.Context, brandID, strategyID string) (*Strategy, er
 	return &s, nil
 }
 
+// ListStrategies returns a brand's strategies ordered most-recently-updated
+// first, capped at `limit` (<=0 falls back to a sane default). Used to give the
+// AI a compact overview of the brand's strategies when no single strategy is
+// open (the strategy list view). Each item carries its document id.
+func ListStrategies(ctx context.Context, brandID string, limit int) ([]Strategy, error) {
+	if brandID == "" {
+		return nil, fmt.Errorf("ListStrategies: empty brandID")
+	}
+	if limit <= 0 {
+		limit = 25
+	}
+	iter := strategiesCollection(brandID).
+		OrderBy("updatedAt", firestore.Desc).
+		Limit(limit).
+		Documents(ctx)
+	defer iter.Stop()
+
+	out := []Strategy{}
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			break
+		}
+		var s Strategy
+		if err := doc.DataTo(&s); err != nil {
+			continue
+		}
+		s.ID = doc.Ref.ID
+		out = append(out, s)
+	}
+	return out, nil
+}
+
 // UpdateStrategy applies a partial update to a strategy document. Callers build
 // the []firestore.Update (so they can use firestore.Increment, FieldPath edits,
 // etc.) — the Firestore call itself lives here in the model.

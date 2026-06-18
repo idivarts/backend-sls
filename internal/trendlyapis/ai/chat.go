@@ -43,6 +43,17 @@ func handleMessageWS(req WSRequest) {
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
 
 	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText)
+	// Content module: prefer the live (possibly unsaved) editor state the client
+	// sends with the message over the last-saved Firestore doc, so the AI reasons
+	// about exactly what's on screen right now (same pattern as content generation).
+	if conv.Module == moduleContent && len(req.Payload) > 0 {
+		var live liveContentPayload
+		if err := decodePayload(req.Payload, &live); err == nil {
+			if brief := briefFromLiveContent(live); brief != "" {
+				systemPrompt = systemPromptWithLiveContent(brand, conv.BrandID, conv.ContextID, brief)
+			}
+		}
+	}
 
 	msgs := make([]openrouter.Message, 0, len(history)+2)
 	msgs = append(msgs, openrouter.Message{Role: "system", Content: systemPrompt})
