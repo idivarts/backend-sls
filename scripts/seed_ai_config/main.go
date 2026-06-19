@@ -48,25 +48,25 @@ func main() {
 			{"id": "anthropic/claude-sonnet-4.6", "displayName": "Claude Sonnet 4.6", "provider": "Anthropic", "minPlan": "free", "vision": false, "imageGen": false, "enabled": true, "order": 1},
 			{"id": "openai/gpt-5.4", "displayName": "GPT-5.4", "provider": "OpenAI", "minPlan": "pro", "vision": true, "imageGen": false, "enabled": true, "order": 2},
 			{"id": "anthropic/claude-opus-4.8", "displayName": "Claude Opus 4.8", "provider": "Anthropic", "minPlan": "pro", "vision": true, "imageGen": false, "enabled": true, "order": 3},
-			{"id": "google/gemini-3-pro-preview", "displayName": "Gemini 3 Pro", "provider": "Google", "minPlan": "team", "vision": true, "imageGen": false, "enabled": true, "order": 4},
+			{"id": "google/gemini-3.1-pro-preview", "displayName": "Gemini 3 Pro", "provider": "Google", "minPlan": "team", "vision": true, "imageGen": false, "enabled": true, "order": 4},
 			{"id": "openai/gpt-5.5", "displayName": "GPT-5.5", "provider": "OpenAI", "minPlan": "team", "vision": true, "imageGen": false, "enabled": true, "order": 5},
-			{"id": "google/gemini-3.1-flash-image-preview", "displayName": "Gemini 3.1 Flash Image", "provider": "Google", "minPlan": "pro", "vision": true, "imageGen": true, "enabled": true, "order": 6},
-			{"id": "google/gemini-3-pro-image-preview", "displayName": "Gemini 3 Pro Image", "provider": "Google", "minPlan": "team", "vision": true, "imageGen": true, "enabled": true, "order": 7},
+			{"id": "google/gemini-3.1-flash-image", "displayName": "Gemini 3.1 Flash Image", "provider": "Google", "minPlan": "pro", "vision": true, "imageGen": true, "enabled": true, "order": 6},
+			{"id": "google/gemini-3-pro-image", "displayName": "Gemini 3 Pro Image", "provider": "Google", "minPlan": "team", "vision": true, "imageGen": true, "enabled": true, "order": 7},
 		},
 	}
 
 	tasks := map[string]any{
 		"updatedAt": now,
 		"tasks": map[string]any{
-			"chat":       map[string]any{"allowed": []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4", "anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3-pro-preview"}},
+			"chat":       map[string]any{"allowed": []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4", "anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3.1-pro-preview"}},
 			"quick_edit": map[string]any{"allowed": []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6"}},
 			"caption":    map[string]any{"allowed": []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4"}},
 			"hashtag":    map[string]any{"allowed": []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6"}},
 			"strategy":   map[string]any{"allowed": []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "anthropic/claude-sonnet-4.6", "google/gemini-3.5-flash"}},
 			"script":     map[string]any{"allowed": []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "openai/gpt-5.4"}},
-			"multimodal": map[string]any{"allowed": []string{"google/gemini-3-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
+			"multimodal": map[string]any{"allowed": []string{"google/gemini-3.1-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
 			"reasoning":  map[string]any{"allowed": []string{"openai/gpt-5.5", "anthropic/claude-opus-4.8", "openai/gpt-5.4"}},
-			"image":      map[string]any{"allowed": []string{"google/gemini-3-pro-image-preview", "google/gemini-3.1-flash-image-preview"}},
+			"image":      map[string]any{"allowed": []string{"google/gemini-3-pro-image", "google/gemini-3.1-flash-image"}},
 		},
 	}
 

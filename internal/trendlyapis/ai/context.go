@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -182,6 +184,14 @@ func loadModuleContext(module, brandID, contextID string) string {
 		return strings.Join(parts, "\n\n")
 
 	case moduleCalendar:
+		// The calendar chat is scoped per month: the brand app sends a
+		// `calendar-YYYY-MM` contextID for the month currently in view, so each
+		// month has its own conversation/memory. Load that month's posts plus
+		// today's date so the AI knows what "today" is relative to the items.
+		if year, month, ok := parseCalendarMonthContext(contextID); ok {
+			return loadCalendarMonth(brandID, year, month)
+		}
+		// Legacy / other contextIDs: a bare content id focuses a single post.
 		if contextID != "" {
 			return loadContentBrief(brandID, contextID)
 		}
@@ -410,6 +420,75 @@ const calendarWindowFuture = 365 * 24 * time.Hour
 // is disclosed (never silently dropped).
 const maxCalendarItems = 150
 
+// calendarMonthContextRe matches a per-month calendar conversation contextID,
+// e.g. "calendar-2026-06" → year 2026, month 06. The brand app derives this from
+// the month currently shown in the calendar so each month keeps its own chat.
+var calendarMonthContextRe = regexp.MustCompile(`^calendar-(\d{4})-(\d{2})$`)
+
+// parseCalendarMonthContext extracts (year, month 1-12) from a calendar contextID
+// of the form "calendar-YYYY-MM". Returns ok=false for any other shape (a bare
+// content id, the legacy "calendar" constant, or empty).
+func parseCalendarMonthContext(contextID string) (year, month int, ok bool) {
+	m := calendarMonthContextRe.FindStringSubmatch(contextID)
+	if m == nil {
+		return 0, 0, false
+	}
+	year, _ = strconv.Atoi(m[1])
+	month, _ = strconv.Atoi(m[2])
+	if month < 1 || month > 12 {
+		return 0, 0, false
+	}
+	return year, month, true
+}
+
+// calendarTodayLine states today's date so the AI can reason about the calendar
+// relative to now ("upcoming", "overdue", "this week"). Calendar timestamps are
+// stored at midnight UTC (see content-calendar's add/move), so we anchor the
+// boundaries and "today" to UTC for a consistent comparison.
+func calendarTodayLine() string {
+	return "Today's date is " + time.Now().UTC().Format("2006-01-02") + " (UTC).\n"
+}
+
+// loadCalendarMonth lists the brand's scheduled (non-archived) content for a
+// single calendar month — the month the user is currently viewing. It includes
+// today's date and the month being viewed, plus each post's id, scheduled date,
+// title, format and status (never caption/hashtags/attachments — those live on
+// the content page). Items outside this month are reachable via the list_calendar
+// tool when the user references them.
+func loadCalendarMonth(brandID string, year, month int) string {
+	monthStart := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	monthEnd := monthStart.AddDate(0, 1, 0)
+	start := monthStart.UnixMilli()
+	end := monthEnd.UnixMilli()
+
+	header := calendarTodayLine() +
+		"The user is viewing the content calendar for " + monthStart.Format("January 2006") + ".\n"
+
+	contents, err := trendlymodels.ListContentInRange(context.Background(), brandID, start, end, false)
+	if err != nil || len(contents) == 0 {
+		return header + "No content is scheduled for this month yet."
+	}
+
+	dropped := 0
+	if len(contents) > maxCalendarItems {
+		dropped = len(contents) - maxCalendarItems
+		contents = contents[:maxCalendarItems]
+	}
+
+	var lines []string
+	for _, ct := range contents {
+		t := time.UnixMilli(ct.PostingTimeStamp).UTC().Format("2006-01-02")
+		// The [id:…] prefix lets the calendar tools target the exact post the
+		// user references without re-stating its title.
+		lines = append(lines, fmt.Sprintf("- [id:%s] [%s] %s — %s (%s)", ct.ID, t, ct.Title, ct.ContentFormat, ct.Status))
+	}
+	out := header + "Posts scheduled this month (dates are scheduled posting dates):\n" + strings.Join(lines, "\n")
+	if dropped > 0 {
+		out += fmt.Sprintf("\n…(%d more items this month not shown)", dropped)
+	}
+	return out
+}
+
 // loadCalendarWindow lists the brand's content across a window of roughly the
 // last 30 days plus all upcoming scheduled posts. Per the ticket it includes the
 // scheduled date, idea/title and other light details (format, status) but NEVER
@@ -468,7 +547,7 @@ func loadCalendarWindow(brandID string) string {
 		// user references without re-stating its title.
 		lines = append(lines, fmt.Sprintf("- [id:%s] [%s] %s — %s (%s)", ct.ID, t, ct.Title, ct.ContentFormat, ct.Status))
 	}
-	out := "Content calendar (recent + upcoming; dates are scheduled posting dates):\n" + strings.Join(lines, "\n")
+	out := calendarTodayLine() + "Content calendar (recent + upcoming; dates are scheduled posting dates):\n" + strings.Join(lines, "\n")
 	if dropped > 0 {
 		out += fmt.Sprintf("\n…(%d more items in this window not shown)", dropped)
 	}
