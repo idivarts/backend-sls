@@ -27,6 +27,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"sync"
 
 	"cloud.google.com/go/firestore"
 	pb "cloud.google.com/go/firestore/apiv1/firestorepb"
@@ -396,59 +397,95 @@ func orgHasSurvivingBrand(doc *firestore.DocumentSnapshot, survivingBrandIDs map
 // Deletion helpers (recursive — the Go SDK has no RecursiveDelete)
 // ----------------------------------------------------------------------------
 
+// discoverWorkers bounds how many subtrees we walk concurrently. Discovery
+// (listing subcollections per doc) is round-trip bound, so concurrency is the
+// main speedup. BulkWriter enqueue stays single-goroutine (it is NOT safe for
+// concurrent Delete calls).
+const discoverWorkers = 24
+
 // deleteWholeCollection recursively deletes every document (and all nested
-// subcollections) of a top-level collection.
+// subcollections) of a top-level collection. Uses DocumentRefs (ListDocuments)
+// so it is cheap even for large flat collections and also catches "missing"
+// parent docs that exist only to hold subcollections.
 func deleteWholeCollection(ctx context.Context, client *firestore.Client, name string) {
-	var refs []*firestore.DocumentRef
-	iter := client.Collection(name).Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Fatalf("%s iteration error: %v", name, err)
-		}
-		refs = append(refs, doc.Ref)
+	refs, err := client.Collection(name).DocumentRefs(ctx).GetAll()
+	if err != nil {
+		log.Fatalf("%s ref listing error: %v", name, err)
 	}
-	iter.Stop()
 	fmt.Printf("\n[%s] DELETE ALL — %d top-level docs\n", name, len(refs))
 	recursiveDeleteDocs(ctx, client, refs, name)
 }
 
 // recursiveDeleteDocs deletes each doc ref and all of its nested subcollections.
-// In dry-run it only counts (including subcollection docs).
+//
+// Dry-run: prints the number of top-level docs that would be deleted (their
+// subcollections go with them) without walking the tree — instant, no extra
+// reads. The top-of-run count report already shows subcollection-group totals.
+//
+// Apply: discovers the full document tree in parallel, then enqueues every
+// delete on a single BulkWriter (which batches the network writes internally).
 func recursiveDeleteDocs(ctx context.Context, client *firestore.Client, refs []*firestore.DocumentRef, label string) {
 	if len(refs) == 0 {
 		return
 	}
 	if !apply {
-		total := 0
-		for _, ref := range refs {
-			total += countDocTree(ctx, ref)
-		}
-		fmt.Printf("  [%s] DRY-RUN: would delete %d docs (incl. subcollections)\n", label, total)
+		fmt.Printf("  [%s] DRY-RUN: would delete %d top-level docs (+ all their subcollections)\n", label, len(refs))
 		return
 	}
 
+	all := collectTrees(ctx, refs)
 	bw := client.BulkWriter(ctx)
-	deleted := 0
-	for _, ref := range refs {
-		deleted += deleteDocTree(ctx, client, bw, ref)
-		if deleted > 0 && deleted%500 == 0 {
-			bw.Flush()
-			log.Printf("  [%s] deleted %d docs...", label, deleted)
+	for i, ref := range all {
+		if _, err := bw.Delete(ref); err != nil {
+			log.Fatalf("failed to enqueue delete for %s: %v", ref.Path, err)
+		}
+		if (i+1)%2000 == 0 {
+			log.Printf("  [%s] enqueued %d/%d ...", label, i+1, len(all))
 		}
 	}
 	bw.End()
-	fmt.Printf("  [%s] APPLIED: deleted %d docs (incl. subcollections)\n", label, deleted)
+	fmt.Printf("  [%s] APPLIED: deleted %d docs (incl. subcollections)\n", label, len(all))
 }
 
-// deleteDocTree recursively enqueues deletes for a doc's subcollections (depth
-// first) then the doc itself, on the given BulkWriter. Returns the number of
-// docs enqueued.
-func deleteDocTree(ctx context.Context, client *firestore.Client, bw *firestore.BulkWriter, ref *firestore.DocumentRef) int {
-	count := 0
+// collectTrees walks the given top-level refs (and all descendants) using a
+// bounded worker pool and returns every doc ref in the forest.
+func collectTrees(ctx context.Context, roots []*firestore.DocumentRef) []*firestore.DocumentRef {
+	jobs := make(chan *firestore.DocumentRef)
+	out := make(chan []*firestore.DocumentRef)
+
+	var wg sync.WaitGroup
+	for w := 0; w < discoverWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for ref := range jobs {
+				out <- collectOneTree(ctx, ref)
+			}
+		}()
+	}
+	go func() {
+		for _, r := range roots {
+			jobs <- r
+		}
+		close(jobs)
+	}()
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	var all []*firestore.DocumentRef
+	for s := range out {
+		all = append(all, s...)
+	}
+	return all
+}
+
+// collectOneTree returns ref plus every descendant doc ref (depth-first,
+// sequential within this subtree). Uses DocumentRefs so it lists doc refs
+// without reading their contents.
+func collectOneTree(ctx context.Context, ref *firestore.DocumentRef) []*firestore.DocumentRef {
+	res := []*firestore.DocumentRef{ref}
 	cols := ref.Collections(ctx)
 	for {
 		col, err := cols.Next()
@@ -458,50 +495,13 @@ func deleteDocTree(ctx context.Context, client *firestore.Client, bw *firestore.
 		if err != nil {
 			log.Fatalf("subcollection listing error for %s: %v", ref.Path, err)
 		}
-		dIter := col.Documents(ctx)
-		for {
-			child, err := dIter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Fatalf("subcollection doc iteration error under %s: %v", col.Path, err)
-			}
-			count += deleteDocTree(ctx, client, bw, child.Ref)
-		}
-		dIter.Stop()
-	}
-	if _, err := bw.Delete(ref); err != nil {
-		log.Fatalf("failed to enqueue delete for %s: %v", ref.Path, err)
-	}
-	count++
-	return count
-}
-
-// countDocTree counts a doc plus all of its nested subcollection docs (dry-run).
-func countDocTree(ctx context.Context, ref *firestore.DocumentRef) int {
-	count := 1
-	cols := ref.Collections(ctx)
-	for {
-		col, err := cols.Next()
-		if err == iterator.Done {
-			break
-		}
+		children, err := col.DocumentRefs(ctx).GetAll()
 		if err != nil {
-			log.Fatalf("subcollection listing error for %s: %v", ref.Path, err)
+			log.Fatalf("subcollection ref listing error under %s: %v", col.Path, err)
 		}
-		dIter := col.Documents(ctx)
-		for {
-			child, err := dIter.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Fatalf("subcollection doc iteration error under %s: %v", col.Path, err)
-			}
-			count += countDocTree(ctx, child.Ref)
+		for _, child := range children {
+			res = append(res, collectOneTree(ctx, child)...)
 		}
-		dIter.Stop()
 	}
-	return count
+	return res
 }
