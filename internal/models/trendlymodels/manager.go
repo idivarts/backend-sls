@@ -30,6 +30,11 @@ type Manager struct {
 	} `json:"moderations,omitempty" firestore:"moderations,omitempty"`
 
 	CreationTime int64 `json:"creationTime" firestore:"creationTime"`
+
+	// DeletedAt soft-deletes the manager account (epoch ms). Non-nil means the
+	// user deleted their account (Firebase auth + Stream user are also removed and
+	// every brand/org membership is stripped). Kept as an audit marker.
+	DeletedAt *int64 `json:"deletedAt,omitempty" firestore:"deletedAt,omitempty"`
 }
 
 func (u *Manager) Get(managerId string) error {
@@ -47,4 +52,13 @@ func (u *Manager) Get(managerId string) error {
 func (u *Manager) Insert(managerId string) (*firestore.WriteResult, error) {
 	wr, err := firestoredb.Client.Collection("managers").Doc(managerId).Set(context.Background(), u)
 	return wr, err
+}
+
+// SoftDeleteManager stamps deletedAt on the manager doc. The DeleteManager
+// handler also revokes Firebase auth, deletes the Stream user, and strips every
+// brand/org membership.
+func SoftDeleteManager(managerID string, deletedAt int64) error {
+	_, err := firestoredb.Client.Collection("managers").Doc(managerID).
+		Update(context.Background(), []firestore.Update{{Path: "deletedAt", Value: deletedAt}})
+	return err
 }

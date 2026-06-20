@@ -105,6 +105,28 @@ func GetMyBrandMemberships(managerId string) ([]BrandMember, error) {
 	return members, nil
 }
 
+// GetMyBrandIds returns the ids of every brand the manager is a member of.
+// Reuses the indexed `members` collection-group query (no extra index needed).
+func GetMyBrandIds(managerId string) ([]string, error) {
+	var brandIds []string
+
+	iter := firestoredb.Client.CollectionGroup("members").Where("managerId", "==", managerId).Documents(context.Background())
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			if err == iterator.Done {
+				break
+			}
+			return nil, err
+		}
+		brandIds = append(brandIds, doc.Ref.Parent.Parent.ID)
+	}
+
+	return brandIds, nil
+}
+
 func GetMyBrands(managerId string) ([]Brand, error) {
 	var brands []Brand
 
