@@ -135,17 +135,17 @@ custom:
     securityPolicy: tls_1_2
 
 functions:
-  sendgrid_sync:
-    handler: scripts/sync-sengrid/main.go
-    package:
-      include:
-        - 'service-account.json'
-        - 'key-secrets.json'
-    timeout: 120
-    events:
-      - schedule:
-          rate: cron(0 12 * * ? *)  # Runs every day at 12:00 PM UTC
-          enabled: ${self:custom.isProd.${self:provider.stage}}
+  # sendgrid_sync:
+  #   handler: scripts/sync-sengrid/main.go
+  #   package:
+  #     include:
+  #       - 'service-account.json'
+  #       - 'key-secrets.json'
+  #   timeout: 120
+  #   events:
+  #     - schedule:
+  #         rate: cron(0 12 * * ? *)  # Runs every day at 12:00 PM UTC
+  #         enabled: ${self:custom.isProd.${self:provider.stage}}
   matchmaking:
     handler: scripts/matchmaking/main.go
     package:
@@ -158,7 +158,7 @@ functions:
           rate:
             - cron(30 2 * * ? *)   # 8:00 AM IST daily
             - cron(30 14 * * ? *)  # 8:00 PM IST daily
-          enabled: ${self:custom.isProd.${self:provider.stage}}
+          # enabled: ${self:custom.isProd.${self:provider.stage}}
   billing_cron:
     handler: scripts/billing-cron/main.go
     package:
@@ -171,7 +171,7 @@ functions:
     events:
       - schedule:
           rate: cron(0 2 1 * ? *)  # 02:00 UTC on the 1st of every month
-          enabled: ${self:custom.isProd.${self:provider.stage}}
+          # enabled: ${self:custom.isProd.${self:provider.stage}}
   social_token_refresh:
     handler: functions/trendly_social_refresh/main.go
     package:
@@ -184,7 +184,7 @@ functions:
     events:
       - schedule:
           rate: cron(0 */6 * * ? *)  # Every 6 hours
-          enabled: true
+          # enabled: true
   analytics_snapshot:
     handler: functions/trendly_analytics_snapshot/main.go
     package:
@@ -197,7 +197,7 @@ functions:
     events:
       - schedule:
           rate: cron(0 1 * * ? *)  # Every day at 01:00 UTC
-          enabled: ${self:custom.isProd.${self:provider.stage}}
+          # enabled: ${self:custom.isProd.${self:provider.stage}}
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
     environment:

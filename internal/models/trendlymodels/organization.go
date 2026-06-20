@@ -188,6 +188,39 @@ func ListAllOrganizations() ([]OrganizationWithID, error) {
 	return out, nil
 }
 
+// ListOrganizationsOwnedBy returns every non-deleted organization owned by the
+// given manager. Used by account deletion (block-&-instruct): the user can't
+// delete their account while they still solely own an org that holds active
+// brands or a paid subscription.
+func ListOrganizationsOwnedBy(managerID string) ([]OrganizationWithID, error) {
+	docs, err := firestoredb.Client.Collection(orgCollection).
+		Where("ownerId", "==", managerID).Documents(context.Background()).GetAll()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]OrganizationWithID, 0, len(docs))
+	for _, d := range docs {
+		var o Organization
+		if err := d.DataTo(&o); err != nil {
+			continue
+		}
+		if o.DeletedAt != nil {
+			continue
+		}
+		out = append(out, OrganizationWithID{ID: d.Ref.ID, Organization: o})
+	}
+	return out, nil
+}
+
+// SoftDeleteOrganization marks an org deleted (epoch ms) WITHOUT the
+// DeleteOrganization guards. Used by account deletion after the caller has
+// already verified the owned org is empty + on the free plan.
+func SoftDeleteOrganization(orgID string, deletedAt int64) error {
+	_, err := firestoredb.Client.Collection(orgCollection).Doc(orgID).
+		Update(context.Background(), []firestore.Update{{Path: "deletedAt", Value: deletedAt}})
+	return err
+}
+
 // SetOrgAccessState updates the org-level billing access state
 // ("active" | "past_due" | "locked" | "canceled") that the paywall/lock reads.
 func SetOrgAccessState(orgID, state string) error {

@@ -43,6 +43,11 @@ func handleManagerAPIs() {
 	// Soft-delete a brand (blocked while it has active contracts).
 	managerApisV1.DELETE("/brands/:brandId", trendlyapis.DeleteBrand)
 
+	// ── Account (self-service account deletion — App Store / Play requirement) ──
+	// Blocked while the manager still solely owns an org with active brands or a
+	// paid subscription (block-&-instruct).
+	managerApisV1.DELETE("/managers/delete", trendlyapis.DeleteManager)
+
 	// ── Brand member management (team assignment) ─────────────────────────────
 	// Reads (list members) are served directly from Firestore by the apps.
 	managerApisV1.PATCH("/brands/:brandId/members/:managerId", trendlyapis.UpdateBrandMember)
