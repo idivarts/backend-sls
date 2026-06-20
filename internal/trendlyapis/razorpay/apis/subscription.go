@@ -53,15 +53,30 @@ func CreateSubscription(c *gin.Context) {
 		planId = BUSINESS_PLAN_ID
 	}
 
-	if brand.Billing == nil {
+	// Billing lives on the org now — read it from there to decide trial eligibility.
+	var orgBilling *trendlymodels.BrandBilling
+	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+		org := &trendlymodels.Organization{}
+		if err := org.Get(*brand.OrganizationID); err == nil {
+			orgBilling = org.Billing
+		}
+	}
+	if orgBilling == nil {
 		trialDays = 0
 	}
 
-	_, link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, map[string]interface{}{
+	notes := map[string]interface{}{
 		"brandId":      req.BrandID,
 		"planName":     planName,
 		"isGrowthPlan": req.IsGrowthPlan,
-	}, "")
+	}
+	// Billing lives on the Organization now — carry organizationId so the webhook
+	// writes org billing. Legacy brands without an org still carry only brandId.
+	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+		notes["organizationId"] = *brand.OrganizationID
+	}
+
+	_, link, err := payments.CreateSubscriptionLink(planId, billingCycle, trialDays, 0, notes, "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to create subscription link"})
 		return
@@ -103,12 +118,22 @@ func CancelSubscription(c *gin.Context) {
 		return
 	}
 
-	if brand.Billing == nil {
+	// Billing lives on the org — pull the subscription/status from there.
+	if brand.OrganizationID == nil || *brand.OrganizationID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no-organization", "message": "Brand is not linked to an organization"})
+		return
+	}
+	org := &trendlymodels.Organization{}
+	if err := org.Get(*brand.OrganizationID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to load organization"})
+		return
+	}
+	if org.Billing == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "billing-not-defined", "message": "Billing is not defined"})
 		return
 	}
 
-	data, err := payments.CancelSubscription(myutil.DerefString(brand.Billing.Subscription), (brand.Billing.BillingStatus != nil && *brand.Billing.BillingStatus == "active"))
+	data, err := payments.CancelSubscription(myutil.DerefString(org.Billing.Subscription), (org.Billing.BillingStatus != nil && *org.Billing.BillingStatus == "active"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Not a part of the current brand"})
 		return

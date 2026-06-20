@@ -77,6 +77,15 @@ func (b *Invitation) Update() (*firestore.WriteResult, error) {
 	return res, nil
 }
 
+// CreateInApp writes the invitation into the per-collaboration subcollection
+// (collaborations/{collabID}/invitations/{userID}). This is the location the
+// creators app inbox and SendInvitation read from — distinct from the top-level
+// `collaborations-invites` CRM collection that Create() writes to. Used for
+// on-platform influencers so the invite shows up in their in-app Invites tab.
+func (b *Invitation) CreateInApp(collabID, userID string) (*firestore.WriteResult, error) {
+	return firestoredb.Client.Collection("collaborations").Doc(collabID).Collection("invitations").Doc(userID).Set(context.Background(), b)
+}
+
 // Upsert creates a new invitation if it does not exist; otherwise it updates the existing doc.
 // Returns (writeResult, created=true) when a fresh document was inserted,
 // or (writeResult, created=false) when an existing document was updated.

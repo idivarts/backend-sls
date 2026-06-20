@@ -2,115 +2,76 @@ package paymentwebhooks
 
 import (
 	"errors"
+	"log"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
+	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
 
-type PaymentLinkEntity struct {
-	AcceptPartial bool   `json:"accept_partial"`
-	Amount        int64  `json:"amount"`
-	AmountPaid    int64  `json:"amount_paid"`
-	CancelledAt   int64  `json:"cancelled_at"`
-	CreatedAt     int64  `json:"created_at"`
-	Currency      string `json:"currency"`
-	Customer      struct {
-		Contact string `json:"contact"`
-		Email   string `json:"email"`
-	} `json:"customer"`
-	Description           string            `json:"description"`
-	ExpireBy              int64             `json:"expire_by"`
-	ExpiredAt             int64             `json:"expired_at"`
-	FirstMinPartialAmount int64             `json:"first_min_partial_amount"`
-	ID                    string            `json:"id"`
-	Notes                 SubscriptionNotes `json:"notes"` // nullable
-	Notify                struct {
-		Email    bool `json:"email"`
-		SMS      bool `json:"sms"`
-		WhatsApp bool `json:"whatsapp"`
-	} `json:"notify"`
-	OrderID        string `json:"order_id"`
-	ReferenceID    string `json:"reference_id"`
-	ReminderEnable bool   `json:"reminder_enable"`
-	Reminders      struct {
-		Status string `json:"status"`
-	} `json:"reminders"`
-	ShortURL     string `json:"short_url"`
-	Status       string `json:"status"`
-	UpdatedAt    int64  `json:"updated_at"`
-	UPILink      bool   `json:"upi_link"`
-	UserID       string `json:"user_id"`
-	WhatsAppLink bool   `json:"whatsapp_link"`
-}
-
-// Accepted Value for Status
-// created
-// partially_paid
-// expired
-// cancelled
-// paid
-
-func handlePaymentLink(event RazorpayWebhookEvent) error {
-	paymentLink := event.Payload.PaymentLink.Entity
-	if paymentLink.Notes.BrandID == "" {
-		return errors.New("brandid-null")
+func handlePaymentLink(event *webhook.Event) error {
+	if event.Payload.PaymentLink == nil {
+		return errors.New("payment_link payload missing")
 	}
 
-	brand := &trendlymodels.Brand{}
-	err := brand.Get(paymentLink.Notes.BrandID)
+	paymentLink := event.Payload.PaymentLink.Entity
+	if paymentLink.Notes.BrandID == "" && paymentLink.Notes.OrganizationID == "" {
+		return errors.New("billing-target-null")
+	}
+
+	// Billing lives on the Organization now; resolve the org (preferred) + brand
+	// (mirror) the webhook applies to.
+	target, err := resolveBillingTarget(paymentLink.Notes)
 	if err != nil {
 		return err
 	}
-	if brand.Billing == nil {
-		brand.Billing = &trendlymodels.BrandBilling{}
-	}
+	billing := target.currentBilling()
 
-	if brand.Billing.PaymentLinkId != nil && brand.Billing.PaymentLinkId != &paymentLink.ID &&
+	if billing.PaymentLinkId != nil && billing.PaymentLinkId != &paymentLink.ID &&
 		paymentLink.Status != "paid" &&
-		brand.Billing.Status != nil && *brand.Billing.Status == 1 {
+		billing.Status != nil && *billing.Status == 1 {
 		return errors.New("payment-link-cant-be-replaced-unless-active")
 	}
 
-	brand.Billing.PaymentLinkId = &paymentLink.ID
-	// brand.Billing.SubscriptionUrl = subscription.ShortURL
-	brand.Billing.BillingStatus = myutil.StrPtr("active")
+	billing.PaymentLinkId = &paymentLink.ID
+	billing.BillingStatus = myutil.StrPtr("active")
 	if paymentLink.Notes.PlanKey != "" {
-		brand.Billing.PlanKey = &paymentLink.Notes.PlanKey
+		billing.PlanKey = &paymentLink.Notes.PlanKey
 	}
 	if paymentLink.Notes.PlanCycle != "" {
-		brand.Billing.PlanCycle = &paymentLink.Notes.PlanCycle
+		billing.PlanCycle = &paymentLink.Notes.PlanCycle
 	}
 
 	switch paymentLink.Status {
 	case "paid":
-		brand.Billing.IsOnTrial = myutil.BoolPtr(false)
-		brand.Billing.Status = myutil.IntPtr(1)
-		break
+		billing.IsOnTrial = myutil.BoolPtr(false)
+		billing.Status = myutil.IntPtr(1)
 	default:
-		brand.Billing.IsOnTrial = myutil.BoolPtr(true)
-		brand.Billing.Status = myutil.IntPtr(0)
-		break
+		billing.IsOnTrial = myutil.BoolPtr(true)
+		billing.Status = myutil.IntPtr(0)
 	}
 
-	if event.Event == "payment_link.paid" {
-		bCredit, b := trendlymodels.PlanCreditsMap[*brand.Billing.PlanKey]
-		if b {
-			mult := 1
-			if *brand.Billing.PlanKey == "yearly" {
-				mult = 12
+	// The invoice / manual-pay fallback: a PAID payment-link grants exactly one
+	// month of access (billingMode=invoice) and funds the wallet. The cron
+	// re-locks the org when this paid month lapses unless another invoice is paid.
+	if paymentLink.Status == "paid" {
+		reset := trendlymodels.NextMonthlyReset(time.Now())
+		billing.AccessState = myutil.StrPtr("active")
+		billing.BillingMode = myutil.StrPtr("invoice")
+		billing.BillingAnchorDay = myutil.IntPtr(1)
+		billing.Provider = myutil.StrPtr("razorpay")
+		billing.PeriodEnd = &reset
+		planKey := paymentLink.Notes.PlanKey
+		if planKey == "" && billing.PlanKey != nil {
+			planKey = *billing.PlanKey
+		}
+		if planKey != "" {
+			if err := trendlymodels.ApplyPlanToOrg(target.orgID, planKey, reset); err != nil {
+				log.Println("apply plan / wallet refill (invoice) failed", target.orgID, err)
 			}
-			brand.Credits.Discovery += (bCredit.Discovery * mult)
-			brand.Credits.Collaboration += (bCredit.Collaboration * mult)
-			brand.Credits.Connection += (bCredit.Connection * mult)
-			brand.Credits.Contract += (bCredit.Contract * mult)
-			brand.Credits.Influencer += (bCredit.Influencer * mult)
 		}
 	}
 
-	_, err = brand.Insert(paymentLink.Notes.BrandID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return target.save(billing)
 }

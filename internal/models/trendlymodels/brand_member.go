@@ -10,8 +10,24 @@ import (
 
 type BrandMember struct {
 	ManagerID string `json:"managerId" firestore:"managerId"`
-	Role      string `json:"role" firestore:"role"`
 	Status    int    `json:"status" firestore:"status"`
+	// TeamID is the single team this member belongs to. The member inherits that
+	// team's feature privileges. Empty only for members not yet migrated to the
+	// team-privilege model (see scripts/migrate-teams-v2).
+	TeamID string `json:"teamId,omitempty" firestore:"teamId,omitempty"`
+}
+
+// ResolveTeam loads the team this member belongs to. Returns (nil, nil) when the
+// member has no team assigned (pre-migration legacy member).
+func (b *BrandMember) ResolveTeam(brandID string) (*Team, error) {
+	if b.TeamID == "" {
+		return nil, nil
+	}
+	team := &Team{}
+	if err := team.Get(brandID, b.TeamID); err != nil {
+		return nil, err
+	}
+	return team, nil
 }
 
 func (b *BrandMember) Set(brandID string) (*firestore.WriteResult, error) {
@@ -29,6 +45,11 @@ func (b *BrandMember) Get(brandID, userID string) error {
 	if err != nil {
 		return err
 	}
+	return err
+}
+
+func DeleteBrandMember(brandID, managerID string) error {
+	_, err := firestoredb.Client.Collection("brands").Doc(brandID).Collection("members").Doc(managerID).Delete(context.Background())
 	return err
 }
 

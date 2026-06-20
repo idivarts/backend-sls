@@ -1,0 +1,87 @@
+<!-- 
+Dynamic Variables:
+    {{.InfluencerName}} => Creator's display name
+    {{.BrandName}}      => Brand name
+    {{.CollabTitle}}   => Name of the collaboration
+    {{.ContractLink}}  => Link to the contract in the creator app
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Confirm you received the product</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #054463;
+        }
+
+        .info-box {
+            background-color: #e8f0f4;
+            padding: 16px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #054463;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+
+        a.button {
+            background-color: #054463;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Please confirm your package</h2>
+
+        <p>Hi <strong>{{.InfluencerName}}</strong>,</p>
+
+        <p><strong>{{.BrandName}}</strong> has marked the product for "<strong>{{.CollabTitle}}</strong>" as
+            <strong>delivered</strong>, and is waiting for you to <strong>acknowledge receipt with a photo</strong> of
+            the product.</p>
+
+        <div class="info-box">
+            <p><strong>What to do:</strong> Open the contract, confirm whether you received the package, and upload a
+                <strong>photo of the product</strong> as proof. The collaboration can’t move forward to the
+                deliverable until you do.</p>
+        </div>
+
+        <a href="{{.ContractLink}}" class="button">Open contract</a>
+
+        <div class="footer">
+            You're receiving this email because you're part of a collaboration on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

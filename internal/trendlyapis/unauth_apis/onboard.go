@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/myemail"
-	"github.com/idivarts/backend-sls/pkg/myutil"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	myjwt "github.com/idivarts/backend-sls/internal/trendlyapis/jwt"
 	templates "github.com/idivarts/backend-sls/templates"
 )
@@ -24,6 +24,10 @@ type SignupRequest struct {
 }
 
 type ResetPasswordRequest struct {
+	Email string `json:"email" binding:"required"`
+}
+
+type CheckEmailRequest struct {
 	Email string `json:"email" binding:"required"`
 }
 
@@ -56,12 +60,9 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	dev := ""
-	if myutil.IsDevEnvironment() {
-		dev = "/dev"
-	}
-	// Build the verification link pointing to our email-redirection endpoint
-	verificationLink := fmt.Sprintf("%s%s/onboard/email-redirection?token=%s", os.Getenv("SELF_BASE_URL"), dev, url.QueryEscape(token))
+	// Build the verification link pointing to our email-redirection endpoint.
+	// GetTrendlyBE() is stage-aware (adds the "/dev" API Gateway stage in dev).
+	verificationLink := fmt.Sprintf("%s/onboard/email-redirection?token=%s", constants.GetTrendlyBE(), url.QueryEscape(token))
 
 	// Send custom verification email via SendGrid
 	data := map[string]interface{}{
@@ -102,7 +103,7 @@ func EmailRedirection(c *gin.Context) {
 	}
 
 	// Redirect to Trendly Brands login page with email pre-filled
-	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s?email=%s", os.Getenv("BRAND_LOGIN_URL"), url.QueryEscape(uRecord.Email)))
+	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s%s?email=%s", constants.GetBrandsFronted(), os.Getenv("BRAND_LOGIN_URL"), url.QueryEscape(uRecord.Email)))
 }
 
 // ResetPassword takes an email and sends a custom password reset email via SendGrid
@@ -123,7 +124,7 @@ func ResetPassword(c *gin.Context) {
 
 	// Generate a Firebase password reset link
 	actionCodeSettings := &auth.ActionCodeSettings{
-		URL:             os.Getenv("BRAND_LOGIN_URL"),
+		URL:             fmt.Sprintf("%s%s", constants.GetBrandsFronted(), os.Getenv("BRAND_LOGIN_URL")),
 		HandleCodeInApp: true,
 	}
 	resetLink, err := fauth.Client.PasswordResetLinkWithSettings(context.Background(), req.Email, actionCodeSettings)
@@ -148,4 +149,29 @@ func ResetPassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent successfully. Please check your inbox."})
+}
+
+// CheckEmail reports whether a brand-manager account already exists for the given
+// email. Firebase Auth is the source of truth (a manager Firestore doc is only
+// created on first successful sign-in, so a signed-up-but-never-logged-in account
+// would be missed by a Firestore query). The pre-signin screen uses this to route
+// the user to login (exists) vs create-new-account (does not exist).
+func CheckEmail(c *gin.Context) {
+	var req CheckEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := fauth.Client.GetUserByEmail(context.Background(), req.Email)
+	if err != nil {
+		if auth.IsUserNotFound(err) {
+			c.JSON(http.StatusOK, gin.H{"exists": false})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error checking email"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"exists": true})
 }

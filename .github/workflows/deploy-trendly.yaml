@@ -33,9 +33,16 @@ jobs:
       - run: go mod download
       - name: Add Service JSON and Deploy
         env:
+          # Schema-less WS API Gateway host, picked per-stage from org-level action variables
+          WEBSOCKET_TRENDLY: ${{ env.STAGE == 'prod' && vars.WEBSOCKET_PROD_TRENDLY || vars.WEBSOCKET_DEV_TRENDLY }}
+          FIRESTORE_DATABASE_ID: ${{ env.STAGE == 'prod' && vars.FIRESTORE_DATABASE_PROD_ID || vars.FIRESTORE_DATABASE_DEV_ID }}
           JWT_ENCODE_KEY: ${{ secrets.JWT_ENCODE_KEY }}
+          FB_CLIENT_ID: ${{ vars.FB_CLIENT_ID }}
           FB_CLIENT_SECRET: ${{ secrets.FB_CLIENT_SECRET }}
+          INSTA_CLIENT_ID: ${{ vars.INSTA_CLIENT_ID }}
           INSTA_CLIENT_SECRET: ${{ secrets.INSTA_CLIENT_SECRET }}
+          TWITTER_CLIENT_ID: ${{ vars.TWITTER_CLIENT_ID }}
+          TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
           STREAM_SECRET: ${{ secrets.STREAM_SECRET }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
@@ -44,6 +51,11 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} # This uses the secret stored in GitHub
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ vars.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          LINKEDIN_CLIENT_ID: ${{ vars.LINKEDIN_CLIENT_ID }}
+          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
         run: |
           echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
           echo $TRENDLY_KEY_SECRETS_BASE64 | base64 -d > key-secrets.json

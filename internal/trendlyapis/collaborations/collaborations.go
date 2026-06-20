@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/constants"
+	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	ai_collaboration "github.com/idivarts/backend-sls/internal/openai/collaboration"
 	"github.com/idivarts/backend-sls/pkg/myemail"
@@ -145,15 +146,15 @@ func PostCollaboration(c *gin.Context) {
 		return
 	}
 
+	if _, ok := middlewares.RequireFeaturePrivilege(c, collab.BrandID, trendlymodels.FeatureInfluencerMarketing, trendlymodels.PrivInfluencerManage); !ok {
+		return
+	}
+
 	brand := trendlymodels.Brand{}
 	err = brand.Get(collab.BrandID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Cant fetch Brand"})
 		return
-	}
-
-	if brand.Credits.Collaboration <= 0 {
-		collab.Status = "deleted"
 	}
 
 	valid, filters := evaluateCollab(collab, &brand)
@@ -174,7 +175,6 @@ func PostCollaboration(c *gin.Context) {
 	}
 
 	if collab.Status == "active" && !myutil.Includes(brand.PostedCollaborations, collabId) {
-		brand.Credits.Collaboration -= 1
 		brand.PostedCollaborations = append(brand.PostedCollaborations, collabId)
 	}
 	collab.IsLive = !myutil.IsDevEnvironment()
@@ -220,6 +220,12 @@ func CreateCollaborationWithPrompt(c *gin.Context) {
 	if err := c.BindJSON(&body); err != nil || body.Prompt == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "missing prompt"})
 		return
+	}
+
+	if body.BrandID != "" {
+		if _, ok := middlewares.RequireFeaturePrivilege(c, body.BrandID, trendlymodels.FeatureInfluencerMarketing, trendlymodels.PrivInfluencerManage); !ok {
+			return
+		}
 	}
 
 	// Temporary adjustments as Image search is taking a lot of time

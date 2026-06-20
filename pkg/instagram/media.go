@@ -23,6 +23,7 @@ type InstagramMedia struct {
 	CommentsCount int                  `json:"comments_count"`
 	LikeCount     int                  `json:"like_count"`
 	ID            string               `json:"id"`
+	TopComments   []InstagramComment   `json:"top_comments,omitempty"`
 }
 
 type instaResponse struct {
@@ -30,9 +31,10 @@ type instaResponse struct {
 }
 
 type IGetMediaParams struct {
-	GraphType int
-	PageID    string
-	Count     int
+	GraphType   int
+	PageID      string
+	Count       int
+	TopComments bool
 }
 
 func GetMedia(pageID, accessToken string, params IGetMediaParams) ([]InstagramMedia, error) {
@@ -87,5 +89,62 @@ func GetMedia(pageID, accessToken string, params IGetMediaParams) ([]InstagramMe
 	if err != nil {
 		return nil, err
 	}
+
+	if params.TopComments {
+		commentParams := IGetCommentsParams{
+			GraphType: params.GraphType,
+			Count:     2,
+		}
+		for i := range data.Data {
+			comments, err := GetComments(data.Data[i].ID, accessToken, commentParams)
+			if err != nil {
+				log.Println("Error fetching top comments for media", data.Data[i].ID, ":", err)
+				continue
+			}
+			data.Data[i].TopComments = comments
+		}
+	}
+
 	return data.Data, nil
+}
+
+// GraphBaseURL returns the Graph API base + version for a given GetMedia/GetComments
+// graphType: a directly-connected Instagram account (non-zero) reads from the
+// Instagram Graph; an IG Business account linked to a Facebook Page (0) reads
+// from the Facebook Graph using the page access token.
+func GraphBaseURL(graphType int) string {
+	if graphType == 0 {
+		return fmt.Sprintf("%s/%s", messenger.BaseURL, messenger.ApiVersion)
+	}
+	return fmt.Sprintf("%s/%s", BaseURL, ApiVersion)
+}
+
+// GetMediaByID fetches a single media node's public fields (caption, type,
+// like/comment counts, permalink, thumbnail). Used for per-post basic analytics
+// — likes/comments are always available here without the insights scope.
+func GetMediaByID(mediaID, accessToken string, graphType int) (*InstagramMedia, error) {
+	iParam := url.Values{}
+	iParam.Set("fields", "caption,media_type,media_url,thumbnail_url,permalink,timestamp,comments_count,like_count")
+	iParam.Set("access_token", accessToken)
+	apiURL := fmt.Sprintf("%s/%s?%s", GraphBaseURL(graphType), mediaID, iParam.Encode())
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
+	}
+
+	media := InstagramMedia{}
+	if err := json.Unmarshal(body, &media); err != nil {
+		return nil, err
+	}
+	return &media, nil
 }

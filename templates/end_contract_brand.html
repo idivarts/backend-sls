@@ -4,6 +4,7 @@
     {{.InfluencerName}}    => Name of the influencer whose contract was ended
     {{.CollabTitle}}       => Title of the collaboration
     {{.EndDate}}           => Date the contract was ended
+  (Brand is prompted to submit a rating; copy assumes feedback is not yet submitted.)
 -->
 
 <!DOCTYPE html>
@@ -30,7 +31,7 @@
         }
 
         h2 {
-            color: #4caf50;
+            color: #0a6644;
         }
 
         .footer {
@@ -50,11 +51,9 @@
             <strong>{{.InfluencerName}}</strong> on <strong>{{.EndDate}}</strong>.
         </p>
 
-        <p>Thank you for submitting your rating for the influencer. Your feedback helps maintain a high standard across
-            our platform.</p>
+        <p>Please take a moment to <strong>rate {{.InfluencerName}}</strong> in Trendly. Your feedback helps keep collaborations fair and high quality for everyone.</p>
 
-        <p><strong>Note:</strong> To ensure fairness, your rating will remain hidden until the influencer also rates
-            you. We’ll notify you once they submit their review.</p>
+        <p><strong>Note:</strong> For fairness, your rating stays hidden until the influencer rates you too. We’ll notify you when they submit their review.</p>
 
         <div class="footer">
             You're receiving this email because you're involved in a collaboration on Trendly.<br />

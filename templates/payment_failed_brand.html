@@ -1,0 +1,85 @@
+<!-- 
+  Dynamic Variables:
+    {{.BrandMemberName}} => Brand name shown in greeting (same as other brand emails)
+    {{.CollabTitle}}      => Name of the collaboration
+    {{.ContractLink}}    => Link to open the contract on the brand Trendly app / web
+    {{.FailureDetail}}   => Short explanation for the brand (gateway message or default copy)
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Payment Unsuccessful</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdfdfd;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #c62828;
+        }
+
+        .info-box {
+            background-color: #fff8f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #c62828;
+        }
+
+        a.button {
+            background-color: #054463;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Payment could not be completed</h2>
+
+        <p>Hi <strong>{{.BrandMemberName}}</strong>,</p>
+
+        <p>We tried to process the payment for "<strong>{{.CollabTitle}}</strong>" on Trendly, but it did not go through.</p>
+
+        <div class="info-box">
+            <p>{{.FailureDetail}}</p>
+        </div>
+
+        <p>Open your contract to review details and try paying again when you are ready.</p>
+
+        <a href="{{.ContractLink}}" class="button">Open contract</a>
+
+        <div class="footer">
+            You're receiving this email because you're a manager for this brand on Trendly.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

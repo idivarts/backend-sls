@@ -58,7 +58,7 @@ func RequestDeliverable(c *gin.Context) {
 			"InfluencerName":  influencer.Name,
 			"BrandName":       data.Brand.Name,
 			"CollabTitle":     collabName,
-			"DeliverableLink": fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"DeliverableLink": fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.DeliverableRequested, templates.SubjectDeliverableRequested, emailData)
 		if err != nil {
@@ -96,25 +96,30 @@ func ApproveDeliverable(c *gin.Context) {
 		return
 	}
 
-	scenarioText := ""
+	scenarioText := trendlymodels.PostingScenario("")
 	switch req.PostingScenario {
 	case 1:
-		scenarioText = "Influencer Will Post"
+		scenarioText = trendlymodels.PostingScenarioInfluencerWillPost
 		data.Contract.Status = trendlymodels.ContractStatusPostScheduled
 		if req.ScheduledDate == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Scheduled date is required for this scenario"})
 			return
 		}
 	case 2:
-		scenarioText = "Influencer and Brand Collab Post"
+		scenarioText = trendlymodels.PostingScenarioInfluencerBrandCollabPost
 		data.Contract.Status = trendlymodels.ContractStatusPostScheduled
 		if req.ScheduledDate == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Scheduled date is required for this scenario"})
 			return
 		}
 	case 3:
-		scenarioText = "Brand will use video independently"
-		data.Contract.Status = trendlymodels.ContractStatusPostDone
+		scenarioText = trendlymodels.PostingScenarioBrandUsesVideoIndependently
+		if contractHasNoPlatformPayout(data.Contract.Payment) {
+			data.Contract.Status = trendlymodels.ContractStatusSettled
+		} else {
+			data.Contract.Status = trendlymodels.ContractStatusPostDone
+		}
+
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid posting scenario"})
 		return
@@ -126,11 +131,34 @@ func ApproveDeliverable(c *gin.Context) {
 	}
 	data.Contract.Posting.PostingScenario = scenarioText
 	data.Contract.Posting.ScheduledDate = req.ScheduledDate
-	data.Contract.Posting.Status = "approved"
+	data.Contract.Posting.Status = trendlymodels.PostingStatusApproved
+
+	if data.Contract.Status == trendlymodels.ContractStatusPostDone || data.Contract.Status == trendlymodels.ContractStatusSettled {
+		endTime := time.Now().UnixMilli()
+		data.Contract.ContractTimestamp.EndedOn = &endTime
+	}
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return
+	}
+
+	if data.Contract.Status == trendlymodels.ContractStatusPostDone {
+		err = releasePaymentAfterHoldingForDay(*data.Contract, 0)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to release payment after holding for day"})
+			return
+		}
+	}
+	if data.Contract.Status == trendlymodels.ContractStatusSettled {
+		if err := notifyAboutContractEnded(data.ContractID, *data.Contract); err != nil {
+			log.Printf("notify contract ended: %v", err)
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":         "Deliverable approved — collaboration complete",
+			"contractSettled": true,
+		})
 		return
 	}
 
@@ -154,9 +182,17 @@ func ApproveDeliverable(c *gin.Context) {
 		scheduledDateStr = time.UnixMilli(req.ScheduledDate).Format("Jan 02, 2006")
 	}
 
+	approvedBody := fmt.Sprintf("%s has approved your video for %s.", data.Brand.Name, collabName)
+	if req.ScheduledDate > 0 {
+		approvedBody += fmt.Sprintf(" Your post is scheduled for %s.", time.UnixMilli(req.ScheduledDate).Format("Jan 02, 2006"))
+	} else if scenarioText == trendlymodels.PostingScenarioBrandUsesVideoIndependently {
+		approvedBody += " The brand will handle posting directly."
+	} else {
+		approvedBody += " You're free to post whenever ready."
+	}
 	notif := &trendlymodels.Notification{
 		Title:       "Deliverable Approved! 🎉",
-		Description: fmt.Sprintf("%s has approved your video for %s. Posting Scenario: %s", data.Brand.Name, collabName, scenarioText),
+		Description: approvedBody,
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "deliverable-approved",
@@ -178,7 +214,7 @@ func ApproveDeliverable(c *gin.Context) {
 			"PostingScenario":     scenarioText,
 			"ScheduledDate":       scheduledDateStr,
 			"IsInfluencerPosting": req.PostingScenario == 1 || req.PostingScenario == 2,
-			"ContractLink":        fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"ContractLink":        fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.DeliverableApproved, templates.SubjectDeliverableApproved, emailData)
 		if err != nil {
@@ -224,8 +260,8 @@ func RequestDeliverableChange(c *gin.Context) {
 	}
 	data.Contract.Deliverable.RevisionCount++
 	data.Contract.Deliverable.RevisionNotes = append(data.Contract.Deliverable.RevisionNotes, req.Notes)
-	data.Contract.Deliverable.Status = "revision-requested"
-	data.Contract.Status = trendlymodels.ContractStatusReceived
+	data.Contract.Deliverable.Status = trendlymodels.DeliverableStatusRevisionRequested
+	data.Contract.Status = trendlymodels.ContractStatusDeliverablePending
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
@@ -246,11 +282,22 @@ func RequestDeliverableChange(c *gin.Context) {
 	if err == nil {
 		collabName = collab.Name
 	}
+	maxRevisions := collab.MaxRevisions
+	if maxRevisions == 0 {
+		maxRevisions = constants.DefaultMaxRevisions
+	}
+	revisionLimitExceeded := data.Contract.Deliverable.RevisionCount > maxRevisions
 
 	// 3. Send Push Notification to Influencer
+	revisionTitle := "Revision Requested! 📽️"
+	revisionDesc := fmt.Sprintf("%s has requested some changes for %s. Review the feedback now!", data.Brand.Name, collabName)
+	if revisionLimitExceeded {
+		revisionTitle = "Revision Limit Exceeded ⚠️"
+		revisionDesc = fmt.Sprintf("%s requested revision #%d for %s — this exceeds the agreed limit of %d. You can raise a dispute if you believe this is unreasonable.", data.Brand.Name, data.Contract.Deliverable.RevisionCount, collabName, maxRevisions)
+	}
 	notif := &trendlymodels.Notification{
-		Title:       "Revision Requested! 📽️",
-		Description: fmt.Sprintf("%s has requested some changes for %s. Review the feedback now!", data.Brand.Name, collabName),
+		Title:       revisionTitle,
+		Description: revisionDesc,
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "deliverable-revision",
@@ -271,7 +318,7 @@ func RequestDeliverableChange(c *gin.Context) {
 			"BrandName":       data.Brand.Name,
 			"CollabTitle":     collabName,
 			"Feedback":        req.Notes,
-			"DeliverableLink": fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"DeliverableLink": fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.DeliverableRevisionRequested, templates.SubjectDeliverableRevisionRequested, emailData)
 		if err != nil {
@@ -287,7 +334,10 @@ func RequestDeliverableChange(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Revision requested successfully",
+		"message":               "Revision requested successfully",
+		"revisionLimitExceeded": revisionLimitExceeded,
+		"revisionCount":         data.Contract.Deliverable.RevisionCount,
+		"maxRevisions":          maxRevisions,
 	})
 }
 
@@ -315,7 +365,7 @@ func SendDeliverable(c *gin.Context) {
 	}
 	data.Contract.Deliverable.DeliverableLinks = append(data.Contract.Deliverable.DeliverableLinks, req.VideoURL)
 	data.Contract.Deliverable.Notes = req.Note
-	data.Contract.Deliverable.Status = "submitted"
+	data.Contract.Deliverable.Status = trendlymodels.DeliverableStatusSubmitted
 	data.Contract.Status = trendlymodels.ContractStatusDeliverableSent
 
 	err = data.Contract.Update(data.ContractID)
@@ -357,7 +407,7 @@ func SendDeliverable(c *gin.Context) {
 			"InfluencerName":  influencer.Name,
 			"CollabTitle":     collabName,
 			"Notes":           req.Note,
-			"ReviewLink":      fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
+			"ReviewLink":      fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.DeliverableSent, templates.SubjectDeliverableSent, emailData)
 		if err != nil {

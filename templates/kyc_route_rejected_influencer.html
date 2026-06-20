@@ -1,0 +1,88 @@
+<!-- 
+  Dynamic Variables:
+    {{.InfluencerName}}   => Creator's display name
+    {{.RejectionReason}}  => Optional details from the verification partner (may be empty)
+    {{.TrendlyAppLink}}   => Link to the creator Trendly app (home / open app)
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Payout setup update</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fafafa;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: auto;
+        }
+
+        h2 {
+            color: #c62828;
+        }
+
+        .info-box {
+            background-color: #ffebee;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #c62828;
+        }
+
+        a.button {
+            background-color: #054463;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .footer {
+            font-size: 12px;
+            color: #999;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Payout verification wasn’t approved</h2>
+
+        <p>Hi <strong>{{.InfluencerName}}</strong>,</p>
+
+        <p>We’re writing to let you know that your payout account verification <strong>could not be approved</strong> at
+            this time.</p>
+
+        {{if .RejectionReason}}
+        <div class="info-box">
+            <p><strong>Details:</strong></p>
+            <p>{{.RejectionReason}}</p>
+        </div>
+        {{else}}
+        <p>Please review your details in the Trendly app and try again, or contact Trendly support if you need help.</p>
+        {{end}}
+
+        <a href="{{.TrendlyAppLink}}" class="button">Open Trendly</a>
+
+        <div class="footer">
+            You're receiving this email because you use Trendly as a creator.<br />
+            Please do not reply to this email directly.
+        </div>
+    </div>
+</body>
+
+</html>

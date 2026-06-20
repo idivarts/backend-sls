@@ -8,13 +8,25 @@ import (
 )
 
 func main() {
-	handler := apihandler.GinEngine.Group("/monetize", middlewares.ValidateSessionMiddleware())
+	// Razorpay signs the body; no Firebase session on these routes.
+	publicWebhooks := apihandler.GinEngine.Group("/monetize/webhooks")
+	publicWebhooksHandler(publicWebhooks)
 
+	handler := apihandler.GinEngine.Group("/monetize", middlewares.ValidateSessionMiddleware())
 	brandAPIs(handler)
 	influencersAPIs(handler)
-	webhookHandler(handler)
 
 	apihandler.StartLambda()
+}
+func publicWebhooksHandler(handler *gin.RouterGroup) {
+	// [BRAND Webhook] Listen to check the payment status and mark the collaboration paid
+	handler.Any("/orders", monetize.PaymentWebhook)
+
+	// Once Payment processed, notify both the agents and close the contract
+	handler.Any("/transfers", monetize.TransferWebhook)
+
+	// Routes webhook when an influencer is approved and creates a route account
+	handler.Any("/routes", monetize.RouteWebhook)
 }
 
 func brandAPIs(handler *gin.RouterGroup) {
@@ -24,11 +36,15 @@ func brandAPIs(handler *gin.RouterGroup) {
 	brands.POST("/contracts/:contractId/order", monetize.CreateOrder)
 	// [BRAND] API to check the payment status of the order
 	brands.GET("/contracts/:contractId/order", monetize.GetOrder)
+	// [BRAND] API for non-India brands to acknowledge off-platform settlement and start the contract (no Razorpay)
+	brands.POST("/contracts/:contractId/order/acknowledge", monetize.AcknowledgeSelfManagedPayment)
 
 	// [BRAND] API for marking as shipped
 	brands.POST("/contracts/:contractId/shipment", monetize.MarkShipment)
 	// [BRANDS] API for mark as product delivered
 	brands.POST("/contracts/:contractId/shipment/delivered", monetize.MarkShipmentDelivered)
+	// [BRANDS] API for confirming if the product is received
+	brands.POST("/contracts/:contractId/shipment/get-status", monetize.RequestShipmentStatus)
 
 	// [BRAND] Request for First Video/ Revision
 	brands.POST("/contracts/:contractId/deliverable/request", monetize.RequestDeliverable)
@@ -39,6 +55,18 @@ func brandAPIs(handler *gin.RouterGroup) {
 
 	// [BRAND] Schedule/Reschedule the release date of the video
 	brands.POST("/contracts/:contractId/posting/reschedule", monetize.ReSchedulePosting)
+
+	// [BRAND] Raise a dispute on a contract
+	brands.POST("/contracts/:contractId/dispute", monetize.RaiseDisputeAsBrand)
+	// [BRAND] Request cancellation of a contract
+	brands.POST("/contracts/:contractId/cancel/request", monetize.RequestCancellationAsBrand)
+	// [BRAND] Respond to an influencer's cancellation request
+	brands.POST("/contracts/:contractId/cancel/respond", monetize.RespondToCancellationAsBrand)
+
+	// [ADMIN] Resolve a dispute (isAdmin check inside handler)
+	brands.POST("/contracts/:contractId/dispute/resolve", monetize.ResolveDispute)
+	// [ADMIN] List all open disputes across all contracts
+	brands.GET("/disputes", monetize.ListOpenDisputes)
 }
 
 func influencersAPIs(handler *gin.RouterGroup) {
@@ -70,17 +98,13 @@ func influencersAPIs(handler *gin.RouterGroup) {
 	influencer.POST("/contracts/:contractId/posting/request-reschedule", monetize.RequestPostReSchedule)
 	// [USER] Mark video as Posted
 	influencer.POST("/contracts/:contractId/posting", monetize.MarkPosted)
-}
 
-func webhookHandler(handler *gin.RouterGroup) {
-	webhook := handler.Group("/webhooks")
-
-	// [BRAND Webhook] Listen to check the payment status and mark the collaboration paid
-	webhook.Any("/payments", monetize.PaymentWebhook)
-
-	// Once Payment processed, notify both the agents and close the contract
-	webhook.Any("/transfer", monetize.TransferWebhook)
-
+	// [USER] Raise a dispute on a contract
+	influencer.POST("/contracts/:contractId/dispute", monetize.RaiseDisputeAsInfluencer)
+	// [USER] Request cancellation of a contract
+	influencer.POST("/contracts/:contractId/cancel/request", monetize.RequestCancellationAsInfluencer)
+	// [USER] Respond to a brand's cancellation request
+	influencer.POST("/contracts/:contractId/cancel/respond", monetize.RespondToCancellationAsInfluencer)
 }
 
 // Remind User and Brands on the posting day (Multiple Reminders needed)

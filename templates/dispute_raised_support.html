@@ -1,0 +1,40 @@
+<!--
+  Dynamic Variables:
+    {{.ContractID}}     => Contract ID
+    {{.BrandName}}      => Brand's name
+    {{.InfluencerName}} => Influencer's name
+    {{.CollabTitle}}    => Collaboration title
+    {{.DisputeType}}    => Type of dispute
+    {{.Description}}    => Dispute description
+    {{.RaisedBy}}       => Who raised the dispute
+    {{.Evidence}}       => Evidence URLs (slice)
+    {{.ContractLink}}   => Link to contract in brands app
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>New Dispute — Support Action Required</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; padding: 20px; }
+    .container { background-color: #fff; border-radius: 8px; padding: 24px; max-width: 600px; margin: auto; }
+    h2 { color: #c62828; }
+    .field { margin: 8px 0; }
+    .label { font-weight: bold; color: #555; }
+    .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background-color: #c62828; color: #fff; text-decoration: none; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🚨 New Contract Dispute — Action Required</h2>
+    <div class="field"><span class="label">Contract ID:</span> {{.ContractID}}</div>
+    <div class="field"><span class="label">Brand:</span> {{.BrandName}}</div>
+    <div class="field"><span class="label">Influencer:</span> {{.InfluencerName}}</div>
+    <div class="field"><span class="label">Collaboration:</span> {{.CollabTitle}}</div>
+    <div class="field"><span class="label">Dispute Type:</span> {{.DisputeType}}</div>
+    <div class="field"><span class="label">Raised By:</span> {{.RaisedBy}}</div>
+    <div class="field"><span class="label">Description:</span> {{.Description}}</div>
+    <a href="{{.ContractLink}}" class="btn">Review Contract in Admin</a>
+  </div>
+</body>
+</html>

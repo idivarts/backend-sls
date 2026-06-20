@@ -10,6 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/payments"
 	"github.com/idivarts/backend-sls/pkg/streamchat"
 	"github.com/idivarts/backend-sls/templates"
 )
@@ -36,7 +37,7 @@ func ReSchedulePosting(c *gin.Context) {
 		data.Contract.Posting = &trendlymodels.Posting{}
 	}
 	data.Contract.Posting.ScheduledDate = req.NewScheduledDate
-	data.Contract.Posting.Status = "rescheduled"
+	data.Contract.Posting.Status = trendlymodels.PostingStatusRescheduled
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
@@ -83,7 +84,7 @@ func ReSchedulePosting(c *gin.Context) {
 			"BrandName":      data.Brand.Name,
 			"CollabTitle":    collabName,
 			"NewDate":        newDateStr,
-			"ContractLink":   fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"ContractLink":   fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.PostRescheduledInfluencer, templates.SubjectPostRescheduledByBrand, emailData)
 		if err != nil {
@@ -109,6 +110,102 @@ type MarkPostedReq struct {
 	Notes           string `json:"notes"`
 }
 
+func releasePaymentAfterHoldingForDay(contract trendlymodels.Contract, days int) error {
+	if contract.Payment == nil || contract.Payment.TransferID == "" {
+		return fmt.Errorf("payment not found")
+	}
+
+	_, err := payments.UpdateTransferHold(contract.Payment.TransferID, days)
+	return err
+}
+
+func notifyAboutContractEnded(contractID string, contract trendlymodels.Contract) error {
+	brand := &trendlymodels.Brand{}
+	if err := brand.Get(contract.BrandID); err != nil {
+		return fmt.Errorf("get brand: %w", err)
+	}
+	influencer := &trendlymodels.User{}
+	if err := influencer.Get(contract.UserID); err != nil {
+		return fmt.Errorf("get influencer: %w", err)
+	}
+	collab := &trendlymodels.Collaboration{}
+	if err := collab.Get(contract.CollaborationID); err != nil {
+		return fmt.Errorf("get collaboration: %w", err)
+	}
+
+	collabName := collab.Name
+	if collabName == "" {
+		collabName = "Your Collaboration"
+	}
+	endDate := time.Now().Format("Jan 02, 2006")
+	ratingLink := fmt.Sprintf("%s/contract-details/%s", constants.GetCreatorsFronted(), contractID)
+
+	// In-app + push (Insert)
+	notifBrand := &trendlymodels.Notification{
+		Title:       "Collaboration complete",
+		Description: fmt.Sprintf("The contract for %s is complete. Thank you for collaborating with %s.", collabName, influencer.Name),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "contract-ended",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &contract.CollaborationID,
+			GroupID:         &contractID,
+		},
+	}
+	_, brandEmails, err := notifBrand.Insert(trendlymodels.BRAND_COLLECTION, contract.BrandID)
+	if err != nil {
+		log.Printf("contract ended: brand notification: %v", err)
+	}
+
+	notifInfluencer := &trendlymodels.Notification{
+		Title:       "Collaboration complete",
+		Description: fmt.Sprintf("Your collaboration %s with %s is complete. Share your feedback to close it out.", collabName, brand.Name),
+		TimeStamp:   time.Now().UnixMilli(),
+		IsRead:      false,
+		Type:        "contract-ended",
+		Data: &trendlymodels.NotificationData{
+			CollaborationID: &contract.CollaborationID,
+			GroupID:         &contractID,
+		},
+	}
+	if _, _, err := notifInfluencer.Insert(trendlymodels.USER_COLLECTION, contract.UserID); err != nil {
+		log.Printf("contract ended: influencer notification: %v", err)
+	}
+
+	// Email
+	if len(brandEmails) > 0 {
+		emailBrand := map[string]interface{}{
+			"BrandMemberName": brand.Name,
+			"InfluencerName":  influencer.Name,
+			"CollabTitle":     collabName,
+			"EndDate":         endDate,
+		}
+		if err := myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.CollaborationEndedBrand, templates.SubjectContractEndedForBrand, emailBrand); err != nil {
+			log.Printf("contract ended: brand email: %v", err)
+		}
+	}
+	if influencer.Email != nil && *influencer.Email != "" {
+		emailInfluencer := map[string]interface{}{
+			"InfluencerName": influencer.Name,
+			"BrandName":      brand.Name,
+			"CollabTitle":    collabName,
+			"EndDate":        endDate,
+			"RatingLink":     ratingLink,
+		}
+		if err := myemail.SendCustomHTMLEmail(*influencer.Email, templates.CollaborationEndedInfluencer, templates.SubjectContractEndedForInfluencer, emailInfluencer); err != nil {
+			log.Printf("contract ended: influencer email: %v", err)
+		}
+	}
+
+	// Stream
+	streamMsg := fmt.Sprintf("🏁 **Collaboration complete**\n\nThe contract for **%s** is closed. You can leave ratings in the app when you’re ready. Thank you both! ✨", collabName)
+	if err := streamchat.SendSystemMessage(contract.StreamChannelID, streamMsg); err != nil {
+		log.Printf("contract ended: stream: %v", err)
+	}
+
+	return nil
+}
+
 func MarkPosted(c *gin.Context) {
 	var req MarkPostedReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -129,12 +226,39 @@ func MarkPosted(c *gin.Context) {
 	data.Contract.Posting.ProofScreenshot = req.ProofScreenshot
 	data.Contract.Posting.PostURL = req.PostURL
 	data.Contract.Posting.Notes = req.Notes
-	data.Contract.Posting.Status = "posted"
-	data.Contract.Status = trendlymodels.ContractStatusPostDone
+	data.Contract.Posting.Status = trendlymodels.PostingStatusPosted
+	if contractHasNoPlatformPayout(data.Contract.Payment) {
+		data.Contract.Status = trendlymodels.ContractStatusSettled
+	} else {
+		data.Contract.Status = trendlymodels.ContractStatusPostDone
+	}
+
+	if data.Contract.Status == trendlymodels.ContractStatusPostDone || data.Contract.Status == trendlymodels.ContractStatusSettled {
+		endTime := time.Now().UnixMilli()
+		data.Contract.ContractTimestamp.EndedOn = &endTime
+	}
 
 	err = data.Contract.Update(data.ContractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to update contract"})
+		return
+	}
+
+	if data.Contract.Status == trendlymodels.ContractStatusPostDone {
+		err = releasePaymentAfterHoldingForDay(*data.Contract, 2)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to release payment after holding for day"})
+			return
+		}
+	}
+	if data.Contract.Status == trendlymodels.ContractStatusSettled {
+		if err := notifyAboutContractEnded(data.ContractID, *data.Contract); err != nil {
+			log.Printf("notify contract ended: %v", err)
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":         "Post marked as live successfully",
+			"contractSettled": true,
+		})
 		return
 	}
 
@@ -173,7 +297,7 @@ func MarkPosted(c *gin.Context) {
 			"PostURL":         req.PostURL,
 			"Notes":           req.Notes,
 			"ProofScreenshot": req.ProofScreenshot,
-			"ReviewLink":      fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
+			"ReviewLink":      fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PostMarkedLiveBrand, templates.SubjectPostMarkedLiveForBrand, emailDataBrand)
 		if err != nil {
@@ -184,7 +308,7 @@ func MarkPosted(c *gin.Context) {
 	// 4. Notify Influencer (Push & Email)
 	notifToInfluencer := &trendlymodels.Notification{
 		Title:       "Congratulations! 🎉",
-		Description: "Your post is live. Funds will be released in 2 days after brand review.",
+		Description: "Your post is live. Funds will be released after the brand's review window closes.",
 		TimeStamp:   time.Now().UnixMilli(),
 		IsRead:      false,
 		Type:        "post-live-confirmation",
@@ -199,7 +323,7 @@ func MarkPosted(c *gin.Context) {
 			"InfluencerName": influencer.Name,
 			"BrandName":      data.Brand.Name,
 			"CollabTitle":    collabName,
-			"ReviewLink":     fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
+			"ReviewLink":     fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_CREATORS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmail(*influencer.Email, templates.PostMarkedLiveInfluencer, templates.SubjectPostMarkedLiveForInfluencer, emailDataInfluencer)
 		if err != nil {
@@ -272,7 +396,7 @@ func RequestPostReSchedule(c *gin.Context) {
 			"InfluencerName":  influencer.Name,
 			"CollabTitle":     collabName,
 			"Note":            req.Note,
-			"ShipmentLink":    fmt.Sprintf("%s/contracts/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
+			"ShipmentLink":    fmt.Sprintf("%s/contract-details/%s", constants.TRENDLY_BRANDS_FE, data.ContractID),
 		}
 		err = myemail.SendCustomHTMLEmailToMultipleRecipients(brandEmails, templates.PostRescheduleRequest, templates.SubjectPostRescheduleRequested, emailData)
 		if err != nil {

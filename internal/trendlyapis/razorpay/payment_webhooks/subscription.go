@@ -3,72 +3,41 @@ package paymentwebhooks
 import (
 	"errors"
 	"log"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	"github.com/idivarts/backend-sls/pkg/payments"
+	"github.com/idivarts/backend-sls/pkg/payments/webhook"
 )
 
-type SubscriptionNotes struct {
-	BrandID     string `json:"brandId"`
-	PlanKey     string `json:"planKey"`
-	PlanCycle   string `json:"planCycle"`
-	PlanVersion string `json:"planVersion"`
-}
-type SubscriptionEntity struct {
-	ID                  string            `json:"id"`
-	Entity              string            `json:"entity"`
-	PlanID              string            `json:"plan_id"`
-	CustomerID          string            `json:"customer_id"`
-	Status              string            `json:"status"`
-	CurrentStart        int64             `json:"current_start"`
-	CurrentEnd          int64             `json:"current_end"`
-	EndedAt             *int64            `json:"ended_at"` // nullable
-	Quantity            int               `json:"quantity"`
-	Notes               SubscriptionNotes `json:"notes"`
-	ChargeAt            int64             `json:"charge_at"`
-	StartAt             int64             `json:"start_at"`
-	EndAt               int64             `json:"end_at"`
-	AuthAttempts        int               `json:"auth_attempts"`
-	TotalCount          int               `json:"total_count"`
-	PaidCount           int               `json:"paid_count"`
-	CustomerNotify      bool              `json:"customer_notify"`
-	CreatedAt           int64             `json:"created_at"`
-	ExpireBy            int64             `json:"expire_by"`
-	ShortURL            *string           `json:"short_url"` // nullable
-	HasScheduledChanges bool              `json:"has_scheduled_changes"`
-	ChangeScheduledAt   *int64            `json:"change_scheduled_at"` // nullable
-	Source              string            `json:"source"`
-	OfferID             string            `json:"offer_id"`
-	RemainingCount      int               `json:"remaining_count"`
-}
-
-func HandleSubscription(event RazorpayWebhookEvent) error {
+func HandleSubscription(event *webhook.Event) error {
+	if event.Payload.Subscription == nil {
+		return errors.New("subscription payload missing")
+	}
 
 	subscription := event.Payload.Subscription.Entity
 
-	if subscription.Notes.BrandID == "" {
-		return errors.New("brandid-null")
+	if subscription.Notes.BrandID == "" && subscription.Notes.OrganizationID == "" {
+		return errors.New("billing-target-null")
 	}
 
-	brand := &trendlymodels.Brand{}
-	err := brand.Get(subscription.Notes.BrandID)
+	// Billing lives on the Organization now; resolve the org (preferred) + brand
+	// (mirror) the webhook applies to.
+	target, err := resolveBillingTarget(subscription.Notes)
 	if err != nil {
 		return err
 	}
-	if brand.Billing == nil {
-		brand.Billing = &trendlymodels.BrandBilling{}
-	}
+	billing := target.currentBilling()
 
-	if brand.Billing.Subscription != nil && brand.Billing.Subscription != &subscription.ID &&
+	if billing.Subscription != nil && billing.Subscription != &subscription.ID &&
 		subscription.Status != "active" &&
-		brand.Billing.Status != nil && *brand.Billing.Status == 1 {
+		billing.Status != nil && *billing.Status == 1 {
 		return errors.New("subscription-cant-be-replaced-unless-active")
 	}
 
-	if brand.Billing.Subscription != nil && *brand.Billing.Subscription != "" && *brand.Billing.Subscription != subscription.ID {
-		// Cancel the subscription before adding new
-		subscriptionID := *brand.Billing.Subscription
+	if billing.Subscription != nil && *billing.Subscription != "" && *billing.Subscription != subscription.ID {
+		subscriptionID := *billing.Subscription
 		defer func() {
 			_, err := payments.CancelSubscription(subscriptionID, false)
 			if err != nil {
@@ -77,61 +46,61 @@ func HandleSubscription(event RazorpayWebhookEvent) error {
 		}()
 	}
 
-	brand.Billing.Subscription = &subscription.ID
-	brand.Billing.SubscriptionUrl = subscription.ShortURL
-	brand.Billing.BillingStatus = &subscription.Status
+	billing.Subscription = &subscription.ID
+	billing.SubscriptionUrl = subscription.ShortURL
+	billing.BillingStatus = &subscription.Status
 	if subscription.Notes.PlanKey != "" {
-		brand.Billing.PlanKey = &subscription.Notes.PlanKey
+		billing.PlanKey = &subscription.Notes.PlanKey
 	}
 	if subscription.Notes.PlanCycle != "" {
-		brand.Billing.PlanCycle = &subscription.Notes.PlanCycle
+		billing.PlanCycle = &subscription.Notes.PlanCycle
 	}
 
-	switch *brand.Billing.BillingStatus {
+	switch *billing.BillingStatus {
 	case "created":
-		brand.Billing.Status = myutil.IntPtr(0)
-		break
+		billing.Status = myutil.IntPtr(0)
 	case "authenticated":
-		brand.Billing.IsOnTrial = myutil.BoolPtr(true)
-		brand.Billing.Status = myutil.IntPtr(1)
-		break
+		billing.IsOnTrial = myutil.BoolPtr(true)
+		billing.Status = myutil.IntPtr(1)
 	case "active":
-		brand.Billing.IsOnTrial = myutil.BoolPtr(false)
-		brand.Billing.Status = myutil.IntPtr(1)
-		break
+		billing.IsOnTrial = myutil.BoolPtr(false)
+		billing.Status = myutil.IntPtr(1)
 	case "pending":
 	case "completed":
-		brand.Billing.Status = myutil.IntPtr(5)
-		break
+		billing.Status = myutil.IntPtr(5)
 	case "halted":
-		brand.Billing.Status = myutil.IntPtr(2)
-		break
+		billing.Status = myutil.IntPtr(2)
 	case "cancelled":
-		brand.Billing.Status = myutil.IntPtr(3)
-		break
+		billing.Status = myutil.IntPtr(3)
 	}
 
-	log.Println("Updating Brand Subscription Status to", event.Event, *brand.Billing.BillingStatus, brand.Billing.PlanKey)
-	if event.Event == "subscription.charged" || event.Event == "subscription.authenticated" {
-		bCredit, b := trendlymodels.PlanCreditsMap[*brand.Billing.PlanKey]
-		if b {
-			mult := 1
-			if *brand.Billing.PlanKey == "yearly" {
-				mult = 12
-			}
-			// Made it so that there is no stacking of credits on renewals
-			brand.Credits.Discovery = (bCredit.Discovery * mult)
-			brand.Credits.Collaboration = (bCredit.Collaboration * mult)
-			brand.Credits.Connection = (bCredit.Connection * mult)
-			brand.Credits.Contract = (bCredit.Contract * mult)
-			brand.Credits.Influencer = (bCredit.Influencer * mult)
+	// Drive OUR app-level access state + fund the org token wallet. Each "active"
+	// webhook (subscription.activated + each monthly subscription.charged) refills
+	// the wallet to the plan's monthly allotment and refreshes entitlements.
+	switch subscription.Status {
+	case "active":
+		reset := trendlymodels.NextMonthlyReset(time.Now())
+		billing.AccessState = myutil.StrPtr("active")
+		billing.BillingMode = myutil.StrPtr("recurring")
+		billing.BillingAnchorDay = myutil.IntPtr(1)
+		billing.Provider = myutil.StrPtr("razorpay")
+		billing.PeriodEnd = &reset
+		planKey := subscription.Notes.PlanKey
+		if planKey == "" && billing.PlanKey != nil {
+			planKey = *billing.PlanKey
 		}
+		if planKey != "" {
+			if err := trendlymodels.ApplyPlanToOrg(target.orgID, planKey, reset); err != nil {
+				log.Println("apply plan / wallet refill failed", target.orgID, err)
+			}
+		}
+	case "halted":
+		billing.AccessState = myutil.StrPtr("past_due")
+	case "cancelled":
+		billing.AccessState = myutil.StrPtr("canceled")
 	}
 
-	_, err = brand.Insert(subscription.Notes.BrandID)
-	if err != nil {
-		return err
-	}
+	log.Println("Updating Subscription Status to", event.Event, *billing.BillingStatus, billing.PlanKey)
 
-	return nil
+	return target.save(billing)
 }

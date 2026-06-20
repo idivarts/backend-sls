@@ -9,27 +9,39 @@ provider:
   versionFunctions: true  # Enables versioning of Lambda functions
   environment:
     STAGE: ${self:provider.stage}
+    GIN_MODE: ${self:custom.ginMode.${self:provider.stage}}
+    FIRESTORE_DATABASE_ID: ${env:FIRESTORE_DATABASE_ID, '(default)'}
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
     CLOUDFRONT_DISTRIBUTION_URL: https://d2x6j6vtsfyq7w.cloudfront.net
     IMAGE_CF_DISTRIBUTION_URL: https://d1tfun8qrz04mk.cloudfront.net
     ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
-    WS_GATEWAY_ENDPOINT: https://cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev
-    FB_CLIENT_ID: 567254166026958
-    FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
-    INSTA_CLIENT_ID: 1166596944824933
-    INSTA_CLIENT_SECRET: ${env:INSTA_CLIENT_SECRET}
+    # WEBSOCKET_TRENDLY is the schema-less WS API Gateway host (e.g. cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev)
+    # passed in per-stage from GitHub Actions (org vars WEBSOCKET_DEV_TRENDLY / WEBSOCKET_PROD_TRENDLY).
+    WS_GATEWAY_ENDPOINT: https://${env:WEBSOCKET_TRENDLY, 'cuowcrxmii.execute-api.us-east-1.amazonaws.com/dev'}
     STREAM_CLIENT: gg9xameygwse
     STREAM_SECRET: ${env:STREAM_SECRET}
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
-    BRAND_LOGIN_URL: "https://brands.trendly.now/login"
+    OPENROUTER_API_KEY: ${env:OPENROUTER_API_KEY, ''}
+    BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
     SENDGRID_NAME: Trendly
     SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
+    # Social Connect V2 — new OAuth platform credentials
+    FB_CLIENT_ID: ${env:FB_CLIENT_ID, '567254166026958'}
+    FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
+    INSTA_CLIENT_ID: ${env:INSTA_CLIENT_ID, '1166596944824933'}
+    INSTA_CLIENT_SECRET: ${env:INSTA_CLIENT_SECRET}
+    YOUTUBE_CLIENT_ID: ${env:YOUTUBE_CLIENT_ID, ''}
+    YOUTUBE_CLIENT_SECRET: ${env:YOUTUBE_CLIENT_SECRET, ''}
+    LINKEDIN_CLIENT_ID: ${env:LINKEDIN_CLIENT_ID, ''}
+    LINKEDIN_CLIENT_SECRET: ${env:LINKEDIN_CLIENT_SECRET, ''}
+    TWITTER_CLIENT_ID: ${env:TWITTER_CLIENT_ID, ''}
+    TWITTER_CLIENT_SECRET: ${env:TWITTER_CLIENT_SECRET, ''}
     # All Razorpay related variables
     GROWTH_PLAN_ID: plan_QywVXV2flgIY7N
     BUSINESS_PLAN_ID: plan_QywX8bnObf3P42
@@ -68,6 +80,20 @@ provider:
           Action:
             - "sqs:sendmessage"
           Resource: { "Fn::GetAtt": ["DiscoveryMessageQueue", "Arn"] }
+        - Effect: "Allow"
+          Action:
+            - "execute-api:ManageConnections"
+          Resource: "arn:aws:execute-api:*:*:*/@connections/*"
+        # ── Scheduled content publishing: drive the delayed-publish state machine + queue ──
+        - Effect: "Allow"
+          Action:
+            - "states:StartExecution"
+            - "states:StopExecution"
+          Resource: "*"
+        - Effect: "Allow"
+          Action:
+            - "sqs:SendMessage"
+          Resource: { "Fn::GetAtt": ["ContentPublishQueue", "Arn"] }
 plugins:
   - serverless-go-plugin
   - serverless-domain-manager
@@ -94,6 +120,9 @@ custom:
   isProd:
     dev: false
     prod: true
+  ginMode:
+    dev: debug
+    prod: release
   customDomain:
     domainName: be.trendly.now
     basePath: ${self:custom.basePathMap.${self:provider.stage}}
@@ -129,6 +158,45 @@ functions:
           rate:
             - cron(30 2 * * ? *)   # 8:00 AM IST daily
             - cron(30 14 * * ? *)  # 8:00 PM IST daily
+          enabled: ${self:custom.isProd.${self:provider.stage}}
+  billing_cron:
+    handler: scripts/billing-cron/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+    timeout: 900  # 15 min — scans all orgs to renew wallets + advance billing state
+    memorySize: 256
+    description: "1st-of-month org billing: token-wallet renewal + lock/invoice state machine"
+    events:
+      - schedule:
+          rate: cron(0 2 1 * ? *)  # 02:00 UTC on the 1st of every month
+          enabled: ${self:custom.isProd.${self:provider.stage}}
+  social_token_refresh:
+    handler: functions/trendly_social_refresh/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+    timeout: 900  # 15 min — can scan many users
+    memorySize: 256
+    description: "Refreshes expiring social platform OAuth tokens (runs every 6h)"
+    events:
+      - schedule:
+          rate: cron(0 */6 * * ? *)  # Every 6 hours
+          enabled: true
+  analytics_snapshot:
+    handler: functions/trendly_analytics_snapshot/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+    timeout: 900  # 15 min — scans all brands' connected Meta accounts
+    memorySize: 256
+    description: "Daily top-line social analytics snapshot for trend graphs"
+    events:
+      - schedule:
+          rate: cron(0 1 * * ? *)  # Every day at 01:00 UTC
           enabled: ${self:custom.isProd.${self:provider.stage}}
   trendly_discovery:
     handler: functions/trendly_discovery/main.go
@@ -199,6 +267,14 @@ functions:
   #     - http: ANY /api/v1/{proxy+}
   trendly_v2_apis:
     handler: functions/trendly_v2/main.go
+    environment:
+      # Scheduled content publishing — drives the delayed-publish state machine.
+      DELAY_STATE_FUNCTION:
+        Fn::GetAtt:
+          - ContentPublishStateMachine
+          - Arn
+      SEND_MESSAGE_QUEUE_ARN:
+        Ref: ContentPublishQueue   # Ref returns the queue URL (QueueUrl for sqs:sendMessage)
     package:
       include:
         - 'service-account.json'
@@ -217,6 +293,17 @@ functions:
     timeout: 30
     events:
       - http: ANY /api/collabs/{proxy+}
+  trendly_ai_apis:
+    handler: functions/trendly_ai/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /api/ai/{proxy+}
+      - http: ANY /api/content-strategy/{proxy+}
   trendly_matchmaking_apis:
     handler: functions/trendly_matchmaking/main.go
     package:
@@ -274,6 +361,20 @@ functions:
             Fn::GetAtt:
               - StreamMessageQueue
               - Arn
+  scheduled_publish_sqs:
+    handler: functions/scheduled_publish_sqs/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 120
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - ContentPublishQueue
+              - Arn
   insta_apis:
     handler: functions/unauth_apis/main.go
     package:
@@ -290,6 +391,12 @@ functions:
       - http: ANY /firebase/{proxy+}
       - http: ANY /onboard
       - http: ANY /onboard/{proxy+}
+      # Public free AI tools for the marketing website
+      - http: ANY /tools
+      - http: ANY /tools/{proxy+}
+      # Social Connect V2 portal routes
+      - http: ANY /connect
+      - http: ANY /connect/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
     package:
@@ -297,6 +404,7 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
+    timeout: 300
     events:
       - websocket: $connect
       - websocket: $disconnect
@@ -360,6 +468,63 @@ resources:
               - StreamMessageDLQ
               - Arn
           maxReceiveCount: 5
+
+    # --------------------------------------------------------------------------------------
+    # ------------- Scheduled content publishing (delayed_sqs via Step Functions) ----------
+    # --------------------------------------------------------------------------------------
+    ContentPublishQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ContentPublishQueue-${self:provider.stage}
+        VisibilityTimeout: 180   # ≥ scheduled_publish_sqs timeout (120s) + buffer
+
+    ContentPublishStateMachineRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Action: ["sts:AssumeRole"]
+              Principal:
+                Service:
+                  - !Sub "states.${AWS::Region}.amazonaws.com"
+        Policies:
+          - PolicyName: "ContentPublishSendToSQS"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action: ["sqs:SendMessage"]
+                  Resource: { "Fn::GetAtt": ["ContentPublishQueue", "Arn"] }
+
+    ContentPublishStateMachine:
+      Type: "AWS::StepFunctions::StateMachine"
+      Properties:
+        StateMachineName: ContentPublishDelayedSQS-${self:provider.stage}
+        RoleArn: !GetAtt ContentPublishStateMachineRole.Arn
+        DefinitionString: |
+          {
+            "StartAt": "Delay",
+            "Comment": "Publish to SQS after a delay (scheduled content publishing)",
+            "States": {
+              "Delay": {
+                "Type": "Wait",
+                "SecondsPath": "$.delay_seconds",
+                "Next": "Send message to SQS"
+              },
+              "Send message to SQS": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::sqs:sendMessage",
+                "Parameters": {
+                  "QueueUrl.$": "$.topic",
+                  "MessageBody.$": "$.message"
+                },
+                "End": true
+              }
+            }
+          }
 
     # --------------------------------------------------------------------------------------
     # ------------- S3 for Videos -----------------------------------------------------

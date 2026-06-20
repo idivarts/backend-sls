@@ -36,7 +36,7 @@ type KeySecretJson struct {
 func loadSecrets() RazorpaySecrets {
 	basePath := "."
 	if myutil.IsTest() {
-		basePath = "/Users/rsinha/iDiv/backend-sls/"
+		basePath = "/Users/rsinha/Trendly/backend-sls/"
 	}
 	path := filepath.Join(basePath, "key-secrets.json")
 	file, err := os.Open(path)

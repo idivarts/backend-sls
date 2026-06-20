@@ -74,7 +74,7 @@ func CreateSubscriptionV2(c *gin.Context) {
 	// }, nil)
 	// if plans, ok := body["items"].([]interface{}); ok {
 	// 	for _, item := range plans {
-	// 		var plan paymentwebhooks.PlanEntity
+	// 		var plan webhook.PlanEntity
 	// 		b, _ := json.Marshal(item)   // convert map[string]interface{} -> []byte
 	// 		_ = json.Unmarshal(b, &plan) // convert []byte -> struct
 	// 		if plan.Notes.PlanKey == planKey && plan.Notes.PlanCycle == planCycle && plan.Notes.PlanVersion == PLAN_VERSION {
@@ -137,10 +137,17 @@ func CreateSubscriptionV2(c *gin.Context) {
 			}
 		}
 
+		// The subscriber who sets up the brand is added to the default Admin team,
+		// which always holds full access (all features + privileges).
+		defTeams, _ := trendlymodels.EnsureDefaultTeam(req.BrandID, uid, time.Now().UnixMilli())
+		var defTeamID string
+		if len(defTeams) > 0 {
+			defTeamID = defTeams[0].ID
+		}
 		brandMember := trendlymodels.BrandMember{
 			ManagerID: uid,
-			Role:      "manager",
 			Status:    1,
+			TeamID:    defTeamID,
 		}
 		_, err = brandMember.Set(req.BrandID)
 		if err != nil {
@@ -153,6 +160,11 @@ func CreateSubscriptionV2(c *gin.Context) {
 		"brandId":   req.BrandID,
 		"planKey":   planKey,
 		"planCycle": planCycle,
+	}
+	// Billing lives on the Organization now — carry organizationId so the webhook
+	// writes org billing. Legacy brands without an org still carry only brandId.
+	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+		notes["organizationId"] = *brand.OrganizationID
 	}
 
 	var id, link string
@@ -176,7 +188,7 @@ func CreateSubscriptionV2(c *gin.Context) {
 
 	if req.AdminData != nil && req.AdminData.IsOnTrial {
 		tEndTime := time.Now().Add(time.Duration(trialDays * 24 * int(time.Hour))).UnixMilli()
-		brand.Billing = &trendlymodels.BrandBilling{
+		billing := &trendlymodels.BrandBilling{
 			Subscription:    &id,
 			SubscriptionUrl: &link,
 			BillingStatus:   myutil.StrPtr("created"),
@@ -186,21 +198,30 @@ func CreateSubscriptionV2(c *gin.Context) {
 			TrialEnds:       &tEndTime,
 			Status:          myutil.IntPtr(0),
 		}
-		x, b := trendlymodels.PlanCreditsMap[planKey]
-		if b {
-			brand.Credits = x
+		if req.AdminData.OneTimePayment != nil {
+			billing.Subscription = nil
+			billing.PaymentLinkId = &id
 		}
 
-		if req.AdminData != nil && req.AdminData.OneTimePayment != nil {
-			brand.Billing.Subscription = nil
-			brand.Billing.PaymentLinkId = &id
+		// Billing lives on the org — write the trial billing there.
+		if brand.OrganizationID == nil || *brand.OrganizationID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no-organization", "message": "Brand is not linked to an organization"})
+			return
+		}
+		org := &trendlymodels.Organization{}
+		if err := org.Get(*brand.OrganizationID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Unable to load organization"})
+			return
+		}
+		if err := org.SetBilling(*brand.OrganizationID, billing); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Organization Subscription"})
+			return
 		}
 
 		brand.HasPayWall = true
-
 		_, err = brand.Insert(req.BrandID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Brand Subscription"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error updating Brand"})
 			return
 		}
 	}

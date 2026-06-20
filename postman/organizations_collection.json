@@ -1,0 +1,130 @@
+{
+  "info": {
+    "name": "Trendly Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Organizations",
+      "description": "Organization tenant above Brand: CRUD, brand lifecycle (add/delete/transfer). All under trendly_v2 with the managers session middleware.",
+      "item": [
+        {
+          "name": "Organization - CRUD",
+          "description": "Create / list / detail / delete organizations.",
+          "item": [
+            {
+              "name": "Create organization",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v2/organizations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v2", "organizations"]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Acme Group\",\n  \"image\": \"https://example.com/logo.png\"\n}"
+                }
+              }
+            },
+            {
+              "name": "List my organizations",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v2/organizations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v2", "organizations"]
+                }
+              }
+            },
+            {
+              "name": "Get organization (with brands)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v2/organizations/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v2", "organizations", ":id"],
+                  "variable": [{ "key": "id", "value": "ORG_ID" }]
+                }
+              }
+            },
+            {
+              "name": "Delete organization",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v2/organizations/:id",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v2", "organizations", ":id"],
+                  "variable": [{ "key": "id", "value": "ORG_ID" }]
+                },
+                "description": "Owner-only. Blocked (409) if the org still owns active brands (org-has-brands) or holds a paid plan (org-has-active-subscription)."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Organization - Brand lifecycle",
+          "description": "Add a brand within the plan cap, move a brand into an org you own, and delete a brand.",
+          "item": [
+            {
+              "name": "Add brand to organization",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v2/organizations/:id/brands",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v2", "organizations", ":id", "brands"],
+                  "variable": [{ "key": "id", "value": "ORG_ID" }]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Acme Skincare\",\n  \"image\": \"https://example.com/brand.png\"\n}"
+                },
+                "description": "Cap-enforced in a transaction. Returns 409 brand-limit-reached when the org is at its maxBrands."
+              }
+            },
+            {
+              "name": "Transfer brand to another org you own",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v2/organizations/:id/brands/:brandId/transfer",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v2", "organizations", ":id", "brands", ":brandId", "transfer"],
+                  "variable": [
+                    { "key": "id", "value": "DEST_ORG_ID" },
+                    { "key": "brandId", "value": "BRAND_ID" }
+                  ]
+                },
+                "description": "Destination must be owned by the caller. Returns 409 brand-limit-reached if the destination is at its cap."
+              }
+            },
+            {
+              "name": "Delete brand",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v2/brands/:brandId",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "v2", "brands", ":brandId"],
+                  "variable": [{ "key": "brandId", "value": "BRAND_ID" }]
+                },
+                "description": "Soft-delete. Returns 409 brand-has-active-contracts if the brand has any non-terminal contract."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -8,7 +8,7 @@ import (
 )
 
 func TestCreateOrder(t *testing.T) {
-	payments.CreateOrder(499, map[string]interface{}{})
+	payments.CreateOrder(499, map[string]interface{}{}, nil)
 }
 
 func TestCreatePaymentLink(t *testing.T) {

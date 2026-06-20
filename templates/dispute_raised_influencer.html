@@ -1,0 +1,44 @@
+<!--
+  Dynamic Variables:
+    {{.RecipientName}}  => Influencer's name
+    {{.BrandName}}      => Brand's name
+    {{.CollabTitle}}    => Collaboration title
+    {{.DisputeType}}    => Type of dispute
+    {{.Description}}    => Dispute description
+    {{.RaisedBy}}       => Who raised the dispute ("influencer" | "brand")
+    {{.ContractLink}}   => Link to contract page
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dispute Raised</title>
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; padding: 20px; }
+    .container { background-color: #fff; border-radius: 8px; padding: 24px; max-width: 600px; margin: auto; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+    h2 { color: #c62828; }
+    .info-box { background-color: #fff3f3; border-left: 4px solid #c62828; padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+    .btn { display: inline-block; margin-top: 20px; padding: 12px 24px; background-color: #c62828; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; }
+    .footer { margin-top: 24px; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>⚠️ Dispute Raised on Your Contract</h2>
+    <p>Hi {{.RecipientName}},</p>
+    <p>A dispute has been raised on your contract for <strong>{{.CollabTitle}}</strong> with <strong>{{.BrandName}}</strong>.</p>
+    <div class="info-box">
+      <p><strong>Dispute Type:</strong> {{.DisputeType}}</p>
+      <p><strong>Description:</strong> {{.Description}}</p>
+      <p><strong>Raised by:</strong> {{.RaisedBy}}</p>
+    </div>
+    <p>Your contract is currently <strong>on hold</strong> while the Trendly support team reviews the situation. We aim to resolve disputes within 3–5 business days.</p>
+    <p>You can view the contract and any communications in the app.</p>
+    <a href="{{.ContractLink}}" class="btn">View Contract</a>
+    <div class="footer">
+      <p>If you have questions, contact us at support@trendly.now</p>
+      <p>— Team Trendly</p>
+    </div>
+  </div>
+</body>
+</html>

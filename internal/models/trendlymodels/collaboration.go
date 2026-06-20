@@ -11,13 +11,32 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+type CollabProduct struct {
+	Name *string `firestore:"name,omitempty" json:"name,omitempty"` // Product/service name
+	Cost *int    `firestore:"cost,omitempty" json:"cost,omitempty"` // Product cost (optional)
+}
+
+type PromotionSubject string
+type PromotionType string
+
+const (
+	PromotionSubjectPhysicalProduct PromotionSubject = "physical-product"
+	PromotionSubjectServices        PromotionSubject = "services"
+	PromotionSubjectOthers          PromotionSubject = "others"
+
+	PromotionTypePaid   PromotionType = "Paid Collab"
+	PromotionTypeBarter PromotionType = "Barter Collab"
+)
+
 type Collaboration struct {
 	Name                      string                `firestore:"name" json:"name"`
 	BrandID                   string                `firestore:"brandId" json:"brandId"`
 	ManagerID                 string                `firestore:"managerId" json:"managerId"`
 	Attachments               []interface{}         `firestore:"attachments,omitempty" json:"attachments,omitempty"`
 	Description               string                `firestore:"description,omitempty" json:"description,omitempty"`
-	PromotionType             string                `firestore:"promotionType" json:"promotionType"`
+	PromotionType             PromotionType         `firestore:"promotionType" json:"promotionType"`
+	PromotionSubject          PromotionSubject      `firestore:"promotionSubject,omitempty" json:"promotionSubject,omitempty"`
+	Products                  []CollabProduct       `firestore:"products,omitempty" json:"products,omitempty"`
 	Budget                    *Budget               `firestore:"budget,omitempty" json:"budget,omitempty"`
 	PreferredContentLanguage  []string              `firestore:"preferredContentLanguage" json:"preferredContentLanguage"`
 	ContentFormat             []string              `firestore:"contentFormat" json:"contentFormat"`
@@ -34,6 +53,7 @@ type Collaboration struct {
 	TimeStamp                 int64                 `firestore:"timeStamp" json:"timeStamp"`
 	ViewsLastHour             *int                  `firestore:"viewsLastHour,omitempty" json:"viewsLastHour,omitempty"`
 	LastReviewedTimeStamp     *int64                `firestore:"lastReviewedTimeStamp,omitempty" json:"lastReviewedTimeStamp,omitempty"`
+	MaxRevisions              int                   `firestore:"maxRevisions,omitempty" json:"maxRevisions,omitempty"` // default 3 if unset
 }
 
 type Budget struct {

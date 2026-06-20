@@ -90,7 +90,7 @@ func notifyApplicationAccepted(userId string, collab trendlymodels.Collaboration
 	// Push Notification
 	notif := &trendlymodels.Notification{
 		Title:       fmt.Sprintf("Your application for %s is accepted", collab.Name),
-		Description: "Start messaging the brand to get your contract started.",
+		Description: "Start messaging the brand to align on your collaboration.",
 		IsRead:      false,
 		Data: &trendlymodels.NotificationData{
 			CollaborationID: &collab.Name,
@@ -160,7 +160,7 @@ func notifyToReviseApplication(userId, collabId string, collab trendlymodels.Col
 	// Push Notification
 	notif := &trendlymodels.Notification{
 		Title:       fmt.Sprintf("Revise your quotation for %s", collab.Name),
-		Description: "Please open your contract details and revise your quotation",
+		Description: "Please open your contract details and revise your quotation.",
 		IsRead:      false,
 		Data: &trendlymodels.NotificationData{
 			CollaborationID: &collab.Name,
