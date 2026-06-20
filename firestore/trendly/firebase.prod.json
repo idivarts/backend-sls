@@ -1,0 +1,7 @@
+{
+  "firestore": {
+    "database": "trendly-prod",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
