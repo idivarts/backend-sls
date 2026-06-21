@@ -187,7 +187,7 @@ func publishToLinkedIn(account *trendlymodels.SocialAccount, accessToken string,
 	if !strings.HasPrefix(authorURN, "urn:") {
 		authorURN = "urn:li:person:" + sub
 	}
-	return linkedin.CreateMemberPost(accessToken, authorURN, buildCaption(ct), firstImageURL(ct))
+	return linkedin.CreateMemberPost(accessToken, authorURN, buildCaption(ct), imageURLs(ct))
 }
 
 // PublishContent loads a content doc and publishes it to each destination,

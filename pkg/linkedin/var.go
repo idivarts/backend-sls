@@ -28,7 +28,11 @@ const (
 	// defaultAPIVersion is a supported LinkedIn-Version month (YYYYMM) used when
 	// LINKEDIN_API_VERSION is not set. Keep in sync with the version enabled on
 	// the LinkedIn developer app.
-	defaultAPIVersion = "202506"
+	//
+	// ⚠️ LinkedIn sunsets each versioned month ~12 months after release, so this
+	// must be bumped roughly yearly. "202506" was sunset by mid-2026; "202606" is
+	// the current month and supports the Posts API multiImage (carousel) content.
+	defaultAPIVersion = "202606"
 )
 
 var (
