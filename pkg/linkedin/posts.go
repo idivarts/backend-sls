@@ -40,12 +40,14 @@ func escapeCommentary(s string) string {
 // the main feed via the versioned Posts API.
 //
 //	authorURN — the member URN, e.g. "urn:li:person:abc123"
-//	text      — the post body (caption + hashtags); required unless imageURL is set
-//	imageURL  — optional single image; uploaded to LinkedIn before posting
+//	text      — the post body (caption + hashtags); required unless images are set
+//	imageURLs — optional images; each is uploaded to LinkedIn before posting.
+//	            A single image uses the `media` content; 2+ images use the
+//	            `multiImage` content (LinkedIn's native carousel/swipe post).
 //
 // Returns the created post URN (from the x-restli-id response header).
-func CreateMemberPost(accessToken, authorURN, text, imageURL string) (string, error) {
-	if strings.TrimSpace(text) == "" && imageURL == "" {
+func CreateMemberPost(accessToken, authorURN, text string, imageURLs []string) (string, error) {
+	if strings.TrimSpace(text) == "" && len(imageURLs) == 0 {
 		return "", fmt.Errorf("linkedin: post has no text or image")
 	}
 
@@ -62,15 +64,38 @@ func CreateMemberPost(accessToken, authorURN, text, imageURL string) (string, er
 		},
 	}
 
-	if imageURL != "" {
-		imageURN, err := uploadImage(accessToken, authorURN, imageURL)
-		if err != nil {
-			return "", err
+	if len(imageURLs) > 0 {
+		// Upload every image up front so each gets its own image URN.
+		imageURNs := make([]string, 0, len(imageURLs))
+		for _, u := range imageURLs {
+			imageURN, err := uploadImage(accessToken, authorURN, u)
+			if err != nil {
+				return "", err
+			}
+			imageURNs = append(imageURNs, imageURN)
 		}
-		post["content"] = map[string]interface{}{
-			"media": map[string]interface{}{
-				"id": imageURN,
-			},
+
+		if len(imageURNs) == 1 {
+			post["content"] = map[string]interface{}{
+				"media": map[string]interface{}{
+					"id": imageURNs[0],
+				},
+			}
+		} else {
+			// 2+ images → LinkedIn multi-image (carousel) post. Each entry needs
+			// an `id`; `altText` is required by the API, so we send an empty one.
+			images := make([]map[string]interface{}, 0, len(imageURNs))
+			for _, urn := range imageURNs {
+				images = append(images, map[string]interface{}{
+					"id":      urn,
+					"altText": "",
+				})
+			}
+			post["content"] = map[string]interface{}{
+				"multiImage": map[string]interface{}{
+					"images": images,
+				},
+			}
 		}
 	}
 
