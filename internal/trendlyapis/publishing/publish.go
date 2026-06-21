@@ -263,7 +263,14 @@ func PublishContent(brandID, contentID string) error {
 		"publishedIds": publishedIds,
 	}
 	if len(publishedIds) > 0 {
+		// The post is live now (whether via publish-now or a scheduled job that
+		// just fired). Stamp the actual posting time onto both the precise
+		// publish field and the calendar-placement field so the calendar shows
+		// the post when it really went out, not at a stale scheduled time.
+		postedAt := time.Now().UnixMilli()
 		fields["status"] = "posted"
+		fields["scheduledAt"] = postedAt
+		fields["postingTimeStamp"] = postedAt
 	}
 	if firstErr != nil {
 		fields["publishError"] = firstErr.Error()
