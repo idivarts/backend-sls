@@ -52,6 +52,46 @@ func SetAnalyticsCache(brandID string, d *AnalyticsCacheDoc) error {
 	return err
 }
 
+// ─── AnalyticsOverview (brands/{brandId}/analyticsOverview/{range}) ───────────
+//
+// The latest computed analytics overview for a (brand, range), produced
+// asynchronously by the social_sqs worker (OpAnalytics) so the dashboard reads
+// it live from Firestore instead of blocking on a slow all-accounts Graph fetch.
+// Payload is the JSON-encoded analytics.Overview (kept opaque here so this model
+// doesn't depend on the analytics package). Written server-side only.
+
+type AnalyticsOverviewDoc struct {
+	Range       string `json:"range" firestore:"range"`
+	Payload     string `json:"payload" firestore:"payload"` // JSON-encoded analytics.Overview
+	GeneratedAt int64  `json:"generatedAt" firestore:"generatedAt"`
+}
+
+// GetAnalyticsOverview reads the overview doc for a (brand, range); returns
+// (nil, nil) when absent (callers treat it as "no cached overview yet").
+func GetAnalyticsOverview(brandID, rng string) (*AnalyticsOverviewDoc, error) {
+	doc, err := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/analyticsOverview", brandID)).
+		Doc(rng).
+		Get(context.Background())
+	if err != nil {
+		return nil, nil
+	}
+	var d AnalyticsOverviewDoc
+	if err := doc.DataTo(&d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+// SetAnalyticsOverview writes/overwrites the overview doc for a (brand, range).
+func SetAnalyticsOverview(brandID string, d *AnalyticsOverviewDoc) error {
+	_, err := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/analyticsOverview", brandID)).
+		Doc(d.Range).
+		Set(context.Background(), d)
+	return err
+}
+
 // ─── AnalyticsSnapshot (brands/{brandId}/analyticsSnapshots/{socialId_date}) ───
 //
 // One daily top-line snapshot per connected account, written by the snapshot

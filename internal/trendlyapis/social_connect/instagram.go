@@ -152,5 +152,9 @@ func InstagramCallback(c *gin.Context) {
 	// routing, not the connection itself.
 	upsertSocialIndex(igAccountID, trendlymodels.PlatformInstagram, state, socialID, now)
 
+	// Warm the inbox / media / analytics caches in the background so those pages
+	// are already populated on first open. Best-effort.
+	enqueueWarmup(state.BrandID)
+
 	c.Redirect(302, CallbackSuccessURL(connectBase, "instagram", state.CallbackScheme, state.App))
 }

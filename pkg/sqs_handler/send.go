@@ -31,18 +31,24 @@ func SendToMessageQueue(message string, delayInSeconds int64) error {
 	} else {
 		fmt.Println("Environment variable value:", envValue)
 	}
-	// Specify the URL of your SQS queue
-	queueURL := envValue
 
-	// Send the message to the SQS queue
+	return SendToQueue(envValue, message, delayInSeconds)
+}
+
+// SendToQueue sends a message to an explicit SQS queue URL. Use this when a caller
+// has its own queue (rather than the shared SEND_MESSAGE_QUEUE_ARN one).
+func SendToQueue(queueURL, message string, delayInSeconds int64) error {
+	if queueURL == "" {
+		return fmt.Errorf("SendToQueue: empty queue URL")
+	}
+
 	sendMessageInput := &sqs.SendMessageInput{
 		QueueUrl:     &queueURL,
 		MessageBody:  &message,
 		DelaySeconds: &delayInSeconds,
 	}
 
-	_, err := svc.SendMessage(sendMessageInput)
-	if err != nil {
+	if _, err := svc.SendMessage(sendMessageInput); err != nil {
 		fmt.Println("Error sending message to SQS:", err)
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/socialsync"
 	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/messenger"
 )
@@ -90,15 +91,10 @@ func GetConversations(brandID string) ([]trendlymodels.InboxConversation, error)
 		return nil, err
 	}
 	if count == 0 {
-		if syncErr := SyncFromMeta(brandID); syncErr != nil {
-			log.Printf("inbox: read-through sync failed for brand %s: %v", brandID, syncErr)
+		if syncErr := enqueueOrRun(brandID, socialsync.OpInboxSync); syncErr != nil {
+			log.Printf("inbox: read-through enqueue failed for brand %s: %v", brandID, syncErr)
 		}
 	}
-	return trendlymodels.ListInboxConversations(brandID)
-}
-
-// ListConversations returns the cached conversations without triggering a sync.
-func ListConversations(brandID string) ([]trendlymodels.InboxConversation, error) {
 	return trendlymodels.ListInboxConversations(brandID)
 }
 
@@ -131,8 +127,8 @@ func GetConversationsFiltered(brandID, filter string) ([]trendlymodels.InboxConv
 		return nil, err
 	}
 	if count == 0 {
-		if syncErr := SyncFromMeta(brandID); syncErr != nil {
-			log.Printf("inbox: read-through sync failed for brand %s: %v", brandID, syncErr)
+		if syncErr := enqueueOrRun(brandID, socialsync.OpInboxSync); syncErr != nil {
+			log.Printf("inbox: read-through enqueue failed for brand %s: %v", brandID, syncErr)
 		}
 	}
 	q := filterToQuery(filter)
@@ -179,23 +175,6 @@ func SyncFromMeta(brandID string) error {
 		}
 	}
 	return firstErr
-}
-
-// ResyncFromMeta clears the brand's cached DM conversations and re-pulls them
-// fresh from Meta. Comments are webhook-only (not re-fetchable here) so they are
-// left intact. Used by the admin/repair resync to rebuild participant
-// names/avatars and drop stale or duplicated DM docs. Returns the rebuilt list.
-func ResyncFromMeta(brandID string) ([]trendlymodels.InboxConversation, error) {
-	deleted, err := trendlymodels.DeleteInboxConversationsByKind(brandID, trendlymodels.InboxKindDM)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("inbox: resync cleared %d DM conversations for brand %s", deleted, brandID)
-	if err := SyncFromMeta(brandID); err != nil {
-		log.Printf("inbox: resync sync-from-meta failed for %s: %v", brandID, err)
-		// Non-fatal: return whatever repopulated.
-	}
-	return trendlymodels.ListInboxConversations(brandID)
 }
 
 // syncAccountDMs fetches recent DM conversations for one account and upserts them.
@@ -251,6 +230,30 @@ func isSelfParticipant(s *trendlymodels.SocialAccount, selfID, id, username stri
 		return true
 	}
 	return false
+}
+
+// mapMessengerMessage converts a Meta DM message to our InboxMessage, deciding
+// direction with the robust self-detection (app-scoped from.id / username) and
+// carrying any media attachment through (photos, videos, reels, shared posts,
+// story replies, voice clips, files) so media-only messages don't render empty.
+// Shared by the bulk sync and the unit-level thread/message resyncs.
+func mapMessengerMessage(s *trendlymodels.SocialAccount, selfID string, m messenger.Message) trendlymodels.InboxMessage {
+	author := trendlymodels.InboxAuthorContact
+	if isSelfParticipant(s, selfID, m.From.ID, m.From.Username) {
+		author = trendlymodels.InboxAuthorBusiness
+	}
+	msg := trendlymodels.InboxMessage{
+		ID:     m.ID,
+		Author: author,
+		Text:   m.Message,
+		SentAt: m.CreatedTime.UnixMilli(),
+	}
+	if media := m.FirstMedia(); media != nil {
+		msg.AttachmentURL = media.URL
+		msg.AttachmentType = media.Type
+		msg.AttachmentThumbURL = media.Thumb
+	}
+	return msg
 }
 
 // fetchContactProfile looks up a DM contact's display profile (name, handle,
@@ -363,40 +366,14 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		// Meta returns newest-first; reverse to chronological for the thread.
 		data := c.Messages.Data
 		for i := len(data) - 1; i >= 0; i-- {
-			m := data[i]
-			// Decide direction with the same robust self-detection used for
-			// participants. Meta returns app-scoped ids (IGSID/PSID) on a
-			// message's `from`, which don't always equal our stored
-			// PlatformAccountID — so a plain `m.From.ID == selfID` check never
-			// matches on Instagram and every message wrongly renders as inbound.
-			// isSelfParticipant additionally matches the linked IG business id
-			// and the account's own username.
-			author := trendlymodels.InboxAuthorContact
-			if isSelfParticipant(s, selfID, m.From.ID, m.From.Username) {
-				author = trendlymodels.InboxAuthorBusiness
-			}
-			ts := m.CreatedTime.UnixMilli()
-			msg := trendlymodels.InboxMessage{
-				ID:     m.ID,
-				Author: author,
-				Text:   m.Message,
-				SentAt: ts,
-			}
-			// Carry media through — photos, videos, reels, shared posts, story
-			// replies, voice clips and files. Without this, media-only messages
-			// render as empty bubbles.
-			if media := m.FirstMedia(); media != nil {
-				msg.AttachmentURL = media.URL
-				msg.AttachmentType = media.Type
-				msg.AttachmentThumbURL = media.Thumb
-			}
+			msg := mapMessengerMessage(s, selfID, data[i])
 			msgs = append(msgs, msg)
-			if ts > lastAt {
-				lastAt = ts
+			if msg.SentAt > lastAt {
+				lastAt = msg.SentAt
 				preview = inboxMsgPreview(msg)
 			}
-			if author == trendlymodels.InboxAuthorContact && ts > lastInboundAt {
-				lastInboundAt = ts
+			if msg.Author == trendlymodels.InboxAuthorContact && msg.SentAt > lastInboundAt {
+				lastInboundAt = msg.SentAt
 			}
 		}
 	}
