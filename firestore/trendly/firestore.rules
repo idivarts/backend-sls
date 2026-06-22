@@ -144,8 +144,7 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
-      // Analytics cache + daily snapshots. Written/read server-side only —
-      // the dashboard reads analytics through the backend API, never directly.
+      // Analytics cache + daily snapshots. Written/read server-side only.
       // Admin SDK bypasses these rules.
       match /analyticsCache/{cacheId} {
         allow read, write: if false;
@@ -154,9 +153,23 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Analytics overview — computed async by the social_sqs worker. Read: any
+      // brand member (the dashboard subscribes live). Writes are backend-only.
+      match /analyticsOverview/{range} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
+      }
+
       // Inbox conversations (DMs + comments). Read: any brand member. Writes go
       // through the backend (Admin SDK), so clients never write directly.
       match /inbox/{conversationId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
+      }
+
+      // Inbox media (published posts/reels) — populated async by the social_sqs
+      // worker. Read: any brand member (the Media tab subscribes live). Backend-only writes.
+      match /inboxMedia/{mediaId} {
         allow read:  if isAuthenticated() && isBrandMember(brandId);
         allow write: if false;
       }
