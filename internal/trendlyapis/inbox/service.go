@@ -313,8 +313,15 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		data := c.Messages.Data
 		for i := len(data) - 1; i >= 0; i-- {
 			m := data[i]
+			// Decide direction with the same robust self-detection used for
+			// participants. Meta returns app-scoped ids (IGSID/PSID) on a
+			// message's `from`, which don't always equal our stored
+			// PlatformAccountID — so a plain `m.From.ID == selfID` check never
+			// matches on Instagram and every message wrongly renders as inbound.
+			// isSelfParticipant additionally matches the linked IG business id
+			// and the account's own username.
 			author := trendlymodels.InboxAuthorContact
-			if m.From.ID == selfID {
+			if isSelfParticipant(s, selfID, m.From.ID, m.From.Username) {
 				author = trendlymodels.InboxAuthorBusiness
 			}
 			ts := m.CreatedTime.UnixMilli()
