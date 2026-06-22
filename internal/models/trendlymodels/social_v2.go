@@ -245,6 +245,13 @@ func ListBrandSocialAccounts(brandID string) ([]SocialAccount, error) {
 		if err := doc.DataTo(&a); err != nil {
 			return nil, fmt.Errorf("ListBrandSocialAccounts: failed to decode %s: %w", doc.Ref.ID, err)
 		}
+		// The doc id IS the socialID (see SaveBrandSocialAccount → Doc(account.ID)).
+		// Backfill from it so callers always get a non-empty ID even if an older
+		// doc didn't persist the `id` field — an empty id silently breaks anything
+		// keyed by socialId (e.g. inbox media → post analytics).
+		if a.ID == "" {
+			a.ID = doc.Ref.ID
+		}
 		accounts = append(accounts, a)
 	}
 	return accounts, nil
@@ -279,6 +286,9 @@ func GetBrandSocialAccount(brandID, id string) (*SocialAccount, error) {
 	var a SocialAccount
 	if err := doc.DataTo(&a); err != nil {
 		return nil, err
+	}
+	if a.ID == "" {
+		a.ID = doc.Ref.ID // backfill from the doc id (== socialID) — see ListBrandSocialAccounts
 	}
 	return &a, nil
 }
