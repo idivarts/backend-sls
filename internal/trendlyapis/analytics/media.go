@@ -175,14 +175,17 @@ func fetchFacebookPost(postID, at string) PostAnalytics {
 	}
 
 	// Post reach — best-effort; reuse the page-insights client against the post id.
+	// NOTE: post_impressions_unique was deprecated by Meta on 2025-11-15 across all
+	// API versions; post_total_media_view_unique is its unique-reach replacement
+	// (per the v25.0 changelog).
 	var reach int64
 	reachAvailable := false
 	if ins, rerr := messenger.GetFacebookInsights(postID, at,
-		[]messenger.FBInsightMetric{"post_impressions_unique"},
+		[]messenger.FBInsightMetric{messenger.FBMetricPostTotalMediaViewUnique},
 		messenger.FBPeriodLifetime,
 		messenger.FBInsightParams{},
-	); rerr == nil && ins != nil && ins.Find("post_impressions_unique") != nil {
-		reach = ins.Total("post_impressions_unique")
+	); rerr == nil && ins != nil && ins.Find(messenger.FBMetricPostTotalMediaViewUnique) != nil {
+		reach = ins.Total(messenger.FBMetricPostTotalMediaViewUnique)
 		reachAvailable = true
 	} else if rerr != nil {
 		log.Printf("analytics post: FB reach fetch failed for %s: %v", postID, rerr)
