@@ -57,7 +57,7 @@ func SendIGMessage(recipientID, text, accessToken string) (*messenger.IMessageRe
 // GetIGConversations lists DM conversations for the connected IG account.
 // GET graph.instagram.com/{version}/me/conversations?platform=instagram&fields=...
 func GetIGConversations(accessToken string) (*messenger.ConversationData, error) {
-	fields := "name,id,participants,messages{id,created_time,from,to,message,attachments}"
+	fields := "name,id,participants,messages{id,created_time,from,to,message,attachments{id,mime_type,name,file_url,image_data,video_data}}"
 	endpoint := fmt.Sprintf("%s/%s/me/conversations?platform=instagram&fields=%s&access_token=%s",
 		BaseURL, ApiVersion, url.QueryEscape(fields), url.QueryEscape(accessToken))
 	resp, err := http.Get(endpoint)

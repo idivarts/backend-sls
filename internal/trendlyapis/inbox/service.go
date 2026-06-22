@@ -325,15 +325,24 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 				author = trendlymodels.InboxAuthorBusiness
 			}
 			ts := m.CreatedTime.UnixMilli()
-			msgs = append(msgs, trendlymodels.InboxMessage{
+			msg := trendlymodels.InboxMessage{
 				ID:     m.ID,
 				Author: author,
 				Text:   m.Message,
 				SentAt: ts,
-			})
+			}
+			// Carry media through — photos, videos, reels, shared posts, story
+			// replies, voice clips and files. Without this, media-only messages
+			// render as empty bubbles.
+			if media := m.FirstMedia(); media != nil {
+				msg.AttachmentURL = media.URL
+				msg.AttachmentType = media.Type
+				msg.AttachmentThumbURL = media.Thumb
+			}
+			msgs = append(msgs, msg)
 			if ts > lastAt {
 				lastAt = ts
-				preview = m.Message
+				preview = inboxMsgPreview(msg)
 			}
 			if author == trendlymodels.InboxAuthorContact && ts > lastInboundAt {
 				lastInboundAt = ts

@@ -103,12 +103,14 @@ func IngestMessaging(platformAccountID string, m *instainterfaces.Messaging) {
 	if isEcho {
 		author = trendlymodels.InboxAuthorBusiness
 	}
+	attURL, attType := firstAttachment(m.Message)
 	newMsg := trendlymodels.InboxMessage{
-		ID:            m.Message.Mid,
-		Author:        author,
-		Text:          m.Message.Text,
-		SentAt:        ts,
-		AttachmentURL: firstAttachmentURL(m.Message),
+		ID:             m.Message.Mid,
+		Author:         author,
+		Text:           m.Message.Text,
+		SentAt:         ts,
+		AttachmentURL:  attURL,
+		AttachmentType: attType,
 	}
 
 	conv, err := trendlymodels.GetInboxConversation(brandID, convID)
@@ -298,27 +300,68 @@ func isSelfAuthor(acc *trendlymodels.SocialAccount, fromID string) bool {
 		(acc.InstagramBusinessID != "" && fromID == acc.InstagramBusinessID)
 }
 
-// firstAttachmentURL returns the URL of the first usable attachment on a DM, if any.
-func firstAttachmentURL(msg *instainterfaces.Message) string {
-	if msg == nil || msg.Attachments == nil {
-		return ""
+// firstAttachment returns the URL and normalized type of the first attachment on
+// a webhook DM, if any. Some attachments (e.g. unsupported media) carry a type
+// but no URL — we still surface the type so the thread shows a placeholder.
+func firstAttachment(msg *instainterfaces.Message) (url, typ string) {
+	if msg == nil || msg.Attachments == nil || len(*msg.Attachments) == 0 {
+		return "", ""
 	}
 	for _, a := range *msg.Attachments {
 		if a.Payload.URL != "" {
-			return a.Payload.URL
+			return a.Payload.URL, normalizeWebhookAttType(a.Type)
 		}
 	}
-	return ""
+	return "", normalizeWebhookAttType((*msg.Attachments)[0].Type)
 }
 
-// inboxMsgPreview returns a one-line list preview for a DM, falling back to an
-// attachment placeholder when the message carries media but no text.
+// normalizeWebhookAttType maps Meta's webhook attachment types (template, audio,
+// file, image, share, story_mention, video, reel, ig_reel, post, ig_post) to the
+// coarse set the frontend renders.
+func normalizeWebhookAttType(t string) string {
+	switch t {
+	case "image":
+		return "image"
+	case "video", "reel", "ig_reel":
+		return "video"
+	case "audio":
+		return "audio"
+	case "share", "post", "ig_post":
+		return "share"
+	case "story_mention", "story":
+		return "story"
+	default:
+		return "file"
+	}
+}
+
+// inboxMsgPreview returns a one-line list preview for a DM, falling back to a
+// type-aware placeholder when the message carries media but no text.
 func inboxMsgPreview(m trendlymodels.InboxMessage) string {
 	if m.Text != "" {
 		return m.Text
 	}
-	if m.AttachmentURL != "" {
-		return "📎 Attachment"
+	if m.AttachmentURL != "" || m.AttachmentType != "" {
+		return attachmentLabel(m.AttachmentType)
 	}
 	return ""
+}
+
+// attachmentLabel is the human label for a media-only message in list previews
+// and (frontend mirrors this) attachment cards.
+func attachmentLabel(typ string) string {
+	switch typ {
+	case "image":
+		return "📷 Photo"
+	case "video":
+		return "🎬 Video"
+	case "audio":
+		return "🎤 Audio"
+	case "share":
+		return "🔗 Shared post"
+	case "story":
+		return "📖 Story"
+	default:
+		return "📎 Attachment"
+	}
 }
