@@ -186,5 +186,9 @@ func FacebookCallback(c *gin.Context) {
 		return
 	}
 
+	// Warm the inbox / media / analytics caches in the background (once per
+	// connect — the ops are brand-wide). Best-effort.
+	enqueueWarmup(state.BrandID)
+
 	c.Redirect(302, CallbackSuccessURL(connectBase, "facebook", state.CallbackScheme, state.App))
 }

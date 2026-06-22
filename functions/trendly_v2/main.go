@@ -71,6 +71,8 @@ func handleManagerAPIs() {
 	// ── Analytics / Reporting (unified Meta insights) ─────────────────────────
 	managerApisV1.GET("/brands/:brandId/analytics/overview", analytics.GetBrandAnalyticsOverview)
 	managerApisV1.GET("/brands/:brandId/analytics/accounts/:id", analytics.GetBrandAccountAnalytics)
+	// Unit-level: recompute a single page's insights (async → Firestore).
+	managerApisV1.POST("/brands/:brandId/analytics/accounts/:id/resync", analytics.ResyncBrandAccountAnalytics)
 	// Per-post basic analytics for a single published media (Content details page).
 	managerApisV1.GET("/brands/:brandId/analytics/media/:mediaId", analytics.GetPostAnalytics)
 
@@ -82,10 +84,15 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/hide", inbox.HideComment)
 	managerApisV1.DELETE("/brands/:brandId/inbox/conversations/:id", inbox.DeleteConversation)
 	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/read", inbox.ReadConversation)
+	// Unit-level resyncs (refresh one stale item — expired avatar/attachment, etc.).
+	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/resync-profile", inbox.ResyncConversationProfile)
+	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/resync", inbox.ResyncConversationThread)
+	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/messages/:msgId/resync", inbox.ResyncConversationMessage)
 
 	// Media tab — browse published posts/reels and their comments (on-demand
 	// Graph reads). Comment actions are keyed by comment id (no stored conv).
 	managerApisV1.GET("/brands/:brandId/inbox/media", inbox.GetMediaList)
+	managerApisV1.POST("/brands/:brandId/inbox/media/:mediaId/resync", inbox.ResyncMedia)
 	managerApisV1.GET("/brands/:brandId/inbox/media/:mediaId/comments", inbox.GetMediaComments)
 	managerApisV1.POST("/brands/:brandId/inbox/comments/:commentId/reply", inbox.ReplyToMediaCommentHandler)
 	managerApisV1.POST("/brands/:brandId/inbox/comments/:commentId/hide", inbox.HideMediaCommentHandler)
