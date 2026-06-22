@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/socialsync"
 	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/messenger"
 )
@@ -90,15 +91,10 @@ func GetConversations(brandID string) ([]trendlymodels.InboxConversation, error)
 		return nil, err
 	}
 	if count == 0 {
-		if syncErr := SyncFromMeta(brandID); syncErr != nil {
-			log.Printf("inbox: read-through sync failed for brand %s: %v", brandID, syncErr)
+		if syncErr := enqueueOrRun(brandID, socialsync.OpInboxSync); syncErr != nil {
+			log.Printf("inbox: read-through enqueue failed for brand %s: %v", brandID, syncErr)
 		}
 	}
-	return trendlymodels.ListInboxConversations(brandID)
-}
-
-// ListConversations returns the cached conversations without triggering a sync.
-func ListConversations(brandID string) ([]trendlymodels.InboxConversation, error) {
 	return trendlymodels.ListInboxConversations(brandID)
 }
 
@@ -131,8 +127,8 @@ func GetConversationsFiltered(brandID, filter string) ([]trendlymodels.InboxConv
 		return nil, err
 	}
 	if count == 0 {
-		if syncErr := SyncFromMeta(brandID); syncErr != nil {
-			log.Printf("inbox: read-through sync failed for brand %s: %v", brandID, syncErr)
+		if syncErr := enqueueOrRun(brandID, socialsync.OpInboxSync); syncErr != nil {
+			log.Printf("inbox: read-through enqueue failed for brand %s: %v", brandID, syncErr)
 		}
 	}
 	q := filterToQuery(filter)
@@ -179,23 +175,6 @@ func SyncFromMeta(brandID string) error {
 		}
 	}
 	return firstErr
-}
-
-// ResyncFromMeta clears the brand's cached DM conversations and re-pulls them
-// fresh from Meta. Comments are webhook-only (not re-fetchable here) so they are
-// left intact. Used by the admin/repair resync to rebuild participant
-// names/avatars and drop stale or duplicated DM docs. Returns the rebuilt list.
-func ResyncFromMeta(brandID string) ([]trendlymodels.InboxConversation, error) {
-	deleted, err := trendlymodels.DeleteInboxConversationsByKind(brandID, trendlymodels.InboxKindDM)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("inbox: resync cleared %d DM conversations for brand %s", deleted, brandID)
-	if err := SyncFromMeta(brandID); err != nil {
-		log.Printf("inbox: resync sync-from-meta failed for %s: %v", brandID, err)
-		// Non-fatal: return whatever repopulated.
-	}
-	return trendlymodels.ListInboxConversations(brandID)
 }
 
 // syncAccountDMs fetches recent DM conversations for one account and upserts them.
@@ -253,11 +232,39 @@ func isSelfParticipant(s *trendlymodels.SocialAccount, selfID, id, username stri
 	return false
 }
 
+// mapMessengerMessage converts a Meta DM message to our InboxMessage, deciding
+// direction with the robust self-detection (app-scoped from.id / username) and
+// carrying any media attachment through (photos, videos, reels, shared posts,
+// story replies, voice clips, files) so media-only messages don't render empty.
+// Shared by the bulk sync and the unit-level thread/message resyncs.
+func mapMessengerMessage(s *trendlymodels.SocialAccount, selfID string, m messenger.Message) trendlymodels.InboxMessage {
+	author := trendlymodels.InboxAuthorContact
+	if isSelfParticipant(s, selfID, m.From.ID, m.From.Username) {
+		author = trendlymodels.InboxAuthorBusiness
+	}
+	msg := trendlymodels.InboxMessage{
+		ID:     m.ID,
+		Author: author,
+		Text:   m.Message,
+		SentAt: m.CreatedTime.UnixMilli(),
+	}
+	if media := m.FirstMedia(); media != nil {
+		msg.AttachmentURL = media.URL
+		msg.AttachmentType = media.Type
+		msg.AttachmentThumbURL = media.Thumb
+	}
+	return msg
+}
+
 // fetchContactProfile looks up a DM contact's display profile (name, handle,
 // avatar) from Meta. Best-effort: returns zero values on any error so callers
 // fall back to whatever they already have. Instagram-Login accounts resolve via
 // graph.instagram.com; Facebook Pages (incl. IG-via-Page) via graph.facebook.com.
-func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID string) (name, handle, avatar string) {
+//
+// usernameHint seeds the Business Discovery fallback (the contact's handle from
+// the conversation participants) for cases where the messaging lookup returns
+// nothing — webhook callers that lack a participant list pass "".
+func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usernameHint string) (name, handle, avatar string) {
 	if contactID == "" || token == "" {
 		return "", "", ""
 	}
@@ -272,9 +279,56 @@ func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID string
 	}
 	if err != nil || prof == nil {
 		log.Printf("inbox: contact profile fetch failed for %s: %v", contactID, err)
-		return "", "", ""
+	} else {
+		name, handle, avatar = prof.Name, prof.Username, prof.ProfilePic
 	}
-	return prof.Name, prof.Username, prof.ProfilePic
+	if handle == "" {
+		handle = usernameHint
+	}
+
+	// Business/professional accounts: the messaging User Profile API withholds
+	// name + profile_pic (returns only the username), so the contact ends up with
+	// the @handle and no avatar. Fall back to the Business Discovery API by
+	// username, which exposes public profile data (name, picture) for professional
+	// target accounts. Best-effort: failures (incl. personal accounts, which are
+	// not discoverable) leave the messaging-API values untouched.
+	if avatar == "" && handle != "" {
+		if bd := fetchBusinessDiscovery(s, token, handle); bd != nil {
+			if name == "" {
+				name = bd.Name
+			}
+			if bd.ProfilePictureURL != "" {
+				avatar = bd.ProfilePictureURL
+			}
+		}
+	}
+	return name, handle, avatar
+}
+
+// fetchBusinessDiscovery resolves a professional contact's public profile by
+// username via the Business Discovery API, keyed off the connected account's own
+// IG id. Returns nil when no usable query node/token exists or the lookup fails.
+func fetchBusinessDiscovery(s *trendlymodels.SocialAccount, token, username string) *messenger.InstagramProfile {
+	var (
+		prof *messenger.InstagramProfile
+		err  error
+	)
+	if s.Platform == trendlymodels.PlatformInstagram {
+		if s.PlatformAccountID == "" {
+			return nil
+		}
+		prof, err = instagram.GetInstagramByUsername(s.PlatformAccountID, username, token)
+	} else {
+		if s.InstagramBusinessID == "" {
+			return nil
+		}
+		prof, err = messenger.GetInstagramByUsername(s.InstagramBusinessID, username, token)
+	}
+	if err != nil || prof == nil {
+		log.Printf("inbox: business discovery failed for %s: %v", username, err)
+		return nil
+	}
+	return prof
 }
 
 // upsertDMConversation maps a Meta conversation to the inbox model and stores it.
@@ -295,7 +349,7 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 	// carry only an id/username and never a profile picture, so without this the
 	// avatar is empty and the name is just the handle.
 	var avatarURL string
-	if name, handle, avatar := fetchContactProfile(s, token, contactID); name != "" || avatar != "" {
+	if name, handle, avatar := fetchContactProfile(s, token, contactID, contactHandle); name != "" || avatar != "" {
 		if name != "" {
 			contactName = name
 		}
@@ -312,24 +366,14 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		// Meta returns newest-first; reverse to chronological for the thread.
 		data := c.Messages.Data
 		for i := len(data) - 1; i >= 0; i-- {
-			m := data[i]
-			author := trendlymodels.InboxAuthorContact
-			if m.From.ID == selfID {
-				author = trendlymodels.InboxAuthorBusiness
+			msg := mapMessengerMessage(s, selfID, data[i])
+			msgs = append(msgs, msg)
+			if msg.SentAt > lastAt {
+				lastAt = msg.SentAt
+				preview = inboxMsgPreview(msg)
 			}
-			ts := m.CreatedTime.UnixMilli()
-			msgs = append(msgs, trendlymodels.InboxMessage{
-				ID:     m.ID,
-				Author: author,
-				Text:   m.Message,
-				SentAt: ts,
-			})
-			if ts > lastAt {
-				lastAt = ts
-				preview = m.Message
-			}
-			if author == trendlymodels.InboxAuthorContact && ts > lastInboundAt {
-				lastInboundAt = ts
+			if msg.Author == trendlymodels.InboxAuthorContact && msg.SentAt > lastInboundAt {
+				lastInboundAt = msg.SentAt
 			}
 		}
 	}

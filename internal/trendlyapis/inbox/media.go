@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
@@ -31,6 +32,7 @@ type MediaItem struct {
 	Permalink     string `json:"permalink,omitempty"`
 	Timestamp     int64  `json:"timestamp"` // epoch ms
 	CommentsCount int    `json:"commentsCount"`
+	LikeCount     int    `json:"likeCount"`
 }
 
 // MediaComment is a top-level comment on a piece of media.
@@ -67,6 +69,7 @@ func igMediaItem(m instagram.InstagramMedia, socialID string) MediaItem {
 		Permalink:     m.Permalink,
 		Timestamp:     m.Timestamp.UnixMilli(),
 		CommentsCount: m.CommentsCount,
+		LikeCount:     m.LikeCount,
 	}
 }
 
@@ -154,6 +157,37 @@ func ListMedia(brandID string, count int) ([]MediaItem, error) {
 
 	sort.Slice(out, func(i, j int) bool { return out[i].Timestamp > out[j].Timestamp })
 	return out, firstErr
+}
+
+// RefreshMedia pulls the brand's published media from Meta and upserts each item
+// to Firestore (brands/{brandId}/inboxMedia), so the Media tab observes them live
+// as they're written. Runs in the social_sqs worker off the HTTP request path.
+// Best-effort: a per-account Graph failure is logged and skipped.
+func RefreshMedia(brandID string) error {
+	items, err := ListMedia(brandID, defaultMediaCount)
+	if err != nil {
+		log.Printf("inbox media: refresh list partial/failed for %s: %v", brandID, err)
+	}
+	now := time.Now().UnixMilli()
+	for i := range items {
+		it := items[i]
+		doc := &trendlymodels.InboxMediaDoc{
+			ID:            it.ID,
+			Channel:       it.Channel,
+			SocialID:      it.SocialID,
+			ThumbnailURL:  it.ThumbnailURL,
+			Caption:       it.Caption,
+			Permalink:     it.Permalink,
+			Timestamp:     it.Timestamp,
+			CommentsCount: it.CommentsCount,
+			LikeCount:     it.LikeCount,
+			UpdatedAt:     now,
+		}
+		if e := doc.Upsert(brandID); e != nil {
+			log.Printf("inbox media: upsert %s failed for %s: %v", it.ID, brandID, e)
+		}
+	}
+	return err
 }
 
 // ListMediaComments fetches the top-level comments on a single piece of media.

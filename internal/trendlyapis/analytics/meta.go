@@ -211,11 +211,14 @@ func fetchFacebook(acc trendlymodels.SocialAccount, token *trendlymodels.SocialT
 	at := token.AccessToken
 	preset := r.FBDatePreset()
 
-	// Daily series: impressions (≈ views), unique impressions (≈ reach), engagement.
+	// Daily series: media views (≈ impressions), unique media views (≈ reach), engagement.
+	// NOTE: Meta deprecated page_impressions* and page_fans* across ALL Graph API
+	// versions on 2025-11-15; they now 400 with "(#100) ... valid insights metric".
+	// Use the page_media_view family instead. (https://developers.facebook.com/blog/post/2025/08/15/page-insights-api-updates/)
 	resp, err := messenger.GetFacebookInsights(pageID, at,
 		[]messenger.FBInsightMetric{
-			messenger.FBMetricPageImpressions,
-			messenger.FBMetricPageImpressionsUnique,
+			messenger.FBMetricPageMediaView,
+			messenger.FBMetricPageTotalMediaUnique,
 			messenger.FBMetricPagePostEngagements,
 		},
 		messenger.FBPeriodDay,
@@ -225,8 +228,8 @@ func fetchFacebook(acc trendlymodels.SocialAccount, token *trendlymodels.SocialT
 		out.Error = "facebook insights: " + err.Error()
 	}
 
-	out.Metrics[BucketReach] = fbMetric(BucketReach, "Reach", resp, messenger.FBMetricPageImpressionsUnique)
-	out.Metrics[BucketImpressions] = fbMetric(BucketImpressions, "Impressions", resp, messenger.FBMetricPageImpressions)
+	out.Metrics[BucketReach] = fbMetric(BucketReach, "Reach", resp, messenger.FBMetricPageTotalMediaUnique)
+	out.Metrics[BucketImpressions] = fbMetric(BucketImpressions, "Impressions", resp, messenger.FBMetricPageMediaView)
 	out.Metrics[BucketEngagement] = fbMetric(BucketEngagement, "Engagement", resp, messenger.FBMetricPagePostEngagements)
 
 	out.Demographics = facebookDemographics(pageID, at)
@@ -254,26 +257,14 @@ func fbMetric(key, label string, resp *messenger.FBInsightResponse, m messenger.
 	return metric
 }
 
-// facebookDemographics fetches lifetime fan-country breakdown best-effort.
-func facebookDemographics(pageID, at string) []DemographicBucket {
-	resp, err := messenger.GetFacebookInsights(pageID, at,
-		[]messenger.FBInsightMetric{messenger.FBMetricPageFansCountry},
-		messenger.FBPeriodLifetime,
-		messenger.FBInsightParams{},
-	)
-	if err != nil || resp == nil {
-		return nil
-	}
-	m := resp.LatestMap(messenger.FBMetricPageFansCountry)
-	if len(m) == 0 {
-		return nil
-	}
-	entries := make([]DemographicEntry, 0, len(m))
-	for k, v := range m {
-		entries = append(entries, DemographicEntry{Label: k, Value: v})
-	}
-	sortEntriesDesc(entries)
-	return []DemographicBucket{{Dimension: "country", Entries: entries}}
+// facebookDemographics previously fetched the lifetime fan-country breakdown via
+// the page_fans_country insights metric. Meta deprecated the entire "page fans"
+// metric family on 2025-11-15 across ALL Graph API versions, and there is no
+// replacement demographic metric on the Pages API. We therefore no longer make
+// the (guaranteed-400) call and return no demographics for Facebook.
+// If/when Meta ships a follower-demographics metric, re-source it here.
+func facebookDemographics(_, _ string) []DemographicBucket {
+	return nil
 }
 
 // facebookTopMedia fetches recent posts with engagement and ranks the best.

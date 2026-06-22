@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/socialsync"
 )
 
 // queryCount parses an optional ?count= query param (<=0 → 0, let the service default).
@@ -19,20 +20,21 @@ func queryCount(c *gin.Context) int {
 	return n
 }
 
-// GET /api/v2/brands/:brandId/inbox/media
-// Lists the brand's published posts/reels across connected Meta accounts.
+// POST/GET /api/v2/brands/:brandId/inbox/media
+// Queues a background refresh of the brand's published posts/reels and returns
+// immediately. The worker upserts each item to Firestore (brands/{brandId}/
+// inboxMedia); the client observes them live via its Firestore listener.
 func GetMediaList(c *gin.Context) {
 	brandID := c.Param("brandId")
 	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
 		return
 	}
-	media, err := ListMedia(brandID, queryCount(c))
-	if err != nil && len(media) == 0 {
-		log.Printf("inbox media: list failed for %s: %v", brandID, err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to load media"})
+	if err := enqueueOrRun(brandID, socialsync.OpMedia); err != nil {
+		log.Printf("inbox media: enqueue refresh failed for %s: %v", brandID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue media refresh"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"media": media})
+	c.JSON(http.StatusAccepted, gin.H{"queued": true})
 }
 
 // GET /api/v2/brands/:brandId/inbox/media/:mediaId/comments?socialId=&channel=

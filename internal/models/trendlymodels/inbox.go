@@ -38,11 +38,13 @@ type InboxParticipant struct {
 }
 
 type InboxMessage struct {
-	ID            string      `json:"id" firestore:"id"`
-	Author        InboxAuthor `json:"author" firestore:"author"`
-	Text          string      `json:"text" firestore:"text"`
-	SentAt        int64       `json:"sentAt" firestore:"sentAt"` // epoch ms
-	AttachmentURL string      `json:"attachmentUrl,omitempty" firestore:"attachmentUrl,omitempty"`
+	ID                 string      `json:"id" firestore:"id"`
+	Author             InboxAuthor `json:"author" firestore:"author"`
+	Text               string      `json:"text" firestore:"text"`
+	SentAt             int64       `json:"sentAt" firestore:"sentAt"` // epoch ms
+	AttachmentURL      string      `json:"attachmentUrl,omitempty" firestore:"attachmentUrl,omitempty"`
+	AttachmentType     string      `json:"attachmentType,omitempty" firestore:"attachmentType,omitempty"`         // image|video|audio|file|share|story
+	AttachmentThumbURL string      `json:"attachmentThumbUrl,omitempty" firestore:"attachmentThumbUrl,omitempty"` // preview image (videos)
 }
 
 type InboxCommentPost struct {

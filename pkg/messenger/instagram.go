@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 type InstagramBriefProfile struct {
@@ -62,6 +63,35 @@ func GetInstagramInBrief(instagramId string, accessToken string) (*InstagramBrie
 		return nil, err
 	}
 	return &data, nil
+}
+
+// GetInstagramByUsername fetches a professional (business/creator) account's
+// public profile (name, username, profile_picture_url, followers) by username via
+// the Business Discovery API. selfIGID is the connected IG Business account id used
+// as the query node; accessToken is its page token. Returns data only for
+// professional target accounts (personal accounts are not discoverable this way).
+// GET graph.facebook.com/{version}/{selfIGID}?fields=business_discovery.username(<username>){...}
+func GetInstagramByUsername(selfIGID, username, accessToken string) (*InstagramProfile, error) {
+	fields := fmt.Sprintf("business_discovery.username(%s){id,name,username,profile_picture_url,followers_count}", username)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=%s&access_token=%s",
+		BaseURL, ApiVersion, selfIGID, url.QueryEscape(fields), url.QueryEscape(accessToken))
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GetInstagramByUsername: status %d: %s", resp.StatusCode, string(body))
+	}
+	var out struct {
+		BusinessDiscovery InstagramProfile `json:"business_discovery"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return &out.BusinessDiscovery, nil
 }
 
 func GetInstagram(instagramId string, accessToken string) (*InstagramProfile, error) {

@@ -94,6 +94,11 @@ provider:
           Action:
             - "sqs:SendMessage"
           Resource: { "Fn::GetAtt": ["ContentPublishQueue", "Arn"] }
+        # ── Social sync: hand slow Meta work (inbox/analytics/media) to social_sqs ──
+        - Effect: "Allow"
+          Action:
+            - "sqs:SendMessage"
+          Resource: { "Fn::GetAtt": ["SocialSyncQueue", "Arn"] }
 plugins:
   - serverless-go-plugin
   - serverless-domain-manager
@@ -275,6 +280,8 @@ functions:
           - Arn
       SEND_MESSAGE_QUEUE_ARN:
         Ref: ContentPublishQueue   # Ref returns the queue URL (QueueUrl for sqs:sendMessage)
+      SOCIAL_SYNC_QUEUE_URL:
+        Ref: SocialSyncQueue       # shared async queue for slow Meta work (see social_sqs worker)
     package:
       include:
         - 'service-account.json'
@@ -375,6 +382,20 @@ functions:
             Fn::GetAtt:
               - ContentPublishQueue
               - Arn
+  social_sqs:
+    handler: functions/social_sqs/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 600   # Meta work (inbox/analytics/media) makes many sequential Graph calls; far above the 30s HTTP limit
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - SocialSyncQueue
+              - Arn
   insta_apis:
     handler: functions/unauth_apis/main.go
     package:
@@ -468,6 +489,15 @@ resources:
               - StreamMessageDLQ
               - Arn
           maxReceiveCount: 5
+
+    # --------------------------------------------------------------------------------------
+    # --- Shared social sync (Meta inbox/analytics/media) — consumed by social_sqs worker ---
+    # --------------------------------------------------------------------------------------
+    SocialSyncQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SocialSyncQueue-${self:provider.stage}
+        VisibilityTimeout: 660   # ≥ social_sqs timeout (600s) + buffer
 
     # --------------------------------------------------------------------------------------
     # ------------- Scheduled content publishing (delayed_sqs via Step Functions) ----------

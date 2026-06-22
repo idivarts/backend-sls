@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
-const messageInfoFields = "id,created_time,from,to,message,attachments"
+// Request the media sub-fields explicitly — the default `attachments` expansion
+// is not guaranteed to include file_url/mime_type, which we need to surface
+// voice clips and file attachments alongside photos and videos.
+const messageInfoFields = "id,created_time,from,to,message,attachments{id,mime_type,name,file_url,image_data,video_data}"
 
 type Participants struct {
 	Data []struct {
@@ -44,6 +48,10 @@ type Paging struct {
 }
 
 type DataItem struct {
+	ID        string     `json:"id,omitempty"`
+	MimeType  string     `json:"mime_type,omitempty"`
+	Name      string     `json:"name,omitempty"`
+	FileURL   string     `json:"file_url,omitempty"`
 	ImageData *ImageData `json:"image_data,omitempty"`
 	VideoData *VideoData `json:"video_data,omitempty"`
 }
@@ -51,6 +59,52 @@ type DataItem struct {
 type Attachments struct {
 	Data   []DataItem `json:"data"`
 	Paging Paging     `json:"paging"`
+}
+
+// MediaAttachment is a normalized view of a message's primary media attachment,
+// independent of how Meta nested it (image_data / video_data / file_url).
+type MediaAttachment struct {
+	URL   string // direct media URL (may be a time-limited Meta CDN link)
+	Type  string // image | video | audio | file
+	Thumb string // optional preview/thumbnail (videos)
+}
+
+// FirstMedia returns the first usable media attachment on the message, or nil
+// when it carries none. Meta folds shared posts, reels and story replies into
+// image_data/video_data ("only the image or video URL for a share is returned"),
+// so image_data + video_data + file_url together cover every media kind the
+// Conversations API exposes — photos, videos, reels, shared posts, story
+// replies, voice clips and file attachments.
+func (m *Message) FirstMedia() *MediaAttachment {
+	if m.Attachments == nil {
+		return nil
+	}
+	for _, d := range m.Attachments.Data {
+		switch {
+		case d.VideoData != nil && d.VideoData.URL != "":
+			return &MediaAttachment{URL: d.VideoData.URL, Type: "video", Thumb: d.VideoData.PreviewURL}
+		case d.ImageData != nil && d.ImageData.URL != "":
+			return &MediaAttachment{URL: d.ImageData.URL, Type: "image", Thumb: d.ImageData.PreviewURL}
+		case d.FileURL != "":
+			return &MediaAttachment{URL: d.FileURL, Type: mediaKindFromMime(d.MimeType)}
+		}
+	}
+	return nil
+}
+
+// mediaKindFromMime maps a MIME type to a coarse attachment kind for file_url
+// attachments (voice notes arrive as audio/*, etc.).
+func mediaKindFromMime(mime string) string {
+	switch {
+	case strings.HasPrefix(mime, "audio"):
+		return "audio"
+	case strings.HasPrefix(mime, "video"):
+		return "video"
+	case strings.HasPrefix(mime, "image"):
+		return "image"
+	default:
+		return "file"
+	}
 }
 
 type Message struct {

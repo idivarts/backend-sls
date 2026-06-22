@@ -27,7 +27,10 @@ const (
 	FBMetricPageDailyUnfollowsUnique       FBInsightMetric = "page_daily_unfollows_unique"
 	FBMetricPageFollows                    FBInsightMetric = "page_follows"
 
-	// Impressions & reach
+	// ⚠️ DEPRECATED by Meta on 2025-11-15 across ALL Graph API versions — these now
+	// return "(#100) The value must be a valid insights metric". Use the page_media_view
+	// family below instead. Kept only for reference; do NOT request these.
+	// https://developers.facebook.com/blog/post/2025/08/15/page-insights-api-updates/
 	FBMetricPageImpressions               FBInsightMetric = "page_impressions"
 	FBMetricPageImpressionsUnique         FBInsightMetric = "page_impressions_unique"
 	FBMetricPageImpressionsPaid           FBInsightMetric = "page_impressions_paid"
@@ -40,7 +43,10 @@ const (
 	FBMetricPagePostsImpressionsUnique    FBInsightMetric = "page_posts_impressions_unique"
 	FBMetricPagePostsImpressionsPaid      FBInsightMetric = "page_posts_impressions_paid"
 
-	// Views
+	// Views — current replacement for the deprecated page_impressions* family.
+	// page_media_view ≈ impressions; page_total_media_view_unique ≈ unique reach.
+	// Both support period day/week/days_28. Paid vs organic is NOT a separate
+	// metric — request the `is_from_ads` breakdown on page_media_view instead.
 	FBMetricPageViewsTotal       FBInsightMetric = "page_views_total"
 	FBMetricPageMediaView        FBInsightMetric = "page_media_view"
 	FBMetricPageTotalMediaUnique FBInsightMetric = "page_total_media_view_unique"
@@ -60,6 +66,11 @@ const (
 	FBMetricPageVideoViewTime           FBInsightMetric = "page_video_view_time"
 
 	// Fans / demographics
+	// ⚠️ DEPRECATED by Meta on 2025-11-15 across ALL Graph API versions (the
+	// "page fans" family) — these now return "(#100) ... valid insights metric".
+	// page_fans has no follower-count replacement on insights (use the Page
+	// `followers_count` field); the *_country/_city/_locale demographics have NO
+	// replacement on the Pages API. Do NOT request these.
 	FBMetricPageFans                   FBInsightMetric = "page_fans"
 	FBMetricPageFansLocale             FBInsightMetric = "page_fans_locale"
 	FBMetricPageFansCity               FBInsightMetric = "page_fans_city"
@@ -81,8 +92,13 @@ const (
 	FBMetricPageReactionsTotal      FBInsightMetric = "page_actions_post_reactions_total"
 
 	// Post-level
-	FBMetricPostClicks                   FBInsightMetric = "post_clicks"
-	FBMetricPostClicksByType             FBInsightMetric = "post_clicks_by_type"
+	FBMetricPostClicks       FBInsightMetric = "post_clicks"
+	FBMetricPostClicksByType FBInsightMetric = "post_clicks_by_type"
+
+	// ⚠️ DEPRECATED by Meta on 2025-11-15 across ALL Graph API versions (the
+	// post_impressions* family) — these now return "(#100) ... valid insights
+	// metric". Use the post_media_views family below instead. Note: it measures
+	// VIEWS (incl. repeats), there is no unique-reach replacement for posts.
 	FBMetricPostImpressions              FBInsightMetric = "post_impressions"
 	FBMetricPostImpressionsUnique        FBInsightMetric = "post_impressions_unique"
 	FBMetricPostImpressionsPaid          FBInsightMetric = "post_impressions_paid"
@@ -93,13 +109,21 @@ const (
 	FBMetricPostImpressionsOrganicUnique FBInsightMetric = "post_impressions_organic_unique"
 	FBMetricPostImpressionsViral         FBInsightMetric = "post_impressions_viral"
 	FBMetricPostImpressionsViralUnique   FBInsightMetric = "post_impressions_viral_unique"
-	FBMetricPostReactionsLikeTotal       FBInsightMetric = "post_reactions_like_total"
-	FBMetricPostReactionsLoveTotal       FBInsightMetric = "post_reactions_love_total"
-	FBMetricPostReactionsWowTotal        FBInsightMetric = "post_reactions_wow_total"
-	FBMetricPostReactionsHahaTotal       FBInsightMetric = "post_reactions_haha_total"
-	FBMetricPostReactionsSorryTotal      FBInsightMetric = "post_reactions_sorry_total"
-	FBMetricPostReactionsAngerTotal      FBInsightMetric = "post_reactions_anger_total"
-	FBMetricPostReactionsByTypeTotal     FBInsightMetric = "post_reactions_by_type_total"
+
+	// Post media views — current replacement for the deprecated post_impressions* family
+	// (per the v25.0 changelog). post_media_view ≈ impressions (period lifetime);
+	// post_total_media_view_unique ≈ unique reach. Paid vs organic is NOT a separate
+	// metric — request the `is_from_ads` breakdown on post_media_view instead.
+	FBMetricPostMediaView            FBInsightMetric = "post_media_view"
+	FBMetricPostTotalMediaViewUnique FBInsightMetric = "post_total_media_view_unique"
+
+	FBMetricPostReactionsLikeTotal   FBInsightMetric = "post_reactions_like_total"
+	FBMetricPostReactionsLoveTotal   FBInsightMetric = "post_reactions_love_total"
+	FBMetricPostReactionsWowTotal    FBInsightMetric = "post_reactions_wow_total"
+	FBMetricPostReactionsHahaTotal   FBInsightMetric = "post_reactions_haha_total"
+	FBMetricPostReactionsSorryTotal  FBInsightMetric = "post_reactions_sorry_total"
+	FBMetricPostReactionsAngerTotal  FBInsightMetric = "post_reactions_anger_total"
+	FBMetricPostReactionsByTypeTotal FBInsightMetric = "post_reactions_by_type_total"
 
 	// Post video
 	FBMetricPostVideoViews        FBInsightMetric = "post_video_views"
