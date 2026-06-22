@@ -76,6 +76,30 @@ func GetIGConversations(accessToken string) (*messenger.ConversationData, error)
 	return data, nil
 }
 
+// GetUser fetches a DM contact's profile (name, username, profile picture) for an
+// Instagram-Login account. The contact id is the Instagram-scoped id (IGSID) seen
+// in conversation participants / webhook sender ids.
+// GET graph.instagram.com/{version}/{igsid}?fields=name,username,profile_pic
+func GetUser(igsid, accessToken string) (*messenger.UserProfile, error) {
+	fields := "name,username,profile_pic"
+	endpoint := fmt.Sprintf("%s/%s/%s?fields=%s&access_token=%s",
+		BaseURL, ApiVersion, igsid, url.QueryEscape(fields), url.QueryEscape(accessToken))
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GetUser: status %d: %s", resp.StatusCode, string(body))
+	}
+	out := &messenger.UserProfile{}
+	if err := json.Unmarshal(body, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ── Comments ──────────────────────────────────────────────────────────────────
 
 type createIDResponse struct {

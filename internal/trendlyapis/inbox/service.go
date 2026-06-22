@@ -3,6 +3,7 @@ package inbox
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -180,6 +181,23 @@ func SyncFromMeta(brandID string) error {
 	return firstErr
 }
 
+// ResyncFromMeta clears the brand's cached DM conversations and re-pulls them
+// fresh from Meta. Comments are webhook-only (not re-fetchable here) so they are
+// left intact. Used by the admin/repair resync to rebuild participant
+// names/avatars and drop stale or duplicated DM docs. Returns the rebuilt list.
+func ResyncFromMeta(brandID string) ([]trendlymodels.InboxConversation, error) {
+	deleted, err := trendlymodels.DeleteInboxConversationsByKind(brandID, trendlymodels.InboxKindDM)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("inbox: resync cleared %d DM conversations for brand %s", deleted, brandID)
+	if err := SyncFromMeta(brandID); err != nil {
+		log.Printf("inbox: resync sync-from-meta failed for %s: %v", brandID, err)
+		// Non-fatal: return whatever repopulated.
+	}
+	return trendlymodels.ListInboxConversations(brandID)
+}
+
 // syncAccountDMs fetches recent DM conversations for one account and upserts them.
 func syncAccountDMs(brandID string, s *trendlymodels.SocialAccount, token string) error {
 	selfID := s.PlatformAccountID
@@ -190,7 +208,7 @@ func syncAccountDMs(brandID string, s *trendlymodels.SocialAccount, token string
 			return err
 		}
 		for ci := range data.Data {
-			upsertDMConversation(brandID, s, selfID, &data.Data[ci])
+			upsertDMConversation(brandID, s, selfID, token, &data.Data[ci])
 		}
 		return nil
 	}
@@ -210,22 +228,81 @@ func syncAccountDMs(brandID string, s *trendlymodels.SocialAccount, token string
 		conv.Messages = &struct {
 			Data []messenger.Message `json:"data"`
 		}{Data: msgs.Data}
-		upsertDMConversation(brandID, s, selfID, &conv)
+		upsertDMConversation(brandID, s, selfID, token, &conv)
 	}
 	return nil
 }
 
+// isSelfParticipant reports whether a conversation participant is the connected
+// account itself, rather than the external contact. Meta returns app-scoped ids
+// (IGSID/PSID) in participants which don't always equal our stored
+// PlatformAccountID, so we also match the linked IG business id and the account's
+// own username — otherwise the business gets mis-picked as the contact and its
+// page handle shows up as the sender name.
+func isSelfParticipant(s *trendlymodels.SocialAccount, selfID, id, username string) bool {
+	if id != "" {
+		if id == selfID ||
+			(s.PlatformAccountID != "" && id == s.PlatformAccountID) ||
+			(s.InstagramBusinessID != "" && id == s.InstagramBusinessID) {
+			return true
+		}
+	}
+	if username != "" && s.Username != "" && strings.EqualFold(username, s.Username) {
+		return true
+	}
+	return false
+}
+
+// fetchContactProfile looks up a DM contact's display profile (name, handle,
+// avatar) from Meta. Best-effort: returns zero values on any error so callers
+// fall back to whatever they already have. Instagram-Login accounts resolve via
+// graph.instagram.com; Facebook Pages (incl. IG-via-Page) via graph.facebook.com.
+func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID string) (name, handle, avatar string) {
+	if contactID == "" || token == "" {
+		return "", "", ""
+	}
+	var (
+		prof *messenger.UserProfile
+		err  error
+	)
+	if s.Platform == trendlymodels.PlatformInstagram {
+		prof, err = instagram.GetUser(contactID, token)
+	} else {
+		prof, err = messenger.GetUser(contactID, token)
+	}
+	if err != nil || prof == nil {
+		log.Printf("inbox: contact profile fetch failed for %s: %v", contactID, err)
+		return "", "", ""
+	}
+	return prof.Name, prof.Username, prof.ProfilePic
+}
+
 // upsertDMConversation maps a Meta conversation to the inbox model and stores it.
-func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID string, c *messenger.ConversationMessagesData) {
+func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID, token string, c *messenger.ConversationMessagesData) {
 	// Identify the contact participant (the one that isn't us).
 	var contactID, contactName, contactHandle string
 	for _, p := range c.Participants.Data {
-		if p.ID != selfID {
-			contactID = p.ID
-			contactName = p.Username
-			contactHandle = p.Username
-			break
+		if isSelfParticipant(s, selfID, p.ID, p.Username) {
+			continue
 		}
+		contactID = p.ID
+		contactName = p.Username
+		contactHandle = p.Username
+		break
+	}
+
+	// Hydrate the contact's real display name + avatar from Meta. Participants
+	// carry only an id/username and never a profile picture, so without this the
+	// avatar is empty and the name is just the handle.
+	var avatarURL string
+	if name, handle, avatar := fetchContactProfile(s, token, contactID); name != "" || avatar != "" {
+		if name != "" {
+			contactName = name
+		}
+		if handle != "" {
+			contactHandle = handle
+		}
+		avatarURL = avatar
 	}
 
 	msgs := make([]trendlymodels.InboxMessage, 0)
@@ -262,9 +339,10 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		Kind:    trendlymodels.InboxKindDM,
 		Channel: s.Platform,
 		Participant: trendlymodels.InboxParticipant{
-			ID:     contactID,
-			Name:   firstNonEmpty(contactName, "Unknown"),
-			Handle: contactHandle,
+			ID:        contactID,
+			Name:      firstNonEmpty(contactName, "Unknown"),
+			Handle:    contactHandle,
+			AvatarURL: avatarURL,
 		},
 		Preview:                preview,
 		LastActivityAt:         lastAt,

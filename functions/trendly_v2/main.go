@@ -77,6 +77,7 @@ func handleManagerAPIs() {
 	// ── Inbox (omni-channel DMs + comments across connected Meta accounts) ────
 	managerApisV1.GET("/brands/:brandId/inbox", inbox.GetInbox)
 	managerApisV1.POST("/brands/:brandId/inbox/sync", inbox.SyncInbox)
+	managerApisV1.POST("/brands/:brandId/inbox/resync", inbox.ResyncInbox)
 	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/reply", inbox.ReplyToConversation)
 	managerApisV1.POST("/brands/:brandId/inbox/conversations/:id/hide", inbox.HideComment)
 	managerApisV1.DELETE("/brands/:brandId/inbox/conversations/:id", inbox.DeleteConversation)

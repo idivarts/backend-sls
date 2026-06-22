@@ -60,6 +60,24 @@ func SyncInbox(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"conversations": conversations})
 }
 
+// POST /api/v2/brands/:brandId/inbox/resync
+// Clears the brand's cached DM conversations and re-pulls them fresh from Meta so
+// participant names/avatars are rebuilt and stale/duplicate DM docs are dropped.
+// Comments are left intact. Repair/dev tool.
+func ResyncInbox(c *gin.Context) {
+	brandID := c.Param("brandId")
+	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID, trendlymodels.FeatureSocialAccounts, trendlymodels.PrivSocialInbox); !ok {
+		return
+	}
+	conversations, err := ResyncFromMeta(brandID)
+	if err != nil {
+		log.Printf("inbox: resync failed for %s: %v", brandID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resync inbox"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"conversations": conversations})
+}
+
 type replyRequest struct {
 	Text string `json:"text" binding:"required"`
 }
