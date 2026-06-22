@@ -243,6 +243,34 @@ func UpdateInboxConversation(brandID, id string, fields []firestore.Update) erro
 	return err
 }
 
+// DeleteInboxConversationsByKind removes every conversation of a given kind for a
+// brand and returns how many were deleted. Used by the admin resync to clear
+// stale DM docs before a fresh read-through; comments are webhook-only and are
+// left untouched.
+func DeleteInboxConversationsByKind(brandID string, kind InboxKind) (int, error) {
+	iter := firestoredb.Client.
+		Collection(brandInboxCollection(brandID)).
+		Where("kind", "==", kind).
+		Documents(context.Background())
+	defer iter.Stop()
+
+	n := 0
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return n, err
+		}
+		if _, err := doc.Ref.Delete(context.Background()); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
 // DeleteInboxConversation removes a conversation document (used by deletion sync
 // and the comment-delete action).
 func DeleteInboxConversation(brandID, id string) error {
