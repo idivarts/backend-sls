@@ -257,7 +257,11 @@ func isSelfParticipant(s *trendlymodels.SocialAccount, selfID, id, username stri
 // avatar) from Meta. Best-effort: returns zero values on any error so callers
 // fall back to whatever they already have. Instagram-Login accounts resolve via
 // graph.instagram.com; Facebook Pages (incl. IG-via-Page) via graph.facebook.com.
-func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID string) (name, handle, avatar string) {
+//
+// usernameHint seeds the Business Discovery fallback (the contact's handle from
+// the conversation participants) for cases where the messaging lookup returns
+// nothing — webhook callers that lack a participant list pass "".
+func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usernameHint string) (name, handle, avatar string) {
 	if contactID == "" || token == "" {
 		return "", "", ""
 	}
@@ -272,9 +276,56 @@ func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID string
 	}
 	if err != nil || prof == nil {
 		log.Printf("inbox: contact profile fetch failed for %s: %v", contactID, err)
-		return "", "", ""
+	} else {
+		name, handle, avatar = prof.Name, prof.Username, prof.ProfilePic
 	}
-	return prof.Name, prof.Username, prof.ProfilePic
+	if handle == "" {
+		handle = usernameHint
+	}
+
+	// Business/professional accounts: the messaging User Profile API withholds
+	// name + profile_pic (returns only the username), so the contact ends up with
+	// the @handle and no avatar. Fall back to the Business Discovery API by
+	// username, which exposes public profile data (name, picture) for professional
+	// target accounts. Best-effort: failures (incl. personal accounts, which are
+	// not discoverable) leave the messaging-API values untouched.
+	if avatar == "" && handle != "" {
+		if bd := fetchBusinessDiscovery(s, token, handle); bd != nil {
+			if name == "" {
+				name = bd.Name
+			}
+			if bd.ProfilePictureURL != "" {
+				avatar = bd.ProfilePictureURL
+			}
+		}
+	}
+	return name, handle, avatar
+}
+
+// fetchBusinessDiscovery resolves a professional contact's public profile by
+// username via the Business Discovery API, keyed off the connected account's own
+// IG id. Returns nil when no usable query node/token exists or the lookup fails.
+func fetchBusinessDiscovery(s *trendlymodels.SocialAccount, token, username string) *messenger.InstagramProfile {
+	var (
+		prof *messenger.InstagramProfile
+		err  error
+	)
+	if s.Platform == trendlymodels.PlatformInstagram {
+		if s.PlatformAccountID == "" {
+			return nil
+		}
+		prof, err = instagram.GetInstagramByUsername(s.PlatformAccountID, username, token)
+	} else {
+		if s.InstagramBusinessID == "" {
+			return nil
+		}
+		prof, err = messenger.GetInstagramByUsername(s.InstagramBusinessID, username, token)
+	}
+	if err != nil || prof == nil {
+		log.Printf("inbox: business discovery failed for %s: %v", username, err)
+		return nil
+	}
+	return prof
 }
 
 // upsertDMConversation maps a Meta conversation to the inbox model and stores it.
@@ -295,7 +346,7 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 	// carry only an id/username and never a profile picture, so without this the
 	// avatar is empty and the name is just the handle.
 	var avatarURL string
-	if name, handle, avatar := fetchContactProfile(s, token, contactID); name != "" || avatar != "" {
+	if name, handle, avatar := fetchContactProfile(s, token, contactID, contactHandle); name != "" || avatar != "" {
 		if name != "" {
 			contactName = name
 		}

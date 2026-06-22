@@ -100,6 +100,35 @@ func GetUser(igsid, accessToken string) (*messenger.UserProfile, error) {
 	return out, nil
 }
 
+// GetInstagramByUsername fetches a professional account's public profile via the
+// Business Discovery API for an Instagram-Login connected account. selfIGID is the
+// connected account's own IG id (the query node); accessToken is its IG user token.
+// Used as a fallback because the messaging User Profile API withholds name/avatar
+// for professional accounts. Returns data only for professional target accounts.
+// GET graph.instagram.com/{version}/{selfIGID}?fields=business_discovery.username(<username>){...}
+func GetInstagramByUsername(selfIGID, username, accessToken string) (*messenger.InstagramProfile, error) {
+	fields := fmt.Sprintf("business_discovery.username(%s){id,name,username,profile_picture_url,followers_count}", username)
+	endpoint := fmt.Sprintf("%s/%s/%s?fields=%s&access_token=%s",
+		BaseURL, ApiVersion, selfIGID, url.QueryEscape(fields), url.QueryEscape(accessToken))
+
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GetInstagramByUsername: status %d: %s", resp.StatusCode, string(body))
+	}
+	var out struct {
+		BusinessDiscovery messenger.InstagramProfile `json:"business_discovery"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return &out.BusinessDiscovery, nil
+}
+
 // ── Comments ──────────────────────────────────────────────────────────────────
 
 type createIDResponse struct {
