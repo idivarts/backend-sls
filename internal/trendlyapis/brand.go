@@ -79,6 +79,13 @@ func CreateBrand(c *gin.Context) {
 		newBrand.PostedCollaborations = nil
 		newBrand.Backend = nil
 
+		// Stamp creationTime server-side if the client didn't send one, so every
+		// brand has a creation timestamp regardless of which create flow was used.
+		if newBrand.CreationTime == nil {
+			now := time.Now().UnixMilli()
+			newBrand.CreationTime = &now
+		}
+
 		brandDocRef := firestoredb.Client.Collection("brands").NewDoc()
 		brandID = brandDocRef.ID
 		memberDocRef := brandDocRef.Collection("members").Doc(creator)
