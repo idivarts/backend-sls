@@ -509,6 +509,25 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "inbox",
+      "fieldPath": "participant.id",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
       "collectionGroup": "orgMembers",
       "fieldPath": "managerId",
       "ttl": false,
