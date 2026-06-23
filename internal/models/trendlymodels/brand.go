@@ -25,6 +25,11 @@ type Brand struct {
 	// brands are removed from their org's brandIds and excluded from surfaces.
 	DeletedAt *int64 `json:"deletedAt,omitempty" firestore:"deletedAt,omitempty"`
 
+	// CreationTime is when the brand was created (epoch ms). The client sends it
+	// at creation; if absent, the create handler stamps it server-side so every
+	// brand has a value. Legacy brands created before this field may have none.
+	CreationTime *int64 `json:"creationTime,omitempty" firestore:"creationTime,omitempty"`
+
 	// Country is the brand's ISO-3166 alpha-2 country code (e.g. "IN", "US"),
 	// captured silently from the client at onboarding. It is the source of truth
 	// for India-only gating (discovery, in-app invites, Razorpay payments).
