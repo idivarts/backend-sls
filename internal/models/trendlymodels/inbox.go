@@ -273,6 +273,42 @@ func DeleteInboxConversationsByKind(brandID string, kind InboxKind) (int, error)
 	return n, nil
 }
 
+// DeleteInboxConversationsByParticipant removes every inbox conversation across
+// ALL brands whose participant is the given platform user id, returning the
+// count deleted. Used by the Meta data-deletion callback to honor a user's
+// erasure request (their DMs and comments are wiped wherever they appear).
+//
+// This is a collection-group query over the `inbox` subcollection and therefore
+// needs a COLLECTION_GROUP-scoped single-field index on `participant.id`:
+//   - dev (Standard):  fieldOverrides in firestore.indexes.json
+//   - prod (Enterprise): gcloud line in migrations/create-enterprise-single-field-indexes.sh
+func DeleteInboxConversationsByParticipant(participantID string) (int, error) {
+	if participantID == "" {
+		return 0, fmt.Errorf("DeleteInboxConversationsByParticipant: empty participantID")
+	}
+	iter := firestoredb.Client.
+		CollectionGroup("inbox").
+		Where("participant.id", "==", participantID).
+		Documents(context.Background())
+	defer iter.Stop()
+
+	n := 0
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return n, err
+		}
+		if _, err := doc.Ref.Delete(context.Background()); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
 // DeleteInboxConversation removes a conversation document (used by deletion sync
 // and the comment-delete action).
 func DeleteInboxConversation(brandID, id string) error {

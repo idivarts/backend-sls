@@ -10,26 +10,39 @@ import (
 )
 
 // Webhook ingestion. Meta delivers events keyed by the platform account id
-// (entry.id). We resolve that to a connected brand via socialAccountIndex and
-// upsert/delete the corresponding inbox document. Events for accounts not in the
-// index (e.g. the legacy chatbot pages) are ignored.
+// (entry.id). We resolve that to every brand that connected the account via
+// socialAccountIndex and fan the event out, upserting/deleting the inbox document
+// in each owner's store. Events for accounts not in the index (e.g. the legacy
+// chatbot pages) are ignored.
 
-// resolveBrand maps a platform account id to its brand-connected account.
-// Returns (brandID, account, ok). ok=false means "not an inbox account".
-func resolveBrand(platformAccountID string) (string, *trendlymodels.SocialAccount, bool) {
+// inboxTarget is one brand-connected account an event must be ingested into.
+type inboxTarget struct {
+	brandID string
+	acc     *trendlymodels.SocialAccount
+}
+
+// resolveTargets maps a platform account id to every brand-connected account
+// that should receive the event. The same account may be owned by multiple
+// brands, so an event fans out to all of them. User-level inboxes are not
+// supported in v1 and are skipped.
+func resolveTargets(platformAccountID string) []inboxTarget {
 	idx, err := trendlymodels.GetSocialAccountIndex(platformAccountID)
 	if err != nil {
-		return "", nil, false // unknown account — not ours
+		return nil // unknown account — not ours
 	}
-	if idx.App != "brands" || idx.BrandID == "" {
-		return "", nil, false // user-level inbox not supported in v1
+	var targets []inboxTarget
+	for _, o := range idx.AllOwners() {
+		if o.App != "brands" || o.BrandID == "" {
+			continue // user-level inbox not supported in v1
+		}
+		acc, err := trendlymodels.GetBrandSocialAccount(o.BrandID, o.SocialID)
+		if err != nil {
+			log.Printf("inbox webhook: account %s/%s missing: %v", o.BrandID, o.SocialID, err)
+			continue
+		}
+		targets = append(targets, inboxTarget{brandID: o.BrandID, acc: acc})
 	}
-	acc, err := trendlymodels.GetBrandSocialAccount(idx.BrandID, idx.SocialID)
-	if err != nil {
-		log.Printf("inbox webhook: account %s/%s missing: %v", idx.BrandID, idx.SocialID, err)
-		return "", nil, false
-	}
-	return idx.BrandID, acc, true
+	return targets
 }
 
 // channelForAccount returns the display channel for an event on a given account.
@@ -42,17 +55,25 @@ func channelForAccount(acc *trendlymodels.SocialAccount, platformAccountID strin
 	return acc.Platform
 }
 
-// IngestMessaging handles a DM event (entry.messaging[]). Handles inbound,
-// outbound echoes, and unsend (deletion sync).
+// IngestMessaging handles a DM event (entry.messaging[]). It fans the event out
+// to every brand that owns the account. Handles inbound, outbound echoes, unsend
+// (deletion sync), and edits (message_edit).
 func IngestMessaging(platformAccountID string, m *instainterfaces.Messaging) {
-	if m.Message == nil {
+	// Edits arrive as a sibling message_edit object (no message field).
+	if m.MessageEdit == nil && m.Message == nil {
 		return
 	}
-	brandID, acc, ok := resolveBrand(platformAccountID)
-	if !ok {
-		return
+	for _, t := range resolveTargets(platformAccountID) {
+		if m.MessageEdit != nil {
+			ingestMessageEditForBrand(t.brandID, t.acc, m)
+		} else {
+			ingestMessagingForBrand(t.brandID, t.acc, platformAccountID, m)
+		}
 	}
+}
 
+// ingestMessagingForBrand applies a DM event to a single brand's inbox.
+func ingestMessagingForBrand(brandID string, acc *trendlymodels.SocialAccount, platformAccountID string, m *instainterfaces.Messaging) {
 	selfID := acc.PlatformAccountID
 	isEcho := m.Message.IsEcho
 
@@ -167,8 +188,56 @@ func IngestMessaging(platformAccountID string, m *instainterfaces.Messaging) {
 	}
 }
 
-// IngestComment handles a comment/feed change event (entry.changes[]).
-// Handles create, edit, hide/unhide, and delete (deletion sync).
+// ingestMessageEditForBrand applies a DM edit to a single brand's inbox: it
+// locates the stored message by its mid and rewrites its text in place,
+// preserving the rest of the thread. Edits for messages or conversations we
+// don't track are ignored.
+func ingestMessageEditForBrand(brandID string, acc *trendlymodels.SocialAccount, m *instainterfaces.Messaging) {
+	if m.MessageEdit == nil || m.MessageEdit.Mid == "" {
+		return
+	}
+
+	selfID := acc.PlatformAccountID
+	// The contact is the non-self party (sender, unless the business edited its
+	// own message, in which case the recipient is the contact).
+	contactID := m.Sender.ID
+	if contactID == selfID {
+		contactID = m.Recipient.ID
+	}
+	if contactID == "" || contactID == selfID {
+		return
+	}
+
+	convID := "dmwh_" + acc.ID + "_" + contactID
+	conv, err := trendlymodels.GetInboxConversation(brandID, convID)
+	if err != nil || conv == nil {
+		return
+	}
+
+	updated := false
+	for i := range conv.Messages {
+		if conv.Messages[i].ID == m.MessageEdit.Mid {
+			conv.Messages[i].Text = m.MessageEdit.Text
+			// Refresh the list preview only if the edited message is the latest.
+			if i == len(conv.Messages)-1 {
+				conv.Preview = inboxMsgPreview(conv.Messages[i])
+			}
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		return
+	}
+	conv.UpdatedAt = time.Now().UnixMilli()
+	if err := conv.Upsert(brandID); err != nil {
+		log.Printf("inbox webhook: DM edit upsert failed %s: %v", convID, err)
+	}
+}
+
+// IngestComment handles a comment/feed change event (entry.changes[]). It fans
+// the event out to every brand that owns the account. Handles create, edit,
+// hide/unhide, and delete (deletion sync).
 func IngestComment(platformAccountID string, ch *instainterfaces.Change) {
 	if ch.Field != "comments" && ch.Field != "feed" && ch.Field != "mentions" {
 		return
@@ -177,15 +246,17 @@ func IngestComment(platformAccountID string, ch *instainterfaces.Change) {
 	if ch.Field == "feed" && ch.Value.Item != "" && ch.Value.Item != "comment" {
 		return
 	}
+	if ch.Value.CommentExternalID() == "" {
+		return
+	}
+	for _, t := range resolveTargets(platformAccountID) {
+		ingestCommentForBrand(t.brandID, t.acc, platformAccountID, ch)
+	}
+}
 
+// ingestCommentForBrand applies a comment/feed event to a single brand's inbox.
+func ingestCommentForBrand(brandID string, acc *trendlymodels.SocialAccount, platformAccountID string, ch *instainterfaces.Change) {
 	commentID := ch.Value.CommentExternalID()
-	if commentID == "" {
-		return
-	}
-	brandID, acc, ok := resolveBrand(platformAccountID)
-	if !ok {
-		return
-	}
 	convID := "cmt_" + commentID
 
 	// ── Deletion sync: the user deleted their comment. Remove our copy. ──
@@ -218,6 +289,19 @@ func IngestComment(platformAccountID string, ch *instainterfaces.Change) {
 	now := time.Now().UnixMilli()
 	text := ch.Value.CommentText()
 	handle := firstNonEmpty(ch.Value.From.Username, ch.Value.From.Name)
+
+	// If we already track this top-level comment, this is an edit (FB `feed` verb
+	// `edited`) or a re-delivery. Patch the text in place and preserve replies,
+	// hidden state and read state — rebuilding the doc would wipe them.
+	// (Instagram sends no comment edit/delete webhooks; this path is FB + retries.)
+	if existing, err := trendlymodels.GetInboxConversation(brandID, convID); err == nil && existing != nil && existing.Comment != nil {
+		_ = trendlymodels.UpdateInboxConversation(brandID, convID, []firestore.Update{
+			{Path: "comment.text", Value: text},
+			{Path: "preview", Value: text},
+			{Path: "updatedAt", Value: now},
+		})
+		return
+	}
 
 	conv := &trendlymodels.InboxConversation{
 		ID:      convID,
