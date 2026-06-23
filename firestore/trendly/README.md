@@ -8,12 +8,21 @@ firebase login:add
 firebase login:ci
 ```
 
-Deploy code -
+Dev Deploy code -
 
 ```
 firebase deploy --only firestore:rules
 firebase deploy --only firestore:indexes
 ```
+
+
+Prod Deploy code -
+
+```
+firebase deploy --config firebase.prod.json --only firestore:rules
+firebase deploy --config firebase.prod.json --only firestore:indexes
+```
+
 
 Pull code from server -
 
