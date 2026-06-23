@@ -41,6 +41,11 @@ jobs:
           FB_CLIENT_SECRET: ${{ secrets.FB_CLIENT_SECRET }}
           INSTA_CLIENT_ID: ${{ vars.INSTA_CLIENT_ID }}
           INSTA_CLIENT_SECRET: ${{ secrets.INSTA_CLIENT_SECRET }}
+          # Social webhooks — per-platform subscription verify tokens (secrets) +
+          # strict-signature gate (non-sensitive boolean toggle → variable)
+          WEBHOOK_VERIFY_TOKEN_INSTAGRAM: ${{ secrets.WEBHOOK_VERIFY_TOKEN_INSTAGRAM }}
+          WEBHOOK_VERIFY_TOKEN_FACEBOOK: ${{ secrets.WEBHOOK_VERIFY_TOKEN_FACEBOOK }}
+          WEBHOOK_STRICT_SIGNATURE: ${{ vars.WEBHOOK_STRICT_SIGNATURE }}
           TWITTER_CLIENT_ID: ${{ vars.TWITTER_CLIENT_ID }}
           TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
           STREAM_SECRET: ${{ secrets.STREAM_SECRET }}

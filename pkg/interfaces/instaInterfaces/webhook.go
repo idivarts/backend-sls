@@ -43,6 +43,17 @@ type Messaging struct {
 	Postback *Postback `json:"postback,omitempty"`
 	Referral *Referral `json:"referral,omitempty"`
 	Read     *Read     `json:"read,omitempty"`
+	// MessageEdit is delivered when a user edits a previously-sent DM. It arrives
+	// as a sibling of `message` (Instagram & Messenger share this shape).
+	MessageEdit *MessageEdit `json:"message_edit,omitempty"`
+}
+
+// MessageEdit carries an edited DM (Meta "message_edits" webhook event). The mid
+// matches the original message; text is the new content. num_edit is omitted on
+// purpose — Meta types it inconsistently across IG/Messenger and we don't use it.
+type MessageEdit struct {
+	Mid  string `json:"mid"`  // id of the original message that was edited
+	Text string `json:"text"` // the new, edited message text
 }
 
 type Sender struct {
