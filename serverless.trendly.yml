@@ -414,6 +414,14 @@ functions:
               - Arn
   insta_apis:
     handler: functions/unauth_apis/main.go
+    environment:
+      # Social Connect (/connect/*) runs here. On a successful brand connect it
+      # enqueues warm-up jobs (inbox DMs + media + analytics) onto the shared
+      # social-sync queue so those caches fill in the background immediately —
+      # without this URL the enqueue silently no-ops and the fetch would only
+      # start on first inbox open. Mirrors trendly_v2_apis.
+      SOCIAL_SYNC_QUEUE_URL:
+        Ref: SocialSyncQueue
     package:
       include:
         - 'service-account.json'
