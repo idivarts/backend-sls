@@ -7,11 +7,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 func FacebookLogin(c *gin.Context) {
-	var person messenger.FacebookLoginRequest
+	var person facebook.FacebookLoginRequest
 
 	organizationID, b := middlewares.GetOrganizationId(c)
 	if !b {
@@ -38,7 +38,7 @@ func FacebookLogin(c *gin.Context) {
 		}
 	}
 
-	lRes, err := messenger.GetLongLivedAccessToken(person.AccessToken)
+	lRes, err := facebook.GetLongLivedAccessToken(person.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -48,7 +48,7 @@ func FacebookLogin(c *gin.Context) {
 	for _, v := range person.Accounts.Data {
 		// var instagram *models.InstagramObject = nil
 		if v.InstagramBusinessAccount.ID != "" {
-			inst, err := messenger.GetInstagramInBrief(v.InstagramBusinessAccount.ID, lRes.AccessToken)
+			inst, err := facebook.GetInstagramInBrief(v.InstagramBusinessAccount.ID, lRes.AccessToken)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return

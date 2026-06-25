@@ -1,4 +1,4 @@
-package messenger
+package facebook
 
 type FacebookLoginRequest struct {
 	Name        string `json:"name"`

@@ -12,11 +12,11 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 func FacebookLogin(c *gin.Context) {
-	var person messenger.FacebookLoginRequest
+	var person facebook.FacebookLoginRequest
 
 	if err := c.ShouldBindJSON(&person); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -29,7 +29,7 @@ func FacebookLogin(c *gin.Context) {
 		return
 	}
 
-	lRes, err := messenger.GetLongLivedAccessToken(person.AccessToken)
+	lRes, err := facebook.GetLongLivedAccessToken(person.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting long lived access token"})
 		return
@@ -38,7 +38,7 @@ func FacebookLogin(c *gin.Context) {
 
 	wg := sync.WaitGroup{}
 
-	fb, accounts, err := messenger.GetMyFacebook(person.ID, lRes.AccessToken)
+	fb, accounts, err := facebook.GetMyFacebook(person.ID, lRes.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting facebook account"})
 		return
@@ -87,7 +87,7 @@ func FacebookLogin(c *gin.Context) {
 			go saveSocialPrivateDefered(fbPPage, userId, v.ID, &wg)
 
 			if instaId != "" {
-				insta, err := messenger.GetInstagram(instaId, lRes.AccessToken)
+				insta, err := facebook.GetInstagram(instaId, lRes.AccessToken)
 				if err != nil {
 					// c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "message": "Error in getting instagram account"})
 					log.Printf("%s - %s\n", err.Error(), "Error in getting instagram account")

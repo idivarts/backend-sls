@@ -79,7 +79,7 @@ These are hard API limits — the UI must account for them, not work around them
 ## 3. Webhooks (real-time inbound)
 
 The backend already subscribes Pages to `messages` and `message_echoes`
-(`pkg/messenger/subscribe_app.go`). For the Inbox add comment events.
+(`pkg/facebook/subscribe_app.go`). For the Inbox add comment events.
 
 **Webhook fields to subscribe (per Page/IG account):**
 - `messages` — inbound DMs (already on)
@@ -149,9 +149,9 @@ For **each** requested scope, Meta requires:
 | Concern | File |
 |---|---|
 | OAuth scope list (Meta connect) | `internal/trendlyapis/social_connect/facebook.go`, `internal/trendlyapis/unauth_apis/instagram.go` |
-| Long-lived token exchange | `pkg/messenger/token.go` |
-| Page webhook subscription | `pkg/messenger/subscribe_app.go` (extend field list) |
-| Conversations / messages fetch | `pkg/messenger/conversation.go`, `pkg/messenger/message.go` |
+| Long-lived token exchange | `pkg/facebook/token.go` |
+| Page webhook subscription | `pkg/facebook/subscribe_app.go` (extend field list) |
+| Conversations / messages fetch | `pkg/facebook/conversation.go`, `pkg/facebook/message.go` |
 | Instagram profile/Graph calls | `pkg/instagram/instagram.go` |
 | Webhook receiver | `functions/unauth_apis/main.go` (+ handler) |
 | Stored tokens (`AccessToken`, `GraphType`) | `internal/models/trendlymodels/social.go` (`SocialsPrivate`) |

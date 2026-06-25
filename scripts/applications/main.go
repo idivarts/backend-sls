@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 const (
@@ -63,7 +63,7 @@ func main() {
 		// 	socialUrl = "https://www.facebook.com/" + social.FBProfile.ID
 		// }
 		if social.InstaProfile == nil {
-			social.InstaProfile = &messenger.InstagramProfile{}
+			social.InstaProfile = &facebook.InstagramProfile{}
 		}
 
 		writer.Write([]string{

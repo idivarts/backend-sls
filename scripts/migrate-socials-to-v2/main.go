@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 
 	_ "github.com/idivarts/backend-sls/pkg/firebase"
 )
@@ -192,5 +192,5 @@ func buildRawProfile(s *trendlymodels.Socials) map[string]interface{} {
 }
 
 // Ensure messenger import is used (profile types are embedded in trendlymodels.Socials).
-var _ = messenger.InstagramProfile{}
+var _ = facebook.InstagramProfile{}
 var _ = firestore.Update{}

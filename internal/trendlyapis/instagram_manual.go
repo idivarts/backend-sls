@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 type IInstagramManualReq struct {
@@ -57,8 +57,8 @@ func ConnectInstagramManual(ctx *gin.Context) {
 		ConnectedID: nil,
 		UserID:      userId,
 		OwnerName:   user.Name,
-		InstaProfile: &messenger.InstagramProfile{
-			InstagramBriefProfile: messenger.InstagramBriefProfile{
+		InstaProfile: &facebook.InstagramProfile{
+			InstagramBriefProfile: facebook.InstagramBriefProfile{
 				Name:      req.Handle,
 				Username:  req.Handle,
 				Biography: "",
@@ -69,7 +69,7 @@ func ConnectInstagramManual(ctx *gin.Context) {
 			FollowsCount:      0,
 			MediaCount:        0,
 			Website:           "",
-			ApproxMetrics: messenger.InstaApproxMetrics{
+			ApproxMetrics: facebook.InstaApproxMetrics{
 				Views:        req.MonthlyViews,
 				Interactions: req.MonthlyInteractions,
 				Followers:    req.FollowerRange,

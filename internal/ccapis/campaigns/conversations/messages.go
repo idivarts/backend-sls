@@ -8,7 +8,7 @@ import (
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 )
 
@@ -46,7 +46,7 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	igConvs, err := messenger.GetConversationsByUserId(cData.LeadID, *pData.AccessToken)
+	igConvs, err := facebook.GetConversationsByUserId(cData.LeadID, *pData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -56,7 +56,7 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 	convId := igConvs.Data[0].ID
-	messages, err := messenger.GetMessagesWithPagination(convId, req.After, req.Limit, *pData.AccessToken)
+	messages, err := facebook.GetMessagesWithPagination(convId, req.After, req.Limit, *pData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -136,7 +136,7 @@ func SendMessage(c *gin.Context) {
 			return
 		}
 	} else if req.SendType == Page && req.Message != "" {
-		msg, err := messenger.SendTextMessage(cData.LeadID, req.Message, *pData.AccessToken)
+		msg, err := facebook.SendTextMessage(cData.LeadID, req.Message, *pData.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

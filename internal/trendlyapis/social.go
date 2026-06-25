@@ -7,7 +7,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 func FetchInsights(c *gin.Context) {
@@ -97,7 +97,7 @@ func FetchMedias(c *gin.Context) {
 		response["medias"] = medias
 	} else {
 		// facebook
-		posts, err := messenger.GetPosts(*pSocial, *socialPriv.AccessToken, messenger.IFBPostsParams{})
+		posts, err := facebook.GetPosts(*pSocial, *socialPriv.AccessToken, facebook.IFBPostsParams{})
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "Error Fetching Posts", "error": err.Error()})
 			return

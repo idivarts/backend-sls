@@ -7,7 +7,7 @@ import (
 
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 	"github.com/idivarts/backend-sls/internal/models"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
@@ -35,13 +35,13 @@ func RunOpenAI(conv *sqsevents.ConversationEvent, additionalInstruction string) 
 		log.Println("This message is old.. Waiting for new message", cData.LastMID, conv.MID)
 		return nil
 	}
-	_, err = messenger.SendAction(cData.LeadID, messenger.MARK_SEEN, *pData.AccessToken)
+	_, err = facebook.SendAction(cData.LeadID, facebook.MARK_SEEN, *pData.AccessToken)
 	if err != nil {
 		log.Println("Error while send Action", err.Error())
 	}
 
 	if !cData.IsProfileFetched {
-		uProfile, err := messenger.GetUser(cData.LeadID, *pData.AccessToken)
+		uProfile, err := facebook.GetUser(cData.LeadID, *pData.AccessToken)
 		if err != nil {
 			return err
 		}

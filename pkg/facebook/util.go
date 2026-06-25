@@ -1,4 +1,4 @@
-package messenger
+package facebook
 
 func FetchAllMessages(convId string, after *string, pageAccessToken string) []Message {
 	if after != nil && *after == "" {

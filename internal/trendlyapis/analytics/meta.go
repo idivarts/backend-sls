@@ -6,7 +6,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 const topMediaLimit = 6
@@ -15,7 +15,7 @@ const mediaScanLimit = 25
 // dayFromEndTime converts a Graph API end_time ("2024-01-02T07:00:00+0000")
 // into a YYYY-MM-DD date string. Falls back to the leading 10 chars.
 // unixOrZero returns the Unix timestamp of a CustomTime, or 0 when unset.
-func unixOrZero(ct messenger.CustomTime) int64 {
+func unixOrZero(ct facebook.CustomTime) int64 {
 	if ct.Time.IsZero() {
 		return 0
 	}
@@ -215,22 +215,22 @@ func fetchFacebook(acc trendlymodels.SocialAccount, token *trendlymodels.SocialT
 	// NOTE: Meta deprecated page_impressions* and page_fans* across ALL Graph API
 	// versions on 2025-11-15; they now 400 with "(#100) ... valid insights metric".
 	// Use the page_media_view family instead. (https://developers.facebook.com/blog/post/2025/08/15/page-insights-api-updates/)
-	resp, err := messenger.GetFacebookInsights(pageID, at,
-		[]messenger.FBInsightMetric{
-			messenger.FBMetricPageMediaView,
-			messenger.FBMetricPageTotalMediaUnique,
-			messenger.FBMetricPagePostEngagements,
+	resp, err := facebook.GetFacebookInsights(pageID, at,
+		[]facebook.FBInsightMetric{
+			facebook.FBMetricPageMediaView,
+			facebook.FBMetricPageTotalMediaUnique,
+			facebook.FBMetricPagePostEngagements,
 		},
-		messenger.FBPeriodDay,
-		messenger.FBInsightParams{DatePreset: preset},
+		facebook.FBPeriodDay,
+		facebook.FBInsightParams{DatePreset: preset},
 	)
 	if err != nil {
 		out.Error = "facebook insights: " + err.Error()
 	}
 
-	out.Metrics[BucketReach] = fbMetric(BucketReach, "Reach", resp, messenger.FBMetricPageTotalMediaUnique)
-	out.Metrics[BucketImpressions] = fbMetric(BucketImpressions, "Impressions", resp, messenger.FBMetricPageMediaView)
-	out.Metrics[BucketEngagement] = fbMetric(BucketEngagement, "Engagement", resp, messenger.FBMetricPagePostEngagements)
+	out.Metrics[BucketReach] = fbMetric(BucketReach, "Reach", resp, facebook.FBMetricPageTotalMediaUnique)
+	out.Metrics[BucketImpressions] = fbMetric(BucketImpressions, "Impressions", resp, facebook.FBMetricPageMediaView)
+	out.Metrics[BucketEngagement] = fbMetric(BucketEngagement, "Engagement", resp, facebook.FBMetricPagePostEngagements)
 
 	out.Demographics = facebookDemographics(pageID, at)
 	out.TopMedia = facebookTopMedia(pageID, at)
@@ -238,7 +238,7 @@ func fetchFacebook(acc trendlymodels.SocialAccount, token *trendlymodels.SocialT
 }
 
 // fbMetric builds a normalized Metric from a FB daily series.
-func fbMetric(key, label string, resp *messenger.FBInsightResponse, m messenger.FBInsightMetric) Metric {
+func fbMetric(key, label string, resp *facebook.FBInsightResponse, m facebook.FBInsightMetric) Metric {
 	metric := Metric{Key: key, Label: label}
 	if resp == nil {
 		return metric
@@ -269,7 +269,7 @@ func facebookDemographics(_, _ string) []DemographicBucket {
 
 // facebookTopMedia fetches recent posts with engagement and ranks the best.
 func facebookTopMedia(pageID, at string) []TopMedia {
-	posts, err := messenger.GetPosts(pageID, at, messenger.IFBPostsParams{
+	posts, err := facebook.GetPosts(pageID, at, facebook.IFBPostsParams{
 		Count:          mediaScanLimit,
 		WithEngagement: true,
 	})

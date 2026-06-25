@@ -8,7 +8,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // Media-tab support. Unlike conversations (Firestore-backed, webhook-fed), the
@@ -107,7 +107,7 @@ func ListMedia(brandID string, count int) ([]MediaItem, error) {
 
 		if s.Platform == trendlymodels.PlatformFacebook {
 			// Facebook Page posts.
-			posts, err := messenger.GetPosts(s.PlatformAccountID, token, messenger.IFBPostsParams{Count: count})
+			posts, err := facebook.GetPosts(s.PlatformAccountID, token, facebook.IFBPostsParams{Count: count})
 			if err != nil {
 				log.Printf("inbox media: FB posts fetch failed for %s/%s: %v", brandID, s.ID, err)
 				record(err)
@@ -202,7 +202,7 @@ func ListMediaComments(brandID, socialID, channel, mediaID string, count int) ([
 
 	out := make([]MediaComment, 0)
 	if channel == trendlymodels.PlatformFacebook {
-		items, err := messenger.GetCommentReplies(mediaID, sa.token)
+		items, err := facebook.GetCommentReplies(mediaID, sa.token)
 		if err != nil {
 			return nil, err
 		}
@@ -259,7 +259,7 @@ func ReplyToMediaComment(brandID, socialID, channel, commentID, text string) err
 		return err
 	}
 	if channel == trendlymodels.PlatformFacebook {
-		_, err = messenger.CreateCommentReply(commentID, text, sa.token)
+		_, err = facebook.CreateCommentReply(commentID, text, sa.token)
 		return err
 	}
 	_, err = instagram.ReplyToIGComment(commentID, text, sa.token)
@@ -273,7 +273,7 @@ func SetMediaCommentHidden(brandID, socialID, channel, commentID string, hidden 
 		return err
 	}
 	if channel == trendlymodels.PlatformFacebook {
-		return messenger.SetCommentHidden(commentID, hidden, sa.token)
+		return facebook.SetCommentHidden(commentID, hidden, sa.token)
 	}
 	return instagram.SetIGCommentHidden(commentID, hidden, sa.token)
 }
@@ -285,7 +285,7 @@ func DeleteMediaComment(brandID, socialID, channel, commentID string) error {
 		return err
 	}
 	if channel == trendlymodels.PlatformFacebook {
-		return messenger.DeleteObject(commentID, sa.token)
+		return facebook.DeleteObject(commentID, sa.token)
 	}
 	return instagram.DeleteIGObject(commentID, sa.token)
 }
