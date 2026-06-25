@@ -152,6 +152,14 @@ func InstagramCallback(c *gin.Context) {
 	// routing, not the connection itself.
 	upsertSocialIndex(igAccountID, trendlymodels.PlatformInstagram, state, socialID, now)
 
+	// Subscribe this IG account to inbox webhooks (DMs + comments). An app-level
+	// dashboard subscription is not enough — each IG account must subscribe the
+	// app via the Graph API with its own token. Best-effort: real-time delivery
+	// degrades on failure, the connection still succeeds.
+	if err := instagram.SubscribeApp(true, longToken.AccessToken); err != nil {
+		log.Printf("instagram: webhook subscribe failed for %s: %v", igAccountID, err)
+	}
+
 	// Warm the inbox / media / analytics caches in the background so those pages
 	// are already populated on first open. Best-effort.
 	enqueueWarmup(state.BrandID)

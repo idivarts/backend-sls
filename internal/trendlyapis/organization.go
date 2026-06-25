@@ -76,6 +76,22 @@ func CreateOrganization(c *gin.Context) {
 		return
 	}
 
+	// Creating additional organizations is an Agency-only capability. The caller
+	// must already own at least one org on the Agency plan; everyone else is sent
+	// to sales. Mirrors the frontend gate so the API can't be bypassed.
+	ownedOrgs, err := trendlymodels.ListOrganizationsOwnedBy(userId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to verify plan eligibility"})
+		return
+	}
+	if !ownsAgencyOrg(ownedOrgs) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "agency_plan_required",
+			"message": "Creating additional organizations is available on the Agency plan. Contact sales to upgrade.",
+		})
+		return
+	}
+
 	orgId, org, err := provisionPersonalOrg(userId, req.Name, req.Image, []string{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to create organization"})
@@ -491,6 +507,21 @@ func RemoveOrganizationMember(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Member removed from organization"})
+}
+
+// ownsAgencyOrg reports whether any of the caller's owned orgs is on the Agency
+// plan. The plan key may live either on the org doc or its billing record, so
+// check both. Drives the "create additional organization" gate.
+func ownsAgencyOrg(orgs []trendlymodels.OrganizationWithID) bool {
+	for _, o := range orgs {
+		if myutil.DerefString(o.PlanKey) == "agency" {
+			return true
+		}
+		if o.Billing != nil && myutil.DerefString(o.Billing.PlanKey) == "agency" {
+			return true
+		}
+	}
+	return false
 }
 
 // getOrgRole returns the caller's role in the org and whether they are a member.
