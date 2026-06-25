@@ -9,7 +9,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/linkedin"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // platformTargeted reports whether p is among the content's targeted platforms.
@@ -157,12 +157,12 @@ func publishToFacebook(pageID, pageToken string, ct *trendlymodels.Content) (str
 	caption := buildCaption(ct)
 	img := firstImageURL(ct)
 
-	var res *messenger.FBPublishResponse
+	var res *facebook.FBPublishResponse
 	var err error
 	if img != "" {
-		res, err = messenger.PublishPagePhoto(pageID, img, caption, pageToken)
+		res, err = facebook.PublishPagePhoto(pageID, img, caption, pageToken)
 	} else {
-		res, err = messenger.PublishPageFeed(pageID, caption, "", pageToken)
+		res, err = facebook.PublishPageFeed(pageID, caption, "", pageToken)
 	}
 	if err != nil {
 		return "", err

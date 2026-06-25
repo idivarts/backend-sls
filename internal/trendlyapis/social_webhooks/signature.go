@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // metaAppSecrets returns the candidate app secrets used to validate Meta
@@ -19,7 +19,7 @@ func metaAppSecrets() []string {
 	return []string{
 		os.Getenv("FB_CLIENT_SECRET"),
 		os.Getenv("INSTA_CLIENT_SECRET"),
-		messenger.ClientSecret,
+		facebook.ClientSecret,
 		instagram.ClientSecret,
 	}
 }

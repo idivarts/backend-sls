@@ -6,7 +6,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 type Leads struct {
@@ -15,7 +15,7 @@ type Leads struct {
 	Name        *string                `json:"name,omitempty" firestore:"name"`
 	SourceType  SourceType             `json:"sourceType" firestore:"sourceType"`
 	SourceID    string                 `json:"sourceId" firestore:"sourceId"`
-	UserProfile *messenger.UserProfile `json:"userProfile,omitempty" firestore:"userProfile"`
+	UserProfile *facebook.UserProfile `json:"userProfile,omitempty" firestore:"userProfile"`
 	TagID       *string                `json:"tagId,omitempty" firestore:"tagId"`
 	CampaignID  *string                `json:"campaignId,omitempty" firestore:"campaignId"`
 	Status      int                    `json:"status" firestore:"status"`

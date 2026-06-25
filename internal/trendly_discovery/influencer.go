@@ -16,7 +16,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/models/trendlyrdb"
 	sui "github.com/idivarts/backend-sls/internal/utilities/scrapping-utility"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 	"github.com/idivarts/backend-sls/pkg/myutil"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
@@ -494,8 +494,8 @@ func FetchInfluencer(c *gin.Context) {
 		IsInstagram: social.SocialType == "instagram",
 		UserID:      influencerId,
 		OwnerName:   social.Name,
-		InstaProfile: &messenger.InstagramProfile{
-			InstagramBriefProfile: messenger.InstagramBriefProfile{
+		InstaProfile: &facebook.InstagramProfile{
+			InstagramBriefProfile: facebook.InstagramBriefProfile{
 				Name:      social.Name,
 				Username:  social.Username,
 				Biography: social.Bio,

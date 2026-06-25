@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // verifyWebhookSignature validates Meta's X-Hub-Signature-256 header against the
@@ -43,7 +43,7 @@ func candidateAppSecrets() []string {
 	return []string{
 		os.Getenv("FB_CLIENT_SECRET"),
 		os.Getenv("INSTA_CLIENT_SECRET"),
-		messenger.ClientSecret,
+		facebook.ClientSecret,
 		instagram.ClientSecret,
 	}
 }

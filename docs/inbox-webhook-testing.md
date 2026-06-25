@@ -83,7 +83,7 @@ the challenge round-trip succeeded (token matched).
 ### 2.3 Per-Page / per-IG subscription
 App-level field subscriptions are not enough — each Page (and its linked IG
 Business Account) must be subscribed to the app. On connect, the Facebook OAuth
-callback calls `SubscribeApp()` per Page (`pkg/messenger/subscribe_app.go`),
+callback calls `SubscribeApp()` per Page (`pkg/facebook/subscribe_app.go`),
 which subscribes the extended field list. For a manually-connected test Page,
 confirm the subscription via:
 

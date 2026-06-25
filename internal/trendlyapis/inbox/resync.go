@@ -7,7 +7,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // Unit-level resyncs: refresh exactly one stale item (an expired avatar/attachment
@@ -59,7 +59,7 @@ func ResyncThread(brandID, convID string) error {
 	acc := sa.account
 
 	if acc.Platform == trendlymodels.PlatformFacebook && conv.ExternalConversationID != "" {
-		msgsData, err := messenger.GetMessagesWithPagination(conv.ExternalConversationID, "", 25, sa.token)
+		msgsData, err := facebook.GetMessagesWithPagination(conv.ExternalConversationID, "", 25, sa.token)
 		if err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func ResyncThread(brandID, convID string) error {
 
 // rebuildThreadMessages replaces a conversation's messages from a fresh Meta
 // pull (newest-first) and recomputes preview / last-activity / reply-window.
-func rebuildThreadMessages(acc *trendlymodels.SocialAccount, conv *trendlymodels.InboxConversation, data []messenger.Message) {
+func rebuildThreadMessages(acc *trendlymodels.SocialAccount, conv *trendlymodels.InboxConversation, data []facebook.Message) {
 	selfID := acc.PlatformAccountID
 	msgs := make([]trendlymodels.InboxMessage, 0, len(data))
 	var lastAt, lastInboundAt int64
@@ -115,7 +115,7 @@ func ResyncMessage(brandID, convID, msgID string) error {
 		return ResyncThread(brandID, convID)
 	}
 
-	full, err := messenger.GetMessageInfo(msgID, sa.token)
+	full, err := facebook.GetMessageInfo(msgID, sa.token)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func ResyncMediaItem(brandID, mediaID, socialID, channel string) error {
 
 	var doc *trendlymodels.InboxMediaDoc
 	if channel == trendlymodels.PlatformFacebook {
-		p, err := messenger.GetPostByID(mediaID, sa.token)
+		p, err := facebook.GetPostByID(mediaID, sa.token)
 		if err != nil {
 			return err
 		}

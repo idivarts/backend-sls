@@ -9,7 +9,7 @@ import (
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
@@ -65,8 +65,8 @@ func SyncConversations(c *gin.Context) {
 		return
 	}
 
-	var conversations []messenger.ConversationMessagesData
-	data, err := messenger.GetConversationsByUserId(cData.LeadID, *ppData.AccessToken)
+	var conversations []facebook.ConversationMessagesData
+	data, err := facebook.GetConversationsByUserId(cData.LeadID, *ppData.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -75,7 +75,7 @@ func SyncConversations(c *gin.Context) {
 	// if req.IGSID != nil {
 
 	// } else {
-	// 	conversations = messenger.FetchAllConversations(nil, *pData.AccessToken)
+	// 	conversations = facebook.FetchAllConversations(nil, *pData.AccessToken)
 	// }
 	if len(conversations) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No Conversation found"})
@@ -83,7 +83,7 @@ func SyncConversations(c *gin.Context) {
 	}
 
 	for _, v := range conversations {
-		igsid := messenger.GetRecepientIDFromParticipants(v.Participants, *pData.UserName)
+		igsid := facebook.GetRecepientIDFromParticipants(v.Participants, *pData.UserName)
 		log.Println("IGSID", igsid)
 		event := sqsevents.CREATE_OR_UPDATE_THREAD
 		// if req.All {

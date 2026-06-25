@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 type IPageWebhook struct {
@@ -46,7 +46,7 @@ func SourceWebhookAction(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page cant be found"})
 		return
 	}
-	err = messenger.SubscribeApp(*req.Enable, *sP.AccessToken)
+	err = facebook.SubscribeApp(*req.Enable, *sP.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -94,7 +94,7 @@ func SourceSyncLeads(c *gin.Context) {
 		return
 	}
 
-	var conversations []messenger.ConversationMessagesData = messenger.FetchAllConversations(nil, *sP.AccessToken)
+	var conversations []facebook.ConversationMessagesData = facebook.FetchAllConversations(nil, *sP.AccessToken)
 
 	if len(conversations) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No Conversation found"})
@@ -102,10 +102,10 @@ func SourceSyncLeads(c *gin.Context) {
 	}
 
 	for _, v := range conversations {
-		igsid := messenger.GetRecepientIDFromParticipants(v.Participants, *sData.UserName)
+		igsid := facebook.GetRecepientIDFromParticipants(v.Participants, *sData.UserName)
 		log.Println("IGSID", igsid)
 
-		uProfile, err := messenger.GetUser(igsid, *sP.AccessToken)
+		uProfile, err := facebook.GetUser(igsid, *sP.AccessToken)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

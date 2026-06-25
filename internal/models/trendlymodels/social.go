@@ -6,7 +6,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 type Socials struct {
@@ -17,8 +17,8 @@ type Socials struct {
 	ConnectedID       *string                     `json:"connectedId,omitempty" firestore:"connectedId"`
 	UserID            string                      `json:"userId" firestore:"userId"`
 	OwnerName         string                      `json:"ownerName" firestore:"ownerName"`
-	InstaProfile      *messenger.InstagramProfile `json:"instaProfile,omitempty" firestore:"instaProfile"`
-	FBProfile         *messenger.FacebookProfile  `json:"fbProfile,omitempty" firestore:"fbProfile"`
+	InstaProfile      *facebook.InstagramProfile `json:"instaProfile,omitempty" firestore:"instaProfile"`
+	FBProfile         *facebook.FacebookProfile  `json:"fbProfile,omitempty" firestore:"fbProfile"`
 	SocialScreenShots []string                    `json:"socialScreenShots,omitempty" firestore:"socialScreenShots"`
 }
 
