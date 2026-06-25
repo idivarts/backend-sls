@@ -21,8 +21,17 @@ func enqueueWarmup(brandID string) {
 		{Type: socialsync.OpAnalytics, BrandID: brandID, Range: "28d"}, // dashboard default
 	}
 	for _, msg := range jobs {
-		if _, err := socialsync.Enqueue(msg); err != nil {
+		queued, err := socialsync.Enqueue(msg)
+		if err != nil {
 			log.Printf("social_connect: warm-up enqueue %s failed for %s: %v", msg.Type, brandID, err)
+			continue
+		}
+		// queued=false means SOCIAL_SYNC_QUEUE_URL is unset for this lambda, so the
+		// job was silently dropped (no inline fallback here — we must not block the
+		// OAuth redirect on slow Meta work). Surface it: in prod the connect lambda
+		// is expected to have the queue URL, so this points at a misconfiguration.
+		if !queued {
+			log.Printf("social_connect: warm-up %s for %s NOT queued (SOCIAL_SYNC_QUEUE_URL unset) — inbox/media will only sync on first page open", msg.Type, brandID)
 		}
 	}
 }

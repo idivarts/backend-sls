@@ -86,6 +86,9 @@ func ingestMessagingForBrand(brandID string, acc *trendlymodels.SocialAccount, p
 		return
 	}
 
+	log.Printf("inbox webhook: DM ingest brand=%s account=%s self=%s platform=%s contact=%s echo=%v mid=%s textLen=%d deleted=%v",
+		brandID, acc.ID, selfID, acc.Platform, contactID, isEcho, m.Message.Mid, len(m.Message.Text), m.Message.IsDeleted)
+
 	// Deterministic conversation id per (account, contact). Webhook payloads do
 	// not include Meta's conversation id, so we key by the participant pair.
 	convID := "dmwh_" + acc.ID + "_" + contactID
