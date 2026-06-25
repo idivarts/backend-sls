@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 type InstagramMedia struct {
@@ -19,7 +19,7 @@ type InstagramMedia struct {
 	MediaURL      string               `json:"media_url"`
 	ThumbnailURL  string               `json:"thumbnail_url,omitempty"` // Optional, as not all items might have this
 	Permalink     string               `json:"permalink"`
-	Timestamp     messenger.CustomTime `json:"timestamp"`
+	Timestamp     facebook.CustomTime `json:"timestamp"`
 	CommentsCount int                  `json:"comments_count"`
 	LikeCount     int                  `json:"like_count"`
 	ID            string               `json:"id"`
@@ -47,7 +47,7 @@ func GetMedia(pageID, accessToken string, params IGetMediaParams) ([]InstagramMe
 		if params.PageID == "" {
 			return nil, fmt.Errorf("pageID is required for instagram - %s", params.PageID)
 		}
-		apiURL = fmt.Sprintf("%s/%s/%s/media", messenger.BaseURL, messenger.ApiVersion, params.PageID)
+		apiURL = fmt.Sprintf("%s/%s/%s/media", facebook.BaseURL, facebook.ApiVersion, params.PageID)
 	}
 	// Create query parameters
 	iParam := url.Values{}
@@ -114,7 +114,7 @@ func GetMedia(pageID, accessToken string, params IGetMediaParams) ([]InstagramMe
 // from the Facebook Graph using the page access token.
 func GraphBaseURL(graphType int) string {
 	if graphType == 0 {
-		return fmt.Sprintf("%s/%s", messenger.BaseURL, messenger.ApiVersion)
+		return fmt.Sprintf("%s/%s", facebook.BaseURL, facebook.ApiVersion)
 	}
 	return fmt.Sprintf("%s/%s", BaseURL, ApiVersion)
 }

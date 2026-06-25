@@ -1,4 +1,4 @@
-package messenger
+package facebook
 
 import (
 	"encoding/json"
@@ -38,7 +38,7 @@ func GetAccessTokenFromCode(code, redirectURI string) (*CodeTokenResponse, error
 
 	resp, err := http.Post(endpoint, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("messenger: code exchange request failed: %w", err)
+		return nil, fmt.Errorf("facebook: code exchange request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -47,7 +47,7 @@ func GetAccessTokenFromCode(code, redirectURI string) (*CodeTokenResponse, error
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("messenger: unexpected status " + resp.Status + ": " + string(b))
+		return nil, errors.New("facebook: unexpected status " + resp.Status + ": " + string(b))
 	}
 
 	log.Println("FB code exchange response:", string(b))
@@ -68,7 +68,7 @@ func GetMeID(accessToken string) (string, error) {
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.New("messenger: /me returned " + resp.Status + ": " + string(b))
+		return "", errors.New("facebook: /me returned " + resp.Status + ": " + string(b))
 	}
 	var result struct {
 		ID string `json:"id"`

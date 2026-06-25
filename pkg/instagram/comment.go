@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 type InstagramCommentFrom struct {
@@ -21,7 +21,7 @@ type InstagramComment struct {
 	ID        string               `json:"id"`
 	Text      string               `json:"text"`
 	From      InstagramCommentFrom `json:"from,omitempty"`
-	Timestamp messenger.CustomTime `json:"timestamp"`
+	Timestamp facebook.CustomTime `json:"timestamp"`
 	LikeCount int                  `json:"like_count"`
 }
 
@@ -39,7 +39,7 @@ func GetComments(mediaID, accessToken string, params IGetCommentsParams) ([]Inst
 
 	apiURL := fmt.Sprintf("%s/%s/%s/comments", BaseURL, ApiVersion, mediaID)
 	if params.GraphType == 0 {
-		apiURL = fmt.Sprintf("%s/%s/%s/comments", messenger.BaseURL, messenger.ApiVersion, mediaID)
+		apiURL = fmt.Sprintf("%s/%s/%s/comments", facebook.BaseURL, facebook.ApiVersion, mediaID)
 	}
 
 	iParam := url.Values{}
@@ -87,7 +87,7 @@ func ReplyToComment(commentID, message, accessToken string, graphType int) (*Com
 
 	apiURL := fmt.Sprintf("%s/%s/%s/replies", BaseURL, ApiVersion, commentID)
 	if graphType == 0 {
-		apiURL = fmt.Sprintf("%s/%s/%s/replies", messenger.BaseURL, messenger.ApiVersion, commentID)
+		apiURL = fmt.Sprintf("%s/%s/%s/replies", facebook.BaseURL, facebook.ApiVersion, commentID)
 	}
 
 	iParam := url.Values{}

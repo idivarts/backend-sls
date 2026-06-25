@@ -14,7 +14,7 @@ const webhook_events = "messages,comments,mentions"
 
 // SubscribeApp subscribes (or unsubscribes) the app to webhooks for an Instagram
 // account connected via the Instagram Login API. This is the IG analogue of
-// messenger.SubscribeApp — an app-level dashboard subscription is not enough;
+// facebook.SubscribeApp — an app-level dashboard subscription is not enough;
 // each IG account must subscribe the app on its own via the Graph API, using the
 // IG user access token.
 //

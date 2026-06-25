@@ -1,4 +1,4 @@
-package messenger
+package facebook
 
 import (
 	"encoding/json"
@@ -339,7 +339,7 @@ func GetFacebookInsights(
 
 	data := FBInsightResponse{}
 	if err := json.Unmarshal(body, &data); err != nil {
-		log.Printf("messenger.GetFacebookInsights: failed to unmarshal response: %v", err)
+		log.Printf("facebook.GetFacebookInsights: failed to unmarshal response: %v", err)
 		return nil, err
 	}
 	return &data, nil

@@ -1,0 +1,60 @@
+package facebook_test
+
+import (
+	"encoding/json"
+	"log"
+	"testing"
+
+	"github.com/idivarts/backend-sls/pkg/facebook"
+)
+
+func TestFacebookFetch(t *testing.T) {
+	fb, err := facebook.GetFacebookPage("pageID", "EAAID6icQOs4BO6GdTXuC4GxBXyKuAmw9nZCnGtwPSOawq2EG4ra385MOL9Wu3esiZCwjqNM5FxiIgDSy55ZBwg9SXLFGoWtgjEcUnG5bIZAkRZCbLNOPTfwhZBwOLONahIlwTw5PZBOKqwpN0ZBoorfWoxaoYz9fJbgAtZC9C2NkKZBr2wVNhuWZBETdl2RBwZBhtmLO")
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Convert fb struct to json and print it
+	fbJSON, err := json.Marshal(fb)
+	if err != nil {
+		t.Error(err)
+	}
+	log.Println(string(fbJSON))
+}
+
+func TestFacebookInsights(t *testing.T) {
+	metrics := []facebook.FBInsightMetric{
+		// facebook.FBMetricPageImpressions,
+		facebook.FBMetricPageImpressionsUnique,
+		facebook.FBMetricPagePostEngagements,
+		// facebook.FBMetricPageFans,
+		facebook.FBMetricPageFollows,
+	}
+
+	_, err := facebook.GetFacebookInsights(
+		"311133518746783",
+		facebook.TestPageAccessToken,
+		metrics,
+		facebook.FBPeriodDay,
+		facebook.FBInsightParams{
+			DatePreset: facebook.FBDatePresetLast30d,
+		},
+	)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestInstaFetch(t *testing.T) {
+	insta, err := facebook.GetInstagram("17841466618151294", "EAAID6icQOs4BO6GdTXuC4GxBXyKuAmw9nZCnGtwPSOawq2EG4ra385MOL9Wu3esiZCwjqNM5FxiIgDSy55ZBwg9SXLFGoWtgjEcUnG5bIZAkRZCbLNOPTfwhZBwOLONahIlwTw5PZBOKqwpN0ZBoorfWoxaoYz9fJbgAtZC9C2NkKZBr2wVNhuWZBETdl2RBwZBhtmLO")
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Convert fb struct to json and print it
+	instaJSON, err := json.Marshal(insta)
+	if err != nil {
+		t.Error(err)
+	}
+	log.Println(string(instaJSON))
+}
