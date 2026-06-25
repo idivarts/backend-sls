@@ -266,6 +266,7 @@ func mapMessengerMessage(s *trendlymodels.SocialAccount, selfID string, m facebo
 // nothing — webhook callers that lack a participant list pass "".
 func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usernameHint string) (name, handle, avatar string) {
 	if contactID == "" || token == "" {
+		log.Printf("inbox: contact profile fetch skipped account=%s contact=%q tokenSet=%v", s.ID, contactID, token != "")
 		return "", "", ""
 	}
 	var (
@@ -278,9 +279,16 @@ func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usern
 		prof, err = facebook.GetUser(contactID, token)
 	}
 	if err != nil || prof == nil {
-		log.Printf("inbox: contact profile fetch failed for %s: %v", contactID, err)
+		// Best-effort BY DESIGN: a failure here — e.g. Meta withholds the profile,
+		// or the Page token lacks pages_messaging / pages_read_engagement (code 190
+		// "...must be granted before impersonating a user's page") — must NOT abort
+		// webhook/sync processing. Callers keep going and upsert the message with
+		// whatever they already have. We log platform/account/contact + the raw Meta
+		// error so the permission/config issue is diagnosable without blocking ingestion.
+		log.Printf("inbox: contact profile fetch failed (non-fatal) platform=%s account=%s contact=%s: %v", s.Platform, s.ID, contactID, err)
 	} else {
 		name, handle, avatar = prof.Name, prof.Username, prof.ProfilePic
+		log.Printf("inbox: contact profile fetched platform=%s account=%s contact=%s name=%q handle=%q hasAvatar=%v", s.Platform, s.ID, contactID, name, handle, avatar != "")
 	}
 	if handle == "" {
 		handle = usernameHint
@@ -302,6 +310,7 @@ func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usern
 			}
 		}
 	}
+	log.Printf("inbox: contact profile resolved account=%s contact=%s name=%q handle=%q hasAvatar=%v", s.ID, contactID, name, handle, avatar != "")
 	return name, handle, avatar
 }
 
