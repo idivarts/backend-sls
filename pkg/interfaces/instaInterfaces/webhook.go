@@ -43,6 +43,17 @@ type Messaging struct {
 	Postback *Postback `json:"postback,omitempty"`
 	Referral *Referral `json:"referral,omitempty"`
 	Read     *Read     `json:"read,omitempty"`
+	// MessageEdit is delivered when a user edits a previously-sent DM. It arrives
+	// as a sibling of `message` (Instagram & Messenger share this shape).
+	MessageEdit *MessageEdit `json:"message_edit,omitempty"`
+}
+
+// MessageEdit carries an edited DM (Meta "message_edits" webhook event). The mid
+// matches the original message; text is the new content. num_edit is omitted on
+// purpose — Meta types it inconsistently across IG/Messenger and we don't use it.
+type MessageEdit struct {
+	Mid  string `json:"mid"`  // id of the original message that was edited
+	Text string `json:"text"` // the new, edited message text
 }
 
 type Sender struct {
@@ -199,9 +210,20 @@ func (v *ChangeValue) IsRemoval() bool {
 	return v.Verb == "remove" || v.Verb == "delete"
 }
 
-// IsReply reports whether the comment is a reply to another comment.
+// IsReply reports whether the comment is a reply to another COMMENT (vs a
+// top-level comment on the post itself).
+//
+//   - Instagram: a top-level comment has no parent_id; a reply's parent_id is the
+//     top-level comment.
+//   - Facebook `feed`: a top-level comment's parent_id is the POST id, and only a
+//     reply's parent_id is another comment. So parent_id == post_id ⇒ top-level,
+//     NOT a reply (otherwise top-level FB comments get misrouted as replies to a
+//     non-existent parent and dropped).
 func (v *ChangeValue) IsReply() bool {
-	return v.ParentID != ""
+	if v.ParentID == "" {
+		return false
+	}
+	return v.ParentID != v.PostRef()
 }
 
 func NewWebHook(jsonString string) (*IMessageWebhook, error) {

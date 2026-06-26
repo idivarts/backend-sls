@@ -10,7 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // FacebookInit redirects to Facebook's OAuth consent screen.
@@ -40,7 +40,7 @@ func FacebookInit(c *gin.Context) {
 	redirectURI := fmt.Sprintf("%s/connect/facebook/callback", constants.GetTrendlyBE())
 	authURL := fmt.Sprintf(
 		"https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=%s&scope=%s&state=%s&response_type=code",
-		messenger.ClientID,
+		facebook.ClientID,
 		url.QueryEscape(redirectURI),
 		url.QueryEscape("pages_show_list,pages_read_engagement,pages_messaging,pages_manage_engagement,pages_manage_metadata,pages_manage_posts"),
 		// ,instagram_basic,instagram_manage_insights,instagram_manage_messages,instagram_manage_comments
@@ -72,21 +72,21 @@ func FacebookCallback(c *gin.Context) {
 
 	redirectURI := fmt.Sprintf("%s/connect/facebook/callback", constants.GetTrendlyBE())
 
-	shortToken, err := messenger.GetAccessTokenFromCode(code, redirectURI)
+	shortToken, err := facebook.GetAccessTokenFromCode(code, redirectURI)
 	if err != nil {
 		log.Printf("facebook: code exchange failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to exchange authorization code."))
 		return
 	}
 
-	longToken, err := messenger.GetLongLivedAccessToken(shortToken.AccessToken)
+	longToken, err := facebook.GetLongLivedAccessToken(shortToken.AccessToken)
 	if err != nil {
 		log.Printf("facebook: long-lived token failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to obtain long-lived token."))
 		return
 	}
 
-	fbUserID, err := messenger.GetMeID(longToken.AccessToken)
+	fbUserID, err := facebook.GetMeID(longToken.AccessToken)
 	if err != nil {
 		log.Printf("facebook: /me fetch failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to fetch Facebook profile."))
@@ -96,14 +96,14 @@ func FacebookCallback(c *gin.Context) {
 	// We store one SocialAccount per managed Page (not the personal FB user),
 	// because the inbox needs Page access tokens to read/reply to Messenger and
 	// Page comments, and the page-linked IG Business Account for IG messaging.
-	_, accounts, err := messenger.GetMyFacebook(fbUserID, longToken.AccessToken)
+	_, accounts, err := facebook.GetMyFacebook(fbUserID, longToken.AccessToken)
 	if err != nil {
 		log.Printf("facebook: profile fetch failed: %v", err)
 		c.Redirect(302, CallbackErrorURL(connectBase, "facebook", state.CallbackScheme, state.App, "Failed to fetch Facebook profile."))
 		return
 	}
 
-	var pages []messenger.FacebookProfile
+	var pages []facebook.FacebookProfile
 	if accounts != nil {
 		pages = accounts.Accounts.Data
 	}
@@ -170,13 +170,15 @@ func FacebookCallback(c *gin.Context) {
 		// IG message/comment webhooks arrive under the IG id but are served with
 		// this Page's token, so both resolve to the same social account.
 		upsertSocialIndex(page.ID, trendlymodels.PlatformFacebook, state, pageSocialID, now)
-		if igBusinessID != "" {
-			upsertSocialIndex(igBusinessID, trendlymodels.PlatformInstagram, state, pageSocialID, now)
-		}
+
+		// We are no longer using facebook's IG Business Account id for webhook resolution for instagram
+		// if igBusinessID != "" {
+		// 	upsertSocialIndex(igBusinessID, trendlymodels.PlatformInstagram, state, pageSocialID, now)
+		// }
 
 		// Subscribe the Page to inbox webhooks (DMs + comments). Best-effort:
 		// real-time delivery degrades on failure, the connection still succeeds.
-		if err := messenger.SubscribeApp(true, page.AccessToken); err != nil {
+		if err := facebook.SubscribeApp(true, page.AccessToken); err != nil {
 			log.Printf("facebook: webhook subscribe failed for page %s: %v", page.ID, err)
 		}
 	}

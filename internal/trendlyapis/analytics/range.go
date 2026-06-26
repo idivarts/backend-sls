@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // ParseRange normalizes a query string into a supported Range, defaulting to 28d.
@@ -36,13 +36,13 @@ func (r Range) SinceUntil(now time.Time) (since string, until string) {
 }
 
 // FBDatePreset maps the range onto the closest Facebook date_preset.
-func (r Range) FBDatePreset() messenger.FBInsightDatePreset {
+func (r Range) FBDatePreset() facebook.FBInsightDatePreset {
 	switch r {
 	case Range7d:
-		return messenger.FBDatePresetLast7d
+		return facebook.FBDatePresetLast7d
 	case Range90d:
-		return messenger.FBDatePresetLast90d
+		return facebook.FBDatePresetLast90d
 	default:
-		return messenger.FBDatePresetLast28d
+		return facebook.FBDatePresetLast28d
 	}
 }

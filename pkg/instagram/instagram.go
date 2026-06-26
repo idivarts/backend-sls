@@ -7,10 +7,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
-func GetInstagramInBrief(instagramId string, accessToken string) (*messenger.InstagramBriefProfile, error) {
+func GetInstagramInBrief(instagramId string, accessToken string) (*facebook.InstagramBriefProfile, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
@@ -36,7 +36,7 @@ func GetInstagramInBrief(instagramId string, accessToken string) (*messenger.Ins
 
 	// Print the response body
 	fmt.Println(string(body))
-	data := messenger.InstagramBriefProfile{}
+	data := facebook.InstagramBriefProfile{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return nil, err
@@ -44,12 +44,12 @@ func GetInstagramInBrief(instagramId string, accessToken string) (*messenger.Ins
 	return &data, nil
 }
 
-func GetInstagram(instagramId string, accessToken string) (*messenger.InstagramProfile, error) {
+func GetInstagram(instagramId string, accessToken string) (*facebook.InstagramProfile, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", BaseURL, ApiVersion, instagramId, accessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,user_id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", BaseURL, ApiVersion, instagramId, accessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -70,7 +70,7 @@ func GetInstagram(instagramId string, accessToken string) (*messenger.InstagramP
 
 	// Print the response body
 	fmt.Println(string(body))
-	data := messenger.InstagramProfile{}
+	data := facebook.InstagramProfile{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return nil, err

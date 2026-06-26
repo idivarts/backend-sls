@@ -10,7 +10,7 @@ import (
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
 	"github.com/idivarts/backend-sls/internal/models"
 	openaitools "github.com/idivarts/backend-sls/internal/openai/tools"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
@@ -44,12 +44,12 @@ func processInput(input string) []IProcessedInput {
 }
 func InstaSend(conv *sqsevents.ConversationEvent) error {
 	log.Println("Sending Message to instagram", conv.Message)
-	_, err := messenger.SendTextMessage(conv.LeadID, conv.Message, conv.PageToken)
+	_, err := facebook.SendTextMessage(conv.LeadID, conv.Message, conv.PageToken)
 	if err != nil {
 		return err
 	}
 	if conv.LastMessage != nil && !*conv.LastMessage {
-		_, err = messenger.SendAction(conv.LeadID, messenger.TYPING_ON, conv.PageToken)
+		_, err = facebook.SendAction(conv.LeadID, facebook.TYPING_ON, conv.PageToken)
 		if err != nil {
 			log.Println("Error while send Action", err.Error())
 		}
@@ -103,7 +103,7 @@ func WaitAndSend(conv *sqsevents.ConversationEvent) error {
 				log.Println("Sending Message", conv.LeadID, aMsg.Value, v.ID)
 				pInp := processInput(aMsg.Value)
 				secondsElapsed := 0
-				_, err = messenger.SendAction(cData.LeadID, messenger.TYPING_ON, *pData.AccessToken)
+				_, err = facebook.SendAction(cData.LeadID, facebook.TYPING_ON, *pData.AccessToken)
 				if err != nil {
 					log.Println("Error while send Action", err.Error())
 				}

@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -106,7 +105,15 @@ func InstagramCallback(c *gin.Context) {
 
 	username := instaProfile.Username
 	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformInstagram, username)
-	igAccountID := strconv.FormatInt(shortToken.UserID, 10)
+	// Use the IG professional account ID (user_id from /me) — this is what
+	// Instagram webhooks send as entry.id. The OAuth token response's user_id
+	// is app-scoped and does NOT match webhook events.
+	igAccountID := instaProfile.UserID
+	if igAccountID == "" {
+		log.Printf("instagram: /me response missing user_id for %s", username)
+		c.Redirect(302, CallbackErrorURL(connectBase, "instagram", state.CallbackScheme, state.App, "Failed to resolve Instagram account ID."))
+		return
+	}
 	now := time.Now().Unix()
 
 	social := &trendlymodels.SocialAccount{
@@ -151,6 +158,14 @@ func InstagramCallback(c *gin.Context) {
 	// connection. Non-fatal: a failure here only degrades real-time webhook
 	// routing, not the connection itself.
 	upsertSocialIndex(igAccountID, trendlymodels.PlatformInstagram, state, socialID, now)
+
+	// Subscribe this IG account to inbox webhooks (DMs + comments). An app-level
+	// dashboard subscription is not enough — each IG account must subscribe the
+	// app via the Graph API with its own token. Best-effort: real-time delivery
+	// degrades on failure, the connection still succeeds.
+	if err := instagram.SubscribeApp(true, longToken.AccessToken); err != nil {
+		log.Printf("instagram: webhook subscribe failed for %s: %v", igAccountID, err)
+	}
 
 	// Warm the inbox / media / analytics caches in the background so those pages
 	// are already populated on first open. Best-effort.

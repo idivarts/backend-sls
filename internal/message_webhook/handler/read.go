@@ -9,7 +9,7 @@ func (msg IGMessagehandler) handleReadOperation() error {
 
 	// Wrong implementation of using Conversation ID. Hence commented
 
-	// oList, err := messenger.GetConversationMessages(msg.ConversationID, pData.AccessToken)
+	// oList, err := facebook.GetConversationMessages(msg.ConversationID, pData.AccessToken)
 	// if err != nil {
 	// 	return err
 	// }

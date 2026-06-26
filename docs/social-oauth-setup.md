@@ -129,7 +129,7 @@ pages_manage_posts
 
 These are requested in code (`social_connect/facebook.go`). Submit for App Review before prod.
 
-`pages_manage_posts` is required for publishing photos and feed posts to a connected Page via `PublishPagePhoto` / `PublishPageFeed` in `pkg/messenger/publish.go`.
+`pages_manage_posts` is required for publishing photos and feed posts to a connected Page via `PublishPagePhoto` / `PublishPageFeed` in `pkg/facebook/publish.go`.
 
 ### Env vars to set
 

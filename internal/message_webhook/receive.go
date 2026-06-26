@@ -42,8 +42,14 @@ func Receive(c *gin.Context) {
 		return
 	}
 
+	// Log the raw inbound payload so we can confirm exactly what Meta sends
+	// (shape, sender/recipient ids, message vs change events) when diagnosing
+	// ingestion or profile-fetch issues.
+	log.Printf("message_webhook: received payload (%d bytes, %d entries): %s", len(rawBody), len(message.Entry), string(rawBody))
+
 	for i := 0; i < len(message.Entry); i++ {
 		sourceId := message.Entry[i].ID
+		log.Printf("message_webhook: entry %d/%d source=%s messaging=%d changes=%d", i+1, len(message.Entry), sourceId, len(message.Entry[i].Messaging), len(message.Entry[i].Changes))
 
 		// ── Direct messages ──────────────────────────────────────────────────
 		for j := 0; j < len(message.Entry[i].Messaging); j++ {

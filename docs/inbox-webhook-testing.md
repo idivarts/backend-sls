@@ -18,22 +18,26 @@ Hands-on guide to **configure the Meta webhooks** the Inbox depends on and
 
 ## 0. How the backend receives webhooks
 
-All Meta events hit a single Lambda (`functions/message_webhook`):
+All Meta events hit a single Lambda (`functions/trendly_social_webhooks`). Each
+platform is a separate `WebhookProvider` (Instagram + Facebook today; LinkedIn /
+X / YouTube plug in later):
 
 | Method / Path | Handler | Purpose |
 |---|---|---|
-| `GET  /webhooks/instagram` | `Validation` | Subscription verification (`hub.challenge`) |
-| `POST /webhooks/instagram` | `Receive` | IG events (DMs + comments) |
-| `GET  /webhooks/facebook`  | `Validation` | Subscription verification |
-| `POST /webhooks/facebook`  | `Receive` | FB events (DMs + comments) |
+| `GET  /webhooks/instagram` | `igProvider.Verify` | Subscription verification (`hub.challenge`) |
+| `POST /webhooks/instagram` | `igProvider.Receive` | IG events (DMs + comments) |
+| `GET  /webhooks/facebook`  | `fbProvider.Verify` | Subscription verification |
+| `POST /webhooks/facebook`  | `fbProvider.Receive` | FB events (DMs + comments) |
 | `POST /webhooks/data-deletion` | `DataDeletion` | Meta data-deletion callback |
 
-Inside `Receive` (`internal/message_webhook/receive.go`):
+Inside `Receive` (`internal/trendlyapis/social_webhooks/meta.go`):
 - `entry[].messaging[]` → `inbox.IngestMessaging()` (DMs).
 - `entry[].changes[]` → `inbox.IngestComment()` (comments/feed/mentions).
-- Events are routed to a brand via `socialAccountIndex/{platformAccountId}`
-  (doc id = the IG Business Account id or FB Page id, i.e. `entry.id`). Events
-  for accounts not in that index are ignored.
+- Events are routed via `socialAccountIndex/{platformAccountId}` (doc id = the IG
+  Business Account id or FB Page id, i.e. `entry.id`). The index holds an
+  `owners[]` array, so an account connected by **multiple brands fans out** — a
+  copy is ingested into each owner's inbox (each replies with its own token).
+  Events for accounts not in the index are ignored.
 
 **Prod base:** `https://be.trendly.now` — **Dev base:** `https://be.trendly.now/dev`
 
@@ -43,7 +47,9 @@ Inside `Receive` (`internal/message_webhook/receive.go`):
 
 | Var | Used for | Default | Notes |
 |---|---|---|---|
-| `WEBHOOK_VERIFY_TOKEN` | `GET` subscription verify | `mytoken` | Must match the **Verify Token** typed into the Meta dashboard. |
+| `WEBHOOK_VERIFY_TOKEN_INSTAGRAM` | IG `GET` subscription verify | `mytoken` | Must match the **Verify Token** typed into the IG webhook config. |
+| `WEBHOOK_VERIFY_TOKEN_FACEBOOK` | FB `GET` subscription verify | `mytoken` | Must match the **Verify Token** typed into the Page webhook config. |
+| `WEBHOOK_VERIFY_TOKEN` | shared fallback verify token | `mytoken` | Used by any platform whose specific token is unset. |
 | `WEBHOOK_STRICT_SIGNATURE` | `POST` signature gate | unset (lenient) | When `true`, a bad `X-Hub-Signature-256` is rejected (403). Leave **off** during initial testing, flip **on** once app secrets are confirmed. |
 | `FB_CLIENT_SECRET` / `INSTA_CLIENT_SECRET` | HMAC signature key | — | Required for signature verification to pass in strict mode. |
 
@@ -77,7 +83,7 @@ the challenge round-trip succeeded (token matched).
 ### 2.3 Per-Page / per-IG subscription
 App-level field subscriptions are not enough — each Page (and its linked IG
 Business Account) must be subscribed to the app. On connect, the Facebook OAuth
-callback calls `SubscribeApp()` per Page (`pkg/messenger/subscribe_app.go`),
+callback calls `SubscribeApp()` per Page (`pkg/facebook/subscribe_app.go`),
 which subscribes the extended field list. For a manually-connected test Page,
 confirm the subscription via:
 
@@ -96,8 +102,8 @@ written when a brand connects the account. Verify in Firestore before testing.
 
 ```bash
 # Should echo back the challenge value (200, plain text "test123")
-curl "https://be.trendly.now/dev/webhooks/instagram?hub.mode=subscribe&hub.verify_token=$WEBHOOK_VERIFY_TOKEN&hub.challenge=test123"
-curl "https://be.trendly.now/dev/webhooks/facebook?hub.mode=subscribe&hub.verify_token=$WEBHOOK_VERIFY_TOKEN&hub.challenge=test123"
+curl "https://be.trendly.now/dev/webhooks/instagram?hub.mode=subscribe&hub.verify_token=$WEBHOOK_VERIFY_TOKEN_INSTAGRAM&hub.challenge=test123"
+curl "https://be.trendly.now/dev/webhooks/facebook?hub.mode=subscribe&hub.verify_token=$WEBHOOK_VERIFY_TOKEN_FACEBOOK&hub.challenge=test123"
 ```
 
 If you get an empty/empty-string body, the token didn't match.
@@ -125,7 +131,7 @@ the reply lands back on the platform.
 ### Per-path checklist
 1. **Trigger** the event from a *second* account (Meta won't deliver `messages`
    for your own outbound unless via `message_echoes`).
-2. **Logs:** `sls logs -f message_webhook --stage dev -t` (or CloudWatch). Look
+2. **Logs:** `sls logs -f trendly_social_webhooks --stage dev -t` (or CloudWatch). Look
    for the POST and absence of `signature verification failed` (or set
    `WEBHOOK_STRICT_SIGNATURE` off while testing).
 3. **Firestore:** the doc above is created/updated; `unread:true`, `preview` set,
@@ -144,6 +150,14 @@ the reply lands back on the platform.
    - **DM attachment:** send an image DM → the message stores `attachmentUrl` and
      the list preview shows `📎 Attachment`.
    - **Unsend (DM)** / **comment delete**: the stored copy is removed.
+     - DM unsend arrives as `message.is_deleted:true`; comment delete as FB
+       `feed` verb `remove`/`delete` (Instagram sends **no** comment delete webhook).
+   - **Edit (DM):** editing a sent DM arrives as a sibling `message_edit`
+     `{mid,text}` object (IG + Messenger) → the stored message's text is rewritten
+     in place (`ingestMessageEdit`); the rest of the thread is preserved.
+   - **Edit (comment):** FB `feed` verb `edited` → `comment.text`/`preview` are
+     patched in place, preserving replies + hidden state (Instagram sends no
+     comment edit webhook).
    - **Hide/unhide (comment):** `comment.hidden` flips.
 
 ---

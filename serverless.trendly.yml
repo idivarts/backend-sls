@@ -36,6 +36,12 @@ provider:
     FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
     INSTA_CLIENT_ID: ${env:INSTA_CLIENT_ID, '1166596944824933'}
     INSTA_CLIENT_SECRET: ${env:INSTA_CLIENT_SECRET}
+    # Social webhooks (trendly_social_webhooks) — per-platform subscription verify
+    # tokens (must match the Verify Token typed into each Meta webhook config) and
+    # the strict-signature gate (leave unset during initial testing).
+    WEBHOOK_VERIFY_TOKEN_INSTAGRAM: ${env:WEBHOOK_VERIFY_TOKEN_INSTAGRAM, 'mytoken'}
+    WEBHOOK_VERIFY_TOKEN_FACEBOOK: ${env:WEBHOOK_VERIFY_TOKEN_FACEBOOK, 'mytoken'}
+    WEBHOOK_STRICT_SIGNATURE: ${env:WEBHOOK_STRICT_SIGNATURE, ''}
     YOUTUBE_CLIENT_ID: ${env:YOUTUBE_CLIENT_ID, ''}
     YOUTUBE_CLIENT_SECRET: ${env:YOUTUBE_CLIENT_SECRET, ''}
     LINKEDIN_CLIENT_ID: ${env:LINKEDIN_CLIENT_ID, ''}
@@ -354,6 +360,16 @@ functions:
     # provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /payment_webhooks
+  trendly_social_webhooks:
+    handler: functions/trendly_social_webhooks/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /webhooks/{proxy+}
   stream_sqs_hook:
     handler: functions/stream_sqs_hook/main.go
     package:
@@ -398,6 +414,14 @@ functions:
               - Arn
   insta_apis:
     handler: functions/unauth_apis/main.go
+    environment:
+      # Social Connect (/connect/*) runs here. On a successful brand connect it
+      # enqueues warm-up jobs (inbox DMs + media + analytics) onto the shared
+      # social-sync queue so those caches fill in the background immediately —
+      # without this URL the enqueue silently no-ops and the fetch would only
+      # start on first inbox open. Mirrors trendly_v2_apis.
+      SOCIAL_SYNC_QUEUE_URL:
+        Ref: SocialSyncQueue
     package:
       include:
         - 'service-account.json'

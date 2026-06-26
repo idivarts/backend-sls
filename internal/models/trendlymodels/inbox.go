@@ -78,6 +78,11 @@ type InboxConversation struct {
 	Preview        string `json:"preview" firestore:"preview"`
 	LastActivityAt int64  `json:"lastActivityAt" firestore:"lastActivityAt"` // epoch ms — list sort key
 	Unread         bool   `json:"unread" firestore:"unread"`
+	// LastSeenAt is epoch ms of the last time the brand viewed this conversation.
+	// Unread ⇔ LastActivityAt > LastSeenAt; the per-conversation new-message count
+	// is the inbound items with sentAt > LastSeenAt. Baselined to LastActivityAt on
+	// first sync (history starts read) and bumped to LastActivityAt on read/reply.
+	LastSeenAt int64 `json:"lastSeenAt" firestore:"lastSeenAt"`
 
 	// DM-only: epoch ms when the 24h reply window closes (0/omitted for comments).
 	ReplyWindowExpiresAt int64 `json:"replyWindowExpiresAt,omitempty" firestore:"replyWindowExpiresAt,omitempty"`
@@ -271,6 +276,113 @@ func DeleteInboxConversationsByKind(brandID string, kind InboxKind) (int, error)
 		n++
 	}
 	return n, nil
+}
+
+// DeleteInboxConversationsByParticipant removes every inbox conversation across
+// ALL brands whose participant is the given platform user id, returning the
+// count deleted. Used by the Meta data-deletion callback to honor a user's
+// erasure request (their DMs and comments are wiped wherever they appear).
+//
+// This is a collection-group query over the `inbox` subcollection and therefore
+// needs a COLLECTION_GROUP-scoped single-field index on `participant.id`:
+//   - dev (Standard):  fieldOverrides in firestore.indexes.json
+//   - prod (Enterprise): gcloud line in migrations/create-enterprise-single-field-indexes.sh
+func DeleteInboxConversationsByParticipant(participantID string) (int, error) {
+	if participantID == "" {
+		return 0, fmt.Errorf("DeleteInboxConversationsByParticipant: empty participantID")
+	}
+	iter := firestoredb.Client.
+		CollectionGroup("inbox").
+		Where("participant.id", "==", participantID).
+		Documents(context.Background())
+	defer iter.Stop()
+
+	n := 0
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return n, err
+		}
+		if _, err := doc.Ref.Delete(context.Background()); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+// BaselineInboxLastSeenAt stamps lastSeenAt = lastActivityAt on every inbox
+// conversation across all brands that has no baseline yet (lastSeenAt == 0).
+// One-time migration so pre-existing history starts "read" when the unread-badge
+// feature ships — run it ONCE at rollout (running it later would mark genuinely
+// unread conversations as read). Returns (updated, scanned).
+func BaselineInboxLastSeenAt() (updated int, scanned int, err error) {
+	iter := firestoredb.Client.CollectionGroup("inbox").Documents(context.Background())
+	defer iter.Stop()
+	for {
+		doc, e := iter.Next()
+		if e == iterator.Done {
+			break
+		}
+		if e != nil {
+			return updated, scanned, e
+		}
+		scanned++
+		var conv InboxConversation
+		if e := doc.DataTo(&conv); e != nil {
+			continue
+		}
+		if conv.LastSeenAt != 0 {
+			continue // already baselined
+		}
+		if _, e := doc.Ref.Update(context.Background(), []firestore.Update{
+			{Path: "lastSeenAt", Value: conv.LastActivityAt},
+		}); e != nil {
+			return updated, scanned, e
+		}
+		updated++
+	}
+	return updated, scanned, nil
+}
+
+// deleteDocsBySocial deletes every document in a brand subcollection whose
+// `socialId` matches — the shared primitive for purging a disconnected account's
+// data (inbox, media, analytics). Returns the count deleted.
+func deleteDocsBySocial(collectionPath, socialID string) (int, error) {
+	if socialID == "" {
+		return 0, fmt.Errorf("deleteDocsBySocial: empty socialID")
+	}
+	iter := firestoredb.Client.
+		Collection(collectionPath).
+		Where("socialId", "==", socialID).
+		Documents(context.Background())
+	defer iter.Stop()
+
+	n := 0
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return n, err
+		}
+		if _, err := doc.Ref.Delete(context.Background()); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+// DeleteInboxConversationsBySocial removes every inbox conversation (DMs +
+// comments) tied to a connected social account. Used on disconnect. Returns the
+// count deleted.
+func DeleteInboxConversationsBySocial(brandID, socialID string) (int, error) {
+	return deleteDocsBySocial(brandInboxCollection(brandID), socialID)
 }
 
 // DeleteInboxConversation removes a conversation document (used by deletion sync

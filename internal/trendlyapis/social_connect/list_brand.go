@@ -52,14 +52,22 @@ func DeleteBrandSocial(c *gin.Context) {
 		return
 	}
 
+	// Remove only THIS brand's ownership from the routing index — other brands
+	// connected to the same account must keep receiving webhooks. The index doc
+	// is deleted only when its last owner is removed.
 	if getErr == nil && account != nil {
 		if account.PlatformAccountID != "" {
-			_ = trendlymodels.DeleteSocialAccountIndex(account.PlatformAccountID)
+			_ = trendlymodels.RemoveSocialAccountOwner(account.PlatformAccountID, "brands", brandID)
 		}
 		if account.InstagramBusinessID != "" {
-			_ = trendlymodels.DeleteSocialAccountIndex(account.InstagramBusinessID)
+			_ = trendlymodels.RemoveSocialAccountOwner(account.InstagramBusinessID, "brands", brandID)
 		}
 	}
+
+	// Hand the data purge (inbox DMs + comments, media, analytics) off to the
+	// social queue so the disconnect API returns immediately — these range
+	// deletes can be slow on large brands.
+	enqueueDisconnectCleanup(brandID, socialID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "brand social account disconnected"})
 }

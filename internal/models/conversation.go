@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"cloud.google.com/go/firestore"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/messenger"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"google.golang.org/api/iterator"
 )
@@ -35,7 +35,7 @@ type Conversation struct {
 
 	// Old fields that needs to be replaced or removed
 	// IGSID       string                 `json:"igsid" firestore:"igsid"`
-	// UserProfile *messenger.UserProfile `json:"userProfile,omitempty" firestore:"userProfile"`
+	// UserProfile *facebook.UserProfile `json:"userProfile,omitempty" firestore:"userProfile"`
 	// Information openaifc.ChangePhase   `json:"information" firestore:"information"`
 }
 
@@ -53,7 +53,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := messenger.GetConversationsByUserId(conversation.LeadID, *pData.AccessToken)
+	convIds, err := facebook.GetConversationsByUserId(conversation.LeadID, *pData.AccessToken, facebook.PlatformInstagram)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	lastMid := ""
 	conv := convIds.Data[0]
 
-	messages := messenger.FetchAllMessages(conv.ID, nil, *pData.AccessToken)
+	messages := facebook.FetchAllMessages(conv.ID, nil, *pData.AccessToken)
 
 	lastindex := 1
 	if includeLastMessage {

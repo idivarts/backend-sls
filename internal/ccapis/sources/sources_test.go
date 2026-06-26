@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	sourcesapi "github.com/idivarts/backend-sls/internal/ccapis/sources"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 func TestFacebookLogin(t *testing.T) {
@@ -93,6 +93,6 @@ func TestFacebookLogin(t *testing.T) {
 }
 
 func TestFetchMessages(t *testing.T) {
-	data := messenger.FetchAllConversations(nil, "EAAGDG5jzw5QBOwqvavtNVZCa9CoxgvzWWCk7PhPKPmxPMeZAKnVRLO3FUWIeOU7mxLVZBzXUUG6uuhvHHQZBeCkKfSOEBzcyec0UJni2fvYZBY5g1bsRSHDrDD9s633ZB4ljUPhfQZAK9UAUg0jVZBbqANeWZAKpe2UxdzaHns7QoSur2yZAw6C0J7DYmp")
+	data := facebook.FetchAllConversations(nil, "EAAGDG5jzw5QBOwqvavtNVZCa9CoxgvzWWCk7PhPKPmxPMeZAKnVRLO3FUWIeOU7mxLVZBzXUUG6uuhvHHQZBeCkKfSOEBzcyec0UJni2fvYZBY5g1bsRSHDrDD9s633ZB4ljUPhfQZAK9UAUg0jVZBbqANeWZAKpe2UxdzaHns7QoSur2yZAw6C0J7DYmp", facebook.PlatformInstagram)
 	log.Println(data)
 }

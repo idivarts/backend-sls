@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // Per-post (single media) basic analytics. Reuses the same Meta insight + media
@@ -157,7 +157,7 @@ func fetchInstagramPost(acc trendlymodels.SocialAccount, at, mediaID string) Pos
 func fetchFacebookPost(postID, at string) PostAnalytics {
 	out := PostAnalytics{MediaID: postID, Channel: trendlymodels.PlatformFacebook, FetchedAt: time.Now().Unix()}
 
-	post, err := messenger.GetPostByID(postID, at)
+	post, err := facebook.GetPostByID(postID, at)
 	if err != nil {
 		out.Error = "facebook post: " + err.Error()
 	}
@@ -180,12 +180,12 @@ func fetchFacebookPost(postID, at string) PostAnalytics {
 	// (per the v25.0 changelog).
 	var reach int64
 	reachAvailable := false
-	if ins, rerr := messenger.GetFacebookInsights(postID, at,
-		[]messenger.FBInsightMetric{messenger.FBMetricPostTotalMediaViewUnique},
-		messenger.FBPeriodLifetime,
-		messenger.FBInsightParams{},
-	); rerr == nil && ins != nil && ins.Find(messenger.FBMetricPostTotalMediaViewUnique) != nil {
-		reach = ins.Total(messenger.FBMetricPostTotalMediaViewUnique)
+	if ins, rerr := facebook.GetFacebookInsights(postID, at,
+		[]facebook.FBInsightMetric{facebook.FBMetricPostTotalMediaViewUnique},
+		facebook.FBPeriodLifetime,
+		facebook.FBInsightParams{},
+	); rerr == nil && ins != nil && ins.Find(facebook.FBMetricPostTotalMediaViewUnique) != nil {
+		reach = ins.Total(facebook.FBMetricPostTotalMediaViewUnique)
 		reachAvailable = true
 	} else if rerr != nil {
 		log.Printf("analytics post: FB reach fetch failed for %s: %v", postID, rerr)

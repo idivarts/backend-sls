@@ -67,7 +67,7 @@ backend-sls/
 │   ├── api_handler/    # GinEngine singleton + StartLambda()
 │   ├── firebase/       # Firebase Admin SDK (auth, firestore, messaging)
 │   ├── instagram/      # Instagram Graph API client
-│   ├── messenger/      # Facebook Messenger client
+│   ├── facebook/       # Facebook Graph/Messenger client
 │   ├── payments/       # Razorpay wrappers
 │   ├── myemail/        # SendGrid helpers
 │   ├── gemini/         # Google Gemini AI

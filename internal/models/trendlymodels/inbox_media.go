@@ -42,3 +42,9 @@ func (m *InboxMediaDoc) Upsert(brandID string) error {
 		Set(context.Background(), m)
 	return err
 }
+
+// DeleteInboxMediaBySocial removes all media docs for a connected account (used
+// on disconnect). Returns the count deleted.
+func DeleteInboxMediaBySocial(brandID, socialID string) (int, error) {
+	return deleteDocsBySocial(brandInboxMediaCollection(brandID), socialID)
+}

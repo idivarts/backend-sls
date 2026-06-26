@@ -1,4 +1,4 @@
-package messenger
+package facebook
 
 import (
 	"encoding/json"
@@ -16,8 +16,9 @@ const messageInfoFields = "id,created_time,from,to,message,attachments{id,mime_t
 
 type Participants struct {
 	Data []struct {
-		Username string `json:"username"`
 		ID       string `json:"id"`
+		Name     string `json:"name"`     // Facebook Messenger participant display name
+		Username string `json:"username"` // Instagram-only handle (empty for Messenger)
 	} `json:"data"`
 }
 
@@ -153,32 +154,20 @@ func GetMessageInfo(messageID string, pageAccessToken string) (*Message, error) 
 	return &data, nil
 }
 
+// GetMessagesWithPagination fetches a page of messages for a conversation. The
+// fetch retries with a shrinking page size on Meta's transient "Please reduce
+// the amount of data you're asking for" 500s (the message attachment expansion
+// is the heaviest part of a DM sync) — see GraphGetRetry.
 func GetMessagesWithPagination(conversationID string, after string, limit int, pageAccessToken string) (*ConversationPaginatedMessageData, error) {
-	// Set up the HTTP client
-	client := http.Client{}
-
-	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s/messages?fields=%s&limit=%d&after=%s&access_token=%s", BaseURL, ApiVersion, conversationID, messageInfoFields, limit, after, pageAccessToken)
-
-	// Make the API request
-	resp, err := client.Get(apiURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
+	body, err := GraphGetRetry(func(l int) string {
+		return fmt.Sprintf("%s/%s/%s/messages?fields=%s&limit=%d&after=%s&access_token=%s", BaseURL, ApiVersion, conversationID, messageInfoFields, l, after, pageAccessToken)
+	}, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	// Print the response body
-	// fmt.Println(string(body))
 	data := ConversationPaginatedMessageData{}
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		fmt.Print(err.Error())
+	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
 	}
 

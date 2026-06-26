@@ -8,14 +8,14 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 // Messaging + comment operations for Instagram accounts connected via Instagram
 // Login (graph.instagram.com) using an IG user access token.
 //
 // For IG Business Accounts linked to a Facebook Page, use the page-token helpers
-// in pkg/messenger instead (those go through graph.facebook.com).
+// in pkg/facebook instead (those go through graph.facebook.com).
 
 // ── Direct messages ───────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ type igSendMessage struct {
 
 // SendIGMessage sends a DM reply from the connected IG account to a recipient.
 // POST graph.instagram.com/{version}/me/messages
-func SendIGMessage(recipientID, text, accessToken string) (*messenger.IMessageResponse, error) {
+func SendIGMessage(recipientID, text, accessToken string) (*facebook.IMessageResponse, error) {
 	payload := igSendMessage{}
 	payload.Recipient.ID = recipientID
 	payload.Message.Text = text
@@ -49,27 +49,30 @@ func SendIGMessage(recipientID, text, accessToken string) (*messenger.IMessageRe
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("SendIGMessage: status %d: %s", resp.StatusCode, string(body))
 	}
-	out := &messenger.IMessageResponse{}
+	out := &facebook.IMessageResponse{}
 	_ = json.Unmarshal(body, out)
 	return out, nil
 }
 
-// GetIGConversations lists DM conversations for the connected IG account.
+// GetIGConversations lists DM conversations for the connected IG account, with
+// recent messages expanded inline.
 // GET graph.instagram.com/{version}/me/conversations?platform=instagram&fields=...
-func GetIGConversations(accessToken string) (*messenger.ConversationData, error) {
-	fields := "name,id,participants,messages{id,created_time,from,to,message,attachments{id,mime_type,name,file_url,image_data,video_data}}"
-	endpoint := fmt.Sprintf("%s/%s/me/conversations?platform=instagram&fields=%s&access_token=%s",
-		BaseURL, ApiVersion, url.QueryEscape(fields), url.QueryEscape(accessToken))
-	resp, err := http.Get(endpoint)
+//
+// Both the conversation page size and the inline messages expansion are bounded,
+// and the fetch retries with a shrinking page size on Meta's transient "Please
+// reduce the amount of data you're asking for" 500s — the unbounded inline
+// messages expansion is what most often trips that error. See
+// facebook.GraphGetRetry.
+func GetIGConversations(accessToken string) (*facebook.ConversationData, error) {
+	body, err := facebook.GraphGetRetry(func(l int) string {
+		fields := fmt.Sprintf("name,id,participants,messages.limit(%d){id,created_time,from,to,message,attachments{id,mime_type,name,file_url,image_data,video_data}}", l)
+		return fmt.Sprintf("%s/%s/me/conversations?platform=instagram&fields=%s&limit=%d&access_token=%s",
+			BaseURL, ApiVersion, url.QueryEscape(fields), l, url.QueryEscape(accessToken))
+	}, 25)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GetIGConversations: status %d: %s", resp.StatusCode, string(body))
-	}
-	data := &messenger.ConversationData{}
+	data := &facebook.ConversationData{}
 	if err := json.Unmarshal(body, data); err != nil {
 		return nil, err
 	}
@@ -80,7 +83,7 @@ func GetIGConversations(accessToken string) (*messenger.ConversationData, error)
 // Instagram-Login account. The contact id is the Instagram-scoped id (IGSID) seen
 // in conversation participants / webhook sender ids.
 // GET graph.instagram.com/{version}/{igsid}?fields=name,username,profile_pic
-func GetUser(igsid, accessToken string) (*messenger.UserProfile, error) {
+func GetUser(igsid, accessToken string) (*facebook.UserProfile, error) {
 	fields := "name,username,profile_pic"
 	endpoint := fmt.Sprintf("%s/%s/%s?fields=%s&access_token=%s",
 		BaseURL, ApiVersion, igsid, url.QueryEscape(fields), url.QueryEscape(accessToken))
@@ -93,7 +96,7 @@ func GetUser(igsid, accessToken string) (*messenger.UserProfile, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GetUser: status %d: %s", resp.StatusCode, string(body))
 	}
-	out := &messenger.UserProfile{}
+	out := &facebook.UserProfile{}
 	if err := json.Unmarshal(body, out); err != nil {
 		return nil, err
 	}
@@ -106,7 +109,7 @@ func GetUser(igsid, accessToken string) (*messenger.UserProfile, error) {
 // Used as a fallback because the messaging User Profile API withholds name/avatar
 // for professional accounts. Returns data only for professional target accounts.
 // GET graph.instagram.com/{version}/{selfIGID}?fields=business_discovery.username(<username>){...}
-func GetInstagramByUsername(selfIGID, username, accessToken string) (*messenger.InstagramProfile, error) {
+func GetInstagramByUsername(selfIGID, username, accessToken string) (*facebook.InstagramProfile, error) {
 	fields := fmt.Sprintf("business_discovery.username(%s){id,name,username,profile_picture_url,followers_count}", username)
 	endpoint := fmt.Sprintf("%s/%s/%s?fields=%s&access_token=%s",
 		BaseURL, ApiVersion, selfIGID, url.QueryEscape(fields), url.QueryEscape(accessToken))
@@ -121,7 +124,7 @@ func GetInstagramByUsername(selfIGID, username, accessToken string) (*messenger.
 		return nil, fmt.Errorf("GetInstagramByUsername: status %d: %s", resp.StatusCode, string(body))
 	}
 	var out struct {
-		BusinessDiscovery messenger.InstagramProfile `json:"business_discovery"`
+		BusinessDiscovery facebook.InstagramProfile `json:"business_discovery"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
 		return nil, err

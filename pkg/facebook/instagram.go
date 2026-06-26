@@ -1,4 +1,4 @@
-package messenger
+package facebook
 
 import (
 	"encoding/json"
@@ -14,6 +14,12 @@ type InstagramBriefProfile struct {
 	Username  string `json:"username" firestore:"username"`
 	Biography string `json:"biography" firestore:"biography"`
 	ID        string `json:"id" firestore:"id"`
+	// UserID is the Instagram professional account ID (IGSID) returned by the
+	// Instagram Business Login API's GET /me?fields=user_id. It matches the
+	// entry.id delivered in Instagram webhook notifications and is the correct
+	// identifier for routing inbox events. Empty when fetched via the Facebook
+	// Graph API path (which uses ID instead).
+	UserID string `json:"user_id,omitempty" firestore:"user_id,omitempty"`
 }
 
 type InstagramProfile struct {

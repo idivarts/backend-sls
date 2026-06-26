@@ -10,7 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/socialsync"
 	"github.com/idivarts/backend-sls/pkg/instagram"
-	"github.com/idivarts/backend-sls/pkg/messenger"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 )
 
 const replyWindowMs = int64(24 * 60 * 60 * 1000)
@@ -193,19 +193,19 @@ func syncAccountDMs(brandID string, s *trendlymodels.SocialAccount, token string
 	}
 
 	// Facebook Page: list conversations, then hydrate recent messages per thread.
-	convs, err := messenger.GetConversationsPaginated("", 25, token)
+	convs, err := facebook.GetConversationsPaginated("", 25, token, facebook.PlatformMessenger)
 	if err != nil {
 		return err
 	}
 	for ci := range convs.Data {
 		conv := convs.Data[ci]
-		msgs, err := messenger.GetMessagesWithPagination(conv.ID, "", 25, token)
+		msgs, err := facebook.GetMessagesWithPagination(conv.ID, "", 25, token)
 		if err != nil {
 			log.Printf("inbox: messages fetch failed for conv %s: %v", conv.ID, err)
 			continue
 		}
 		conv.Messages = &struct {
-			Data []messenger.Message `json:"data"`
+			Data []facebook.Message `json:"data"`
 		}{Data: msgs.Data}
 		upsertDMConversation(brandID, s, selfID, token, &conv)
 	}
@@ -237,7 +237,7 @@ func isSelfParticipant(s *trendlymodels.SocialAccount, selfID, id, username stri
 // carrying any media attachment through (photos, videos, reels, shared posts,
 // story replies, voice clips, files) so media-only messages don't render empty.
 // Shared by the bulk sync and the unit-level thread/message resyncs.
-func mapMessengerMessage(s *trendlymodels.SocialAccount, selfID string, m messenger.Message) trendlymodels.InboxMessage {
+func mapMessengerMessage(s *trendlymodels.SocialAccount, selfID string, m facebook.Message) trendlymodels.InboxMessage {
 	author := trendlymodels.InboxAuthorContact
 	if isSelfParticipant(s, selfID, m.From.ID, m.From.Username) {
 		author = trendlymodels.InboxAuthorBusiness
@@ -258,40 +258,63 @@ func mapMessengerMessage(s *trendlymodels.SocialAccount, selfID string, m messen
 
 // fetchContactProfile looks up a DM contact's display profile (name, handle,
 // avatar) from Meta. Best-effort: returns zero values on any error so callers
-// fall back to whatever they already have. Instagram-Login accounts resolve via
-// graph.instagram.com; Facebook Pages (incl. IG-via-Page) via graph.facebook.com.
+// fall back to whatever they already have.
 //
-// usernameHint seeds the Business Discovery fallback (the contact's handle from
-// the conversation participants) for cases where the messaging lookup returns
-// nothing — webhook callers that lack a participant list pass "".
-func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usernameHint string) (name, handle, avatar string) {
+// The right API depends on the CONTACT's platform, not just the connected
+// account's: a Facebook Page serves BOTH Messenger contacts (PSIDs) and IG
+// contacts (IGSIDs, via a linked IG Business account). The `channel` of the
+// event disambiguates them:
+//   - facebook → Messenger User Profile API (first_name/last_name/profile_pic;
+//     FB users have no username/follower_count — requesting those 400s).
+//   - instagram → IG messaging User Profile API (name/username/profile_pic/…),
+//     via graph.instagram.com for IG-Login accounts or graph.facebook.com for
+//     IG-via-Page, plus a Business Discovery fallback by username.
+//
+// usernameHint seeds the IG Business Discovery fallback (the contact's handle
+// from the conversation participants); webhook callers that lack one pass "".
+func fetchContactProfile(s *trendlymodels.SocialAccount, channel trendlymodels.Platform, token, contactID, usernameHint string) (name, handle, avatar string) {
 	if contactID == "" || token == "" {
+		log.Printf("inbox: contact profile fetch skipped account=%s contact=%q tokenSet=%v", s.ID, contactID, token != "")
 		return "", "", ""
 	}
+
+	// ── Facebook (Messenger) contact: PSID, no username/follower_count. ──
+	if channel == trendlymodels.PlatformFacebook {
+		prof, err := facebook.GetMessengerUser(contactID, token)
+		if err != nil || prof == nil {
+			// Best-effort BY DESIGN: a failure (Meta withholds the profile, or the
+			// page token lacks pages_messaging) must NOT abort ingestion.
+			log.Printf("inbox: contact profile fetch failed (non-fatal) channel=facebook account=%s contact=%s: %v", s.ID, contactID, err)
+			return "", "", ""
+		}
+		name, avatar = prof.FullName(), prof.ProfilePic
+		log.Printf("inbox: contact profile fetched channel=facebook account=%s contact=%s name=%q hasAvatar=%v", s.ID, contactID, name, avatar != "")
+		return name, "", avatar
+	}
+
+	// ── Instagram contact: IGSID via the IG messaging User Profile API. ──
 	var (
-		prof *messenger.UserProfile
+		prof *facebook.UserProfile
 		err  error
 	)
 	if s.Platform == trendlymodels.PlatformInstagram {
-		prof, err = instagram.GetUser(contactID, token)
+		prof, err = instagram.GetUser(contactID, token) // graph.instagram.com
 	} else {
-		prof, err = messenger.GetUser(contactID, token)
+		prof, err = facebook.GetUser(contactID, token) // IG-via-Page, graph.facebook.com
 	}
 	if err != nil || prof == nil {
-		log.Printf("inbox: contact profile fetch failed for %s: %v", contactID, err)
+		log.Printf("inbox: contact profile fetch failed (non-fatal) channel=instagram account=%s contact=%s: %v", s.ID, contactID, err)
 	} else {
 		name, handle, avatar = prof.Name, prof.Username, prof.ProfilePic
+		log.Printf("inbox: contact profile fetched channel=instagram account=%s contact=%s name=%q handle=%q hasAvatar=%v", s.ID, contactID, name, handle, avatar != "")
 	}
 	if handle == "" {
 		handle = usernameHint
 	}
 
-	// Business/professional accounts: the messaging User Profile API withholds
-	// name + profile_pic (returns only the username), so the contact ends up with
-	// the @handle and no avatar. Fall back to the Business Discovery API by
-	// username, which exposes public profile data (name, picture) for professional
-	// target accounts. Best-effort: failures (incl. personal accounts, which are
-	// not discoverable) leave the messaging-API values untouched.
+	// Professional IG accounts: the messaging API withholds name + profile_pic
+	// (only the username), so fall back to Business Discovery by username for
+	// public profile data. Best-effort; personal accounts aren't discoverable.
 	if avatar == "" && handle != "" {
 		if bd := fetchBusinessDiscovery(s, token, handle); bd != nil {
 			if name == "" {
@@ -302,15 +325,16 @@ func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usern
 			}
 		}
 	}
+	log.Printf("inbox: contact profile resolved account=%s contact=%s name=%q handle=%q hasAvatar=%v", s.ID, contactID, name, handle, avatar != "")
 	return name, handle, avatar
 }
 
 // fetchBusinessDiscovery resolves a professional contact's public profile by
 // username via the Business Discovery API, keyed off the connected account's own
 // IG id. Returns nil when no usable query node/token exists or the lookup fails.
-func fetchBusinessDiscovery(s *trendlymodels.SocialAccount, token, username string) *messenger.InstagramProfile {
+func fetchBusinessDiscovery(s *trendlymodels.SocialAccount, token, username string) *facebook.InstagramProfile {
 	var (
-		prof *messenger.InstagramProfile
+		prof *facebook.InstagramProfile
 		err  error
 	)
 	if s.Platform == trendlymodels.PlatformInstagram {
@@ -322,7 +346,7 @@ func fetchBusinessDiscovery(s *trendlymodels.SocialAccount, token, username stri
 		if s.InstagramBusinessID == "" {
 			return nil
 		}
-		prof, err = messenger.GetInstagramByUsername(s.InstagramBusinessID, username, token)
+		prof, err = facebook.GetInstagramByUsername(s.InstagramBusinessID, username, token)
 	}
 	if err != nil || prof == nil {
 		log.Printf("inbox: business discovery failed for %s: %v", username, err)
@@ -332,7 +356,7 @@ func fetchBusinessDiscovery(s *trendlymodels.SocialAccount, token, username stri
 }
 
 // upsertDMConversation maps a Meta conversation to the inbox model and stores it.
-func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID, token string, c *messenger.ConversationMessagesData) {
+func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID, token string, c *facebook.ConversationMessagesData) {
 	// Identify the contact participant (the one that isn't us).
 	var contactID, contactName, contactHandle string
 	for _, p := range c.Participants.Data {
@@ -349,7 +373,7 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 	// carry only an id/username and never a profile picture, so without this the
 	// avatar is empty and the name is just the handle.
 	var avatarURL string
-	if name, handle, avatar := fetchContactProfile(s, token, contactID, contactHandle); name != "" || avatar != "" {
+	if name, handle, avatar := fetchContactProfile(s, s.Platform, token, contactID, contactHandle); name != "" || avatar != "" {
 		if name != "" {
 			contactName = name
 		}
@@ -378,8 +402,21 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		}
 	}
 
+	// Deterministic conversation id per (account, contact). Meta's conversation
+	// id (c.ID) is not available to webhook ingestion, so keying by the
+	// participant pair lets fetch and webhook paths converge on the same doc.
+	convID := "dm_" + s.ID + "_" + contactID
+
+	// Preserve an existing last-seen baseline across resyncs so newly-fetched
+	// inbound messages still surface as unread. On the FIRST sync (no existing
+	// doc) baseline lastSeenAt to the latest activity so history starts read.
+	lastSeenAt := lastAt
+	if existing, err := trendlymodels.GetInboxConversation(brandID, convID); err == nil && existing != nil {
+		lastSeenAt = existing.LastSeenAt
+	}
+
 	conv := &trendlymodels.InboxConversation{
-		ID:      "dm_" + c.ID,
+		ID:      convID,
 		Kind:    trendlymodels.InboxKindDM,
 		Channel: s.Platform,
 		Participant: trendlymodels.InboxParticipant{
@@ -390,7 +427,8 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		},
 		Preview:                preview,
 		LastActivityAt:         lastAt,
-		Unread:                 false,
+		LastSeenAt:             lastSeenAt,
+		Unread:                 lastAt > lastSeenAt,
 		Messages:               msgs,
 		SocialID:               s.ID,
 		ExternalConversationID: c.ID,
@@ -432,37 +470,53 @@ func Reply(brandID, convID, text string) error {
 		if conv.ReplyWindowExpiresAt > 0 && now > conv.ReplyWindowExpiresAt {
 			return fmt.Errorf("reply window expired")
 		}
+		// Capture the platform's returned message id (mid) and store it as the
+		// reply's id, so the message_echoes webhook for this same send dedupes
+		// against it (ingestMessagingForBrand matches by mid) instead of being
+		// appended a second time.
+		var sent *facebook.IMessageResponse
 		if isFB {
-			if _, err := messenger.SendTextMessage(conv.ExternalRecipientID, text, sa.token); err != nil {
-				return err
-			}
+			sent, err = facebook.SendTextMessage(conv.ExternalRecipientID, text, sa.token)
 		} else {
-			if _, err := instagram.SendIGMessage(conv.ExternalRecipientID, text, sa.token); err != nil {
-				return err
-			}
+			sent, err = instagram.SendIGMessage(conv.ExternalRecipientID, text, sa.token)
+		}
+		if err != nil {
+			return err
+		}
+		if sent != nil && sent.MessageID != "" {
+			reply.ID = sent.MessageID
 		}
 		conv.Messages = append(conv.Messages, reply)
 		conv.Preview = text
 		conv.LastActivityAt = now
+		conv.LastSeenAt = now // replying implies the thread has been seen
 		conv.Unread = false
 		conv.UpdatedAt = now
 		return conv.Upsert(brandID)
 	}
 
-	// Comment reply.
+	// Comment reply. Capture the platform's returned comment id and store it as
+	// the reply's id, so the webhook echo of this same comment (and any Meta
+	// redelivery) dedupes against it in ingestCommentReply instead of being
+	// appended a second time. Comment webhooks carry no is_echo flag, so id-based
+	// dedup is the only reliable guard.
+	var newCommentID string
 	if isFB {
-		if _, err := messenger.CreateCommentReply(conv.ExternalCommentID, text, sa.token); err != nil {
-			return err
-		}
+		newCommentID, err = facebook.CreateCommentReply(conv.ExternalCommentID, text, sa.token)
 	} else {
-		if _, err := instagram.ReplyToIGComment(conv.ExternalCommentID, text, sa.token); err != nil {
-			return err
-		}
+		newCommentID, err = instagram.ReplyToIGComment(conv.ExternalCommentID, text, sa.token)
+	}
+	if err != nil {
+		return err
+	}
+	if newCommentID != "" {
+		reply.ID = newCommentID
 	}
 	if conv.Comment != nil {
 		conv.Comment.Replies = append(conv.Comment.Replies, reply)
 	}
 	conv.LastActivityAt = now
+	conv.LastSeenAt = now // replying implies the thread has been seen
 	conv.Unread = false
 	conv.UpdatedAt = now
 	return conv.Upsert(brandID)
@@ -482,7 +536,7 @@ func SetCommentHidden(brandID, convID string, hidden bool) error {
 		return err
 	}
 	if sa.account.Platform == trendlymodels.PlatformFacebook {
-		err = messenger.SetCommentHidden(conv.ExternalCommentID, hidden, sa.token)
+		err = facebook.SetCommentHidden(conv.ExternalCommentID, hidden, sa.token)
 	} else {
 		err = instagram.SetIGCommentHidden(conv.ExternalCommentID, hidden, sa.token)
 	}
@@ -509,7 +563,7 @@ func DeleteComment(brandID, convID string) error {
 		return err
 	}
 	if sa.account.Platform == trendlymodels.PlatformFacebook {
-		err = messenger.DeleteObject(conv.ExternalCommentID, sa.token)
+		err = facebook.DeleteObject(conv.ExternalCommentID, sa.token)
 	} else {
 		err = instagram.DeleteIGObject(conv.ExternalCommentID, sa.token)
 	}
@@ -519,10 +573,16 @@ func DeleteComment(brandID, convID string) error {
 	return trendlymodels.DeleteInboxConversation(brandID, convID)
 }
 
-// MarkRead clears the unread flag on a conversation.
+// MarkRead clears the unread flag on a conversation and advances lastSeenAt to
+// the latest activity so the per-conversation new-message count drops to 0.
 func MarkRead(brandID, convID string) error {
+	conv, err := trendlymodels.GetInboxConversation(brandID, convID)
+	if err != nil {
+		return err
+	}
 	return trendlymodels.UpdateInboxConversation(brandID, convID, []firestore.Update{
 		{Path: "unread", Value: false},
+		{Path: "lastSeenAt", Value: conv.LastActivityAt},
 		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	})
 }

@@ -39,7 +39,7 @@ func CreateOrUpdateThread(ev *sqsevents.ConversationEvent) error {
 			return err
 		}
 		// TODO: Write code to update the lead table
-		// user, err := messenger.GetUser(igsid, *pData.AccessToken)
+		// user, err := facebook.GetUser(igsid, *pData.AccessToken)
 		// if err != nil {
 		// 	return err
 		// }
