@@ -387,8 +387,21 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		}
 	}
 
+	// Deterministic conversation id per (account, contact). Meta's conversation
+	// id (c.ID) is not available to webhook ingestion, so keying by the
+	// participant pair lets fetch and webhook paths converge on the same doc.
+	convID := "dm_" + s.ID + "_" + contactID
+
+	// Preserve an existing last-seen baseline across resyncs so newly-fetched
+	// inbound messages still surface as unread. On the FIRST sync (no existing
+	// doc) baseline lastSeenAt to the latest activity so history starts read.
+	lastSeenAt := lastAt
+	if existing, err := trendlymodels.GetInboxConversation(brandID, convID); err == nil && existing != nil {
+		lastSeenAt = existing.LastSeenAt
+	}
+
 	conv := &trendlymodels.InboxConversation{
-		ID:      "dm_" + c.ID,
+		ID:      convID,
 		Kind:    trendlymodels.InboxKindDM,
 		Channel: s.Platform,
 		Participant: trendlymodels.InboxParticipant{
@@ -399,7 +412,8 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		},
 		Preview:                preview,
 		LastActivityAt:         lastAt,
-		Unread:                 false,
+		LastSeenAt:             lastSeenAt,
+		Unread:                 lastAt > lastSeenAt,
 		Messages:               msgs,
 		SocialID:               s.ID,
 		ExternalConversationID: c.ID,
@@ -441,37 +455,53 @@ func Reply(brandID, convID, text string) error {
 		if conv.ReplyWindowExpiresAt > 0 && now > conv.ReplyWindowExpiresAt {
 			return fmt.Errorf("reply window expired")
 		}
+		// Capture the platform's returned message id (mid) and store it as the
+		// reply's id, so the message_echoes webhook for this same send dedupes
+		// against it (ingestMessagingForBrand matches by mid) instead of being
+		// appended a second time.
+		var sent *facebook.IMessageResponse
 		if isFB {
-			if _, err := facebook.SendTextMessage(conv.ExternalRecipientID, text, sa.token); err != nil {
-				return err
-			}
+			sent, err = facebook.SendTextMessage(conv.ExternalRecipientID, text, sa.token)
 		} else {
-			if _, err := instagram.SendIGMessage(conv.ExternalRecipientID, text, sa.token); err != nil {
-				return err
-			}
+			sent, err = instagram.SendIGMessage(conv.ExternalRecipientID, text, sa.token)
+		}
+		if err != nil {
+			return err
+		}
+		if sent != nil && sent.MessageID != "" {
+			reply.ID = sent.MessageID
 		}
 		conv.Messages = append(conv.Messages, reply)
 		conv.Preview = text
 		conv.LastActivityAt = now
+		conv.LastSeenAt = now // replying implies the thread has been seen
 		conv.Unread = false
 		conv.UpdatedAt = now
 		return conv.Upsert(brandID)
 	}
 
-	// Comment reply.
+	// Comment reply. Capture the platform's returned comment id and store it as
+	// the reply's id, so the webhook echo of this same comment (and any Meta
+	// redelivery) dedupes against it in ingestCommentReply instead of being
+	// appended a second time. Comment webhooks carry no is_echo flag, so id-based
+	// dedup is the only reliable guard.
+	var newCommentID string
 	if isFB {
-		if _, err := facebook.CreateCommentReply(conv.ExternalCommentID, text, sa.token); err != nil {
-			return err
-		}
+		newCommentID, err = facebook.CreateCommentReply(conv.ExternalCommentID, text, sa.token)
 	} else {
-		if _, err := instagram.ReplyToIGComment(conv.ExternalCommentID, text, sa.token); err != nil {
-			return err
-		}
+		newCommentID, err = instagram.ReplyToIGComment(conv.ExternalCommentID, text, sa.token)
+	}
+	if err != nil {
+		return err
+	}
+	if newCommentID != "" {
+		reply.ID = newCommentID
 	}
 	if conv.Comment != nil {
 		conv.Comment.Replies = append(conv.Comment.Replies, reply)
 	}
 	conv.LastActivityAt = now
+	conv.LastSeenAt = now // replying implies the thread has been seen
 	conv.Unread = false
 	conv.UpdatedAt = now
 	return conv.Upsert(brandID)
@@ -528,10 +558,16 @@ func DeleteComment(brandID, convID string) error {
 	return trendlymodels.DeleteInboxConversation(brandID, convID)
 }
 
-// MarkRead clears the unread flag on a conversation.
+// MarkRead clears the unread flag on a conversation and advances lastSeenAt to
+// the latest activity so the per-conversation new-message count drops to 0.
 func MarkRead(brandID, convID string) error {
+	conv, err := trendlymodels.GetInboxConversation(brandID, convID)
+	if err != nil {
+		return err
+	}
 	return trendlymodels.UpdateInboxConversation(brandID, convID, []firestore.Update{
 		{Path: "unread", Value: false},
+		{Path: "lastSeenAt", Value: conv.LastActivityAt},
 		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	})
 }

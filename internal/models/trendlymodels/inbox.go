@@ -78,6 +78,11 @@ type InboxConversation struct {
 	Preview        string `json:"preview" firestore:"preview"`
 	LastActivityAt int64  `json:"lastActivityAt" firestore:"lastActivityAt"` // epoch ms — list sort key
 	Unread         bool   `json:"unread" firestore:"unread"`
+	// LastSeenAt is epoch ms of the last time the brand viewed this conversation.
+	// Unread ⇔ LastActivityAt > LastSeenAt; the per-conversation new-message count
+	// is the inbound items with sentAt > LastSeenAt. Baselined to LastActivityAt on
+	// first sync (history starts read) and bumped to LastActivityAt on read/reply.
+	LastSeenAt int64 `json:"lastSeenAt" firestore:"lastSeenAt"`
 
 	// DM-only: epoch ms when the 24h reply window closes (0/omitted for comments).
 	ReplyWindowExpiresAt int64 `json:"replyWindowExpiresAt,omitempty" firestore:"replyWindowExpiresAt,omitempty"`
@@ -307,6 +312,40 @@ func DeleteInboxConversationsByParticipant(participantID string) (int, error) {
 		n++
 	}
 	return n, nil
+}
+
+// BaselineInboxLastSeenAt stamps lastSeenAt = lastActivityAt on every inbox
+// conversation across all brands that has no baseline yet (lastSeenAt == 0).
+// One-time migration so pre-existing history starts "read" when the unread-badge
+// feature ships — run it ONCE at rollout (running it later would mark genuinely
+// unread conversations as read). Returns (updated, scanned).
+func BaselineInboxLastSeenAt() (updated int, scanned int, err error) {
+	iter := firestoredb.Client.CollectionGroup("inbox").Documents(context.Background())
+	defer iter.Stop()
+	for {
+		doc, e := iter.Next()
+		if e == iterator.Done {
+			break
+		}
+		if e != nil {
+			return updated, scanned, e
+		}
+		scanned++
+		var conv InboxConversation
+		if e := doc.DataTo(&conv); e != nil {
+			continue
+		}
+		if conv.LastSeenAt != 0 {
+			continue // already baselined
+		}
+		if _, e := doc.Ref.Update(context.Background(), []firestore.Update{
+			{Path: "lastSeenAt", Value: conv.LastActivityAt},
+		}); e != nil {
+			return updated, scanned, e
+		}
+		updated++
+	}
+	return updated, scanned, nil
 }
 
 // DeleteInboxConversation removes a conversation document (used by deletion sync
