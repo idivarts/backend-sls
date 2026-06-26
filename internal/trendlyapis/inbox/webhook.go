@@ -90,8 +90,10 @@ func ingestMessagingForBrand(brandID string, acc *trendlymodels.SocialAccount, p
 		brandID, acc.ID, selfID, acc.Platform, contactID, isEcho, m.Message.Mid, len(m.Message.Text), m.Message.IsDeleted)
 
 	// Deterministic conversation id per (account, contact). Webhook payloads do
-	// not include Meta's conversation id, so we key by the participant pair.
-	convID := "dmwh_" + acc.ID + "_" + contactID
+	// not include Meta's conversation id, so we key by the participant pair —
+	// the bulk fetch path (upsertDMConversation) uses the same format so both
+	// ingestion paths converge on the same doc.
+	convID := "dm_" + acc.ID + "_" + contactID
 
 	ts := m.Timestamp
 	if ts == 0 {
@@ -211,7 +213,7 @@ func ingestMessageEditForBrand(brandID string, acc *trendlymodels.SocialAccount,
 		return
 	}
 
-	convID := "dmwh_" + acc.ID + "_" + contactID
+	convID := "dm_" + acc.ID + "_" + contactID
 	conv, err := trendlymodels.GetInboxConversation(brandID, convID)
 	if err != nil || conv == nil {
 		return

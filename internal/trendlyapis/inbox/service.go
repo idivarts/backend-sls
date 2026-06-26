@@ -387,8 +387,11 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		}
 	}
 
+	// Deterministic conversation id per (account, contact). Meta's conversation
+	// id (c.ID) is not available to webhook ingestion, so keying by the
+	// participant pair lets fetch and webhook paths converge on the same doc.
 	conv := &trendlymodels.InboxConversation{
-		ID:      "dm_" + c.ID,
+		ID:      "dm_" + s.ID + "_" + contactID,
 		Kind:    trendlymodels.InboxKindDM,
 		Channel: s.Platform,
 		Participant: trendlymodels.InboxParticipant{
