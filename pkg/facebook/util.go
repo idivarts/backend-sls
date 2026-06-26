@@ -18,7 +18,7 @@ func FetchAllMessages(convId string, after *string, pageAccessToken string) []Me
 	return messages
 }
 
-func FetchAllConversations(after *string, pageAccessToken string) []ConversationMessagesData {
+func FetchAllConversations(after *string, pageAccessToken, platform string) []ConversationMessagesData {
 	if after != nil && *after == "" {
 		return []ConversationMessagesData{}
 	}
@@ -26,13 +26,13 @@ func FetchAllConversations(after *string, pageAccessToken string) []Conversation
 	if after != nil {
 		aStr = *after
 	}
-	data, err := GetConversationsPaginated(aStr, 10, pageAccessToken)
+	data, err := GetConversationsPaginated(aStr, 10, pageAccessToken, platform)
 	if err != nil {
 		return []ConversationMessagesData{}
 	}
 	messages := []ConversationMessagesData{}
 	messages = append(messages, data.Data...)
-	messages = append(messages, FetchAllConversations(&data.Paging.Cursors.After, pageAccessToken)...)
+	messages = append(messages, FetchAllConversations(&data.Paging.Cursors.After, pageAccessToken, platform)...)
 
 	return messages
 }

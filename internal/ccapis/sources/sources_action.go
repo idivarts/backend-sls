@@ -94,7 +94,7 @@ func SourceSyncLeads(c *gin.Context) {
 		return
 	}
 
-	var conversations []facebook.ConversationMessagesData = facebook.FetchAllConversations(nil, *sP.AccessToken)
+	var conversations []facebook.ConversationMessagesData = facebook.FetchAllConversations(nil, *sP.AccessToken, facebook.PlatformInstagram)
 
 	if len(conversations) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No Conversation found"})
