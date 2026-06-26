@@ -348,6 +348,43 @@ func BaselineInboxLastSeenAt() (updated int, scanned int, err error) {
 	return updated, scanned, nil
 }
 
+// deleteDocsBySocial deletes every document in a brand subcollection whose
+// `socialId` matches — the shared primitive for purging a disconnected account's
+// data (inbox, media, analytics). Returns the count deleted.
+func deleteDocsBySocial(collectionPath, socialID string) (int, error) {
+	if socialID == "" {
+		return 0, fmt.Errorf("deleteDocsBySocial: empty socialID")
+	}
+	iter := firestoredb.Client.
+		Collection(collectionPath).
+		Where("socialId", "==", socialID).
+		Documents(context.Background())
+	defer iter.Stop()
+
+	n := 0
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return n, err
+		}
+		if _, err := doc.Ref.Delete(context.Background()); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+// DeleteInboxConversationsBySocial removes every inbox conversation (DMs +
+// comments) tied to a connected social account. Used on disconnect. Returns the
+// count deleted.
+func DeleteInboxConversationsBySocial(brandID, socialID string) (int, error) {
+	return deleteDocsBySocial(brandInboxCollection(brandID), socialID)
+}
+
 // DeleteInboxConversation removes a conversation document (used by deletion sync
 // and the comment-delete action).
 func DeleteInboxConversation(brandID, id string) error {
