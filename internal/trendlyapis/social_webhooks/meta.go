@@ -118,14 +118,17 @@ func (p *MetaProvider) Receive(c *gin.Context) {
 func (p *MetaProvider) dispatch(msg *instainterfaces.IMessageWebhook) {
 	for i := range msg.Entry {
 		sourceID := msg.Entry[i].ID
+		log.Printf("social_webhooks/%s: entry sourceID=%s", p.name, sourceID)
 
 		// Direct messages (entry.messaging[]).
 		for j := range msg.Entry[i].Messaging {
+			log.Printf("social_webhooks/%s: messaging entry: %+v", p.name, msg.Entry[i].Messaging[j])
 			inbox.IngestMessaging(sourceID, &msg.Entry[i].Messaging[j])
 		}
 
 		// Comments / mentions / feed (entry.changes[]).
 		for k := range msg.Entry[i].Changes {
+			log.Printf("social_webhooks/%s: changes entry: %+v", p.name, msg.Entry[i].Changes[k])
 			inbox.IngestComment(sourceID, &msg.Entry[i].Changes[k])
 		}
 	}
