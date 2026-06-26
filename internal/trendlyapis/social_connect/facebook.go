@@ -170,9 +170,11 @@ func FacebookCallback(c *gin.Context) {
 		// IG message/comment webhooks arrive under the IG id but are served with
 		// this Page's token, so both resolve to the same social account.
 		upsertSocialIndex(page.ID, trendlymodels.PlatformFacebook, state, pageSocialID, now)
-		if igBusinessID != "" {
-			upsertSocialIndex(igBusinessID, trendlymodels.PlatformInstagram, state, pageSocialID, now)
-		}
+
+		// We are no longer using facebook's IG Business Account id for webhook resolution for instagram
+		// if igBusinessID != "" {
+		// 	upsertSocialIndex(igBusinessID, trendlymodels.PlatformInstagram, state, pageSocialID, now)
+		// }
 
 		// Subscribe the Page to inbox webhooks (DMs + comments). Best-effort:
 		// real-time delivery degrades on failure, the connection still succeeds.
