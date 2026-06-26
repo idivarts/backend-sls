@@ -162,7 +162,7 @@ func ingestMessagingForBrand(brandID string, acc *trendlymodels.SocialAccount, p
 	// to showing the page name with an empty avatar.
 	if conv.Participant.Name == "" || conv.Participant.AvatarURL == "" {
 		if tok, terr := trendlymodels.GetBrandSocialToken(brandID, acc.ID); terr == nil {
-			if name, handle, avatar := fetchContactProfile(acc, tok.AccessToken, contactID, ""); name != "" || avatar != "" {
+			if name, handle, avatar := fetchContactProfile(acc, channelForAccount(acc, platformAccountID), tok.AccessToken, contactID, ""); name != "" || avatar != "" {
 				if conv.Participant.Name == "" && name != "" {
 					conv.Participant.Name = name
 				}

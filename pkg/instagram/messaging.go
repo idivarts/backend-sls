@@ -54,20 +54,23 @@ func SendIGMessage(recipientID, text, accessToken string) (*facebook.IMessageRes
 	return out, nil
 }
 
-// GetIGConversations lists DM conversations for the connected IG account.
+// GetIGConversations lists DM conversations for the connected IG account, with
+// recent messages expanded inline.
 // GET graph.instagram.com/{version}/me/conversations?platform=instagram&fields=...
+//
+// Both the conversation page size and the inline messages expansion are bounded,
+// and the fetch retries with a shrinking page size on Meta's transient "Please
+// reduce the amount of data you're asking for" 500s — the unbounded inline
+// messages expansion is what most often trips that error. See
+// facebook.GraphGetRetry.
 func GetIGConversations(accessToken string) (*facebook.ConversationData, error) {
-	fields := "name,id,participants,messages{id,created_time,from,to,message,attachments{id,mime_type,name,file_url,image_data,video_data}}"
-	endpoint := fmt.Sprintf("%s/%s/me/conversations?platform=instagram&fields=%s&access_token=%s",
-		BaseURL, ApiVersion, url.QueryEscape(fields), url.QueryEscape(accessToken))
-	resp, err := http.Get(endpoint)
+	body, err := facebook.GraphGetRetry(func(l int) string {
+		fields := fmt.Sprintf("name,id,participants,messages.limit(%d){id,created_time,from,to,message,attachments{id,mime_type,name,file_url,image_data,video_data}}", l)
+		return fmt.Sprintf("%s/%s/me/conversations?platform=instagram&fields=%s&limit=%d&access_token=%s",
+			BaseURL, ApiVersion, url.QueryEscape(fields), l, url.QueryEscape(accessToken))
+	}, 25)
 	if err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GetIGConversations: status %d: %s", resp.StatusCode, string(body))
 	}
 	data := &facebook.ConversationData{}
 	if err := json.Unmarshal(body, data); err != nil {

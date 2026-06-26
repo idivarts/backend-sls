@@ -10,6 +10,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/socialsync"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 )
 
 // handler is the single worker for all slow Meta/social Graph-API jobs. It
@@ -53,6 +54,12 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 			if err := inbox.ResyncMediaItem(msg.BrandID, msg.MediaID, msg.SocialID, msg.Channel); err != nil {
 				log.Printf("social_sqs: media item resync failed for %s/%s: %v", msg.BrandID, msg.MediaID, err)
 			}
+		case socialsync.OpDisconnectCleanup:
+			if msg.SocialID == "" {
+				log.Println("social_sqs: disconnect cleanup missing socialId, skipping:", record.Body)
+				continue
+			}
+			social_connect.CleanupBrandSocialData(msg.BrandID, msg.SocialID)
 		default: // OpInboxSync (and any unknown type) → DM sync
 			if err := inbox.SyncFromMeta(msg.BrandID); err != nil {
 				log.Printf("social_sqs: inbox sync failed for %s: %v", msg.BrandID, err)

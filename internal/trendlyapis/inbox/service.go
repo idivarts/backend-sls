@@ -258,48 +258,63 @@ func mapMessengerMessage(s *trendlymodels.SocialAccount, selfID string, m facebo
 
 // fetchContactProfile looks up a DM contact's display profile (name, handle,
 // avatar) from Meta. Best-effort: returns zero values on any error so callers
-// fall back to whatever they already have. Instagram-Login accounts resolve via
-// graph.instagram.com; Facebook Pages (incl. IG-via-Page) via graph.facebook.com.
+// fall back to whatever they already have.
 //
-// usernameHint seeds the Business Discovery fallback (the contact's handle from
-// the conversation participants) for cases where the messaging lookup returns
-// nothing — webhook callers that lack a participant list pass "".
-func fetchContactProfile(s *trendlymodels.SocialAccount, token, contactID, usernameHint string) (name, handle, avatar string) {
+// The right API depends on the CONTACT's platform, not just the connected
+// account's: a Facebook Page serves BOTH Messenger contacts (PSIDs) and IG
+// contacts (IGSIDs, via a linked IG Business account). The `channel` of the
+// event disambiguates them:
+//   - facebook → Messenger User Profile API (first_name/last_name/profile_pic;
+//     FB users have no username/follower_count — requesting those 400s).
+//   - instagram → IG messaging User Profile API (name/username/profile_pic/…),
+//     via graph.instagram.com for IG-Login accounts or graph.facebook.com for
+//     IG-via-Page, plus a Business Discovery fallback by username.
+//
+// usernameHint seeds the IG Business Discovery fallback (the contact's handle
+// from the conversation participants); webhook callers that lack one pass "".
+func fetchContactProfile(s *trendlymodels.SocialAccount, channel trendlymodels.Platform, token, contactID, usernameHint string) (name, handle, avatar string) {
 	if contactID == "" || token == "" {
 		log.Printf("inbox: contact profile fetch skipped account=%s contact=%q tokenSet=%v", s.ID, contactID, token != "")
 		return "", "", ""
 	}
+
+	// ── Facebook (Messenger) contact: PSID, no username/follower_count. ──
+	if channel == trendlymodels.PlatformFacebook {
+		prof, err := facebook.GetMessengerUser(contactID, token)
+		if err != nil || prof == nil {
+			// Best-effort BY DESIGN: a failure (Meta withholds the profile, or the
+			// page token lacks pages_messaging) must NOT abort ingestion.
+			log.Printf("inbox: contact profile fetch failed (non-fatal) channel=facebook account=%s contact=%s: %v", s.ID, contactID, err)
+			return "", "", ""
+		}
+		name, avatar = prof.FullName(), prof.ProfilePic
+		log.Printf("inbox: contact profile fetched channel=facebook account=%s contact=%s name=%q hasAvatar=%v", s.ID, contactID, name, avatar != "")
+		return name, "", avatar
+	}
+
+	// ── Instagram contact: IGSID via the IG messaging User Profile API. ──
 	var (
 		prof *facebook.UserProfile
 		err  error
 	)
 	if s.Platform == trendlymodels.PlatformInstagram {
-		prof, err = instagram.GetUser(contactID, token)
+		prof, err = instagram.GetUser(contactID, token) // graph.instagram.com
 	} else {
-		prof, err = facebook.GetUser(contactID, token)
+		prof, err = facebook.GetUser(contactID, token) // IG-via-Page, graph.facebook.com
 	}
 	if err != nil || prof == nil {
-		// Best-effort BY DESIGN: a failure here — e.g. Meta withholds the profile,
-		// or the Page token lacks pages_messaging / pages_read_engagement (code 190
-		// "...must be granted before impersonating a user's page") — must NOT abort
-		// webhook/sync processing. Callers keep going and upsert the message with
-		// whatever they already have. We log platform/account/contact + the raw Meta
-		// error so the permission/config issue is diagnosable without blocking ingestion.
-		log.Printf("inbox: contact profile fetch failed (non-fatal) platform=%s account=%s contact=%s: %v", s.Platform, s.ID, contactID, err)
+		log.Printf("inbox: contact profile fetch failed (non-fatal) channel=instagram account=%s contact=%s: %v", s.ID, contactID, err)
 	} else {
 		name, handle, avatar = prof.Name, prof.Username, prof.ProfilePic
-		log.Printf("inbox: contact profile fetched platform=%s account=%s contact=%s name=%q handle=%q hasAvatar=%v", s.Platform, s.ID, contactID, name, handle, avatar != "")
+		log.Printf("inbox: contact profile fetched channel=instagram account=%s contact=%s name=%q handle=%q hasAvatar=%v", s.ID, contactID, name, handle, avatar != "")
 	}
 	if handle == "" {
 		handle = usernameHint
 	}
 
-	// Business/professional accounts: the messaging User Profile API withholds
-	// name + profile_pic (returns only the username), so the contact ends up with
-	// the @handle and no avatar. Fall back to the Business Discovery API by
-	// username, which exposes public profile data (name, picture) for professional
-	// target accounts. Best-effort: failures (incl. personal accounts, which are
-	// not discoverable) leave the messaging-API values untouched.
+	// Professional IG accounts: the messaging API withholds name + profile_pic
+	// (only the username), so fall back to Business Discovery by username for
+	// public profile data. Best-effort; personal accounts aren't discoverable.
 	if avatar == "" && handle != "" {
 		if bd := fetchBusinessDiscovery(s, token, handle); bd != nil {
 			if name == "" {
@@ -358,7 +373,7 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 	// carry only an id/username and never a profile picture, so without this the
 	// avatar is empty and the name is just the handle.
 	var avatarURL string
-	if name, handle, avatar := fetchContactProfile(s, token, contactID, contactHandle); name != "" || avatar != "" {
+	if name, handle, avatar := fetchContactProfile(s, s.Platform, token, contactID, contactHandle); name != "" || avatar != "" {
 		if name != "" {
 			contactName = name
 		}

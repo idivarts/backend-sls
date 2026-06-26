@@ -2,7 +2,6 @@ package facebook
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -99,36 +98,20 @@ func GetConversationById(conversationID string, pageAccessToken string) (*Conver
 	return &data, nil
 }
 
+// GetConversationsPaginated lists DM conversations for a page-token-backed
+// account (IG Business linked via a Facebook Page). The fetch retries with a
+// shrinking page size on Meta's transient "Please reduce the amount of data
+// you're asking for" 500s — see GraphGetRetry.
 func GetConversationsPaginated(after string, limit int, pageAccessToken string) (*ConversationData, error) {
-	// Set up the HTTP client
-	client := http.Client{}
-
-	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&limit=%d&access_token=%s&after=%s", BaseURL, ApiVersion, platform, limit, pageAccessToken, after)
-
-	// Make the API request
-	resp, err := client.Get(apiURL)
+	body, err := GraphGetRetry(func(l int) string {
+		return fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&limit=%d&access_token=%s&after=%s", BaseURL, ApiVersion, platform, l, pageAccessToken, after)
+	}, limit)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("Error: Unexpected status code - " + resp.Status + "\n" + string(body))
-	}
-
-	// Print the response body
-	// fmt.Println(string(body))
 
 	data := ConversationData{}
-	err = json.Unmarshal(body, &data)
-	if err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
 	}
 	return &data, nil
