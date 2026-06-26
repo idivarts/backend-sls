@@ -49,7 +49,7 @@ func GetInstagram(instagramId string, accessToken string) (*facebook.InstagramPr
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", BaseURL, ApiVersion, instagramId, accessToken)
+	apiURL := fmt.Sprintf("%s/%s/%s?fields=id,user_id,name,username,profile_picture_url,biography,followers_count,follows_count,media_count,website&access_token=%s", BaseURL, ApiVersion, instagramId, accessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)

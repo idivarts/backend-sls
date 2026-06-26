@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -106,7 +105,15 @@ func InstagramCallback(c *gin.Context) {
 
 	username := instaProfile.Username
 	socialID := trendlymodels.SocialAccountID(trendlymodels.PlatformInstagram, username)
-	igAccountID := strconv.FormatInt(shortToken.UserID, 10)
+	// Use the IG professional account ID (user_id from /me) — this is what
+	// Instagram webhooks send as entry.id. The OAuth token response's user_id
+	// is app-scoped and does NOT match webhook events.
+	igAccountID := instaProfile.UserID
+	if igAccountID == "" {
+		log.Printf("instagram: /me response missing user_id for %s", username)
+		c.Redirect(302, CallbackErrorURL(connectBase, "instagram", state.CallbackScheme, state.App, "Failed to resolve Instagram account ID."))
+		return
+	}
 	now := time.Now().Unix()
 
 	social := &trendlymodels.SocialAccount{
