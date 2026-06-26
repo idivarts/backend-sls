@@ -7,10 +7,13 @@ import (
 	"net/http"
 )
 
-// Subscribed webhook fields. messages/message_echoes power DMs; feed (Facebook
-// Page) and comments/mentions (Instagram) power the comment inbox. Meta ignores
-// fields not applicable to a given subscription target.
-const webhook_events = "messages,message_echoes,feed,comments,mentions"
+// Subscribed webhook fields for a Facebook PAGE. These are the Page object's
+// field names — distinct from the Instagram object's (which uses comments/
+// mentions). `messages`/`message_echoes`/`message_edits` power DMs (inbound,
+// outbound echoes, edits); `feed` delivers Page comments (add/edit/remove/hide).
+// NOTE: `comments` and `mentions` are Instagram-only fields — sending them to a
+// Page subscription is rejected with "(#100) ... must be one of {...}".
+const webhook_events = "messages,message_echoes,message_edits,feed"
 
 func SubscribeApp(doSubsription bool, pageAccessToken string) error {
 	// Convert the message struct to JSON
