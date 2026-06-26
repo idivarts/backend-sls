@@ -444,14 +444,21 @@ func Reply(brandID, convID, text string) error {
 		if conv.ReplyWindowExpiresAt > 0 && now > conv.ReplyWindowExpiresAt {
 			return fmt.Errorf("reply window expired")
 		}
+		// Capture the platform's returned message id (mid) and store it as the
+		// reply's id, so the message_echoes webhook for this same send dedupes
+		// against it (ingestMessagingForBrand matches by mid) instead of being
+		// appended a second time.
+		var sent *facebook.IMessageResponse
 		if isFB {
-			if _, err := facebook.SendTextMessage(conv.ExternalRecipientID, text, sa.token); err != nil {
-				return err
-			}
+			sent, err = facebook.SendTextMessage(conv.ExternalRecipientID, text, sa.token)
 		} else {
-			if _, err := instagram.SendIGMessage(conv.ExternalRecipientID, text, sa.token); err != nil {
-				return err
-			}
+			sent, err = instagram.SendIGMessage(conv.ExternalRecipientID, text, sa.token)
+		}
+		if err != nil {
+			return err
+		}
+		if sent != nil && sent.MessageID != "" {
+			reply.ID = sent.MessageID
 		}
 		conv.Messages = append(conv.Messages, reply)
 		conv.Preview = text
@@ -461,15 +468,22 @@ func Reply(brandID, convID, text string) error {
 		return conv.Upsert(brandID)
 	}
 
-	// Comment reply.
+	// Comment reply. Capture the platform's returned comment id and store it as
+	// the reply's id, so the webhook echo of this same comment (and any Meta
+	// redelivery) dedupes against it in ingestCommentReply instead of being
+	// appended a second time. Comment webhooks carry no is_echo flag, so id-based
+	// dedup is the only reliable guard.
+	var newCommentID string
 	if isFB {
-		if _, err := facebook.CreateCommentReply(conv.ExternalCommentID, text, sa.token); err != nil {
-			return err
-		}
+		newCommentID, err = facebook.CreateCommentReply(conv.ExternalCommentID, text, sa.token)
 	} else {
-		if _, err := instagram.ReplyToIGComment(conv.ExternalCommentID, text, sa.token); err != nil {
-			return err
-		}
+		newCommentID, err = instagram.ReplyToIGComment(conv.ExternalCommentID, text, sa.token)
+	}
+	if err != nil {
+		return err
+	}
+	if newCommentID != "" {
+		reply.ID = newCommentID
 	}
 	if conv.Comment != nil {
 		conv.Comment.Replies = append(conv.Comment.Replies, reply)
