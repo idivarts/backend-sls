@@ -18,13 +18,12 @@ import (
 
 // CommentItem is a single comment as returned by the Graph API.
 type CommentItem struct {
-	ID        string `json:"id"`
-	Message   string `json:"message"`
-	Timestamp string `json:"timestamp,omitempty"`
-	From      struct {
-		ID       string `json:"id"`
-		Name     string `json:"name,omitempty"`
-		Username string `json:"username,omitempty"`
+	ID          string `json:"id"`
+	Message     string `json:"message"`
+	CreatedTime string `json:"created_time,omitempty"`
+	From        struct {
+		ID   string `json:"id"`
+		Name string `json:"name,omitempty"`
 	} `json:"from"`
 }
 
@@ -98,10 +97,13 @@ func DeleteObject(objectID, accessToken string) error {
 	return nil
 }
 
-// GetCommentReplies fetches replies under a comment.
-// GET /{comment-id}/comments?fields=id,message,timestamp,from{id,name,username}
+// GetCommentReplies fetches the comments under a Facebook post or the replies
+// under a comment. Uses Facebook field names — `created_time` (not the Instagram
+// `timestamp`) and `from{id,name}` (a FB user has no `username`); requesting
+// Instagram-only fields returns "(#100) nonexisting field".
+// GET /{post-or-comment-id}/comments?fields=id,message,created_time,from{id,name}
 func GetCommentReplies(commentID, accessToken string) ([]CommentItem, error) {
-	fields := "id,message,timestamp,from{id,name,username}"
+	fields := "id,message,created_time,from{id,name}"
 	endpoint := fmt.Sprintf("%s/%s/%s/comments?fields=%s&access_token=%s",
 		BaseURL, ApiVersion, commentID, url.QueryEscape(fields), url.QueryEscape(accessToken))
 	resp, err := http.Get(endpoint)
