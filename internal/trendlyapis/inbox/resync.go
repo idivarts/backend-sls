@@ -25,7 +25,7 @@ func ResyncProfile(brandID, convID string) error {
 	if err != nil {
 		return err
 	}
-	name, handle, avatar := fetchContactProfile(sa.account, sa.token, conv.Participant.ID, conv.Participant.Handle)
+	name, handle, avatar := fetchContactProfile(sa.account, conv.Channel, sa.token, conv.Participant.ID, conv.Participant.Handle)
 
 	updates := []firestore.Update{{Path: "updatedAt", Value: time.Now().UnixMilli()}}
 	if name != "" {
