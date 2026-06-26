@@ -390,8 +390,18 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 	// Deterministic conversation id per (account, contact). Meta's conversation
 	// id (c.ID) is not available to webhook ingestion, so keying by the
 	// participant pair lets fetch and webhook paths converge on the same doc.
+	convID := "dm_" + s.ID + "_" + contactID
+
+	// Preserve an existing last-seen baseline across resyncs so newly-fetched
+	// inbound messages still surface as unread. On the FIRST sync (no existing
+	// doc) baseline lastSeenAt to the latest activity so history starts read.
+	lastSeenAt := lastAt
+	if existing, err := trendlymodels.GetInboxConversation(brandID, convID); err == nil && existing != nil {
+		lastSeenAt = existing.LastSeenAt
+	}
+
 	conv := &trendlymodels.InboxConversation{
-		ID:      "dm_" + s.ID + "_" + contactID,
+		ID:      convID,
 		Kind:    trendlymodels.InboxKindDM,
 		Channel: s.Platform,
 		Participant: trendlymodels.InboxParticipant{
@@ -402,7 +412,8 @@ func upsertDMConversation(brandID string, s *trendlymodels.SocialAccount, selfID
 		},
 		Preview:                preview,
 		LastActivityAt:         lastAt,
-		Unread:                 false,
+		LastSeenAt:             lastSeenAt,
+		Unread:                 lastAt > lastSeenAt,
 		Messages:               msgs,
 		SocialID:               s.ID,
 		ExternalConversationID: c.ID,
@@ -463,6 +474,7 @@ func Reply(brandID, convID, text string) error {
 		conv.Messages = append(conv.Messages, reply)
 		conv.Preview = text
 		conv.LastActivityAt = now
+		conv.LastSeenAt = now // replying implies the thread has been seen
 		conv.Unread = false
 		conv.UpdatedAt = now
 		return conv.Upsert(brandID)
@@ -489,6 +501,7 @@ func Reply(brandID, convID, text string) error {
 		conv.Comment.Replies = append(conv.Comment.Replies, reply)
 	}
 	conv.LastActivityAt = now
+	conv.LastSeenAt = now // replying implies the thread has been seen
 	conv.Unread = false
 	conv.UpdatedAt = now
 	return conv.Upsert(brandID)
@@ -545,10 +558,16 @@ func DeleteComment(brandID, convID string) error {
 	return trendlymodels.DeleteInboxConversation(brandID, convID)
 }
 
-// MarkRead clears the unread flag on a conversation.
+// MarkRead clears the unread flag on a conversation and advances lastSeenAt to
+// the latest activity so the per-conversation new-message count drops to 0.
 func MarkRead(brandID, convID string) error {
+	conv, err := trendlymodels.GetInboxConversation(brandID, convID)
+	if err != nil {
+		return err
+	}
 	return trendlymodels.UpdateInboxConversation(brandID, convID, []firestore.Update{
 		{Path: "unread", Value: false},
+		{Path: "lastSeenAt", Value: conv.LastActivityAt},
 		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	})
 }
