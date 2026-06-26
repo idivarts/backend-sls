@@ -30,6 +30,11 @@ const (
 	OpThreadResync  OpType = "thread_resync"  // re-pull one DM thread's messages
 	OpMessageResync OpType = "message_resync" // re-fetch one message (e.g. expired attachment)
 	OpMediaResync   OpType = "media_resync"   // re-fetch one media item (counts + image)
+
+	// Per-account cleanup (purge inbox + media + analytics for one disconnected
+	// account). Runs after the account doc is already deleted, so the API can
+	// return immediately instead of waiting on potentially-large range deletes.
+	OpDisconnectCleanup OpType = "disconnect_cleanup"
 )
 
 // Message is the single payload shape for the shared queue. Only the fields a
