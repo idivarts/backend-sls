@@ -16,8 +16,9 @@ const messageInfoFields = "id,created_time,from,to,message,attachments{id,mime_t
 
 type Participants struct {
 	Data []struct {
-		Username string `json:"username"`
 		ID       string `json:"id"`
+		Name     string `json:"name"`     // Facebook Messenger participant display name
+		Username string `json:"username"` // Instagram-only handle (empty for Messenger)
 	} `json:"data"`
 }
 

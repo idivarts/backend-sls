@@ -9,7 +9,7 @@ import (
 var conversationID = ""
 
 func TestGetAll(t *testing.T) {
-	data, err := facebook.GetConversationsPaginated("", 10, facebook.TestPageAccessToken)
+	data, err := facebook.GetConversationsPaginated("", 10, facebook.TestPageAccessToken, facebook.PlatformMessenger)
 	if err != nil {
 		t.Fail()
 	}

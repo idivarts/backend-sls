@@ -193,7 +193,7 @@ func syncAccountDMs(brandID string, s *trendlymodels.SocialAccount, token string
 	}
 
 	// Facebook Page: list conversations, then hydrate recent messages per thread.
-	convs, err := facebook.GetConversationsPaginated("", 25, token)
+	convs, err := facebook.GetConversationsPaginated("", 25, token, facebook.PlatformMessenger)
 	if err != nil {
 		return err
 	}

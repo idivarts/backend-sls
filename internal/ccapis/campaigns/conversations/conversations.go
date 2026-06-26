@@ -66,7 +66,7 @@ func SyncConversations(c *gin.Context) {
 	}
 
 	var conversations []facebook.ConversationMessagesData
-	data, err := facebook.GetConversationsByUserId(cData.LeadID, *ppData.AccessToken)
+	data, err := facebook.GetConversationsByUserId(cData.LeadID, *ppData.AccessToken, facebook.PlatformInstagram)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

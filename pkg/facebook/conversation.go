@@ -34,12 +34,17 @@ type ConversationPaginatedMessageData struct {
 	} `json:"paging"`
 }
 
-func GetConversationsByUserId(userID string, pageAccessToken string) (*ConversationData, error) {
+// GetConversationsByUserId looks up the conversation(s) a given external user
+// has with the connected Page on the given Meta platform. Pass
+// `PlatformMessenger` for Facebook Page Messenger threads or `PlatformInstagram`
+// for IG Direct threads via a linked IG Business Account (the IG-via-Page
+// legacy flow — IG-Login accounts use pkg/instagram instead).
+func GetConversationsByUserId(userID, pageAccessToken, platform string) (*ConversationData, error) {
 	// Set up the HTTP client
 	client := http.Client{}
 
 	// Set the API endpoint
-	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=name,id,participants&user_id=%s&access_token=%s", BaseURL, ApiVersion, platform, userID, pageAccessToken)
+	apiURL := fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,participants&user_id=%s&access_token=%s", BaseURL, ApiVersion, platform, userID, pageAccessToken)
 
 	// Make the API request
 	resp, err := client.Get(apiURL)
@@ -99,12 +104,14 @@ func GetConversationById(conversationID string, pageAccessToken string) (*Conver
 }
 
 // GetConversationsPaginated lists DM conversations for a page-token-backed
-// account (IG Business linked via a Facebook Page). The fetch retries with a
-// shrinking page size on Meta's transient "Please reduce the amount of data
-// you're asking for" 500s — see GraphGetRetry.
-func GetConversationsPaginated(after string, limit int, pageAccessToken string) (*ConversationData, error) {
+// account on the given Meta platform: pass `PlatformMessenger` for Facebook
+// Page Messenger threads, or `PlatformInstagram` for IG Direct threads on a
+// linked IG Business Account (IG-Login accounts use pkg/instagram instead).
+// The fetch retries with a shrinking page size on Meta's transient "Please
+// reduce the amount of data you're asking for" 500s — see GraphGetRetry.
+func GetConversationsPaginated(after string, limit int, pageAccessToken, platform string) (*ConversationData, error) {
 	body, err := GraphGetRetry(func(l int) string {
-		return fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,name,participants&limit=%d&access_token=%s&after=%s", BaseURL, ApiVersion, platform, l, pageAccessToken, after)
+		return fmt.Sprintf("%s/%s/me/conversations?platform=%s&fields=id,participants&limit=%d&access_token=%s&after=%s", BaseURL, ApiVersion, platform, l, pageAccessToken, after)
 	}, limit)
 	if err != nil {
 		return nil, err

@@ -93,6 +93,6 @@ func TestFacebookLogin(t *testing.T) {
 }
 
 func TestFetchMessages(t *testing.T) {
-	data := facebook.FetchAllConversations(nil, "EAAGDG5jzw5QBOwqvavtNVZCa9CoxgvzWWCk7PhPKPmxPMeZAKnVRLO3FUWIeOU7mxLVZBzXUUG6uuhvHHQZBeCkKfSOEBzcyec0UJni2fvYZBY5g1bsRSHDrDD9s633ZB4ljUPhfQZAK9UAUg0jVZBbqANeWZAKpe2UxdzaHns7QoSur2yZAw6C0J7DYmp")
+	data := facebook.FetchAllConversations(nil, "EAAGDG5jzw5QBOwqvavtNVZCa9CoxgvzWWCk7PhPKPmxPMeZAKnVRLO3FUWIeOU7mxLVZBzXUUG6uuhvHHQZBeCkKfSOEBzcyec0UJni2fvYZBY5g1bsRSHDrDD9s633ZB4ljUPhfQZAK9UAUg0jVZBbqANeWZAKpe2UxdzaHns7QoSur2yZAw6C0J7DYmp", facebook.PlatformInstagram)
 	log.Println(data)
 }

@@ -8,7 +8,7 @@ import (
 
 func TestConversationFetch(t *testing.T) {
 	pToken := "EAAGDG5jzw5QBOyTEBNU9EMBmICh4WuTppVDZC4A3pqQDyaeIxXg0KhU0nbeSkO1Bb4El3U2sPIwcpLdp17MtNg7HTOgBip7lMVMhnktYy7M0P00yWvUe29a0C1ozMrqJGdUo3ZAWEENy0qoKDweZBALZBZAEo2i0QWQTOBlRcHWyZAMoCKGXTIhLvA4vMZBBIbdEg0FHL4cM0H7i1lvMnO0MVLi"
-	data := FetchAllConversations(nil, pToken)
+	data := FetchAllConversations(nil, pToken, PlatformMessenger)
 	log.Println(len(data))
 	log.Println(data)
 }

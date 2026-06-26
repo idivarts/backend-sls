@@ -46,7 +46,7 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	igConvs, err := facebook.GetConversationsByUserId(cData.LeadID, *pData.AccessToken)
+	igConvs, err := facebook.GetConversationsByUserId(cData.LeadID, *pData.AccessToken, facebook.PlatformInstagram)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

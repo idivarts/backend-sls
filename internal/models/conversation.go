@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/facebook"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/myopenai"
 	"google.golang.org/api/iterator"
 )
@@ -53,7 +53,7 @@ func (conversation *Conversation) CreateThread(includeLastMessage bool) error {
 	threadId := thread.ID
 
 	log.Println("Getting all conversations for this user")
-	convIds, err := facebook.GetConversationsByUserId(conversation.LeadID, *pData.AccessToken)
+	convIds, err := facebook.GetConversationsByUserId(conversation.LeadID, *pData.AccessToken, facebook.PlatformInstagram)
 	if err != nil {
 		return err
 	}
