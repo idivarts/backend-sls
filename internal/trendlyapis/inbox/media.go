@@ -211,9 +211,9 @@ func ListMediaComments(brandID, socialID, channel, mediaID string, count int) ([
 				ID:      it.ID,
 				Channel: trendlymodels.PlatformFacebook,
 				Author: trendlymodels.InboxParticipant{
-					ID:     it.From.ID,
-					Name:   firstNonEmpty(it.From.Name, it.From.Username, "Unknown"),
-					Handle: it.From.Username,
+					ID:   it.From.ID,
+					Name: firstNonEmpty(it.From.Name, "Unknown"),
+					// Facebook users have no username/handle.
 				},
 				Text: it.Message,
 			})
