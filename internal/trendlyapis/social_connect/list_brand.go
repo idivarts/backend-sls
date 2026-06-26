@@ -64,5 +64,18 @@ func DeleteBrandSocial(c *gin.Context) {
 		}
 	}
 
+	// Purge all data derived from this account — inbox (DMs + comments), media,
+	// and analytics (cache + daily snapshots). Best-effort: the account is already
+	// gone, so a cleanup failure is logged but doesn't fail the disconnect.
+	if n, err := trendlymodels.DeleteInboxConversationsBySocial(brandID, socialID); err != nil {
+		log.Printf("deleteBrandSocial: inbox cleanup for %s/%s failed after %d: %v", brandID, socialID, n, err)
+	}
+	if n, err := trendlymodels.DeleteInboxMediaBySocial(brandID, socialID); err != nil {
+		log.Printf("deleteBrandSocial: media cleanup for %s/%s failed after %d: %v", brandID, socialID, n, err)
+	}
+	if n, err := trendlymodels.DeleteAnalyticsBySocial(brandID, socialID); err != nil {
+		log.Printf("deleteBrandSocial: analytics cleanup for %s/%s failed after %d: %v", brandID, socialID, n, err)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "brand social account disconnected"})
 }
