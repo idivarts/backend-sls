@@ -117,6 +117,10 @@ func ingestMessagingForBrand(brandID string, acc *trendlymodels.SocialAccount, p
 			last := kept[len(kept)-1]
 			conv.Preview = inboxMsgPreview(last)
 			conv.LastActivityAt = last.SentAt
+		} else {
+			// No messages left after the unsend — clear the stale preview so the
+			// list doesn't keep showing the deleted message's text.
+			conv.Preview = ""
 		}
 		conv.UpdatedAt = time.Now().UnixMilli()
 		if err := conv.Upsert(brandID); err != nil {
