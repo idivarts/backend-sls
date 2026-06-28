@@ -17,6 +17,7 @@ const (
 		"email," +
 		"pages_show_list," +
 		"pages_read_engagement," +
+		"read_insights," + // required for GET /{page-id}/insights (Page Insights metrics)
 		"pages_read_user_content," +
 		"pages_messaging," +
 		"pages_manage_engagement," +
