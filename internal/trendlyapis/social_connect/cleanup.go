@@ -5,6 +5,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/socialsync"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 )
 
 // CleanupBrandSocialData purges every data surface derived from a single
@@ -22,6 +23,9 @@ func CleanupBrandSocialData(brandID, socialID string) {
 	}
 	if n, err := trendlymodels.DeleteAnalyticsBySocial(brandID, socialID); err != nil {
 		log.Printf("social_connect cleanup: analytics cleanup for %s/%s failed after %d: %v", brandID, socialID, n, err)
+	}
+	if err := analytics.PruneAccountFromOverviews(brandID, socialID); err != nil {
+		log.Printf("social_connect cleanup: overview prune for %s/%s failed: %v", brandID, socialID, err)
 	}
 }
 
