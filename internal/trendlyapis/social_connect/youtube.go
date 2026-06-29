@@ -19,6 +19,10 @@ var youtubeScopesRequired = strings.Join([]string{
 	youtube.ScopeYTAnalytics,
 	youtube.ScopeUserInfoProfile,
 	youtube.ScopeUserInfoEmail,
+	// Upload + force-ssl power video/Shorts posting and thumbnail set. Sensitive
+	// scopes — require Google OAuth verification (see dashboard setup doc §2).
+	youtube.ScopeYouTubeUpload,
+	youtube.ScopeYouTubeForceSSL,
 }, " ")
 
 // YouTubeInit redirects to Google's OAuth consent screen.

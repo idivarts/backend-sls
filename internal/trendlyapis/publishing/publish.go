@@ -6,10 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/facebook"
 	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/linkedin"
-	"github.com/idivarts/backend-sls/pkg/facebook"
+	"github.com/idivarts/backend-sls/pkg/reddit"
+	"github.com/idivarts/backend-sls/pkg/twitter"
+	"github.com/idivarts/backend-sls/pkg/youtube"
 )
 
 // platformTargeted reports whether p is among the content's targeted platforms.
@@ -190,6 +194,117 @@ func publishToLinkedIn(account *trendlymodels.SocialAccount, accessToken string,
 	return linkedin.CreateMemberPost(accessToken, authorURN, buildCaption(ct), imageURLs(ct))
 }
 
+// orgURNForAccount derives the organization URN for a linkedin_page account from
+// its stored orgUrn (preferred) or its PlatformAccountID (the numeric org id).
+func orgURNForAccount(account *trendlymodels.SocialAccount) string {
+	if account.RawProfile != nil {
+		if u, ok := account.RawProfile["orgUrn"].(string); ok && u != "" {
+			return u
+		}
+	}
+	if account.PlatformAccountID != "" {
+		return "urn:li:organization:" + account.PlatformAccountID
+	}
+	return ""
+}
+
+// publishToLinkedInPage posts to a LinkedIn Company/Showcase Page (org feed) via
+// the Community Management API.
+func publishToLinkedInPage(account *trendlymodels.SocialAccount, accessToken string, ct *trendlymodels.Content) (string, error) {
+	orgURN := orgURNForAccount(account)
+	if orgURN == "" {
+		return "", fmt.Errorf("linkedin page account %s has no organization urn", account.ID)
+	}
+	return linkedin.CreateOrgPost(accessToken, orgURN, buildCaption(ct), imageURLs(ct))
+}
+
+// publishToTwitter posts a tweet (text, up to 4 images, or one video). The
+// shared scheduler handles timing, so this always publishes immediately.
+func publishToTwitter(accessToken string, ct *trendlymodels.Content) (string, error) {
+	text := buildCaption(ct)
+	if len([]rune(text)) > 280 {
+		return "", fmt.Errorf("twitter: post text exceeds 280 characters (%d)", len([]rune(text)))
+	}
+	// PublishTweet prioritises a video when present, else attaches images.
+	return twitter.PublishTweet(accessToken, text, imageURLs(ct), firstVideoURL(ct))
+}
+
+// publishToYouTube uploads a video (or Short) to the connected channel. A video
+// attachment is required; the title comes from platform options or the content
+// title, the description from the caption. We publish immediately (privacy from
+// options, default public) — the shared scheduler owns timing, so we do NOT use
+// YouTube's native publishAt.
+func publishToYouTube(accessToken string, ct *trendlymodels.Content) (string, error) {
+	video := firstVideoURL(ct)
+	if video == "" {
+		return "", fmt.Errorf("youtube requires a video attachment")
+	}
+	title := strings.TrimSpace(ct.Title)
+	privacy := "public"
+	madeForKids := false
+	if ct.PlatformOptions != nil {
+		if t := strings.TrimSpace(ct.PlatformOptions.YouTubeTitle); t != "" {
+			title = t
+		}
+		if p := strings.TrimSpace(ct.PlatformOptions.YouTubePrivacy); p != "" {
+			privacy = p
+		}
+		madeForKids = ct.PlatformOptions.YouTubeMadeForKids
+	}
+	if title == "" {
+		title = "Untitled"
+	}
+	desc := buildCaption(ct)
+	// A "reel" maps to a YouTube Short — tag #Shorts so YouTube classifies it
+	// (there is no dedicated Shorts upload endpoint).
+	if strings.EqualFold(ct.ContentFormat, "reel") && !strings.Contains(strings.ToLower(desc), "#shorts") {
+		desc = strings.TrimSpace(desc + "\n#Shorts")
+	}
+	return youtube.PublishVideo(accessToken, youtube.UploadOptions{
+		Title:         title,
+		Description:   desc,
+		PrivacyStatus: privacy,
+		VideoURL:      video,
+		MadeForKids:   madeForKids,
+	})
+}
+
+// publishToReddit submits a post to the chosen subreddit. Subreddit + title are
+// required (collected via platform options). An image attachment → image post,
+// otherwise a self (text) post. Returns the post fullname (t3_…).
+func publishToReddit(accessToken string, ct *trendlymodels.Content) (string, error) {
+	opt := reddit.SubmitOptions{}
+	if ct.PlatformOptions != nil {
+		opt.Subreddit = strings.TrimSpace(ct.PlatformOptions.RedditSubreddit)
+		opt.Title = strings.TrimSpace(ct.PlatformOptions.RedditTitle)
+		opt.FlairID = ct.PlatformOptions.RedditFlairID
+		opt.NSFW = ct.PlatformOptions.RedditNSFW
+	}
+	if opt.Subreddit == "" {
+		return "", fmt.Errorf("reddit requires a target subreddit")
+	}
+	if opt.Title == "" {
+		opt.Title = strings.TrimSpace(ct.Title)
+	}
+	if opt.Title == "" {
+		return "", fmt.Errorf("reddit requires a post title")
+	}
+	body := buildCaption(ct)
+	if img := firstImageURL(ct); img != "" {
+		opt.Kind = "image"
+		opt.ImageURLs = []string{img}
+		opt.Text = body
+	} else {
+		opt.Kind = "self"
+		opt.Text = body
+	}
+	fullname, _, err := reddit.Submit(accessToken, opt)
+	if err != nil {
+		return "", err
+	}
+	return fullname, nil
+}
+
 // PublishContent loads a content doc and publishes it to each destination,
 // recording per-platform published ids and a final status on the document.
 func PublishContent(brandID, contentID string) error {
@@ -218,7 +333,10 @@ func PublishContent(brandID, contentID string) error {
 			}
 			continue
 		}
-		token, terr := trendlymodels.GetBrandSocialToken(brandID, dest.SocialAccountID)
+		// Resolve via the account so linkedin_page Pages (which share one member
+		// token doc via TokenRef) read the right token; all other platforms have
+		// an empty TokenRef and behave identically to a by-id lookup.
+		token, terr := trendlymodels.GetBrandSocialTokenForAccount(brandID, account)
 		if terr != nil {
 			if firstErr == nil {
 				firstErr = terr
@@ -254,6 +372,48 @@ func PublishContent(brandID, contentID string) error {
 				continue
 			}
 			publishedIds["linkedin"] = id
+		case "linkedin_page":
+			id, perr := publishToLinkedInPage(account, token.AccessToken, ct)
+			if perr != nil {
+				if firstErr == nil {
+					firstErr = perr
+				}
+				continue
+			}
+			publishedIds["linkedin_page"] = id
+		case "twitter":
+			id, perr := publishToTwitter(token.AccessToken, ct)
+			if perr != nil {
+				if firstErr == nil {
+					firstErr = perr
+				}
+				continue
+			}
+			publishedIds["twitter"] = id
+		case "youtube":
+			id, perr := publishToYouTube(token.AccessToken, ct)
+			if perr != nil {
+				if firstErr == nil {
+					firstErr = perr
+				}
+				continue
+			}
+			publishedIds["youtube"] = id
+		case "reddit":
+			if !constants.RedditEnabled {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("reddit integration is not enabled")
+				}
+				continue
+			}
+			id, perr := publishToReddit(token.AccessToken, ct)
+			if perr != nil {
+				if firstErr == nil {
+					firstErr = perr
+				}
+				continue
+			}
+			publishedIds["reddit"] = id
 		default:
 			log.Printf("publishing: unsupported platform %q for content %s", dest.Platform, contentID)
 		}

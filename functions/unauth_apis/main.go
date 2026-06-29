@@ -44,6 +44,8 @@ func main() {
 	connectInit.GET("/youtube", social_connect.YouTubeInit)
 	connectInit.GET("/linkedin", social_connect.LinkedInInit)
 	connectInit.GET("/twitter", social_connect.TwitterInit)
+	connectInit.GET("/reddit", social_connect.RedditInit)
+	connectInit.GET("/linkedin_page", social_connect.LinkedInPageInit)
 
 	// Callback routes: called by OAuth provider — no auth header; userId in state.
 	connectCallback := apihandler.GinEngine.Group("/connect")
@@ -52,6 +54,11 @@ func main() {
 	connectCallback.GET("/youtube/callback", social_connect.YouTubeCallback)
 	connectCallback.GET("/linkedin/callback", social_connect.LinkedInCallback)
 	connectCallback.GET("/twitter/callback", social_connect.TwitterCallback)
+	connectCallback.GET("/reddit/callback", social_connect.RedditCallback)
+	connectCallback.GET("/linkedin_page/callback", social_connect.LinkedInPageCallback)
+	// Page-picker support (public, guarded by the random session id):
+	connectCallback.GET("/linkedin_page/session", social_connect.LinkedInPageSessionInfo)
+	connectCallback.POST("/linkedin_page/select", social_connect.LinkedInPageSelect)
 
 	apihandler.StartLambda()
 }

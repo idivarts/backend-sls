@@ -38,21 +38,21 @@ var AllContentFormats = []ContentFormat{
 // content's targeted platforms must all support its chosen format.
 //
 // Confirmed matrix (2026-06-17):
-//   - post:     all except YouTube
-//   - reel:     all (YouTube = Shorts)
+//   - post:     all except YouTube (Reddit = link/image submission)
+//   - reel:     all video platforms (YouTube = Shorts)
 //   - video:    all (Instagram = feed video, not a Reel)
 //   - story:    Instagram + Facebook only
 //   - carousel: Instagram, Facebook, LinkedIn
 //   - live:     all except X/Twitter
-//   - text:     Facebook, LinkedIn, X/Twitter (Instagram cannot do a text post)
+//   - text:     Facebook, LinkedIn, X/Twitter, Reddit (Instagram cannot do a text post)
 var FormatPlatformSupport = map[ContentFormat][]Platform{
-	ContentFormatPost:     {PlatformInstagram, PlatformFacebook, PlatformLinkedIn, PlatformTwitter},
-	ContentFormatReel:     {PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformTwitter},
-	ContentFormatVideo:    {PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformTwitter},
+	ContentFormatPost:     {PlatformInstagram, PlatformFacebook, PlatformLinkedIn, PlatformLinkedInPage, PlatformTwitter, PlatformReddit},
+	ContentFormatReel:     {PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformLinkedInPage, PlatformTwitter},
+	ContentFormatVideo:    {PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformLinkedInPage, PlatformTwitter},
 	ContentFormatStory:    {PlatformInstagram, PlatformFacebook},
-	ContentFormatCarousel: {PlatformInstagram, PlatformFacebook, PlatformLinkedIn},
-	ContentFormatLive:     {PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn},
-	ContentFormatText:     {PlatformFacebook, PlatformLinkedIn, PlatformTwitter},
+	ContentFormatCarousel: {PlatformInstagram, PlatformFacebook, PlatformLinkedIn, PlatformLinkedInPage},
+	ContentFormatLive:     {PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformLinkedInPage},
+	ContentFormatText:     {PlatformFacebook, PlatformLinkedIn, PlatformLinkedInPage, PlatformTwitter, PlatformReddit},
 }
 
 // IsValidContentFormat reports whether f is a known content format.
@@ -108,7 +108,7 @@ func NormalizePlatform(v string) (Platform, bool) {
 	switch s {
 	case "x", "x / twitter", "twitter/x":
 		return PlatformTwitter, true
-	case PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformTwitter:
+	case PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformLinkedInPage, PlatformTwitter, PlatformReddit:
 		return s, true
 	default:
 		return "", false

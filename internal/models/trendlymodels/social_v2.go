@@ -22,6 +22,12 @@ const (
 	PlatformYouTube   Platform = "youtube"
 	PlatformLinkedIn  Platform = "linkedin"
 	PlatformTwitter   Platform = "twitter"
+	PlatformReddit    Platform = "reddit"
+	// PlatformLinkedInPage is a LinkedIn Company/Showcase Page connected via the
+	// dedicated Community Management API app. It is intentionally DISTINCT from
+	// PlatformLinkedIn (personal profile) — different OAuth app, scopes, and
+	// capabilities (org posting + comments + insights). See linkedin_page.go.
+	PlatformLinkedInPage Platform = "linkedin_page"
 )
 
 // ─── SocialAccount (users/{userId}/socialAccounts/{id}) ───────────────────────
@@ -58,6 +64,18 @@ type SocialAccount struct {
 	FollowerCount  int64 `json:"followerCount" firestore:"followerCount"`
 	FollowingCount int64 `json:"followingCount" firestore:"followingCount"`
 	MediaCount     int64 `json:"mediaCount" firestore:"mediaCount"` // posts/videos
+
+	// AccountType distinguishes a personal/member account ("" or "member") from an
+	// organization/page account ("organization"). Set for linkedin_page accounts.
+	AccountType string `json:"accountType,omitempty" firestore:"accountType,omitempty"`
+	// TokenRef points at the socialTokens doc id holding this account's token when
+	// it is NOT stored at the account's own id. Used by linkedin_page: many Pages
+	// connected in one OAuth share ONE member token doc (keyed by member id), so
+	// each page account references it here. Empty → token lives at this account's id.
+	TokenRef string `json:"tokenRef,omitempty" firestore:"tokenRef,omitempty"`
+	// VanityName is the platform's human-readable handle/slug (e.g. a LinkedIn
+	// Page vanity name) when distinct from Username.
+	VanityName string `json:"vanityName,omitempty" firestore:"vanityName,omitempty"`
 
 	// Connection metadata
 	ConnectedAt int64 `json:"connectedAt" firestore:"connectedAt"` // Unix timestamp
@@ -272,6 +290,48 @@ func GetBrandSocialToken(brandID, id string) (*SocialToken, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// GetBrandSocialTokenForAccount reads the token for a brand-connected account,
+// following acc.TokenRef when set (linkedin_page Pages share one member token
+// doc). For every other account TokenRef is empty, so this behaves identically
+// to GetBrandSocialToken(brandID, acc.ID).
+func GetBrandSocialTokenForAccount(brandID string, acc *SocialAccount) (*SocialToken, error) {
+	id := acc.ID
+	if acc.TokenRef != "" {
+		id = acc.TokenRef
+	}
+	return GetBrandSocialToken(brandID, id)
+}
+
+// SaveBrandPageAccounts writes a shared token doc once (at tokenDocID) plus one
+// page SocialAccount per element, each referencing the shared token via TokenRef,
+// in a single atomic batch. Used when a member connects multiple LinkedIn Pages
+// in one OAuth flow.
+func SaveBrandPageAccounts(brandID string, accounts []SocialAccount, sharedToken *SocialToken, tokenDocID string) error {
+	if len(accounts) == 0 {
+		return fmt.Errorf("SaveBrandPageAccounts: no accounts to save")
+	}
+	ctx := context.Background()
+	batch := firestoredb.Client.Batch()
+
+	tokenRef := firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialTokens", brandID)).
+		Doc(tokenDocID)
+	batch.Set(tokenRef, sharedToken)
+
+	for i := range accounts {
+		accounts[i].TokenRef = tokenDocID
+		pubRef := firestoredb.Client.
+			Collection(fmt.Sprintf("brands/%s/socialAccounts", brandID)).
+			Doc(accounts[i].ID)
+		batch.Set(pubRef, &accounts[i])
+	}
+
+	if _, err := batch.Commit(ctx); err != nil {
+		return fmt.Errorf("SaveBrandPageAccounts: batch commit failed: %w", err)
+	}
+	return nil
 }
 
 // GetBrandSocialAccount reads a single brand-connected social account.

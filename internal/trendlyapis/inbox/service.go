@@ -7,10 +7,13 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/socialsync"
-	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/facebook"
+	"github.com/idivarts/backend-sls/pkg/instagram"
+	"github.com/idivarts/backend-sls/pkg/reddit"
+	"github.com/idivarts/backend-sls/pkg/twitter"
 )
 
 const replyWindowMs = int64(24 * 60 * 60 * 1000)
@@ -31,9 +34,40 @@ type servingAccount struct {
 	token   string
 }
 
-// isInboxChannel reports whether a platform participates in the inbox (Meta only).
+// isDMChannel reports whether a platform supports the direct-message (Messages)
+// inbox. Meta (IG/FB) sync via webhooks + read-through; Twitter via polling;
+// Reddit via read-only PM polling. LinkedIn is intentionally EXCLUDED — LinkedIn
+// exposes no company-page messaging API (closed partner program), so it must
+// never appear as a DM channel (see the "Linkedin Messaging" ticket).
+func isDMChannel(p trendlymodels.Platform) bool {
+	switch p {
+	case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook,
+		trendlymodels.PlatformTwitter:
+		return true
+	case trendlymodels.PlatformReddit:
+		return constants.RedditEnabled // gated — see internal/constants/features.go
+	}
+	return false
+}
+
+// isCommentChannel reports whether a platform supports the comments (Media)
+// inbox. LinkedIn COMPANY PAGES (linkedin_page) have org-post comments via the
+// CMA; personal LinkedIn does NOT (no API), so it is excluded.
+func isCommentChannel(p trendlymodels.Platform) bool {
+	switch p {
+	case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook,
+		trendlymodels.PlatformLinkedInPage, trendlymodels.PlatformTwitter:
+		return true
+	case trendlymodels.PlatformReddit:
+		return constants.RedditEnabled // gated — see internal/constants/features.go
+	}
+	return false
+}
+
+// isInboxChannel reports whether a platform participates in the inbox in ANY
+// capacity (DM or comments). Used to surface connected accounts.
 func isInboxChannel(p trendlymodels.Platform) bool {
-	return p == trendlymodels.PlatformInstagram || p == trendlymodels.PlatformFacebook
+	return isDMChannel(p) || isCommentChannel(p)
 }
 
 // ListAccounts returns the brand's Meta-connected accounts for the inbox.
@@ -75,7 +109,7 @@ func loadServingAccount(brandID, socialID string) (*servingAccount, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loadServingAccount: account %s: %w", socialID, err)
 	}
-	tok, err := trendlymodels.GetBrandSocialToken(brandID, socialID)
+	tok, err := trendlymodels.GetBrandSocialTokenForAccount(brandID, acc)
 	if err != nil {
 		return nil, fmt.Errorf("loadServingAccount: token %s: %w", socialID, err)
 	}
@@ -157,20 +191,29 @@ func SyncFromMeta(brandID string) error {
 	var firstErr error
 	for i := range socials {
 		s := socials[i]
-		if !isInboxChannel(s.Platform) {
+		if !isDMChannel(s.Platform) {
 			continue
 		}
-		tok, err := trendlymodels.GetBrandSocialToken(brandID, s.ID)
+		tok, err := trendlymodels.GetBrandSocialTokenForAccount(brandID, &s)
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}
 			continue
 		}
-		if err := syncAccountDMs(brandID, &s, tok.AccessToken); err != nil {
-			log.Printf("inbox: DM sync failed for %s/%s: %v", brandID, s.ID, err)
+		var serr error
+		switch s.Platform {
+		case trendlymodels.PlatformTwitter:
+			serr = syncTwitterDMs(brandID, &s, tok.AccessToken)
+		case trendlymodels.PlatformReddit:
+			serr = syncRedditPMs(brandID, &s, tok.AccessToken)
+		default: // instagram / facebook
+			serr = syncAccountDMs(brandID, &s, tok.AccessToken)
+		}
+		if serr != nil {
+			log.Printf("inbox: DM sync failed for %s/%s (%s): %v", brandID, s.ID, s.Platform, serr)
 			if firstErr == nil {
-				firstErr = err
+				firstErr = serr
 			}
 		}
 	}
@@ -466,25 +509,42 @@ func Reply(brandID, convID, text string) error {
 	}
 
 	if conv.Kind == trendlymodels.InboxKindDM {
-		// Enforce the 24h reply window server-side.
+		// Enforce the 24h reply window server-side (Meta only; non-Meta channels
+		// leave ReplyWindowExpiresAt=0 so this never triggers).
 		if conv.ReplyWindowExpiresAt > 0 && now > conv.ReplyWindowExpiresAt {
 			return fmt.Errorf("reply window expired")
 		}
-		// Capture the platform's returned message id (mid) and store it as the
-		// reply's id, so the message_echoes webhook for this same send dedupes
-		// against it (ingestMessagingForBrand matches by mid) instead of being
-		// appended a second time.
-		var sent *facebook.IMessageResponse
-		if isFB {
+		// Capture the platform's returned message id and store it as the reply's
+		// id, so the echo webhook (Meta) dedupes against it instead of appending
+		// a second copy.
+		switch sa.account.Platform {
+		case trendlymodels.PlatformFacebook:
+			var sent *facebook.IMessageResponse
 			sent, err = facebook.SendTextMessage(conv.ExternalRecipientID, text, sa.token)
-		} else {
+			if err == nil && sent != nil && sent.MessageID != "" {
+				reply.ID = sent.MessageID
+			}
+		case trendlymodels.PlatformInstagram:
+			var sent *facebook.IMessageResponse
 			sent, err = instagram.SendIGMessage(conv.ExternalRecipientID, text, sa.token)
+			if err == nil && sent != nil && sent.MessageID != "" {
+				reply.ID = sent.MessageID
+			}
+		case trendlymodels.PlatformTwitter:
+			var dmID string
+			dmID, err = twitter.SendDM(sa.token, conv.ExternalRecipientID, text)
+			if err == nil && dmID != "" {
+				reply.ID = dmID
+			}
+		case trendlymodels.PlatformReddit:
+			// Reddit PMs are read-only since Aug 2025; compose is best-effort and
+			// usually 403s. We surface the API error to the caller.
+			err = reddit.ComposeMessage(sa.token, conv.ExternalRecipientID, "Re: "+conv.Preview, text)
+		default:
+			err = fmt.Errorf("messaging not supported for platform %q", sa.account.Platform)
 		}
 		if err != nil {
 			return err
-		}
-		if sent != nil && sent.MessageID != "" {
-			reply.ID = sent.MessageID
 		}
 		conv.Messages = append(conv.Messages, reply)
 		conv.Preview = text

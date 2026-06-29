@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
@@ -28,15 +29,7 @@ func getAccountAnalytics(brandID string, acc trendlymodels.SocialAccount, r Rang
 		}
 	}
 
-	// Non-Meta platforms aren't wired for analytics in phase 1 — return the
-	// header (follower count etc.) flagged unsupported. Not worth caching.
-	if acc.Platform != trendlymodels.PlatformInstagram && acc.Platform != trendlymodels.PlatformFacebook {
-		a := baseAccount(acc, r)
-		a.Supported = false
-		return a
-	}
-
-	fresh := fetchMetaAccount(brandID, acc, r)
+	fresh := fetchAccount(brandID, acc, r)
 
 	// Live fetch errored — fall back to any cached copy, marked stale.
 	if fresh.Error != "" && cached != nil {
@@ -60,9 +53,9 @@ func getAccountAnalytics(brandID string, acc trendlymodels.SocialAccount, r Rang
 	return fresh
 }
 
-// fetchMetaAccount dispatches a live fetch to the right Meta platform client.
-func fetchMetaAccount(brandID string, acc trendlymodels.SocialAccount, r Range) AccountAnalytics {
-	token, err := trendlymodels.GetBrandSocialToken(brandID, acc.ID)
+// fetchAccount dispatches a live analytics fetch to the right platform client.
+func fetchAccount(brandID string, acc trendlymodels.SocialAccount, r Range) AccountAnalytics {
+	token, err := trendlymodels.GetBrandSocialTokenForAccount(brandID, &acc)
 	if err != nil {
 		a := baseAccount(acc, r)
 		a.Supported = true
@@ -74,11 +67,32 @@ func fetchMetaAccount(brandID string, acc trendlymodels.SocialAccount, r Range) 
 		return fetchInstagram(acc, token, r)
 	case trendlymodels.PlatformFacebook:
 		return fetchFacebook(acc, token, r)
+	case trendlymodels.PlatformYouTube:
+		return fetchYouTube(acc, token, r)
+	case trendlymodels.PlatformLinkedInPage:
+		// Analytics are an ORG capability (page/follower/share stats). Personal
+		// LinkedIn has no analytics API and falls through to unsupported below.
+		return fetchLinkedIn(acc, token, r)
+	case trendlymodels.PlatformTwitter:
+		return fetchTwitter(acc, token, r)
+	case trendlymodels.PlatformReddit:
+		if constants.RedditEnabled { // gated — see internal/constants/features.go
+			return fetchReddit(acc, token, r)
+		}
+		a := baseAccount(acc, r)
+		a.Supported = false
+		return a
 	default:
 		a := baseAccount(acc, r)
 		a.Supported = false
 		return a
 	}
+}
+
+// fetchMetaAccount is retained for the daily snapshot path (Meta accounts only).
+// It now delegates to the unified dispatcher.
+func fetchMetaAccount(brandID string, acc trendlymodels.SocialAccount, r Range) AccountAnalytics {
+	return fetchAccount(brandID, acc, r)
 }
 
 func decodeCache(c *trendlymodels.AnalyticsCacheDoc) (AccountAnalytics, bool) {

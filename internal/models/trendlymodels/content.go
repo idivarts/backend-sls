@@ -26,6 +26,21 @@ type ContentDestination struct {
 	Username        string `json:"username,omitempty" firestore:"username"`
 }
 
+// ContentPlatformOptions holds per-platform publishing extras that don't fit the
+// shared caption/attachment model. Optional; only the fields for a content's
+// targeted platforms are read at publish time.
+type ContentPlatformOptions struct {
+	// YouTube — a video needs a title + visibility distinct from the caption.
+	YouTubeTitle       string `json:"youtubeTitle,omitempty" firestore:"youtubeTitle,omitempty"`
+	YouTubePrivacy     string `json:"youtubePrivacy,omitempty" firestore:"youtubePrivacy,omitempty"` // public|private|unlisted
+	YouTubeMadeForKids bool   `json:"youtubeMadeForKids,omitempty" firestore:"youtubeMadeForKids,omitempty"`
+	// Reddit — a submission needs a target subreddit + title (+ optional flair).
+	RedditSubreddit string `json:"redditSubreddit,omitempty" firestore:"redditSubreddit,omitempty"`
+	RedditTitle     string `json:"redditTitle,omitempty" firestore:"redditTitle,omitempty"`
+	RedditFlairID   string `json:"redditFlairId,omitempty" firestore:"redditFlairId,omitempty"`
+	RedditNSFW      bool   `json:"redditNsfw,omitempty" firestore:"redditNsfw,omitempty"`
+}
+
 // ContentImageGeneration tracks the live state of an AI image-generation job on
 // the content doc. It is written by the websocket image handler so the brand app
 // can render progress and the finished image from its Firestore subscription —
@@ -62,6 +77,7 @@ type Content struct {
 	IsArchived       bool                    `json:"isArchived,omitempty" firestore:"isArchived"`
 	Attachments      []ContentAttachment     `json:"attachments,omitempty" firestore:"attachments"`
 	Destinations     []ContentDestination    `json:"destinations,omitempty" firestore:"destinations"`
+	PlatformOptions  *ContentPlatformOptions `json:"platformOptions,omitempty" firestore:"platformOptions,omitempty"`
 	ImageGeneration  *ContentImageGeneration `json:"imageGeneration,omitempty" firestore:"imageGeneration"`
 	// MediaConversationID is the dedicated AI thread (ai_conversations doc,
 	// module="media") for this content's image generate/enhance iterations.
