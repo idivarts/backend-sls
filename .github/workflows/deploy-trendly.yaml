@@ -61,6 +61,14 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           LINKEDIN_CLIENT_ID: ${{ vars.LINKEDIN_CLIENT_ID }}
           LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
+          # Dedicated LinkedIn Community Management API app (linkedin_page provider).
+          LINKEDIN_CM_CLIENT_ID: ${{ vars.LINKEDIN_CM_CLIENT_ID }}
+          LINKEDIN_CM_CLIENT_SECRET: ${{ secrets.LINKEDIN_CM_CLIENT_SECRET }}
+          # Reddit Data API (confidential OAuth app). REDDIT_USER_AGENT is a
+          # non-secret variable; Reddit requires it to be unique + descriptive.
+          REDDIT_CLIENT_ID: ${{ vars.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USER_AGENT: ${{ vars.REDDIT_USER_AGENT }}
         run: |
           echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
           echo $TRENDLY_KEY_SECRETS_BASE64 | base64 -d > key-secrets.json

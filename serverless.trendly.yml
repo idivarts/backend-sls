@@ -46,8 +46,19 @@ provider:
     YOUTUBE_CLIENT_SECRET: ${env:YOUTUBE_CLIENT_SECRET, ''}
     LINKEDIN_CLIENT_ID: ${env:LINKEDIN_CLIENT_ID, ''}
     LINKEDIN_CLIENT_SECRET: ${env:LINKEDIN_CLIENT_SECRET, ''}
+    # Dedicated Community Management API app (Company Pages / linkedin_page
+    # provider) — MUST be a separate LinkedIn app (CMA must be its only product).
+    # See docs/linkedin-pages-cma-setup.md.
+    LINKEDIN_CM_CLIENT_ID: ${env:LINKEDIN_CM_CLIENT_ID, ''}
+    LINKEDIN_CM_CLIENT_SECRET: ${env:LINKEDIN_CM_CLIENT_SECRET, ''}
     TWITTER_CLIENT_ID: ${env:TWITTER_CLIENT_ID, ''}
     TWITTER_CLIENT_SECRET: ${env:TWITTER_CLIENT_SECRET, ''}
+    # Reddit Data API (OAuth confidential web app). REDDIT_USER_AGENT is mandatory
+    # and must be unique — Reddit bans generic/spoofed UAs. See
+    # docs/social-expansion-dashboard-setup.md §4.
+    REDDIT_CLIENT_ID: ${env:REDDIT_CLIENT_ID, ''}
+    REDDIT_CLIENT_SECRET: ${env:REDDIT_CLIENT_SECRET, ''}
+    REDDIT_USER_AGENT: ${env:REDDIT_USER_AGENT, 'web:trendly-ai-social-planner:v1.0 (by /u/trendlyapp)'}
     # All Razorpay related variables
     GROWTH_PLAN_ID: plan_QywVXV2flgIY7N
     BUSINESS_PLAN_ID: plan_QywX8bnObf3P42

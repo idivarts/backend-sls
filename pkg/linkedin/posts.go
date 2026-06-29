@@ -130,6 +130,15 @@ func CreateMemberPost(accessToken, authorURN, text string, imageURLs []string) (
 	return postURN, nil
 }
 
+// CreateOrgPost publishes a post authored by an ORGANIZATION (Company/Showcase
+// Page) via the versioned Posts API. orgURN must be "urn:li:organization:{id}";
+// the connecting member needs w_organization_social on that page. The post body
+// + image-upload flow is identical to a member post (author-agnostic), so this
+// delegates to the shared implementation.
+func CreateOrgPost(accessToken, orgURN, text string, imageURLs []string) (string, error) {
+	return CreateMemberPost(accessToken, orgURN, text, imageURLs)
+}
+
 // uploadImage registers and uploads a single image via the versioned Images API
 // and returns its image URN (urn:li:image:...). owner is the author URN (member
 // or organization) that will own the asset.

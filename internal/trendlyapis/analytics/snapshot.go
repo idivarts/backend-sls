@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 )
 
@@ -32,8 +33,18 @@ func SnapshotBrand(brandID, date string) (written, failed int) {
 
 	now := time.Now().Unix()
 	for _, acc := range accounts {
-		if acc.Platform != trendlymodels.PlatformInstagram &&
-			acc.Platform != trendlymodels.PlatformFacebook {
+		// Snapshot every platform whose analytics are wired. Accumulated daily
+		// snapshots power trend graphs the live APIs can't reproduce — especially
+		// important for X (organic metrics expire at 30 days).
+		// Reddit is gated off (see internal/constants/features.go) — skip it.
+		if acc.Platform == trendlymodels.PlatformReddit && !constants.RedditEnabled {
+			continue
+		}
+		switch acc.Platform {
+		case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook,
+			trendlymodels.PlatformYouTube, trendlymodels.PlatformLinkedInPage,
+			trendlymodels.PlatformTwitter, trendlymodels.PlatformReddit:
+		default:
 			continue
 		}
 
