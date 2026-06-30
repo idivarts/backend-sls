@@ -38,6 +38,67 @@ func buildCaption(ct *trendlymodels.Content) string {
 	return strings.Join(parts, "\n\n")
 }
 
+// isSentenceEnd reports whether r terminates a sentence/statement.
+func isSentenceEnd(r rune) bool {
+	return r == '.' || r == '!' || r == '?' || r == '…'
+}
+
+// splitTweetThread splits body into ≤limit-rune segments, never breaking
+// mid-word and preferring a sentence boundary, then the last whitespace. Mirrors
+// the frontend utils/twitter-thread.ts splitter.
+func splitTweetThread(body string, limit int) []string {
+	text := strings.TrimSpace(body)
+	if text == "" {
+		return []string{}
+	}
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return []string{text}
+	}
+
+	out := []string{}
+	rest := runes
+	for len(rest) > limit {
+		window := rest[:limit]
+
+		// Last sentence break in the window (index just after the terminator).
+		sentenceAt := -1
+		for i := 0; i < len(window); i++ {
+			if isSentenceEnd(window[i]) && (i+1 >= len(window) || window[i+1] == ' ' || window[i+1] == '\n') {
+				sentenceAt = i + 1
+			}
+		}
+		// Last whitespace in the window.
+		spaceAt := -1
+		for i := len(window) - 1; i >= 0; i-- {
+			if window[i] == ' ' || window[i] == '\n' || window[i] == '\t' {
+				spaceAt = i
+				break
+			}
+		}
+
+		cut := 0
+		switch {
+		case sentenceAt > limit*2/5:
+			cut = sentenceAt
+		case spaceAt > 0:
+			cut = spaceAt
+		default:
+			cut = limit // one giant token — hard split
+		}
+
+		piece := strings.TrimSpace(string(rest[:cut]))
+		if piece != "" {
+			out = append(out, piece)
+		}
+		rest = []rune(strings.TrimSpace(string(rest[cut:])))
+	}
+	if len(rest) > 0 {
+		out = append(out, strings.TrimSpace(string(rest)))
+	}
+	return out
+}
+
 func firstImageURL(ct *trendlymodels.Content) string {
 	for _, a := range ct.Attachments {
 		if a.ImageURL != "" {
@@ -218,15 +279,49 @@ func publishToLinkedInPage(account *trendlymodels.SocialAccount, accessToken str
 	return linkedin.CreateOrgPost(accessToken, orgURN, buildCaption(ct), imageURLs(ct))
 }
 
-// publishToTwitter posts a tweet (text, up to 4 images, or one video). The
+// tweetSegments returns the ordered tweets to post for this content: the
+// variation's explicit thread when set, otherwise the caption auto-split into
+// ≤280-char tweets (never breaking mid-word). A single-element result is a
+// normal one-off tweet.
+func tweetSegments(ct *trendlymodels.Content) []string {
+	if ct.PlatformOptions != nil && len(ct.PlatformOptions.TwitterThread) > 0 {
+		out := []string{}
+		for _, t := range ct.PlatformOptions.TwitterThread {
+			if s := strings.TrimSpace(t); s != "" {
+				out = append(out, s)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return splitTweetThread(buildCaption(ct), 280)
+}
+
+// publishToTwitter posts a tweet, or a self-reply thread when the content is too
+// long / an explicit thread was authored. Media rides on the first tweet. The
 // shared scheduler handles timing, so this always publishes immediately.
 func publishToTwitter(accessToken string, ct *trendlymodels.Content) (string, error) {
-	text := buildCaption(ct)
-	if len([]rune(text)) > 280 {
-		return "", fmt.Errorf("twitter: post text exceeds 280 characters (%d)", len([]rune(text)))
+	segments := tweetSegments(ct)
+	if len(segments) == 0 {
+		return "", fmt.Errorf("twitter: post has no text")
 	}
-	// PublishTweet prioritises a video when present, else attaches images.
-	return twitter.PublishTweet(accessToken, text, imageURLs(ct), firstVideoURL(ct))
+	// First tweet carries any media (up to 4 images, or one video).
+	firstID, err := twitter.PublishTweet(accessToken, segments[0], imageURLs(ct), firstVideoURL(ct))
+	if err != nil {
+		return "", err
+	}
+	replyTo := firstID
+	for _, seg := range segments[1:] {
+		id, rerr := twitter.ReplyToTweet(accessToken, replyTo, seg)
+		if rerr != nil {
+			// The thread is partially posted — surface the failure but keep the
+			// first tweet's id so the post is still recorded.
+			return firstID, fmt.Errorf("twitter: thread reply failed after %d tweet(s): %w", len(segments)-len(segments[1:]), rerr)
+		}
+		replyTo = id
+	}
+	return firstID, nil
 }
 
 // publishToYouTube uploads a video (or Short) to the connected channel. A video
@@ -255,6 +350,12 @@ func publishToYouTube(accessToken string, ct *trendlymodels.Content) (string, er
 		title = "Untitled"
 	}
 	desc := buildCaption(ct)
+	// A variation may set a dedicated YouTube description distinct from the caption.
+	if ct.PlatformOptions != nil {
+		if d := strings.TrimSpace(ct.PlatformOptions.YouTubeDescription); d != "" {
+			desc = d
+		}
+	}
 	// A "reel" maps to a YouTube Short — tag #Shorts so YouTube classifies it
 	// (there is no dedicated Shorts upload endpoint).
 	if strings.EqualFold(ct.ContentFormat, "reel") && !strings.Contains(strings.ToLower(desc), "#shorts") {
@@ -316,6 +417,14 @@ func PublishContent(brandID, contentID string) error {
 		return fmt.Errorf("content %s has no destinations", contentID)
 	}
 
+	// Per-platform variations override the generic content at publish time. A
+	// missing variation → that platform publishes the generic content unchanged.
+	variations, verr := trendlymodels.ListContentVariations(brandID, contentID)
+	if verr != nil {
+		log.Printf("publishing: could not load variations for content %s (using generic): %v", contentID, verr)
+		variations = map[string]*trendlymodels.ContentVariation{}
+	}
+
 	publishedIds := map[string]string{}
 	var firstErr error
 
@@ -326,6 +435,8 @@ func PublishContent(brandID, contentID string) error {
 			log.Printf("publishing: destination platform %q not in content %s targeted platforms; skipping", dest.Platform, contentID)
 			continue
 		}
+		// Effective content for THIS platform = generic ⊕ its variation override.
+		eff := ct.EffectiveForPlatform(variations[string(dest.Platform)])
 		account, aerr := trendlymodels.GetBrandSocialAccount(brandID, dest.SocialAccountID)
 		if aerr != nil {
 			if firstErr == nil {
@@ -346,7 +457,7 @@ func PublishContent(brandID, contentID string) error {
 
 		switch dest.Platform {
 		case "instagram":
-			id, perr := publishToInstagram(account.PlatformAccountID, token.AccessToken, ct)
+			id, perr := publishToInstagram(account.PlatformAccountID, token.AccessToken, eff)
 			if perr != nil {
 				if firstErr == nil {
 					firstErr = perr
@@ -355,7 +466,7 @@ func PublishContent(brandID, contentID string) error {
 			}
 			publishedIds["instagram"] = id
 		case "facebook":
-			id, perr := publishToFacebook(account.PlatformAccountID, token.AccessToken, ct)
+			id, perr := publishToFacebook(account.PlatformAccountID, token.AccessToken, eff)
 			if perr != nil {
 				if firstErr == nil {
 					firstErr = perr
@@ -364,7 +475,7 @@ func PublishContent(brandID, contentID string) error {
 			}
 			publishedIds["facebook"] = id
 		case "linkedin":
-			id, perr := publishToLinkedIn(account, token.AccessToken, ct)
+			id, perr := publishToLinkedIn(account, token.AccessToken, eff)
 			if perr != nil {
 				if firstErr == nil {
 					firstErr = perr
@@ -373,7 +484,7 @@ func PublishContent(brandID, contentID string) error {
 			}
 			publishedIds["linkedin"] = id
 		case "linkedin_page":
-			id, perr := publishToLinkedInPage(account, token.AccessToken, ct)
+			id, perr := publishToLinkedInPage(account, token.AccessToken, eff)
 			if perr != nil {
 				if firstErr == nil {
 					firstErr = perr
@@ -382,7 +493,7 @@ func PublishContent(brandID, contentID string) error {
 			}
 			publishedIds["linkedin_page"] = id
 		case "twitter":
-			id, perr := publishToTwitter(token.AccessToken, ct)
+			id, perr := publishToTwitter(token.AccessToken, eff)
 			if perr != nil {
 				if firstErr == nil {
 					firstErr = perr
@@ -391,7 +502,7 @@ func PublishContent(brandID, contentID string) error {
 			}
 			publishedIds["twitter"] = id
 		case "youtube":
-			id, perr := publishToYouTube(token.AccessToken, ct)
+			id, perr := publishToYouTube(token.AccessToken, eff)
 			if perr != nil {
 				if firstErr == nil {
 					firstErr = perr
@@ -406,7 +517,7 @@ func PublishContent(brandID, contentID string) error {
 				}
 				continue
 			}
-			id, perr := publishToReddit(token.AccessToken, ct)
+			id, perr := publishToReddit(token.AccessToken, eff)
 			if perr != nil {
 				if firstErr == nil {
 					firstErr = perr
