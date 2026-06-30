@@ -28,17 +28,40 @@ type ContentDestination struct {
 
 // ContentPlatformOptions holds per-platform publishing extras that don't fit the
 // shared caption/attachment model. Optional; only the fields for a content's
-// targeted platforms are read at publish time.
+// targeted platforms are read at publish time. Mirrors the frontend
+// IPlatformOptions (a flat, prefix-namespaced bag) — keep the two in sync.
 type ContentPlatformOptions struct {
+	// Instagram
+	InstagramLocation     string `json:"instagramLocation,omitempty" firestore:"instagramLocation,omitempty"`
+	InstagramAltText      string `json:"instagramAltText,omitempty" firestore:"instagramAltText,omitempty"`
+	InstagramFirstComment string `json:"instagramFirstComment,omitempty" firestore:"instagramFirstComment,omitempty"`
+	// Facebook
+	FacebookFirstComment string `json:"facebookFirstComment,omitempty" firestore:"facebookFirstComment,omitempty"`
+	// LinkedIn (personal + page)
+	LinkedInVisibility   string `json:"linkedinVisibility,omitempty" firestore:"linkedinVisibility,omitempty"` // PUBLIC|CONNECTIONS|LOGGED_IN
+	LinkedInFirstComment string `json:"linkedinFirstComment,omitempty" firestore:"linkedinFirstComment,omitempty"`
+	LinkedInAltText      string `json:"linkedinAltText,omitempty" firestore:"linkedinAltText,omitempty"`
+	// Twitter / X — a thread of >1 entry publishes as a self-reply chain.
+	TwitterThread        []string `json:"twitterThread,omitempty" firestore:"twitterThread,omitempty"`
+	TwitterReplySettings string   `json:"twitterReplySettings,omitempty" firestore:"twitterReplySettings,omitempty"`
+	TwitterQuoteTweetID  string   `json:"twitterQuoteTweetId,omitempty" firestore:"twitterQuoteTweetId,omitempty"`
+	TwitterAltText       string   `json:"twitterAltText,omitempty" firestore:"twitterAltText,omitempty"`
 	// YouTube — a video needs a title + visibility distinct from the caption.
-	YouTubeTitle       string `json:"youtubeTitle,omitempty" firestore:"youtubeTitle,omitempty"`
-	YouTubePrivacy     string `json:"youtubePrivacy,omitempty" firestore:"youtubePrivacy,omitempty"` // public|private|unlisted
-	YouTubeMadeForKids bool   `json:"youtubeMadeForKids,omitempty" firestore:"youtubeMadeForKids,omitempty"`
+	YouTubeTitle       string   `json:"youtubeTitle,omitempty" firestore:"youtubeTitle,omitempty"`
+	YouTubeDescription string   `json:"youtubeDescription,omitempty" firestore:"youtubeDescription,omitempty"`
+	YouTubeTags        []string `json:"youtubeTags,omitempty" firestore:"youtubeTags,omitempty"`
+	YouTubeCategoryID  string   `json:"youtubeCategoryId,omitempty" firestore:"youtubeCategoryId,omitempty"`
+	YouTubePrivacy     string   `json:"youtubePrivacy,omitempty" firestore:"youtubePrivacy,omitempty"` // public|private|unlisted
+	YouTubeMadeForKids bool     `json:"youtubeMadeForKids,omitempty" firestore:"youtubeMadeForKids,omitempty"`
+	YouTubePlaylistID  string   `json:"youtubePlaylistId,omitempty" firestore:"youtubePlaylistId,omitempty"`
 	// Reddit — a submission needs a target subreddit + title (+ optional flair).
-	RedditSubreddit string `json:"redditSubreddit,omitempty" firestore:"redditSubreddit,omitempty"`
-	RedditTitle     string `json:"redditTitle,omitempty" firestore:"redditTitle,omitempty"`
-	RedditFlairID   string `json:"redditFlairId,omitempty" firestore:"redditFlairId,omitempty"`
-	RedditNSFW      bool   `json:"redditNsfw,omitempty" firestore:"redditNsfw,omitempty"`
+	RedditSubreddit   string `json:"redditSubreddit,omitempty" firestore:"redditSubreddit,omitempty"`
+	RedditTitle       string `json:"redditTitle,omitempty" firestore:"redditTitle,omitempty"`
+	RedditFlairID     string `json:"redditFlairId,omitempty" firestore:"redditFlairId,omitempty"`
+	RedditFlairText   string `json:"redditFlairText,omitempty" firestore:"redditFlairText,omitempty"`
+	RedditNSFW        bool   `json:"redditNsfw,omitempty" firestore:"redditNsfw,omitempty"`
+	RedditSpoiler     bool   `json:"redditSpoiler,omitempty" firestore:"redditSpoiler,omitempty"`
+	RedditSendReplies bool   `json:"redditSendReplies,omitempty" firestore:"redditSendReplies,omitempty"`
 }
 
 // ContentImageGeneration tracks the live state of an AI image-generation job on

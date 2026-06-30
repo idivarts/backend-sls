@@ -240,6 +240,17 @@ service cloud.firestore {
           allow update, delete: if isAuthenticated() && isCommentAuthor() &&
                            (isBrandMember(brandId) || contentShared(brandId, contentId));
         }
+
+        // Per-platform content variations (one doc per platform; doc ID == the
+        // platform key). Same access policy as the parent content: any brand
+        // member may read (and public viewers when the content is shared, so the
+        // public preview can show the right per-platform copy); manage_content
+        // holders create/update/delete.
+        match /variations/{platform} {
+          allow read:                   if (isAuthenticated() && isBrandMember(brandId))
+                                           || (isNonAnonAuthed() && contentShared(brandId, contentId));
+          allow create, update, delete: if isAuthenticated() && canManageContent(brandId);
+        }
       }
 
       // ── Calendar month public share toggle ───────────────────────────────
