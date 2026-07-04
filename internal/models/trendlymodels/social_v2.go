@@ -292,6 +292,15 @@ func GetBrandSocialToken(brandID, id string) (*SocialToken, error) {
 	return &t, nil
 }
 
+// UpdateBrandSocialToken partial-updates a brand-connected token document (e.g.
+// to persist a refreshed access token + expiry). Server-side only.
+func UpdateBrandSocialToken(brandID, id string, fields []firestore.Update) (*firestore.WriteResult, error) {
+	return firestoredb.Client.
+		Collection(fmt.Sprintf("brands/%s/socialTokens", brandID)).
+		Doc(id).
+		Update(context.Background(), fields)
+}
+
 // GetBrandSocialTokenForAccount reads the token for a brand-connected account,
 // following acc.TokenRef when set (linkedin_page Pages share one member token
 // doc). For every other account TokenRef is empty, so this behaves identically
