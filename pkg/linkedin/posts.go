@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 )
 
 // restHeaders sets the headers required by the versioned /rest endpoints
@@ -159,6 +161,12 @@ func baseFeedPost(authorURN, text string) map[string]interface{} {
 func CreateMemberVideoPost(accessToken, authorURN, text, videoURL string) (string, error) {
 	videoURN, err := uploadVideo(accessToken, authorURN, videoURL)
 	if err != nil {
+		return "", err
+	}
+	// LinkedIn processes the uploaded video asynchronously. Creating the post
+	// before processing finishes can fail or publish without the video, so wait
+	// until it's AVAILABLE first (mirrors the Instagram container wait).
+	if err := waitForVideoReady(accessToken, videoURN); err != nil {
 		return "", err
 	}
 	post := baseFeedPost(authorURN, text)
@@ -385,4 +393,60 @@ func uploadVideo(accessToken, ownerURN, videoURL string) (string, error) {
 	}
 
 	return init.Value.Video, nil
+}
+
+// videoStatus fetches a video's processing status via the Videos API. The URN is
+// path-escaped because it contains colons.
+func videoStatus(accessToken, videoURN string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, RestBaseURL+"/videos/"+url.PathEscape(videoURN), nil)
+	if err != nil {
+		return "", fmt.Errorf("linkedin: build video status request: %w", err)
+	}
+	restHeaders(req, accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("linkedin: video status request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("linkedin: video status returned %d: %s", resp.StatusCode, string(body))
+	}
+	var out struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return "", fmt.Errorf("linkedin: parse video status: %w", err)
+	}
+	return out.Status, nil
+}
+
+// waitForVideoReady polls a freshly-finalized video until LinkedIn finishes
+// processing it (status AVAILABLE). A few consecutive status-check errors are
+// tolerated (the video row can 404 for a moment right after finalize); a
+// persistent error, an explicit processing failure, or a timeout is returned so
+// the caller records it rather than posting a video that isn't ready.
+func waitForVideoReady(accessToken, videoURN string) error {
+	consecutiveErrs := 0
+	for i := 0; i < 40; i++ { // ~120s max (40 × 3s)
+		status, err := videoStatus(accessToken, videoURN)
+		if err != nil {
+			consecutiveErrs++
+			if consecutiveErrs >= 3 {
+				return fmt.Errorf("linkedin: could not confirm video processing: %w", err)
+			}
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		consecutiveErrs = 0
+		switch status {
+		case "AVAILABLE":
+			return nil
+		case "PROCESSING_FAILED":
+			return fmt.Errorf("linkedin: video processing failed")
+		}
+		time.Sleep(3 * time.Second)
+	}
+	return fmt.Errorf("linkedin: video did not finish processing in time")
 }
