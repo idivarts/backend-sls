@@ -16,8 +16,10 @@ import (
 // mediaUploadURL is the v2 chunked media upload endpoint.
 const mediaUploadURL = APIURL + "/media/upload"
 
-// maxChunkBytes is the maximum size of a single APPEND chunk (5MB).
-const maxChunkBytes = 5 * 1024 * 1024
+// maxChunkBytes is the size of a single APPEND chunk. The v2 chunked-upload
+// append endpoint rejects larger chunks with HTTP 413; the official quickstart
+// uses 1MB chunks (segment_index maxes at 999 → ~1GB ceiling, ample for video).
+const maxChunkBytes = 1 * 1024 * 1024
 
 // downloadBytes fetches the bytes at srcURL and returns them along with the
 // reported Content-Type (falling back to a sniffed type when the header is
