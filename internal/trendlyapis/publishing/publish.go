@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/idivarts/backend-sls/internal/constants"
@@ -406,9 +407,221 @@ func publishToReddit(accessToken string, ct *trendlymodels.Content) (string, err
 	return fullname, nil
 }
 
-// PublishContent loads a content doc and publishes it to each destination,
-// recording per-platform published ids and a final status on the document.
-func PublishContent(brandID, contentID string) error {
+// Per-destination publish states written to Content.PublishResults.
+const (
+	pubStatusPublishing = "publishing"
+	pubStatusPublished  = "published"
+	pubStatusFailed     = "failed"
+	pubStatusSkipped    = "skipped"
+)
+
+// classifyPublishError maps a platform failure to a recovery hint the UI uses to
+// pick the right action: "auth" → reconnect the account, "validation" → the user
+// must fix the content (wrong media, missing field, too long), "transient" →
+// safe to retry as-is. A coarse heuristic over the error text — good enough to
+// steer the CTA; the human message still carries the detail.
+func classifyPublishError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "token"), strings.Contains(msg, "unauthor"),
+		strings.Contains(msg, "permission"), strings.Contains(msg, "oauth"),
+		strings.Contains(msg, "expired"), strings.Contains(msg, "401"), strings.Contains(msg, "reconnect"):
+		return "auth"
+	case strings.Contains(msg, "no "), strings.Contains(msg, "requires"),
+		strings.Contains(msg, "needs"), strings.Contains(msg, "must "),
+		strings.Contains(msg, "at least"), strings.Contains(msg, "does not support"),
+		strings.Contains(msg, "unsupported"), strings.Contains(msg, "too long"),
+		strings.Contains(msg, "invalid"), strings.Contains(msg, "not enabled"):
+		return "validation"
+	default:
+		return "transient"
+	}
+}
+
+// publishDestination publishes the content (with its per-platform variation
+// applied) to a single destination and returns the platform's post id.
+func publishDestination(brandID string, ct *trendlymodels.Content, dest trendlymodels.ContentDestination, variation *trendlymodels.ContentVariation) (string, error) {
+	// Effective content for THIS platform = generic ⊕ its variation override.
+	eff := ct.EffectiveForPlatform(variation)
+	account, aerr := trendlymodels.GetBrandSocialAccount(brandID, dest.SocialAccountID)
+	if aerr != nil {
+		return "", aerr
+	}
+	// Resolve via the account so linkedin_page Pages (which share one member
+	// token doc via TokenRef) read the right token; all other platforms have an
+	// empty TokenRef and behave identically to a by-id lookup.
+	token, terr := trendlymodels.GetBrandSocialTokenForAccount(brandID, account)
+	if terr != nil {
+		return "", terr
+	}
+	switch dest.Platform {
+	case "instagram":
+		return publishToInstagram(account.PlatformAccountID, token.AccessToken, eff)
+	case "facebook":
+		return publishToFacebook(account.PlatformAccountID, token.AccessToken, eff)
+	case "linkedin":
+		return publishToLinkedIn(account, token.AccessToken, eff)
+	case "linkedin_page":
+		return publishToLinkedInPage(account, token.AccessToken, eff)
+	case "twitter":
+		return publishToTwitter(token.AccessToken, eff)
+	case "youtube":
+		return publishToYouTube(token.AccessToken, eff)
+	case "reddit":
+		if !constants.RedditEnabled {
+			return "", fmt.Errorf("reddit integration is not enabled")
+		}
+		return publishToReddit(token.AccessToken, eff)
+	default:
+		return "", fmt.Errorf("unsupported platform %q", dest.Platform)
+	}
+}
+
+// deriveOverallStatus maps the per-destination results to the content-wide
+// status the badge shows: any still in flight → "publishing"; a mix of
+// success + failure → "partially_failed"; all-good → "posted"; all-bad →
+// "failed". Skipped rows don't count either way.
+func deriveOverallStatus(results []trendlymodels.ContentPublishResult) string {
+	published, failed, publishing := 0, 0, 0
+	for _, r := range results {
+		switch r.Status {
+		case pubStatusPublished:
+			published++
+		case pubStatusFailed:
+			failed++
+		case pubStatusPublishing:
+			publishing++
+		}
+	}
+	switch {
+	case publishing > 0:
+		return "publishing"
+	case published > 0 && failed > 0:
+		return "partially_failed"
+	case published > 0:
+		return "posted"
+	case failed > 0:
+		return "failed"
+	default:
+		return "publishing"
+	}
+}
+
+// writePublishState persists the current per-destination results + derived
+// overall status. When final, it also rebuilds the backward-compat publishedIds
+// map + publishError and (if anything went live) stamps the real posting time.
+func writePublishState(brandID, contentID string, results []trendlymodels.ContentPublishResult, final bool) {
+	fields := map[string]interface{}{
+		"publishResults": results,
+		"status":         deriveOverallStatus(results),
+	}
+	if final {
+		publishedIds := map[string]string{}
+		firstErr := ""
+		anyPublished := false
+		for _, r := range results {
+			if r.Status == pubStatusPublished {
+				anyPublished = true
+				if r.PostID != "" {
+					publishedIds[r.Platform] = r.PostID
+				}
+			}
+			if r.Status == pubStatusFailed && firstErr == "" {
+				firstErr = r.Error
+			}
+		}
+		fields["publishedIds"] = publishedIds
+		fields["publishError"] = firstErr
+		if anyPublished {
+			// The post is live now. Stamp the actual posting time onto both the
+			// precise publish field and the calendar-placement field so the
+			// calendar shows it when it really went out, not at a stale time.
+			postedAt := time.Now().UnixMilli()
+			fields["scheduledAt"] = postedAt
+			fields["postingTimeStamp"] = postedAt
+		}
+	}
+	if err := trendlymodels.UpdateContentFields(brandID, contentID, fields); err != nil {
+		log.Printf("publishing: failed to update content %s: %v", contentID, err)
+	}
+}
+
+func cloneResults(in []trendlymodels.ContentPublishResult) []trendlymodels.ContentPublishResult {
+	out := make([]trendlymodels.ContentPublishResult, len(in))
+	copy(out, in)
+	return out
+}
+
+// buildSeedResults produces the initial per-destination result set (aligned 1:1
+// with ct.Destinations): destinations to run are marked "publishing", untargeted
+// ones "skipped", and — on a retry (onlySet non-empty) — destinations not being
+// re-run carry their prior result forward unchanged.
+func buildSeedResults(ct *trendlymodels.Content, onlySet map[string]bool) []trendlymodels.ContentPublishResult {
+	retry := len(onlySet) > 0
+	prior := map[string]trendlymodels.ContentPublishResult{}
+	for _, r := range ct.PublishResults {
+		prior[r.SocialAccountID] = r
+	}
+	results := make([]trendlymodels.ContentPublishResult, 0, len(ct.Destinations))
+	for _, dest := range ct.Destinations {
+		base := trendlymodels.ContentPublishResult{
+			SocialAccountID: dest.SocialAccountID,
+			Platform:        string(dest.Platform),
+			Username:        dest.Username,
+		}
+		switch {
+		case len(ct.Platforms) > 0 && !platformTargeted(dest.Platform, ct.Platforms):
+			base.Status = pubStatusSkipped
+			base.Error = "platform not targeted by this content"
+		case retry && !onlySet[dest.SocialAccountID]:
+			if p, ok := prior[dest.SocialAccountID]; ok {
+				base = p
+			} else {
+				base.Status = pubStatusSkipped
+			}
+		default:
+			base.Status = pubStatusPublishing
+		}
+		results = append(results, base)
+	}
+	return results
+}
+
+// SeedPublishing flips the targeted destinations to "publishing" and the doc to
+// the "publishing" status the instant Publish/Retry is requested — before the
+// queued worker starts — so the brand app reflects the in-flight state without
+// waiting on SQS delivery. `only` limits the seed to specific destinations
+// (retry). Best-effort: a seed failure doesn't block the enqueue.
+func SeedPublishing(brandID, contentID string, only ...string) error {
+	ct, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil {
+		return err
+	}
+	if len(ct.Destinations) == 0 {
+		return fmt.Errorf("content %s has no destinations", contentID)
+	}
+	onlySet := map[string]bool{}
+	for _, id := range only {
+		if id != "" {
+			onlySet[id] = true
+		}
+	}
+	writePublishState(brandID, contentID, buildSeedResults(ct, onlySet), false)
+	return nil
+}
+
+// PublishContent loads a content doc and publishes it to each destination
+// CONCURRENTLY, recording a per-destination result (published / failed with a
+// reason) and a derived overall status on the document. One platform failing
+// never blocks or aborts the others — partial success is a first-class outcome.
+//
+// When `only` is non-empty it names the destination socialAccountIds to (re)run
+// — used by Retry to republish just the failed socials while carrying every
+// other destination's prior result forward untouched.
+func PublishContent(brandID, contentID string, only ...string) error {
 	ct, err := trendlymodels.GetContent(brandID, contentID)
 	if err != nil {
 		return err
@@ -425,132 +638,75 @@ func PublishContent(brandID, contentID string) error {
 		variations = map[string]*trendlymodels.ContentVariation{}
 	}
 
-	publishedIds := map[string]string{}
-	var firstErr error
-
-	for _, dest := range ct.Destinations {
-		// Never publish to a platform the content isn't targeting. (Legacy docs
-		// with no `platforms` set skip this guard.)
-		if len(ct.Platforms) > 0 && !platformTargeted(dest.Platform, ct.Platforms) {
-			log.Printf("publishing: destination platform %q not in content %s targeted platforms; skipping", dest.Platform, contentID)
-			continue
-		}
-		// Effective content for THIS platform = generic ⊕ its variation override.
-		eff := ct.EffectiveForPlatform(variations[string(dest.Platform)])
-		account, aerr := trendlymodels.GetBrandSocialAccount(brandID, dest.SocialAccountID)
-		if aerr != nil {
-			if firstErr == nil {
-				firstErr = aerr
-			}
-			continue
-		}
-		// Resolve via the account so linkedin_page Pages (which share one member
-		// token doc via TokenRef) read the right token; all other platforms have
-		// an empty TokenRef and behave identically to a by-id lookup.
-		token, terr := trendlymodels.GetBrandSocialTokenForAccount(brandID, account)
-		if terr != nil {
-			if firstErr == nil {
-				firstErr = terr
-			}
-			continue
-		}
-
-		switch dest.Platform {
-		case "instagram":
-			id, perr := publishToInstagram(account.PlatformAccountID, token.AccessToken, eff)
-			if perr != nil {
-				if firstErr == nil {
-					firstErr = perr
-				}
-				continue
-			}
-			publishedIds["instagram"] = id
-		case "facebook":
-			id, perr := publishToFacebook(account.PlatformAccountID, token.AccessToken, eff)
-			if perr != nil {
-				if firstErr == nil {
-					firstErr = perr
-				}
-				continue
-			}
-			publishedIds["facebook"] = id
-		case "linkedin":
-			id, perr := publishToLinkedIn(account, token.AccessToken, eff)
-			if perr != nil {
-				if firstErr == nil {
-					firstErr = perr
-				}
-				continue
-			}
-			publishedIds["linkedin"] = id
-		case "linkedin_page":
-			id, perr := publishToLinkedInPage(account, token.AccessToken, eff)
-			if perr != nil {
-				if firstErr == nil {
-					firstErr = perr
-				}
-				continue
-			}
-			publishedIds["linkedin_page"] = id
-		case "twitter":
-			id, perr := publishToTwitter(token.AccessToken, eff)
-			if perr != nil {
-				if firstErr == nil {
-					firstErr = perr
-				}
-				continue
-			}
-			publishedIds["twitter"] = id
-		case "youtube":
-			id, perr := publishToYouTube(token.AccessToken, eff)
-			if perr != nil {
-				if firstErr == nil {
-					firstErr = perr
-				}
-				continue
-			}
-			publishedIds["youtube"] = id
-		case "reddit":
-			if !constants.RedditEnabled {
-				if firstErr == nil {
-					firstErr = fmt.Errorf("reddit integration is not enabled")
-				}
-				continue
-			}
-			id, perr := publishToReddit(token.AccessToken, eff)
-			if perr != nil {
-				if firstErr == nil {
-					firstErr = perr
-				}
-				continue
-			}
-			publishedIds["reddit"] = id
-		default:
-			log.Printf("publishing: unsupported platform %q for content %s", dest.Platform, contentID)
+	onlySet := map[string]bool{}
+	for _, id := range only {
+		if id != "" {
+			onlySet[id] = true
 		}
 	}
 
-	fields := map[string]interface{}{
-		"publishedIds": publishedIds,
-	}
-	if len(publishedIds) > 0 {
-		// The post is live now (whether via publish-now or a scheduled job that
-		// just fired). Stamp the actual posting time onto both the precise
-		// publish field and the calendar-placement field so the calendar shows
-		// the post when it really went out, not at a stale scheduled time.
-		postedAt := time.Now().UnixMilli()
-		fields["status"] = "posted"
-		fields["scheduledAt"] = postedAt
-		fields["postingTimeStamp"] = postedAt
-	}
-	if firstErr != nil {
-		fields["publishError"] = firstErr.Error()
-	} else {
-		fields["publishError"] = ""
-	}
-	if uerr := trendlymodels.UpdateContentFields(brandID, contentID, fields); uerr != nil {
-		log.Printf("publishing: failed to update content %s: %v", contentID, uerr)
+	// results is aligned 1:1 with ct.Destinations; toRun holds the indices we
+	// actually publish this run (everything marked "publishing" by the seed).
+	results := buildSeedResults(ct, onlySet)
+	toRun := []int{}
+	for i, r := range results {
+		if r.Status == pubStatusPublishing {
+			toRun = append(toRun, i)
+		}
 	}
 
-	return firstErr
+	// Seed the "publishing" state so the app shows spinners immediately.
+	writePublishState(brandID, contentID, cloneResults(results), false)
+
+	// Publish every destination concurrently. Completions are funnelled back to
+	// THIS goroutine over `done`, which writes each progress snapshot in order —
+	// a single writer keeps Firestore updates ordered and guarantees the final
+	// write lands last (so a late progress write can't revert a resolved row).
+	var mu sync.Mutex
+	done := make(chan int, len(toRun))
+	var wg sync.WaitGroup
+	for _, idx := range toRun {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			dest := ct.Destinations[idx]
+			id, perr := publishDestination(brandID, ct, dest, variations[string(dest.Platform)])
+			mu.Lock()
+			r := results[idx]
+			r.At = time.Now().UnixMilli()
+			if perr != nil {
+				r.Status = pubStatusFailed
+				r.Error = perr.Error()
+				r.ErrorKind = classifyPublishError(perr)
+			} else {
+				r.Status = pubStatusPublished
+				r.PostID = id
+				r.Error = ""
+				r.ErrorKind = ""
+			}
+			results[idx] = r
+			mu.Unlock()
+			done <- idx
+		}(idx)
+	}
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	for range done {
+		mu.Lock()
+		snapshot := cloneResults(results)
+		mu.Unlock()
+		writePublishState(brandID, contentID, snapshot, false)
+	}
+
+	// Authoritative final write: derived status + publishedIds + posting time.
+	writePublishState(brandID, contentID, cloneResults(results), true)
+
+	for _, r := range results {
+		if r.Status == pubStatusFailed {
+			return fmt.Errorf("publish failed for %s: %s", r.Platform, r.Error)
+		}
+	}
+	return nil
 }

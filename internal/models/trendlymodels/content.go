@@ -64,6 +64,27 @@ type ContentPlatformOptions struct {
 	RedditSendReplies bool   `json:"redditSendReplies,omitempty" firestore:"redditSendReplies,omitempty"`
 }
 
+// ContentPublishResult is the per-destination outcome of a publish run, written
+// back onto the content doc so the brand app can show which socials went live,
+// which are still in flight, and which failed (with a human error). One entry
+// per targeted destination. The frontend renders these rows live via its
+// Firestore subscription; see trendly-brands PublishStatusPanel.
+type ContentPublishResult struct {
+	SocialAccountID string `json:"socialAccountId,omitempty" firestore:"socialAccountId,omitempty"`
+	Platform        string `json:"platform" firestore:"platform"`
+	Username        string `json:"username,omitempty" firestore:"username,omitempty"`
+	// Status: "publishing" (in flight) | "published" | "failed" | "skipped".
+	Status string `json:"status" firestore:"status"`
+	PostID string `json:"postId,omitempty" firestore:"postId,omitempty"`
+	URL    string `json:"url,omitempty" firestore:"url,omitempty"`
+	Error  string `json:"error,omitempty" firestore:"error,omitempty"`
+	// ErrorKind lets the UI pick the right recovery action:
+	// "validation" (user must fix the content) | "transient" (retry) | "auth"
+	// (reconnect the account).
+	ErrorKind string `json:"errorKind,omitempty" firestore:"errorKind,omitempty"`
+	At        int64  `json:"at,omitempty" firestore:"at,omitempty"`
+}
+
 // ContentImageGeneration tracks the live state of an AI image-generation job on
 // the content doc. It is written by the websocket image handler so the brand app
 // can render progress and the finished image from its Firestore subscription —
@@ -111,6 +132,10 @@ type Content struct {
 	ScheduleExecutionArn string                 `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
 	PublishedIds         map[string]string      `json:"publishedIds,omitempty" firestore:"publishedIds"`
 	PublishError         string                 `json:"publishError,omitempty" firestore:"publishError"`
+	// PublishResults holds the per-destination outcome of the latest publish run
+	// (in-flight, published, or failed with a reason). Source of truth for the
+	// brand app's per-social publish status UI.
+	PublishResults       []ContentPublishResult `json:"publishResults,omitempty" firestore:"publishResults"`
 	PostedURL            string                 `json:"postedUrl,omitempty" firestore:"postedUrl"`
 	Metrics              map[string]interface{} `json:"metrics,omitempty" firestore:"metrics"`
 	CreatedAt            int64                  `json:"createdAt,omitempty" firestore:"createdAt"`
