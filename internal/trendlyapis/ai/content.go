@@ -43,6 +43,13 @@ type captionReq struct {
 	Caption     string `json:"caption"`
 	Hashtags    string `json:"hashtags"`
 	Script      string `json:"script"`
+
+	// Every per-platform variation on the piece, plus the specific platform +
+	// field this request is generating for (set when enhancing a variation), so
+	// the AI tailors the result and stays aware of the sibling variants.
+	Variations     []variationBrief `json:"variations"`
+	TargetPlatform string           `json:"targetPlatform"`
+	TargetField    string           `json:"targetField"`
 }
 
 type captionVariant struct {
@@ -68,6 +75,7 @@ func HTTPCaption(c *gin.Context) {
 	}
 
 	liveBrief := briefFromFields(req.Title, req.Platform, req.Format, req.Description, req.Caption, req.Hashtags, req.Script)
+	liveBrief = enrichLiveBrief(liveBrief, req.Variations, req.TargetPlatform, req.TargetField)
 	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief)
 	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskCaption, req.Model)
 	if locked {
@@ -139,6 +147,11 @@ type hashtagReq struct {
 	Caption     string `json:"caption"`
 	Hashtags    string `json:"hashtags"`
 	Script      string `json:"script"`
+
+	// Per-platform variations + the platform/field being generated (see captionReq).
+	Variations     []variationBrief `json:"variations"`
+	TargetPlatform string           `json:"targetPlatform"`
+	TargetField    string           `json:"targetField"`
 }
 
 type hashtagGroup struct {
@@ -164,6 +177,7 @@ func HTTPHashtags(c *gin.Context) {
 	}
 
 	liveBrief := briefFromFields(req.Title, req.Platform, req.Format, req.Description, req.Caption, req.Hashtags, req.Script)
+	liveBrief = enrichLiveBrief(liveBrief, req.Variations, req.TargetPlatform, req.TargetField)
 	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief)
 	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskHashtag, req.Model)
 	if locked {

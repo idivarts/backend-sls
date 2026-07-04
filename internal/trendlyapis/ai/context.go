@@ -313,10 +313,108 @@ func briefFromFields(title, platform, format, description, caption, hashtags, sc
 	return contentBriefText(ct)
 }
 
+// variationBrief is one per-platform variation summarised for the AI: the values
+// that will actually publish to that platform (generic fields already resolved
+// through any override on the client), plus which fields the user explicitly
+// overrode so the model can tell a tailored value apart from an inherited one.
+// Mirrors the frontend LiveContentVariation.
+type variationBrief struct {
+	Platform         string         `json:"platform"`
+	Caption          string         `json:"caption"`
+	Hashtags         string         `json:"hashtags"`
+	OverriddenFields []string       `json:"overriddenFields"`
+	PlatformOptions  map[string]any `json:"platformOptions"`
+}
+
+// variationsBriefText renders the full set of per-platform variations into a
+// compact block appended to the content brief, so the AI is aware of every
+// tailored variant (not just the generic body). Returns "" when there are none.
+func variationsBriefText(vs []variationBrief) string {
+	if len(vs) == 0 {
+		return ""
+	}
+	var lines []string
+	lines = append(lines, "Per-platform variations (what will actually publish to each platform):")
+	for _, v := range vs {
+		platform := strings.TrimSpace(v.Platform)
+		if platform == "" {
+			continue
+		}
+		seg := "- " + platform
+		if len(v.OverriddenFields) > 0 {
+			seg += fmt.Sprintf(" (overridden: %s)", strings.Join(v.OverriddenFields, ", "))
+		}
+		var parts []string
+		if c := strings.TrimSpace(v.Caption); c != "" {
+			parts = append(parts, "Caption: "+c)
+		}
+		if h := strings.TrimSpace(v.Hashtags); h != "" {
+			parts = append(parts, "Hashtags: "+h)
+		}
+		if len(v.PlatformOptions) > 0 {
+			var opts []string
+			for k, val := range v.PlatformOptions {
+				if val == nil || val == "" {
+					continue
+				}
+				opts = append(opts, fmt.Sprintf("%s=%v", k, val))
+			}
+			if len(opts) > 0 {
+				parts = append(parts, "Options: "+strings.Join(opts, ", "))
+			}
+		}
+		if len(parts) > 0 {
+			seg += ": " + strings.Join(parts, " | ")
+		}
+		lines = append(lines, seg)
+	}
+	if len(lines) <= 1 {
+		return ""
+	}
+	return strings.Join(lines, "\n")
+}
+
+// enrichLiveBrief appends the per-platform variation block and (for a
+// generate/enhance request tied to a variation) the target hint to a live
+// content brief, so caption/hashtag generation sees the full set of variants and
+// knows exactly which platform + field it is producing.
+func enrichLiveBrief(liveBrief string, vs []variationBrief, targetPlatform, targetField string) string {
+	if vb := variationsBriefText(vs); vb != "" {
+		if liveBrief != "" {
+			liveBrief += "\n\n"
+		}
+		liveBrief += vb
+	}
+	if hint := variationTargetHint(targetPlatform, targetField); hint != "" {
+		if liveBrief != "" {
+			liveBrief += "\n\n"
+		}
+		liveBrief += hint
+	}
+	return liveBrief
+}
+
+// variationTargetHint tells the AI which specific platform + field a
+// generate/enhance request is for, so it tailors the result to that variation
+// while staying consistent with the brand and the sibling variations. Returns ""
+// for a generic (non-variation) request.
+func variationTargetHint(platform, field string) string {
+	platform = strings.TrimSpace(platform)
+	field = strings.TrimSpace(field)
+	if platform == "" {
+		return ""
+	}
+	if field == "" {
+		return fmt.Sprintf("You are tailoring content specifically for the %s variation of this piece. Optimise for %s while keeping it consistent with the brand and the other variations.", platform, platform)
+	}
+	return fmt.Sprintf("You are generating the %s specifically for the %s variation of this piece. Tailor it to %s's audience and format while keeping it consistent with the brand and the other variations.", field, platform, platform)
+}
+
 // liveContentPayload carries the current (possibly unsaved) content-editor state
 // the brand app sends alongside a chat message in the content module. It mirrors
 // the live-editor fields used by content generation, plus the on-screen
-// attachments, so the chat AI reasons about exactly what's on screen now rather
+// attachments and every per-platform variation, so the chat AI reasons about
+// exactly what's on screen now — generic body AND each tailored variant — rather
 // than the last-saved Firestore doc.
 type liveContentPayload struct {
 	Title       string                            `json:"title"`
@@ -328,11 +426,13 @@ type liveContentPayload struct {
 	Hashtags    string                            `json:"hashtags"`
 	Script      string                            `json:"script"`
 	Attachments []trendlymodels.ContentAttachment `json:"attachments"`
+	Variations  []variationBrief                  `json:"variations"`
 }
 
 // briefFromLiveContent renders the live editor payload into the same compact
 // brief shape used elsewhere (contentBriefText), including a media summary built
-// from the current on-screen attachments. Returns "" when nothing usable is set.
+// from the current on-screen attachments and a per-platform variation block.
+// Returns "" when nothing usable is set.
 func briefFromLiveContent(p liveContentPayload) string {
 	ct := &trendlymodels.Content{
 		Title:         strings.TrimSpace(p.Title),
@@ -345,7 +445,14 @@ func briefFromLiveContent(p liveContentPayload) string {
 		Script:        strings.TrimSpace(p.Script),
 		Attachments:   p.Attachments,
 	}
-	return contentBriefText(ct)
+	brief := contentBriefText(ct)
+	if vb := variationsBriefText(p.Variations); vb != "" {
+		if brief != "" {
+			brief += "\n\n"
+		}
+		brief += vb
+	}
+	return brief
 }
 
 // summariseAttachments produces a short, model-friendly description of the media
