@@ -145,34 +145,26 @@ func UploadMedia(accessToken string, data []byte, mediaCategory string) (mediaID
 }
 
 func mediaInit(accessToken string, totalBytes int, mediaType, mediaCategory string) (string, error) {
-	// The v2 /2/media/upload endpoint rejects application/x-www-form-urlencoded
-	// bodies (it treats the params as stray query params and errors). It accepts
-	// the command parameters as multipart/form-data, matching the APPEND step.
-	fields := map[string]string{
-		"command":     "INIT",
-		"total_bytes": strconv.Itoa(totalBytes),
+	// v2 chunked upload uses the dedicated /media/upload/initialize endpoint with
+	// a JSON body. (The command-based /media/upload endpoint only accepts simple
+	// image uploads and rejects command/total_bytes + non-image media types.)
+	payload := map[string]any{
 		"media_type":  mediaType,
+		"total_bytes": totalBytes,
 	}
 	if mediaCategory != "" {
-		fields["media_category"] = mediaCategory
+		payload["media_category"] = mediaCategory
+	}
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("twitter: failed to marshal media INIT body: %w", err)
 	}
 
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	for k, v := range fields {
-		if err := writer.WriteField(k, v); err != nil {
-			return "", fmt.Errorf("twitter: failed to write media INIT field: %w", err)
-		}
-	}
-	if err := writer.Close(); err != nil {
-		return "", fmt.Errorf("twitter: failed to close media INIT writer: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, mediaUploadURL, &buf)
+	req, err := http.NewRequest(http.MethodPost, mediaUploadURL+"/initialize", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("twitter: failed to build media INIT request: %w", err)
 	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -208,12 +200,8 @@ func mediaAppend(accessToken, mediaID string, data []byte) error {
 
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		if err := writer.WriteField("command", "APPEND"); err != nil {
-			return fmt.Errorf("twitter: failed to write APPEND field: %w", err)
-		}
-		if err := writer.WriteField("media_id", mediaID); err != nil {
-			return fmt.Errorf("twitter: failed to write APPEND field: %w", err)
-		}
+		// v2 dedicated append endpoint: media_id is in the URL path, so the body
+		// only carries segment_index + the media chunk (no command/media_id).
 		if err := writer.WriteField("segment_index", strconv.Itoa(segmentIndex)); err != nil {
 			return fmt.Errorf("twitter: failed to write APPEND field: %w", err)
 		}
@@ -228,7 +216,8 @@ func mediaAppend(accessToken, mediaID string, data []byte) error {
 			return fmt.Errorf("twitter: failed to close APPEND writer: %w", err)
 		}
 
-		req, err := http.NewRequest(http.MethodPost, mediaUploadURL, &buf)
+		appendURL := fmt.Sprintf("%s/%s/append", mediaUploadURL, mediaID)
+		req, err := http.NewRequest(http.MethodPost, appendURL, &buf)
 		if err != nil {
 			return fmt.Errorf("twitter: failed to build media APPEND request: %w", err)
 		}
@@ -252,25 +241,12 @@ func mediaAppend(accessToken, mediaID string, data []byte) error {
 // mediaFinalize sends FINALIZE and returns processing_info if the media needs
 // asynchronous processing (video/gif), or nil if it is immediately ready.
 func mediaFinalize(accessToken, mediaID string) (*mediaProcessingInfo, error) {
-	// Multipart/form-data — see the note in mediaInit; the v2 endpoint rejects
-	// url-encoded bodies.
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	if err := writer.WriteField("command", "FINALIZE"); err != nil {
-		return nil, fmt.Errorf("twitter: failed to write media FINALIZE field: %w", err)
-	}
-	if err := writer.WriteField("media_id", mediaID); err != nil {
-		return nil, fmt.Errorf("twitter: failed to write media FINALIZE field: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("twitter: failed to close media FINALIZE writer: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, mediaUploadURL, &buf)
+	// v2 dedicated finalize endpoint: media_id is in the URL path, no request body.
+	finalizeURL := fmt.Sprintf("%s/%s/finalize", mediaUploadURL, mediaID)
+	req, err := http.NewRequest(http.MethodPost, finalizeURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("twitter: failed to build media FINALIZE request: %w", err)
 	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := http.DefaultClient.Do(req)
