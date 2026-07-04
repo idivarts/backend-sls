@@ -395,10 +395,14 @@ func uploadVideo(accessToken, ownerURN, videoURL string) (string, error) {
 	return init.Value.Video, nil
 }
 
-// videoStatus fetches a video's processing status via the Videos API. The URN is
-// path-escaped because it contains colons.
+// videoStatus fetches a video's processing status via the Videos API. The URN
+// goes in the path and its colons MUST be percent-encoded (urn%3Ali%3Avideo%3A…)
+// or LinkedIn rejects it with 400 "Syntax exception in path variables". Note
+// url.PathEscape does NOT encode ':' (it's allowed in a path segment), so we
+// escape the colons explicitly.
 func videoStatus(accessToken, videoURN string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, RestBaseURL+"/videos/"+url.PathEscape(videoURN), nil)
+	encodedURN := strings.ReplaceAll(url.PathEscape(videoURN), ":", "%3A")
+	req, err := http.NewRequest(http.MethodGet, RestBaseURL+"/videos/"+encodedURN, nil)
 	if err != nil {
 		return "", fmt.Errorf("linkedin: build video status request: %w", err)
 	}

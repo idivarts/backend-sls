@@ -404,8 +404,10 @@ functions:
         - 'templates/*'
     # Also serves instant publish-now / retry jobs, which publish to every
     # destination concurrently and may upload large video (YouTube/IG/FB) — well
-    # beyond the 30s HTTP limit, hence the queue. 300s covers the slowest fan-out.
-    timeout: 300
+    # beyond the 30s HTTP limit, hence the queue. Set to the Lambda max (900s) so a
+    # slow multi-platform video fan-out (incl. LinkedIn's up-to-120s processing
+    # wait) never times out mid-publish.
+    timeout: 900
     events:
       - sqs:
           arn:
@@ -544,7 +546,7 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ContentPublishQueue-${self:provider.stage}
-        VisibilityTimeout: 360   # ≥ scheduled_publish_sqs timeout (300s) + buffer
+        VisibilityTimeout: 960   # ≥ scheduled_publish_sqs timeout (900s, Lambda max) + buffer
 
     ContentPublishStateMachineRole:
       Type: AWS::IAM::Role
