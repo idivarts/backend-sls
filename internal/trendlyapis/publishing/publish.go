@@ -9,6 +9,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/socialtokens"
 	"github.com/idivarts/backend-sls/pkg/facebook"
 	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/linkedin"
@@ -218,16 +219,21 @@ func publishToInstagram(igUserID, accessToken string, ct *trendlymodels.Content)
 	return instagram.PublishContainer(igUserID, creationID, accessToken)
 }
 
-// publishToFacebook posts to a Facebook Page (photo if an image exists, else text).
+// publishToFacebook posts to a Facebook Page: a video if the content has one
+// (reel/video), else a photo if there's an image, else a plain text status.
 func publishToFacebook(pageID, pageToken string, ct *trendlymodels.Content) (string, error) {
 	caption := buildCaption(ct)
 	img := firstImageURL(ct)
+	video := firstVideoURL(ct)
 
 	var res *facebook.FBPublishResponse
 	var err error
-	if img != "" {
+	switch {
+	case video != "":
+		res, err = facebook.PublishPageVideo(pageID, video, caption, pageToken)
+	case img != "":
 		res, err = facebook.PublishPagePhoto(pageID, img, caption, pageToken)
-	} else {
+	default:
 		res, err = facebook.PublishPageFeed(pageID, caption, "", pageToken)
 	}
 	if err != nil {
@@ -253,6 +259,9 @@ func publishToLinkedIn(account *trendlymodels.SocialAccount, accessToken string,
 	if !strings.HasPrefix(authorURN, "urn:") {
 		authorURN = "urn:li:person:" + sub
 	}
+	if video := firstVideoURL(ct); video != "" {
+		return linkedin.CreateMemberVideoPost(accessToken, authorURN, buildCaption(ct), video)
+	}
 	return linkedin.CreateMemberPost(accessToken, authorURN, buildCaption(ct), imageURLs(ct))
 }
 
@@ -276,6 +285,9 @@ func publishToLinkedInPage(account *trendlymodels.SocialAccount, accessToken str
 	orgURN := orgURNForAccount(account)
 	if orgURN == "" {
 		return "", fmt.Errorf("linkedin page account %s has no organization urn", account.ID)
+	}
+	if video := firstVideoURL(ct); video != "" {
+		return linkedin.CreateOrgVideoPost(accessToken, orgURN, buildCaption(ct), video)
 	}
 	return linkedin.CreateOrgPost(accessToken, orgURN, buildCaption(ct), imageURLs(ct))
 }
@@ -457,6 +469,10 @@ func publishDestination(brandID string, ct *trendlymodels.Content, dest trendlym
 	if terr != nil {
 		return "", terr
 	}
+	// Short-lived tokens (YouTube ~1h, Twitter ~2h) expire long before the refresh
+	// cron runs, so refresh just-in-time — otherwise an upload an hour after connect
+	// 401s with "Invalid Credentials".
+	token = socialtokens.EnsureFreshBrandToken(brandID, account, token)
 	switch dest.Platform {
 	case "instagram":
 		return publishToInstagram(account.PlatformAccountID, token.AccessToken, eff)
