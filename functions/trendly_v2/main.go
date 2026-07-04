@@ -65,6 +65,7 @@ func handleManagerAPIs() {
 
 	// ── Content publishing + scheduling (brands/{brandId}/contents) ───────────
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish", publishing.PublishNow)
+	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish/retry", publishing.RetryPublish)
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/schedule", publishing.SchedulePublish)
 	managerApisV1.DELETE("/brands/:brandId/contents/:contentId/schedule", publishing.CancelSchedule)
 

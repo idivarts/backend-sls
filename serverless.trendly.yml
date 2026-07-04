@@ -402,7 +402,10 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
-    timeout: 120
+    # Also serves instant publish-now / retry jobs, which publish to every
+    # destination concurrently and may upload large video (YouTube/IG/FB) — well
+    # beyond the 30s HTTP limit, hence the queue. 300s covers the slowest fan-out.
+    timeout: 300
     events:
       - sqs:
           arn:
@@ -541,7 +544,7 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ContentPublishQueue-${self:provider.stage}
-        VisibilityTimeout: 180   # ≥ scheduled_publish_sqs timeout (120s) + buffer
+        VisibilityTimeout: 360   # ≥ scheduled_publish_sqs timeout (300s) + buffer
 
     ContentPublishStateMachineRole:
       Type: AWS::IAM::Role
