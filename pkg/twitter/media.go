@@ -145,19 +145,34 @@ func UploadMedia(accessToken string, data []byte, mediaCategory string) (mediaID
 }
 
 func mediaInit(accessToken string, totalBytes int, mediaType, mediaCategory string) (string, error) {
-	form := url.Values{}
-	form.Set("command", "INIT")
-	form.Set("total_bytes", strconv.Itoa(totalBytes))
-	form.Set("media_type", mediaType)
+	// The v2 /2/media/upload endpoint rejects application/x-www-form-urlencoded
+	// bodies (it treats the params as stray query params and errors). It accepts
+	// the command parameters as multipart/form-data, matching the APPEND step.
+	fields := map[string]string{
+		"command":     "INIT",
+		"total_bytes": strconv.Itoa(totalBytes),
+		"media_type":  mediaType,
+	}
 	if mediaCategory != "" {
-		form.Set("media_category", mediaCategory)
+		fields["media_category"] = mediaCategory
 	}
 
-	req, err := http.NewRequest(http.MethodPost, mediaUploadURL, strings.NewReader(form.Encode()))
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	for k, v := range fields {
+		if err := writer.WriteField(k, v); err != nil {
+			return "", fmt.Errorf("twitter: failed to write media INIT field: %w", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("twitter: failed to close media INIT writer: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, mediaUploadURL, &buf)
 	if err != nil {
 		return "", fmt.Errorf("twitter: failed to build media INIT request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -237,15 +252,25 @@ func mediaAppend(accessToken, mediaID string, data []byte) error {
 // mediaFinalize sends FINALIZE and returns processing_info if the media needs
 // asynchronous processing (video/gif), or nil if it is immediately ready.
 func mediaFinalize(accessToken, mediaID string) (*mediaProcessingInfo, error) {
-	form := url.Values{}
-	form.Set("command", "FINALIZE")
-	form.Set("media_id", mediaID)
+	// Multipart/form-data — see the note in mediaInit; the v2 endpoint rejects
+	// url-encoded bodies.
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	if err := writer.WriteField("command", "FINALIZE"); err != nil {
+		return nil, fmt.Errorf("twitter: failed to write media FINALIZE field: %w", err)
+	}
+	if err := writer.WriteField("media_id", mediaID); err != nil {
+		return nil, fmt.Errorf("twitter: failed to write media FINALIZE field: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("twitter: failed to close media FINALIZE writer: %w", err)
+	}
 
-	req, err := http.NewRequest(http.MethodPost, mediaUploadURL, strings.NewReader(form.Encode()))
+	req, err := http.NewRequest(http.MethodPost, mediaUploadURL, &buf)
 	if err != nil {
 		return nil, fmt.Errorf("twitter: failed to build media FINALIZE request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := http.DefaultClient.Do(req)
