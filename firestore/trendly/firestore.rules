@@ -243,12 +243,13 @@ service cloud.firestore {
 
         // Per-platform content variations (one doc per platform; doc ID == the
         // platform key). Same access policy as the parent content: any brand
-        // member may read (and public viewers when the content is shared, so the
-        // public preview can show the right per-platform copy); manage_content
-        // holders create/update/delete.
+        // member may read, AND any public viewer (anonymous included) when the
+        // content is shared — mirroring the parent content's isResourcePublic()
+        // read so the public share view can show the right per-platform copy.
+        // manage_content holders create/update/delete.
         match /variations/{platform} {
           allow read:                   if (isAuthenticated() && isBrandMember(brandId))
-                                           || (isNonAnonAuthed() && contentShared(brandId, contentId));
+                                           || contentShared(brandId, contentId);
           allow create, update, delete: if isAuthenticated() && canManageContent(brandId);
         }
       }
