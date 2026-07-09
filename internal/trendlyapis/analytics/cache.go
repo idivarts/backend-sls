@@ -6,6 +6,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/socialtokens"
 )
 
 // cacheTTLSeconds is how long a live analytics fetch is reused before refetching.
@@ -62,6 +63,9 @@ func fetchAccount(brandID string, acc trendlymodels.SocialAccount, r Range) Acco
 		a.Error = "missing access token"
 		return a
 	}
+	// Short-lived tokens (Twitter ~2h, YouTube ~1h) expire between refresh-cron
+	// runs; refresh just-in-time like the publish path does.
+	token = socialtokens.EnsureFreshBrandToken(brandID, &acc, token)
 	switch acc.Platform {
 	case trendlymodels.PlatformInstagram:
 		return fetchInstagram(acc, token, r)
