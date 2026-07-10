@@ -31,6 +31,8 @@ type ContentDesignRef struct {
 	Height     int    `json:"height" firestore:"height"`   // per-slide height
 	// SlideCount is the number of carousel slides (1 for a single post).
 	SlideCount int `json:"slideCount" firestore:"slideCount"`
+	// DurationMs is the animation length for a video design (0 for images).
+	DurationMs int `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
 	// RenderURL is the first frontend-captured PNG (cover) used for publish/Canva.
 	RenderURL string `json:"renderUrl,omitempty" firestore:"renderUrl,omitempty"`
 	UpdatedAt int64  `json:"updatedAt" firestore:"updatedAt"`
@@ -43,6 +45,7 @@ type ContentDesignRevision struct {
 	Width      int    `json:"width" firestore:"width"`   // per-slide width
 	Height     int    `json:"height" firestore:"height"` // per-slide height
 	SlideCount int    `json:"slideCount" firestore:"slideCount"`
+	DurationMs int    `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
 	DocType    string `json:"docType" firestore:"docType"` // image|video
 	// Origin: "generate" | "edit" | "text" | "revert".
 	Origin           string `json:"origin,omitempty" firestore:"origin,omitempty"`
