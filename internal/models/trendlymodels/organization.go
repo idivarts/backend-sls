@@ -92,6 +92,7 @@ type OrgPlanLimits struct {
 	Approvals        bool   // approvals / campaigns feature
 	InboxReply       bool   // Combined Social Inbox: false = view-only (free tier)
 	MaxPostsPerMonth int    // posting/scheduling cap; -1 = unlimited
+	CanvaBridge      bool   // Canva Connect deep-edit bridge (Pro+); costs us no AI tokens
 }
 
 // PlanLimitsMap is the single source of truth for plan -> entitlements + token
@@ -100,14 +101,14 @@ type OrgPlanLimits struct {
 // backfill (mapped onto the nearest new tier).
 var PlanLimitsMap = map[string]OrgPlanLimits{
 	// New USD tiers (Credit ticket).
-	"free":   {MaxBrands: 1, MaxSeats: 1, MonthlyAllotment: 200_000, AnalyticsTier: "locked", Approvals: false, InboxReply: false, MaxPostsPerMonth: 2},
-	"pro":    {MaxBrands: 1, MaxSeats: 2, MonthlyAllotment: 2_000_000, AnalyticsTier: "standard", Approvals: false, InboxReply: true, MaxPostsPerMonth: -1},
-	"team":   {MaxBrands: 3, MaxSeats: 5, MonthlyAllotment: 5_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1},
-	"agency": {MaxBrands: 100, MaxSeats: 100, MonthlyAllotment: 20_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1},
+	"free":   {MaxBrands: 1, MaxSeats: 1, MonthlyAllotment: 200_000, AnalyticsTier: "locked", Approvals: false, InboxReply: false, MaxPostsPerMonth: 2, CanvaBridge: false},
+	"pro":    {MaxBrands: 1, MaxSeats: 2, MonthlyAllotment: 2_000_000, AnalyticsTier: "standard", Approvals: false, InboxReply: true, MaxPostsPerMonth: -1, CanvaBridge: true},
+	"team":   {MaxBrands: 3, MaxSeats: 5, MonthlyAllotment: 5_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1, CanvaBridge: true},
+	"agency": {MaxBrands: 100, MaxSeats: 100, MonthlyAllotment: 20_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1, CanvaBridge: true},
 	// Legacy India tiers (backfill only).
-	"starter":    {MaxBrands: 1, MaxSeats: 2, MonthlyAllotment: 2_000_000, AnalyticsTier: "standard", Approvals: false, InboxReply: true, MaxPostsPerMonth: -1},
-	"growth":     {MaxBrands: 3, MaxSeats: 5, MonthlyAllotment: 5_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1},
-	"enterprise": {MaxBrands: 100, MaxSeats: 100, MonthlyAllotment: 20_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1},
+	"starter":    {MaxBrands: 1, MaxSeats: 2, MonthlyAllotment: 2_000_000, AnalyticsTier: "standard", Approvals: false, InboxReply: true, MaxPostsPerMonth: -1, CanvaBridge: true},
+	"growth":     {MaxBrands: 3, MaxSeats: 5, MonthlyAllotment: 5_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1, CanvaBridge: true},
+	"enterprise": {MaxBrands: 100, MaxSeats: 100, MonthlyAllotment: 20_000_000, AnalyticsTier: "full", Approvals: true, InboxReply: true, MaxPostsPerMonth: -1, CanvaBridge: true},
 }
 
 // ResolvePlanLimits returns the full limits for a plan key, defaulting to the
@@ -129,6 +130,7 @@ type OrgEntitlements struct {
 	Approvals        bool   `json:"approvals" firestore:"approvals"`
 	InboxReply       bool   `json:"inboxReply" firestore:"inboxReply"`
 	MaxPostsPerMonth int    `json:"maxPostsPerMonth" firestore:"maxPostsPerMonth"`
+	CanvaBridge      bool   `json:"canvaBridge" firestore:"canvaBridge"`
 }
 
 // EntitlementsFor resolves a plan key to its denormalized entitlements (written
@@ -142,6 +144,7 @@ func EntitlementsFor(planKey string) *OrgEntitlements {
 		Approvals:        l.Approvals,
 		InboxReply:       l.InboxReply,
 		MaxPostsPerMonth: l.MaxPostsPerMonth,
+		CanvaBridge:      l.CanvaBridge,
 	}
 }
 

@@ -106,6 +106,20 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 		return dispatchStrategyTool(ctx, brandID, contextID, name, arguments)
 	case toolListCalendar, toolCreateContent, toolUpdateContent, toolMoveContent, toolRemoveContent:
 		return dispatchCalendarTool(ctx, brandID, managerID, name, arguments)
+	case toolGenerateScene:
+		r, err := runGenerateScene(ctx, brandID, contextID, arguments)
+		return r, false, err
+	case toolApplySceneEdits:
+		r, err := runApplySceneEdits(ctx, brandID, contextID, arguments)
+		return r, false, err
+	case toolGenerateMusic:
+		orgID, _ := orgIDForBrand(brandID)
+		r, err := runGenerateMusic(ctx, brandID, contextID, orgID, arguments)
+		return r, false, err
+	case toolGenerateVoiceover:
+		orgID, _ := orgIDForBrand(brandID)
+		r, err := runGenerateVoiceover(ctx, brandID, contextID, orgID, arguments)
+		return r, false, err
 	default:
 		return jsonResult(map[string]any{"ok": false, "error": "unknown tool: " + name}), false, nil
 	}

@@ -25,6 +25,15 @@ provider:
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
     OPENROUTER_API_KEY: ${env:OPENROUTER_API_KEY, ''}
+    # AI Studio — ElevenLabs (music + voiceover) and Canva Connect deep-edit
+    # bridge. See docs/elevenlabs-setup.md and docs/canva-setup.md.
+    ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY, ''}
+    CANVA_CLIENT_ID: ${env:CANVA_CLIENT_ID, ''}
+    CANVA_CLIENT_SECRET: ${env:CANVA_CLIENT_SECRET, ''}
+    CANVA_REDIRECT_URI: ${env:CANVA_REDIRECT_URI, 'https://be.trendly.now/api/integrations/canva/callback'}
+    # Async scene render worker queue (Fargate consumer). Empty ⇒ enqueue is a
+    # no-op (FE renders scene previews itself). See docs/render-worker.md.
+    RENDER_QUEUE_URL: ${env:RENDER_QUEUE_URL, ''}
     BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
@@ -116,6 +125,11 @@ provider:
           Action:
             - "sqs:SendMessage"
           Resource: { "Fn::GetAtt": ["SocialSyncQueue", "Arn"] }
+        # ── AI-Studio: enqueue scene render jobs for the Fargate render worker ──
+        - Effect: "Allow"
+          Action:
+            - "sqs:SendMessage"
+          Resource: { "Fn::GetAtt": ["SceneRenderQueue", "Arn"] }
 plugins:
   - serverless-go-plugin
   - serverless-domain-manager
@@ -328,6 +342,18 @@ functions:
     events:
       - http: ANY /api/ai/{proxy+}
       - http: ANY /api/content-strategy/{proxy+}
+  trendly_studio_apis:
+    handler: functions/trendly_studio/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      # ElevenLabs audio (music + voiceover) and Canva Connect deep-edit bridge.
+      - http: ANY /api/media/{proxy+}
+      - http: ANY /api/integrations/canva/{proxy+}
   trendly_matchmaking_apis:
     handler: functions/trendly_matchmaking/main.go
     package:
@@ -538,6 +564,18 @@ resources:
       Properties:
         QueueName: SocialSyncQueue-${self:provider.stage}
         VisibilityTimeout: 660   # ≥ social_sqs timeout (600s) + buffer
+
+    # AI-Studio scene render worker queue. Consumed by an out-of-band Fargate
+    # container (CanvasKit + FFmpeg) — NOT a Lambda (video render exceeds the
+    # 15-min/10-GB/no-GPU Lambda envelope). The AI/scene handlers enqueue here;
+    # the worker writes renderUrl back onto the content's sceneRef. Set
+    # RENDER_QUEUE_URL to this queue's URL once the worker exists. See
+    # docs/render-worker.md.
+    SceneRenderQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SceneRenderQueue-${self:provider.stage}
+        VisibilityTimeout: 1000  # long-running container render + buffer
 
     # --------------------------------------------------------------------------------------
     # ------------- Scheduled content publishing (delayed_sqs via Step Functions) ----------
