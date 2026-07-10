@@ -43,6 +43,11 @@ func designServerTools() []openrouter.Tool {
 				"give every editable text element a data-el=\"<unique-id>\" attribute; use the brand "+
 				"colors/font from context. For a carousel, tell a story across slides (hook → points "+
 				"→ CTA).\n"+
+				"VIDEO (docType=video): produce a SINGLE full-frame stage (slides=1, one data-slide=\"0\") "+
+				"that ANIMATES using CSS @keyframes over `durationMs` (default ~6000ms): elements fade/"+
+				"slide/pop in over time to tell the story as one motion piece. Use animation-fill-mode:"+
+				"both and stagger animation-delay so the flow reads start→finish. Do NOT make video a "+
+				"multi-slide carousel.\n"+
 				"RENDER-SAFE CSS (the design is rasterized to PNG with html2canvas — unsupported CSS "+
 				"renders garbled): use ONLY solid text colors — NEVER gradient text / "+
 				"background-clip:text / -webkit-text-fill-color:transparent (use a solid brand color "+
@@ -56,9 +61,10 @@ func designServerTools() []openrouter.Tool {
 				"html":    openrouter.StringProp("The complete self-contained HTML document (a data-carousel with `slides` data-slide sections)."),
 				"docType": openrouter.EnumProp("image or video.", []string{"image", "video"}),
 				"format":  openrouter.EnumProp("Content format.", []string{"post", "reel", "story", "video", "carousel"}),
-				"width":   openrouter.NumberProp("Per-slide width in px (e.g. 1080)."),
-				"height":  openrouter.NumberProp("Per-slide height in px (e.g. 1350)."),
-				"slides":  openrouter.NumberProp("Number of slides (1 for a single post; 2-10 for a carousel)."),
+				"width":      openrouter.NumberProp("Per-slide width in px (e.g. 1080)."),
+				"height":     openrouter.NumberProp("Per-slide height in px (e.g. 1350)."),
+				"slides":     openrouter.NumberProp("Number of slides (1 for a single post/video; 2-10 for a carousel)."),
+				"durationMs": openrouter.NumberProp("For video: total animation length in ms (e.g. 6000). 0 for images."),
 			}, []string{"html"}),
 		),
 		openrouter.NewFunctionTool(
@@ -75,12 +81,13 @@ func designServerTools() []openrouter.Tool {
 }
 
 type generateDesignArgs struct {
-	HTML    string `json:"html"`
-	DocType string `json:"docType"`
-	Format  string `json:"format"`
-	Width   int    `json:"width"`
-	Height  int    `json:"height"`
-	Slides  int    `json:"slides"`
+	HTML       string `json:"html"`
+	DocType    string `json:"docType"`
+	Format     string `json:"format"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	Slides     int    `json:"slides"`
+	DurationMs int    `json:"durationMs"`
 }
 
 // countSlides returns the number of data-slide sections in the HTML (min 1).
@@ -116,7 +123,11 @@ func runGenerateDesign(ctx context.Context, brandID, contentID, arguments string
 	if slides < 1 {
 		slides = countSlides(html)
 	}
-	revID, err := persistDesign(brandID, contentID, wrapHTML(html), w, h, slides, docType, "generate", "")
+	duration := a.DurationMs
+	if docType == "video" && duration <= 0 {
+		duration = 6000
+	}
+	revID, err := persistDesign(brandID, contentID, wrapHTML(html), w, h, slides, duration, docType, "generate", "")
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), err
 	}
@@ -156,7 +167,7 @@ func runApplyDesignEdits(ctx context.Context, brandID, contentID, arguments stri
 	if s := countSlides(html); s != slides && s >= 1 {
 		slides = s
 	}
-	revID, err := persistDesign(brandID, contentID, wrapHTML(html), cur.Width, cur.Height, slides, cur.DocType, "edit", cur.ID)
+	revID, err := persistDesign(brandID, contentID, wrapHTML(html), cur.Width, cur.Height, slides, cur.DurationMs, cur.DocType, "edit", cur.ID)
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), err
 	}
@@ -168,18 +179,18 @@ func runApplyDesignEdits(ctx context.Context, brandID, contentID, arguments stri
 }
 
 // persistDesign writes an immutable HTML revision and points the content at it.
-func persistDesign(brandID, contentID, html string, w, h, slides int, docType, origin, parentRev string) (string, error) {
+func persistDesign(brandID, contentID, html string, w, h, slides, durationMs int, docType, origin, parentRev string) (string, error) {
 	if slides < 1 {
 		slides = 1
 	}
 	revID, err := trendlymodels.CreateDesignRevision(brandID, contentID, &trendlymodels.ContentDesignRevision{
-		HTML: html, Width: w, Height: h, SlideCount: slides, DocType: docType, Origin: origin, ParentRevisionID: parentRev,
+		HTML: html, Width: w, Height: h, SlideCount: slides, DurationMs: durationMs, DocType: docType, Origin: origin, ParentRevisionID: parentRev,
 	})
 	if err != nil {
 		return "", err
 	}
 	if err := trendlymodels.SetContentDesignRef(brandID, contentID, &trendlymodels.ContentDesignRef{
-		RevisionID: revID, DocType: docType, Width: w, Height: h, SlideCount: slides,
+		RevisionID: revID, DocType: docType, Width: w, Height: h, SlideCount: slides, DurationMs: durationMs,
 	}); err != nil {
 		return "", err
 	}
