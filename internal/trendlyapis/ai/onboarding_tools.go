@@ -106,11 +106,11 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 		return dispatchStrategyTool(ctx, brandID, contextID, name, arguments)
 	case toolListCalendar, toolCreateContent, toolUpdateContent, toolMoveContent, toolRemoveContent:
 		return dispatchCalendarTool(ctx, brandID, managerID, name, arguments)
-	case toolGenerateScene:
-		r, err := runGenerateScene(ctx, brandID, contextID, arguments)
+	case toolGenerateDesign:
+		r, err := runGenerateDesign(ctx, brandID, contextID, arguments)
 		return r, false, err
-	case toolApplySceneEdits:
-		r, err := runApplySceneEdits(ctx, brandID, contextID, arguments)
+	case toolApplyDesignEdits:
+		r, err := runApplyDesignEdits(ctx, brandID, contextID, arguments)
 		return r, false, err
 	case toolGenerateMusic:
 		orgID, _ := orgIDForBrand(brandID)

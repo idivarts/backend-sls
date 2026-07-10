@@ -317,8 +317,8 @@ func HandleReturn(c *gin.Context) {
 // ---- helpers ----
 
 func renderURLFor(content *trendlymodels.Content) string {
-	if content.SceneRef != nil && content.SceneRef.RenderURL != "" {
-		return content.SceneRef.RenderURL
+	if content.DesignRef != nil && content.DesignRef.RenderURL != "" {
+		return content.DesignRef.RenderURL
 	}
 	for _, a := range content.Attachments {
 		if a.ImageURL != "" {

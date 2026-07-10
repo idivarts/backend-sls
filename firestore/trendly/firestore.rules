@@ -268,17 +268,16 @@ service cloud.firestore {
           allow create, update, delete: if isAuthenticated() && canManageContent(brandId);
         }
 
-        // ── AI Studio scene revisions (immutable) ──────────────────────────
-        // brands/{brandId}/contents/{contentId}/scenes/{revisionId}. The scene
-        // graph + rendered output are written ONLY by the backend (Admin SDK)
-        // as the AI generates/edits and the render worker fills renderUrl, so
-        // clients can never forge geometry. Readable by any brand member, and by
-        // a public viewer when the content is shared (so the share view renders
-        // the scene).
-        match /scenes/{revisionId} {
-          allow read:  if (isAuthenticated() && isBrandMember(brandId))
-                          || contentShared(brandId, contentId);
-          allow write: if false;
+        // ── AI Studio HTML design revisions (immutable) ────────────────────
+        // brands/{brandId}/contents/{contentId}/designs/{revisionId}. Each holds
+        // a self-contained HTML document. CLIENT-WRITABLE (HTML is not sensitive)
+        // so deterministic text edits + the frontend-captured render (renderUrl)
+        // are written directly by the app; the AI also writes via the Admin SDK.
+        // Readable by any brand member, and by a public viewer when shared.
+        match /designs/{revisionId} {
+          allow read:           if (isAuthenticated() && isBrandMember(brandId))
+                                   || contentShared(brandId, contentId);
+          allow create, update: if isAuthenticated() && canManageContent(brandId);
         }
       }
 
