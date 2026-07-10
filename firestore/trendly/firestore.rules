@@ -64,6 +64,21 @@ service cloud.firestore {
       }
     }
 
+    // ── Canva Connect OAuth tokens ────────────────────────────────────────
+    // canvaConnections/{managerId}. Holds a brand-member's Canva access/refresh
+    // tokens. FULLY backend-only — tokens must never reach the client, so both
+    // read and write are denied; the app learns connection state via a backend
+    // status endpoint, not by reading this doc.
+    match /canvaConnections/{managerId} {
+      allow read, write: if false;
+    }
+
+    // Transient OAuth-state records correlating a Canva auth attempt to its
+    // public callback. Backend-only.
+    match /canvaOauthStates/{state} {
+      allow read, write: if false;
+    }
+
     // ── AI model config ───────────────────────────────────────────────────
     // Public catalog of available AI models + per-task allowed-model lists
     // (docs: ai_config/models, ai_config/tasks). Readable by ANY authenticated
@@ -252,6 +267,27 @@ service cloud.firestore {
                                            || contentShared(brandId, contentId);
           allow create, update, delete: if isAuthenticated() && canManageContent(brandId);
         }
+
+        // ── AI Studio scene revisions (immutable) ──────────────────────────
+        // brands/{brandId}/contents/{contentId}/scenes/{revisionId}. The scene
+        // graph + rendered output are written ONLY by the backend (Admin SDK)
+        // as the AI generates/edits and the render worker fills renderUrl, so
+        // clients can never forge geometry. Readable by any brand member, and by
+        // a public viewer when the content is shared (so the share view renders
+        // the scene).
+        match /scenes/{revisionId} {
+          allow read:  if (isAuthenticated() && isBrandMember(brandId))
+                          || contentShared(brandId, contentId);
+          allow write: if false;
+        }
+      }
+
+      // ── Generated audio (ElevenLabs music / voiceovers) ──────────────────
+      // brands/{brandId}/generatedAudio/{audioId}. Written ONLY by the backend
+      // (Admin SDK) after a metered generation; brand members read to preview.
+      match /generatedAudio/{audioId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
       }
 
       // ── Calendar month public share toggle ───────────────────────────────
