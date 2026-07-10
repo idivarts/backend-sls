@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	readtools "github.com/idivarts/backend-sls/internal/trendlyapis/ai/tools"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -329,6 +330,13 @@ func toolsForModule(module string) []openrouter.Tool {
 	if moduleHasStudio(module) {
 		tools = append(tools, designServerTools()...)
 		tools = append(tools, audioServerTools()...)
+	}
+	// On-demand read-only fetch tools (content, analytics, inbox, strategy,
+	// account, assets, billing) let the AI ground its output in the brand's real
+	// data. Available on the planner surfaces — not during onboarding (no data
+	// yet) nor on the lean media image-gen surface.
+	if module != moduleOnboarding && module != moduleMedia {
+		tools = append(tools, readtools.AllTools()...)
 	}
 	return tools
 }
