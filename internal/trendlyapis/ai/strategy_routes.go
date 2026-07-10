@@ -33,11 +33,12 @@ type pushToCalendarReq struct {
 }
 
 type generatedItem struct {
-	Title         string   `json:"title"`
-	Platforms     []string `json:"platforms"`
-	ContentFormat string   `json:"contentFormat"`
-	Description   string   `json:"description"`
-	DayOffset     int      `json:"dayOffset"`
+	Title          string   `json:"title"`
+	Platforms      []string `json:"platforms"`
+	ContentFormat  string   `json:"contentFormat"`
+	Description    string   `json:"description"`
+	ContentPillars []string `json:"contentPillars"`
+	DayOffset      int      `json:"dayOffset"`
 }
 
 // compatiblePlatforms keeps only the candidate platforms that support the given
@@ -154,7 +155,7 @@ func runPushToCalendar(
 		format := trendlymodels.NormalizeContentFormat(it.ContentFormat)
 		platforms := resolveItemPlatforms(format, trendlymodels.NormalizePlatforms(it.Platforms), stratPlatforms)
 		title := strings.TrimSpace(it.Title)
-		id, e := trendlymodels.CreateContent(ctx, brandID, map[string]any{
+		fields := map[string]any{
 			"title":            title,
 			"managerId":        managerID,
 			"strategyId":       strategyID,
@@ -166,7 +167,11 @@ func runPushToCalendar(
 			"isArchived":       false,
 			"createdAt":        now,
 			"updatedAt":        now,
-		})
+		}
+		if len(it.ContentPillars) > 0 {
+			fields["contentPillars"] = it.ContentPillars
+		}
+		id, e := trendlymodels.CreateContent(ctx, brandID, fields)
 		if e == nil {
 			createdItemIds = append(createdItemIds, id)
 			progress("item", "Scheduled: "+title, map[string]any{
@@ -249,9 +254,17 @@ func generateCalendarItems(ctx context.Context, brandID, html string, duration i
 		"and EVERY platform you list MUST support the chosen contentFormat per these rules: " +
 		"post → not youtube; story → instagram & facebook only; carousel → instagram, facebook, linkedin; " +
 		"live → not twitter; text → facebook, linkedin, twitter only (NOT instagram); reel & video → any platform. " +
-		"description is a short idea-level brief for the post. " +
+		"description is the idea/overview for the post — a downstream AI content engine relies ENTIRELY on this " +
+		"text to write the actual caption/script/copy, so it must be clear and descriptive: the concept, the angle, " +
+		"and any specifics that make this post distinct. Do NOT write the full caption or script here, but do NOT " +
+		"artificially shorten or truncate it either — there is no length cap, use as many sentences as the idea needs. " +
+		"contentPillars is an array of short tags (2-4 words each) naming the content pillar(s) this post belongs to, " +
+		"inferred from the strategy document's themes/objective — always populate this. Most posts belong to exactly " +
+		"ONE pillar, so return a single-item array in the common case; only return 2-3 pillars when the post genuinely " +
+		"blends multiple themes at once (e.g. a testimonial that's also a product-education piece) — don't pad the " +
+		"array just to list more tags. " +
 		"Respond with ONLY a JSON object of the form " +
-		`{"items":[{"title":string,"platforms":string[],"contentFormat":string,"description":string,"dayOffset":number}]} ` +
+		`{"items":[{"title":string,"platforms":string[],"contentFormat":string,"description":string,"contentPillars":string[],"dayOffset":number}]} ` +
 		"and nothing else."
 	user := fmt.Sprintf("Campaign length: %d days.\n\nStrategy document (HTML):\n%s", duration, html)
 
