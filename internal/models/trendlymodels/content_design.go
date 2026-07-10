@@ -27,9 +27,11 @@ import (
 type ContentDesignRef struct {
 	RevisionID string `json:"revisionId" firestore:"revisionId"`
 	DocType    string `json:"docType" firestore:"docType"` // image|video
-	Width      int    `json:"width" firestore:"width"`
-	Height     int    `json:"height" firestore:"height"`
-	// RenderURL is the frontend-captured PNG (image) used for publish/Canva.
+	Width      int    `json:"width" firestore:"width"`     // per-slide width
+	Height     int    `json:"height" firestore:"height"`   // per-slide height
+	// SlideCount is the number of carousel slides (1 for a single post).
+	SlideCount int `json:"slideCount" firestore:"slideCount"`
+	// RenderURL is the first frontend-captured PNG (cover) used for publish/Canva.
 	RenderURL string `json:"renderUrl,omitempty" firestore:"renderUrl,omitempty"`
 	UpdatedAt int64  `json:"updatedAt" firestore:"updatedAt"`
 }
@@ -37,10 +39,11 @@ type ContentDesignRef struct {
 // ContentDesignRevision is one immutable HTML snapshot.
 type ContentDesignRevision struct {
 	ID     string `json:"id" firestore:"-"`
-	HTML   string `json:"html" firestore:"html"`
-	Width  int    `json:"width" firestore:"width"`
-	Height int    `json:"height" firestore:"height"`
-	DocType string `json:"docType" firestore:"docType"` // image|video
+	HTML       string `json:"html" firestore:"html"`
+	Width      int    `json:"width" firestore:"width"`   // per-slide width
+	Height     int    `json:"height" firestore:"height"` // per-slide height
+	SlideCount int    `json:"slideCount" firestore:"slideCount"`
+	DocType    string `json:"docType" firestore:"docType"` // image|video
 	// Origin: "generate" | "edit" | "text" | "revert".
 	Origin           string `json:"origin,omitempty" firestore:"origin,omitempty"`
 	ParentRevisionID string `json:"parentRevisionId,omitempty" firestore:"parentRevisionId,omitempty"`

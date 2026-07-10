@@ -33,17 +33,32 @@ func designServerTools() []openrouter.Tool {
 			toolGenerateDesign,
 			"Design an on-brand social post as a SINGLE self-contained HTML document "+
 				"(inline CSS only, no external files or scripts). This is the preferred way "+
-				"to create a polished image/carousel/story post. Requirements: a root element "+
-				"sized EXACTLY width×height px; use flexbox for layout; keep all text WELL "+
-				"INSIDE the frame (never let it overflow — size fonts to fit); give each "+
-				"editable text element a data-el=\"<id>\" attribute; use the brand colors/font "+
-				"provided in context. Return the full HTML string in `html`.",
+				"to create a polished image/carousel/story post.\n"+
+				"STRUCTURE (required): wrap everything in <div data-carousel style=\"display:flex\">. "+
+				"Inside it put EXACTLY `slides` sibling slides, each "+
+				"<section data-slide=\"N\" style=\"flex:0 0 {width}px;width:{width}px;height:{height}px;position:relative;overflow:hidden\"> "+
+				"(N = 0,1,2…). A single post is just slides=1. Each slide is a self-contained "+
+				"width×height frame.\n"+
+				"RULES: keep all text WELL INSIDE each slide (size fonts to fit, never overflow); "+
+				"give every editable text element a data-el=\"<unique-id>\" attribute; use the brand "+
+				"colors/font from context. For a carousel, tell a story across slides (hook → points "+
+				"→ CTA).\n"+
+				"RENDER-SAFE CSS (the design is rasterized to PNG with html2canvas — unsupported CSS "+
+				"renders garbled): use ONLY solid text colors — NEVER gradient text / "+
+				"background-clip:text / -webkit-text-fill-color:transparent (use a solid brand color "+
+				"for accent words instead). NO backdrop-filter, NO mix-blend-mode, NO CSS filter on "+
+				"text, NO position:sticky, NO external @import web fonts (use a system font stack like "+
+				"font-family:'Helvetica Neue',Arial,sans-serif, or a bold weight). Gradients/solid "+
+				"colors as element BACKGROUNDS are fine; box-shadow is fine. Set each slide's "+
+				"background explicitly (don't rely on transparency).\n"+
+				"Return the full HTML in `html`.",
 			openrouter.ObjectSchema(map[string]any{
-				"html":    openrouter.StringProp("The complete self-contained HTML document for the design."),
+				"html":    openrouter.StringProp("The complete self-contained HTML document (a data-carousel with `slides` data-slide sections)."),
 				"docType": openrouter.EnumProp("image or video.", []string{"image", "video"}),
 				"format":  openrouter.EnumProp("Content format.", []string{"post", "reel", "story", "video", "carousel"}),
-				"width":   openrouter.NumberProp("Design width in px (e.g. 1080)."),
-				"height":  openrouter.NumberProp("Design height in px (e.g. 1350)."),
+				"width":   openrouter.NumberProp("Per-slide width in px (e.g. 1080)."),
+				"height":  openrouter.NumberProp("Per-slide height in px (e.g. 1350)."),
+				"slides":  openrouter.NumberProp("Number of slides (1 for a single post; 2-10 for a carousel)."),
 			}, []string{"html"}),
 		),
 		openrouter.NewFunctionTool(
@@ -65,6 +80,16 @@ type generateDesignArgs struct {
 	Format  string `json:"format"`
 	Width   int    `json:"width"`
 	Height  int    `json:"height"`
+	Slides  int    `json:"slides"`
+}
+
+// countSlides returns the number of data-slide sections in the HTML (min 1).
+func countSlides(html string) int {
+	n := strings.Count(html, "data-slide")
+	if n < 1 {
+		return 1
+	}
+	return n
 }
 
 func runGenerateDesign(ctx context.Context, brandID, contentID, arguments string) (string, error) {
@@ -87,7 +112,11 @@ func runGenerateDesign(ctx context.Context, brandID, contentID, arguments string
 	if docType == "" {
 		docType = "image"
 	}
-	revID, err := persistDesign(brandID, contentID, wrapHTML(html), w, h, docType, "generate", "")
+	slides := a.Slides
+	if slides < 1 {
+		slides = countSlides(html)
+	}
+	revID, err := persistDesign(brandID, contentID, wrapHTML(html), w, h, slides, docType, "generate", "")
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), err
 	}
@@ -122,7 +151,12 @@ func runApplyDesignEdits(ctx context.Context, brandID, contentID, arguments stri
 	if html == "" {
 		return jsonResult(map[string]any{"ok": false, "error": "html is required"}), nil
 	}
-	revID, err := persistDesign(brandID, contentID, wrapHTML(html), cur.Width, cur.Height, cur.DocType, "edit", cur.ID)
+	// Preserve the slide count unless the revised HTML changed it.
+	slides := cur.SlideCount
+	if s := countSlides(html); s != slides && s >= 1 {
+		slides = s
+	}
+	revID, err := persistDesign(brandID, contentID, wrapHTML(html), cur.Width, cur.Height, slides, cur.DocType, "edit", cur.ID)
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), err
 	}
@@ -134,15 +168,18 @@ func runApplyDesignEdits(ctx context.Context, brandID, contentID, arguments stri
 }
 
 // persistDesign writes an immutable HTML revision and points the content at it.
-func persistDesign(brandID, contentID, html string, w, h int, docType, origin, parentRev string) (string, error) {
+func persistDesign(brandID, contentID, html string, w, h, slides int, docType, origin, parentRev string) (string, error) {
+	if slides < 1 {
+		slides = 1
+	}
 	revID, err := trendlymodels.CreateDesignRevision(brandID, contentID, &trendlymodels.ContentDesignRevision{
-		HTML: html, Width: w, Height: h, DocType: docType, Origin: origin, ParentRevisionID: parentRev,
+		HTML: html, Width: w, Height: h, SlideCount: slides, DocType: docType, Origin: origin, ParentRevisionID: parentRev,
 	})
 	if err != nil {
 		return "", err
 	}
 	if err := trendlymodels.SetContentDesignRef(brandID, contentID, &trendlymodels.ContentDesignRef{
-		RevisionID: revID, DocType: docType, Width: w, Height: h,
+		RevisionID: revID, DocType: docType, Width: w, Height: h, SlideCount: slides,
 	}); err != nil {
 		return "", err
 	}
