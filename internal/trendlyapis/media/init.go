@@ -16,8 +16,10 @@ func RegisterRoutes(engine *gin.Engine) {
 		middlewares.TrendlyMiddleware("managers"),
 	)
 
-	// Voice catalogue for the voiceover picker.
+	// Voice catalogue for the voiceover picker (includes preview_url per voice).
 	g.GET("/voices", ListVoices)
+	// Curated music catalog for the soundtrack browser (search + preview + select).
+	g.GET("/music/library", ListMusicLibrary)
 
 	// Per-brand generation + library.
 	g.POST("/brands/:brandId/audio/music", GenerateMusic)
