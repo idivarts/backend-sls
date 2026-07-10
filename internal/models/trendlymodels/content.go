@@ -117,6 +117,10 @@ type Content struct {
 	Platform         string                  `json:"platform,omitempty" firestore:"platform"`
 	ManagerID        string                  `json:"managerId,omitempty" firestore:"managerId"`
 	StrategyID       string                  `json:"strategyId,omitempty" firestore:"strategyId"`
+	// ContentPillars is AI-write-only: populated when content is authored by AI
+	// (push-to-calendar or the calendar chat's create_content tool). No UI may
+	// let a user add or edit this field.
+	ContentPillars   []string                `json:"contentPillars,omitempty" firestore:"contentPillars,omitempty"`
 	PostingTimeStamp int64                   `json:"postingTimeStamp,omitempty" firestore:"postingTimeStamp"`
 	IsArchived       bool                    `json:"isArchived,omitempty" firestore:"isArchived"`
 	Attachments      []ContentAttachment     `json:"attachments,omitempty" firestore:"attachments"`

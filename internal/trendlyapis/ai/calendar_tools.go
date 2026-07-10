@@ -66,11 +66,12 @@ func calendarServerTools() []openrouter.Tool {
 			toolCreateContent,
 			"Add a new content item to the calendar.",
 			openrouter.ObjectSchema(map[string]any{
-				"title":     openrouter.StringProp("Short title for the post."),
-				"idea":      openrouter.StringProp("A one-line idea / brief for the post."),
-				"date":      openrouter.StringProp("The date to place it on, as YYYY-MM-DD."),
-				"type":      openrouter.EnumProp("The content format. 'reel' = portrait short video, 'video' = landscape video, 'text' = plain-text post (no media).", []string{"post", "reel", "video", "story", "carousel", "live", "text"}),
-				"platforms": openrouter.ArrayProp("Target platforms — each must support the chosen type. Defaults to Instagram when omitted.", openrouter.EnumProp("A social platform.", []string{"instagram", "facebook", "youtube", "linkedin", "twitter"})),
+				"title":          openrouter.StringProp("Short title for the post."),
+				"idea":           openrouter.StringProp("The idea / brief for the post — as descriptive as needed for a downstream AI to write the caption/script from it later. Not the full caption itself, but don't artificially shorten it."),
+				"date":           openrouter.StringProp("The date to place it on, as YYYY-MM-DD."),
+				"type":           openrouter.EnumProp("The content format. 'reel' = portrait short video, 'video' = landscape video, 'text' = plain-text post (no media).", []string{"post", "reel", "video", "story", "carousel", "live", "text"}),
+				"platforms":      openrouter.ArrayProp("Target platforms — each must support the chosen type. Defaults to Instagram when omitted.", openrouter.EnumProp("A social platform.", []string{"instagram", "facebook", "youtube", "linkedin", "twitter"})),
+				"contentPillars": openrouter.ArrayProp("Short tags (2-4 words each) naming the content pillar(s) this post belongs to. Always populate this since you are authoring the idea. Most posts belong to exactly ONE pillar — return a single-item array in the common case; only list 2-3 when the post genuinely blends multiple themes at once. Don't pad the array just to list more tags.", openrouter.StringProp("A content pillar tag.")),
 			}, []string{"title", "date"}),
 		),
 		openrouter.NewFunctionTool(
@@ -142,11 +143,12 @@ func contentLocked(status string) bool {
 // ── create ───────────────────────────────────────────────────────────────────
 
 type createContentArgs struct {
-	Title     string   `json:"title"`
-	Idea      string   `json:"idea"`
-	Date      string   `json:"date"`
-	Type      string   `json:"type"`
-	Platforms []string `json:"platforms"`
+	Title          string   `json:"title"`
+	Idea           string   `json:"idea"`
+	Date           string   `json:"date"`
+	Type           string   `json:"type"`
+	Platforms      []string `json:"platforms"`
+	ContentPillars []string `json:"contentPillars"`
 }
 
 // defaultPlatforms resolves a content item's `platforms` for the calendar chat:
@@ -181,7 +183,7 @@ func createContentTool(ctx context.Context, brandID, managerID, arguments string
 	format := trendlymodels.NormalizeContentFormat(a.Type)
 	platforms := defaultPlatforms(format, a.Platforms)
 	now := time.Now().UnixMilli()
-	id, err := trendlymodels.CreateContent(ctx, brandID, map[string]any{
+	fields := map[string]any{
 		"title":            title,
 		"managerId":        managerID,
 		"platforms":        platforms,
@@ -192,7 +194,11 @@ func createContentTool(ctx context.Context, brandID, managerID, arguments string
 		"isArchived":       false,
 		"createdAt":        now,
 		"updatedAt":        now,
-	})
+	}
+	if len(a.ContentPillars) > 0 {
+		fields["contentPillars"] = a.ContentPillars
+	}
+	id, err := trendlymodels.CreateContent(ctx, brandID, fields)
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "failed to create: " + err.Error()}), false, err
 	}
