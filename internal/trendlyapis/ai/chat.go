@@ -317,6 +317,11 @@ func toolsForModule(module string) []openrouter.Tool {
 	if moduleHasImageGen(module) {
 		tools = append(tools, imageGenServerTools()...)
 	}
+	// The AI-Studio scene editor + audio generation live on the content module.
+	if moduleHasStudio(module) {
+		tools = append(tools, sceneServerTools()...)
+		tools = append(tools, audioServerTools()...)
+	}
 	return tools
 }
 
