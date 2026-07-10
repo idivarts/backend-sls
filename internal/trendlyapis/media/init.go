@@ -23,9 +23,7 @@ func RegisterRoutes(engine *gin.Engine) {
 	g.POST("/brands/:brandId/audio/music", GenerateMusic)
 	g.POST("/brands/:brandId/audio/voiceover", GenerateVoiceover)
 	g.GET("/brands/:brandId/audio", ListGeneratedAudio)
-
-	// Deterministic scene ops (text edit / seed / revert — no AI).
-	g.POST("/brands/:brandId/contents/:contentId/scene/generate", GenerateSceneHTTP)
-	g.POST("/brands/:brandId/contents/:contentId/scene/ops", ApplySceneOpsHTTP)
-	g.POST("/brands/:brandId/contents/:contentId/scene/revert", RevertSceneHTTP)
+	// Deterministic design edits (text edit + revert) happen frontend-side now:
+	// the designs subcollection is client-writable, so the app writes new HTML
+	// revisions + captured renders directly (no backend round-trip).
 }

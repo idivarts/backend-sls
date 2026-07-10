@@ -132,10 +132,11 @@ type Content struct {
 	// Source records how the current media was produced: "ai" (scene graph),
 	// "upload", "canva", or "" (legacy). Drives the MediaStage rendering path.
 	Source string `json:"source,omitempty" firestore:"source,omitempty"`
-	// SceneRef points at the CURRENT scene revision plus its rendered output and
-	// hit-box layout. The full scene graph lives in the scenes subcollection
-	// (content_scene.go) so the parent doc stays small and edits are revertable.
-	SceneRef *ContentSceneRef `json:"sceneRef,omitempty" firestore:"sceneRef,omitempty"`
+	// DesignRef points at the CURRENT HTML design revision + its captured render.
+	// The HTML approach supersedes the scene-graph JSON (SceneRef, retained only
+	// so legacy docs still unmarshal — no longer written).
+	DesignRef *ContentDesignRef `json:"designRef,omitempty" firestore:"designRef,omitempty"`
+	SceneRef  *ContentSceneRef  `json:"sceneRef,omitempty" firestore:"sceneRef,omitempty"`
 	// Audio holds the generated music/voiceover attached to a video content.
 	Audio *ContentAudio `json:"audio,omitempty" firestore:"audio,omitempty"`
 	// Canva deep-edit bridge references (Module 3).
