@@ -259,6 +259,34 @@ func loadContentBrief(brandID, contentID string) string {
 	return contentBriefText(ct)
 }
 
+// currentDesignBrief returns the content's CURRENT AI-design HTML so the chat
+// model always knows exactly what design is on screen and can revise it (via
+// apply_design_edits) in the ongoing conversation. Bounded so the prompt stays
+// small. Returns "" when the content has no design.
+func currentDesignBrief(brandID, contentID string) string {
+	ct, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil || ct.DesignRef == nil || ct.DesignRef.RevisionID == "" {
+		return ""
+	}
+	rev, err := trendlymodels.GetDesignRevision(brandID, contentID, ct.DesignRef.RevisionID)
+	if err != nil || rev == nil || strings.TrimSpace(rev.HTML) == "" {
+		return ""
+	}
+	html := rev.HTML
+	const maxHTML = 14000
+	if len(html) > maxHTML {
+		html = html[:maxHTML] + "\n<!-- …truncated… -->"
+	}
+	return fmt.Sprintf(
+		"CURRENT DESIGN: this content already has an AI-generated HTML design (%d slide(s)). "+
+			"When the user asks to change the visual/design (\"make the headline bigger\", "+
+			"\"use my logo\", \"change slide 2\"…), call apply_design_edits and return the FULL "+
+			"revised HTML — preserve the data-carousel/data-slide structure and every data-el id. "+
+			"Here is the current HTML:\n```html\n%s\n```",
+		ct.DesignRef.SlideCount, html,
+	)
+}
+
 // contentBriefText renders a content doc into the compact brief the AI prompts
 // use. Shared by the persisted-doc path (loadContentBrief) and the live-edits
 // path (briefFromFields) so both produce an identical shape.

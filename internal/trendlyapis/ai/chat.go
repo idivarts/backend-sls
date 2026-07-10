@@ -54,6 +54,14 @@ func handleMessageWS(req WSRequest) {
 			}
 		}
 	}
+	// Always give the content chat the CURRENT design HTML (both the live-edit and
+	// persisted-doc prompt paths) so the AI knows what's on screen and can revise
+	// it when the user comments / asks for a change.
+	if conv.Module == moduleContent && conv.ContextID != "" {
+		if design := currentDesignBrief(conv.BrandID, conv.ContextID); design != "" {
+			systemPrompt = systemPrompt + "\n\n" + design
+		}
+	}
 
 	msgs := make([]openrouter.Message, 0, len(history)+2)
 	msgs = append(msgs, openrouter.Message{Role: "system", Content: systemPrompt})
