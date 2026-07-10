@@ -43,11 +43,14 @@ func designServerTools() []openrouter.Tool {
 				"give every editable text element a data-el=\"<unique-id>\" attribute; use the brand "+
 				"colors/font from context. For a carousel, tell a story across slides (hook → points "+
 				"→ CTA).\n"+
-				"VIDEO (docType=video): produce a SINGLE full-frame stage (slides=1, one data-slide=\"0\") "+
-				"that ANIMATES using CSS @keyframes over `durationMs` (default ~6000ms): elements fade/"+
-				"slide/pop in over time to tell the story as one motion piece. Use animation-fill-mode:"+
-				"both and stagger animation-delay so the flow reads start→finish. Do NOT make video a "+
-				"multi-slide carousel.\n"+
+				"VIDEO (docType=video): build it as a SEQUENCE OF SCENES, exactly like a carousel — "+
+				"one [data-carousel] wrapping N [data-slide] SCENES, each a COMPLETE standalone "+
+				"full-frame layout (do NOT stack all scenes' content into one frame — that overlaps). "+
+				"Give EACH scene a data-duration=\"<ms>\" (how long it stays on screen, e.g. 3000-5000). "+
+				"Inside each scene, use CSS @keyframes so its OWN elements animate in when the scene "+
+				"appears (animation-fill-mode:both; short delays). Scenes play in sequence; only one is "+
+				"visible at a time. Set `slides` = number of scenes and `durationMs` = the TOTAL "+
+				"(sum of scene durations).\n"+
 				"RENDER-SAFE CSS (the design is rasterized to PNG with html2canvas — unsupported CSS "+
 				"renders garbled): use ONLY solid text colors — NEVER gradient text / "+
 				"background-clip:text / -webkit-text-fill-color:transparent (use a solid brand color "+

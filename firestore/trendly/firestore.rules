@@ -79,6 +79,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ── Music library (shared soundtrack catalog) ─────────────────────────
+    // musicLibrary/{trackId}. Curated, commercially-licensed tracks generated
+    // via the seed script (Admin SDK). Readable by any authenticated user for
+    // the soundtrack browser; clients never write.
+    match /musicLibrary/{trackId} {
+      allow read:  if isAuthenticated();
+      allow write: if false;
+    }
+
     // ── AI model config ───────────────────────────────────────────────────
     // Public catalog of available AI models + per-task allowed-model lists
     // (docs: ai_config/models, ai_config/tasks). Readable by ANY authenticated
