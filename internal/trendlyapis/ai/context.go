@@ -51,6 +51,10 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		sb.WriteString(" brand")
 	}
 	sb.WriteString(".\n")
+	// Anchor EVERY conversation to the current date so the AI can reason about
+	// "today", "this week/month", and the fetch tools' date-relative defaults
+	// consistently. UTC matches how calendar/content timestamps are stored.
+	sb.WriteString("Current date: " + time.Now().UTC().Format("Monday, 2 January 2006") + " (UTC).\n")
 	if brand != nil && brand.AIVoice != nil && *brand.AIVoice != "" {
 		sb.WriteString("Brand voice: ")
 		sb.WriteString(*brand.AIVoice)
