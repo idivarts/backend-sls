@@ -1,30 +1,31 @@
 package scenegraph
 
-// Box is a pixel-space rectangle.
+// Box is a pixel-space rectangle. firestore tags mirror the json ones so the
+// boxes cached on a content's sceneRef persist with lowercase keys the app reads.
 type Box struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-	W float64 `json:"w"`
-	H float64 `json:"h"`
+	X float64 `json:"x" firestore:"x"`
+	Y float64 `json:"y" firestore:"y"`
+	W float64 `json:"w" firestore:"w"`
+	H float64 `json:"h" firestore:"h"`
 }
 
 // NormBox is a rectangle in normalized [0,1] frame coordinates. This is the
 // hit-box the frontend overlays on the rendered PNG so users can tap an element
 // to edit its text or pin a comment — no client-side scene engine required.
 type NormBox struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-	W float64 `json:"w"`
-	H float64 `json:"h"`
+	X float64 `json:"x" firestore:"x"`
+	Y float64 `json:"y" firestore:"y"`
+	W float64 `json:"w" firestore:"w"`
+	H float64 `json:"h" firestore:"h"`
 }
 
 // LayoutBox is a placed element.
 type LayoutBox struct {
-	ID   string      `json:"id"`
-	Type ElementType `json:"type"`
-	Zone Zone        `json:"zone"`
-	Px   Box         `json:"px"`
-	Norm NormBox     `json:"norm"`
+	ID   string      `json:"id" firestore:"id"`
+	Type ElementType `json:"type" firestore:"type"`
+	Zone Zone        `json:"zone" firestore:"zone"`
+	Px   Box         `json:"px" firestore:"px"`
+	Norm NormBox     `json:"norm" firestore:"norm"`
 }
 
 // Layout is the computed placement of every element in a document, in source
