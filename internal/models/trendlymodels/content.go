@@ -127,6 +127,21 @@ type Content struct {
 	// module="media") for this content's image generate/enhance iterations.
 	// Stamped on first generation, loaded directly on enhance (no index needed).
 	MediaConversationID  string                 `json:"mediaConversationId,omitempty" firestore:"mediaConversationId,omitempty"`
+
+	// ── AI Studio (scene-graph editor) ──
+	// Source records how the current media was produced: "ai" (scene graph),
+	// "upload", "canva", or "" (legacy). Drives the MediaStage rendering path.
+	Source string `json:"source,omitempty" firestore:"source,omitempty"`
+	// SceneRef points at the CURRENT scene revision plus its rendered output and
+	// hit-box layout. The full scene graph lives in the scenes subcollection
+	// (content_scene.go) so the parent doc stays small and edits are revertable.
+	SceneRef *ContentSceneRef `json:"sceneRef,omitempty" firestore:"sceneRef,omitempty"`
+	// Audio holds the generated music/voiceover attached to a video content.
+	Audio *ContentAudio `json:"audio,omitempty" firestore:"audio,omitempty"`
+	// Canva deep-edit bridge references (Module 3).
+	CanvaDesignID    string `json:"canvaDesignId,omitempty" firestore:"canvaDesignId,omitempty"`
+	ExportedAssetRef string `json:"exportedAssetRef,omitempty" firestore:"exportedAssetRef,omitempty"`
+
 	ScheduleMode         string                 `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
 	ScheduledAt          int64                  `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
 	ScheduleExecutionArn string                 `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
