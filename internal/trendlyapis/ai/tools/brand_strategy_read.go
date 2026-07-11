@@ -65,6 +65,26 @@ func brandMemory() Registered {
 	}
 }
 
+func designSystem() Registered {
+	return Registered{
+		Tool: openrouter.NewFunctionTool(
+			"get_design_system",
+			"Fetch the brand's full Design System: identity, color palette (with roles + hex), typography, logos, imagery style, voice & tone, content rules/guardrails and per-platform overrides. A compact summary is already in your context — call this only when you need the complete detail (e.g. an exact hex, the full banned-words list, or a specific platform's overrides).",
+			openrouter.ObjectSchema(map[string]any{}, nil),
+		),
+		Handler: func(ctx context.Context, brandID string, args map[string]any) (any, error) {
+			ds, err := trendlymodels.GetDesignSystem(ctx, brandID)
+			if err != nil {
+				return nil, err
+			}
+			if ds == nil {
+				return map[string]any{"hasDesignSystem": false, "note": "This brand has not created a Design System yet."}, nil
+			}
+			return map[string]any{"hasDesignSystem": true, "designSystem": ds}, nil
+		},
+	}
+}
+
 func summarizeStrategy(s trendlymodels.Strategy, includeBody bool) map[string]any {
 	m := map[string]any{
 		"id": s.ID, "name": s.Name, "objective": s.Objective, "status": s.Status,

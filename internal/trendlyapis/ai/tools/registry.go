@@ -56,6 +56,7 @@ var registry = []Registered{
 	// Strategy & brand knowledge
 	brandProfile(),
 	brandMemory(),
+	designSystem(),
 	activeStrategy(),
 	pastStrategies(),
 	strategyContent(),
