@@ -39,7 +39,85 @@ func verifyBrandAccess(brandID, managerID string) bool {
 	return member.Get(brandID, managerID) == nil
 }
 
-func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, focusedText string) string {
+// renderFocus turns the structured focus list into a labeled, one-per-line block
+// for the system prompt. Mirrors the frontend `focusesToPromptString`.
+func renderFocus(focus []trendlymodels.AIFocus) string {
+	if len(focus) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for _, f := range focus {
+		sb.WriteString("- ")
+		sb.WriteString(describeFocusArea(f.FocusArea))
+		sb.WriteString("\n")
+	}
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+// describeFocusArea is the Go mirror of the frontend `describeFocusArea`
+// (types/focus.ts) — a precise human description of a focus target.
+func describeFocusArea(a trendlymodels.AIFocusArea) string {
+	clip := func(s string, n int) string {
+		s = strings.TrimSpace(s)
+		if len(s) > n {
+			return s[:n] + "…"
+		}
+		return s
+	}
+	switch a.Type {
+	case "design-element":
+		where := ""
+		if a.SlideIndex != nil {
+			where = fmt.Sprintf(" on slide %d", *a.SlideIndex+1)
+			if a.SlideCount != nil {
+				where += fmt.Sprintf("/%d", *a.SlideCount)
+			}
+		}
+		reads := ""
+		if strings.TrimSpace(a.Text) != "" {
+			reads = fmt.Sprintf(", which reads: %q", clip(a.Text, 160))
+		}
+		return fmt.Sprintf("a design element (id: %s)%s of content %s%s", a.ElementID, where, a.ContentID, reads)
+	case "strategy-snippet":
+		return fmt.Sprintf("a passage in strategy %s: %q", a.StrategyID, clip(a.Snippet, 160))
+	case "calendar-content":
+		bits := []string{}
+		if a.Title != "" {
+			bits = append(bits, fmt.Sprintf("%q", clip(a.Title, 80)))
+		}
+		if a.ContentType != "" {
+			bits = append(bits, a.ContentType)
+		}
+		if a.Date != "" {
+			bits = append(bits, a.Date)
+		}
+		extra := ""
+		if len(bits) > 0 {
+			extra = " (" + strings.Join(bits, ", ") + ")"
+		}
+		return fmt.Sprintf("the scheduled post %s%s", a.ContentID, extra)
+	case "content":
+		title := ""
+		if a.Title != "" {
+			title = fmt.Sprintf(" (%q)", clip(a.Title, 80))
+		}
+		return fmt.Sprintf("content %s%s", a.ContentID, title)
+	case "comment":
+		t := ""
+		if strings.TrimSpace(a.Text) != "" {
+			t = fmt.Sprintf(": %q", clip(a.Text, 160))
+		}
+		inh := ""
+		if a.Inherits != nil {
+			inh = ", which refers to " + describeFocusArea(*a.Inherits)
+		}
+		return fmt.Sprintf("comment %s%s%s", a.CommentID, t, inh)
+	default:
+		return "the referenced item"
+	}
+}
+
+func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, focusedText string, focus []trendlymodels.AIFocus) string {
 	var sb strings.Builder
 	sb.WriteString("You are an AI assistant for ")
 	if brand != nil {
@@ -87,8 +165,17 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		sb.WriteString("\n")
 	}
 
-	if focusedText != "" {
-		sb.WriteString("The user is focused on this text: \"")
+	// Focus — the exact target(s) the user pointed the AI at (a design element on
+	// a specific slide, a strategy passage, a scheduled post, a comment, …).
+	// Prefer the structured list (precise: carries ids/slide/content) and fall
+	// back to the legacy plain string. Framed as authoritative so the model treats
+	// it as the primary subject of the request.
+	if focusBlock := renderFocus(focus); focusBlock != "" {
+		sb.WriteString("The user has pinpointed specific target(s) for this request — treat them as the PRIMARY subject and apply changes to exactly these, not the whole document:\n")
+		sb.WriteString(focusBlock)
+		sb.WriteString("\n")
+	} else if focusedText != "" {
+		sb.WriteString("The user is focused on this: \"")
 		sb.WriteString(focusedText)
 		sb.WriteString("\"\n")
 	}

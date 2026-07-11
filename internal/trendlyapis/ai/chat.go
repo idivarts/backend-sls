@@ -43,7 +43,7 @@ func handleMessageWS(req WSRequest) {
 
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
 
-	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText)
+	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText, req.Focus)
 	// Content module: prefer the live (possibly unsaved) editor state the client
 	// sends with the message over the last-saved Firestore doc, so the AI reasons
 	// about exactly what's on screen right now (same pattern as content generation).
@@ -82,6 +82,7 @@ func handleMessageWS(req WSRequest) {
 		Content:     req.Content,
 		Images:      req.Images,
 		FocusedText: req.FocusedText,
+		Focus:       req.Focus,
 		Timestamp:   time.Now().UnixMilli(),
 	}); err != nil {
 		log.Printf("ai chat: persist user msg: %v", err)
@@ -342,9 +343,10 @@ func toolsForModule(module string) []openrouter.Tool {
 }
 
 type httpMessageReq struct {
-	Content     string `json:"content" binding:"required"`
-	FocusedText string `json:"focusedText"`
-	Model       string `json:"model"`
+	Content     string                  `json:"content" binding:"required"`
+	FocusedText string                  `json:"focusedText"`
+	Focus       []trendlymodels.AIFocus `json:"focus"`
+	Model       string                  `json:"model"`
 }
 
 func HTTPMessage(c *gin.Context) {
@@ -379,7 +381,7 @@ func HTTPMessage(c *gin.Context) {
 	}
 
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
-	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText)
+	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText, req.Focus)
 
 	msgs := []openrouter.Message{{Role: "system", Content: systemPrompt}}
 	msgs = append(msgs, openrouter.ToOpenRouterMessages(history)...)
@@ -413,7 +415,7 @@ func HTTPMessage(c *gin.Context) {
 	}
 
 	_, _ = openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
-		Role: "user", Content: req.Content, FocusedText: req.FocusedText,
+		Role: "user", Content: req.Content, FocusedText: req.FocusedText, Focus: req.Focus,
 		Timestamp: time.Now().UnixMilli(),
 	})
 	_, _ = openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{

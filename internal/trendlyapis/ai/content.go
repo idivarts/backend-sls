@@ -259,7 +259,7 @@ func systemPromptWithLiveContent(brand *trendlymodels.Brand, brandID, contextID,
 	if liveBrief != "" {
 		ctxID = ""
 	}
-	sys := buildSystemPrompt(brand, "content", brandID, ctxID, "")
+	sys := buildSystemPrompt(brand, "content", brandID, ctxID, "", nil)
 	if liveBrief != "" {
 		sys += "\nThe content the user is working on right now (may include unsaved edits — treat this as the current state of the piece):\n" + liveBrief + "\n"
 	}
