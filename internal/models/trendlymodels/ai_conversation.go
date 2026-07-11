@@ -25,7 +25,15 @@ type AIMessage struct {
 	ClientMsgID string `json:"clientMsgId,omitempty" firestore:"clientMsgId,omitempty"`
 	Content     string `json:"content" firestore:"content"`
 	Model       string `json:"model,omitempty" firestore:"model,omitempty"`
+	// FocusedText is the legacy plain-string focus (kept for back-compat). New
+	// clients send the structured Focus list below; the string is still derived
+	// and sent as a prompt fallback so an un-migrated backend/reader still works.
 	FocusedText string `json:"focusedText,omitempty" firestore:"focusedText,omitempty"`
+	// Focus is the structured "what the user pointed the AI at" for this message
+	// (design element / strategy passage / calendar post / comment, with optional
+	// inheritance). Persisted so the reference survives reload and can be rendered
+	// back into the UI. Mirror of the frontend `Focus` type (types/focus.ts).
+	Focus []AIFocus `json:"focus,omitempty" firestore:"focus,omitempty"`
 	// ImageURL is the legacy single-image field (kept for back-compat). New code
 	// uses Images (multi). On a user message Images are vision input the user
 	// attached; on an assistant message they are generated/referenced image URLs.
@@ -60,4 +68,44 @@ type AIControl struct {
 type AIControlOption struct {
 	Label string `json:"label" firestore:"label"`
 	Value string `json:"value" firestore:"value"`
+}
+
+// AIFocus mirrors the frontend `Focus` (types/focus.ts): a structured target the
+// user pointed the AI at, plus its human display label.
+type AIFocus struct {
+	ID        string      `json:"id,omitempty" firestore:"id,omitempty"`
+	FocusText string      `json:"focusText,omitempty" firestore:"focusText,omitempty"`
+	FocusArea AIFocusArea `json:"focusArea" firestore:"focusArea"`
+}
+
+// AIFocusArea mirrors the frontend `FocusArea` discriminated union. Fields are
+// flattened with a `Type` discriminator; only the fields relevant to a given
+// Type are populated. `Inherits` supports a comment focus that itself points at
+// another area (a design element, a strategy passage, …).
+type AIFocusArea struct {
+	Type string `json:"type" firestore:"type"`
+
+	// content / design / calendar
+	ContentID   string `json:"contentId,omitempty" firestore:"contentId,omitempty"`
+	Title       string `json:"title,omitempty" firestore:"title,omitempty"`
+	ContentType string `json:"contentType,omitempty" firestore:"contentType,omitempty"`
+	Date        string `json:"date,omitempty" firestore:"date,omitempty"`
+
+	// design-element
+	RevisionID string `json:"revisionId,omitempty" firestore:"revisionId,omitempty"`
+	ElementID  string `json:"elementId,omitempty" firestore:"elementId,omitempty"`
+	SlideIndex *int   `json:"slideIndex,omitempty" firestore:"slideIndex,omitempty"`
+	SlideCount *int   `json:"slideCount,omitempty" firestore:"slideCount,omitempty"`
+	DocType    string `json:"docType,omitempty" firestore:"docType,omitempty"`
+	Text       string `json:"text,omitempty" firestore:"text,omitempty"`
+
+	// strategy-snippet
+	StrategyID  string `json:"strategyId,omitempty" firestore:"strategyId,omitempty"`
+	Snippet     string `json:"snippet,omitempty" firestore:"snippet,omitempty"`
+	AnchorStart *int   `json:"anchorStart,omitempty" firestore:"anchorStart,omitempty"`
+	AnchorEnd   *int   `json:"anchorEnd,omitempty" firestore:"anchorEnd,omitempty"`
+
+	// comment
+	CommentID string       `json:"commentId,omitempty" firestore:"commentId,omitempty"`
+	Inherits  *AIFocusArea `json:"inherits,omitempty" firestore:"inherits,omitempty"`
 }

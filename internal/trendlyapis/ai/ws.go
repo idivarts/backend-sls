@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	wshandler "github.com/idivarts/backend-sls/pkg/ws_handler"
 )
 
@@ -19,6 +20,7 @@ type WSRequest struct {
 	Content        string
 	Images         []string
 	FocusedText    string
+	Focus          []trendlymodels.AIFocus
 	Model          string
 	Module         string
 	ContextID      string
