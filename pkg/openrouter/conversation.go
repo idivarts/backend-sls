@@ -159,14 +159,23 @@ func UpdateConversationModel(ctx context.Context, conversationID, model string) 
 func ToOpenRouterMessages(history []trendlymodels.AIMessage) []Message {
 	out := make([]Message, 0, len(history))
 	for _, m := range history {
+		content := m.Content
+		// Carry a user turn's focus into its content so the referenced target
+		// (element/slide/content/comment) persists across turns — otherwise a
+		// later "move this" loses the reference and the model asks "which one?".
+		if m.Role == "user" {
+			if note := m.FocusNote(); note != "" {
+				content = note + "\n" + content
+			}
+		}
 		// Replay a user turn's attached images as multimodal vision input so the
 		// model keeps visual context across the thread. Assistant/tool turns stay
 		// text-only (their generated images are surfaced as URLs in the prose).
 		if m.Role == "user" && len(m.Images) > 0 {
-			out = append(out, UserMessageWithImages(m.Content, m.Images))
+			out = append(out, UserMessageWithImages(content, m.Images))
 			continue
 		}
-		out = append(out, Message{Role: m.Role, Content: m.Content})
+		out = append(out, Message{Role: m.Role, Content: content})
 	}
 	return out
 }

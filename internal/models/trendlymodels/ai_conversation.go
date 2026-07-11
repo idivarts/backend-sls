@@ -1,5 +1,10 @@
 package trendlymodels
 
+import (
+	"fmt"
+	"strings"
+)
+
 type AIConversation struct {
 	ID           string `json:"id,omitempty" firestore:"-"`
 	BrandID      string `json:"brandId" firestore:"brandId"`
@@ -108,4 +113,95 @@ type AIFocusArea struct {
 	// comment
 	CommentID string       `json:"commentId,omitempty" firestore:"commentId,omitempty"`
 	Inherits  *AIFocusArea `json:"inherits,omitempty" firestore:"inherits,omitempty"`
+}
+
+func clipFocusStr(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
+}
+
+// Describe returns a precise human description of a focus target. Mirror of the
+// frontend describeFocusArea (types/focus.ts).
+func (a AIFocusArea) Describe() string {
+	switch a.Type {
+	case "design-element":
+		where := ""
+		if a.SlideIndex != nil {
+			where = fmt.Sprintf(" on slide %d", *a.SlideIndex+1)
+			if a.SlideCount != nil {
+				where += fmt.Sprintf("/%d", *a.SlideCount)
+			}
+		}
+		reads := ""
+		if strings.TrimSpace(a.Text) != "" {
+			reads = fmt.Sprintf(", which reads: %q", clipFocusStr(a.Text, 160))
+		}
+		return fmt.Sprintf("a design element (id: %s)%s of content %s%s", a.ElementID, where, a.ContentID, reads)
+	case "strategy-snippet":
+		return fmt.Sprintf("a passage in strategy %s: %q", a.StrategyID, clipFocusStr(a.Snippet, 160))
+	case "calendar-content":
+		bits := []string{}
+		if a.Title != "" {
+			bits = append(bits, fmt.Sprintf("%q", clipFocusStr(a.Title, 80)))
+		}
+		if a.ContentType != "" {
+			bits = append(bits, a.ContentType)
+		}
+		if a.Date != "" {
+			bits = append(bits, a.Date)
+		}
+		extra := ""
+		if len(bits) > 0 {
+			extra = " (" + strings.Join(bits, ", ") + ")"
+		}
+		return fmt.Sprintf("the scheduled post %s%s", a.ContentID, extra)
+	case "content":
+		title := ""
+		if a.Title != "" {
+			title = fmt.Sprintf(" (%q)", clipFocusStr(a.Title, 80))
+		}
+		return fmt.Sprintf("content %s%s", a.ContentID, title)
+	case "comment":
+		t := ""
+		if strings.TrimSpace(a.Text) != "" {
+			t = fmt.Sprintf(": %q", clipFocusStr(a.Text, 160))
+		}
+		inh := ""
+		if a.Inherits != nil {
+			inh = ", which refers to " + a.Inherits.Describe()
+		}
+		return fmt.Sprintf("comment %s%s%s", a.CommentID, t, inh)
+	default:
+		return "the referenced item"
+	}
+}
+
+// RenderFocusList joins a focus list into one description string.
+func RenderFocusList(focus []AIFocus) string {
+	if len(focus) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(focus))
+	for _, f := range focus {
+		parts = append(parts, f.FocusArea.Describe())
+	}
+	return strings.Join(parts, "; ")
+}
+
+// FocusNote is the compact inline prefix carrying a (user) message's focus into
+// the conversation history the model reads — so a focused reference persists
+// across turns (a later "move this" still knows which element/slide). Empty when
+// the message has no focus. Prefers the structured focus, falls back to the
+// legacy plain string.
+func (m AIMessage) FocusNote() string {
+	if s := RenderFocusList(m.Focus); s != "" {
+		return "[Focused on: " + s + "]"
+	}
+	if s := strings.TrimSpace(m.FocusedText); s != "" {
+		return "[Focused on: " + s + "]"
+	}
+	return ""
 }
