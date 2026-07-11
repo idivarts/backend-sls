@@ -83,7 +83,7 @@ func HTTPOnboardingStrategyInit(c *gin.Context) {
 	// 3. Compose the pre-written first message from the brand details and ask the
 	//    AI to drive the strategy conversation.
 	kickoff := buildStrategyKickoffMessage(brand)
-	systemPrompt := buildSystemPrompt(brand, moduleStrategy, req.BrandID, strategyID, "", nil)
+	systemPrompt := buildSystemPrompt(brand, moduleStrategy, req.BrandID, strategyID)
 	msgs := []openrouter.Message{
 		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: kickoff},

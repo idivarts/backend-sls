@@ -43,7 +43,7 @@ func handleMessageWS(req WSRequest) {
 
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
 
-	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText, req.Focus)
+	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID)
 	// Content module: prefer the live (possibly unsaved) editor state the client
 	// sends with the message over the last-saved Firestore doc, so the AI reasons
 	// about exactly what's on screen right now (same pattern as content generation).
@@ -67,11 +67,19 @@ func handleMessageWS(req WSRequest) {
 	msgs := make([]openrouter.Message, 0, len(history)+2)
 	msgs = append(msgs, openrouter.Message{Role: "system", Content: systemPrompt})
 	msgs = append(msgs, openrouter.ToOpenRouterMessages(history)...)
+	// Attach the focus to THIS (latest) user turn — not the system prompt. Models
+	// weight the newest message most, so a "[Focused on: …]" prefix on the current
+	// turn is respected, whereas the same info in the system prompt is often
+	// treated as stale and the model re-asks "which one?".
+	userContent := req.Content
+	if note := (trendlymodels.AIMessage{Focus: req.Focus, FocusedText: req.FocusedText}).FocusNote(); note != "" {
+		userContent = note + "\n" + req.Content
+	}
 	// When the user attached images, send the turn as multimodal vision input.
 	if len(req.Images) > 0 {
-		msgs = append(msgs, openrouter.UserMessageWithImages(req.Content, req.Images))
+		msgs = append(msgs, openrouter.UserMessageWithImages(userContent, req.Images))
 	} else {
-		msgs = append(msgs, openrouter.Message{Role: "user", Content: req.Content})
+		msgs = append(msgs, openrouter.Message{Role: "user", Content: userContent})
 	}
 
 	if _, err := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
@@ -381,11 +389,17 @@ func HTTPMessage(c *gin.Context) {
 	}
 
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
-	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText, req.Focus)
+	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID)
 
 	msgs := []openrouter.Message{{Role: "system", Content: systemPrompt}}
 	msgs = append(msgs, openrouter.ToOpenRouterMessages(history)...)
-	msgs = append(msgs, openrouter.Message{Role: "user", Content: req.Content})
+	// Attach focus to the latest user turn (not the system prompt) — see the WS
+	// handler for why.
+	httpUserContent := req.Content
+	if note := (trendlymodels.AIMessage{Focus: req.Focus, FocusedText: req.FocusedText}).FocusNote(); note != "" {
+		httpUserContent = note + "\n" + req.Content
+	}
+	msgs = append(msgs, openrouter.Message{Role: "user", Content: httpUserContent})
 
 	model, locked := pickModel(ctx, conv.BrandID, openrouter.TaskChat, req.Model)
 	if locked {

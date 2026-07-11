@@ -39,7 +39,7 @@ func handleQuickEditWS(req WSRequest) {
 		return
 	}
 
-	systemPrompt := buildSystemPrompt(brand, req.Module, req.BrandID, req.ContextID, "", nil)
+	systemPrompt := buildSystemPrompt(brand, req.Module, req.BrandID, req.ContextID)
 	model, locked := pickModel(context.Background(), req.BrandID, openrouter.TaskQuickEdit, req.Model)
 	if locked {
 		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskQuickEdit)})
@@ -109,7 +109,7 @@ func HTTPQuickEdit(c *gin.Context) {
 		return
 	}
 
-	systemPrompt := buildSystemPrompt(brand, req.Module, req.BrandID, req.ContextID, "", nil)
+	systemPrompt := buildSystemPrompt(brand, req.Module, req.BrandID, req.ContextID)
 	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskQuickEdit, req.Model)
 	if locked {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskQuickEdit})

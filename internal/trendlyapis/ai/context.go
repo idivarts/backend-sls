@@ -39,7 +39,7 @@ func verifyBrandAccess(brandID, managerID string) bool {
 	return member.Get(brandID, managerID) == nil
 }
 
-func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, focusedText string, focus []trendlymodels.AIFocus) string {
+func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID string) string {
 	var sb strings.Builder
 	sb.WriteString("You are an AI assistant for ")
 	if brand != nil {
@@ -87,24 +87,12 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		sb.WriteString("\n")
 	}
 
-	// Focus — the exact target(s) the user pointed the AI at (a design element on
-	// a specific slide, a strategy passage, a scheduled post, a comment, …).
-	// Prefer the structured list (precise: carries ids/slide/content) and fall
-	// back to the legacy plain string. Framed as authoritative so the model treats
-	// it as the primary subject of the request.
-	if focusBlock := trendlymodels.RenderFocusList(focus); focusBlock != "" {
-		sb.WriteString("The user has pinpointed specific target(s) for this request — treat them as the PRIMARY subject and apply changes to exactly these, not the whole document: ")
-		sb.WriteString(focusBlock)
-		sb.WriteString("\n")
-	} else if focusedText != "" {
-		sb.WriteString("The user is focused on this: \"")
-		sb.WriteString(focusedText)
-		sb.WriteString("\"\n")
-	}
-	// Earlier user turns in the history may begin with a "[Focused on: …]" prefix
-	// naming the exact target that message applied to. Use it to resolve later
-	// references like "this"/"it"/"move it" WITHOUT asking which item/slide.
-	sb.WriteString("When a user turn begins with \"[Focused on: …]\", that names the exact target (element/slide/content/comment) the message applies to — resolve follow-up references from it and never ask which item the user means when it can be inferred from the most recent focus.\n")
+	// NOTE: focus targets are NOT injected here. Models weight the system prompt
+	// as background/stale, so the actual focus rides on the USER turn itself (a
+	// "[Focused on: …]" prefix added in chat.go for the current turn and in
+	// ToOpenRouterMessages for history). This is just the convention note so the
+	// model knows how to read that prefix.
+	sb.WriteString("When a user turn begins with \"[Focused on: …]\", that line names the exact target (element/slide/content/comment) the rest of that message applies to — apply the change to exactly that target, and resolve follow-up references like \"this\"/\"it\"/\"move it\" from the most recent focus WITHOUT asking which item/slide the user means.\n")
 
 	// Memory-writing capability is available in every module — appended here,
 	// before the per-module instruction blocks that return early below.
