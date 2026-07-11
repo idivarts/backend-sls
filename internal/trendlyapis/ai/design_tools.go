@@ -3,7 +3,6 @@ package ai
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
@@ -225,14 +224,4 @@ func wrapHTML(html string) string {
 		"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
 		"<style>*{box-sizing:border-box;margin:0;padding:0}html,body{margin:0;padding:0}</style>" +
 		"</head><body>" + html + "</body></html>"
-}
-
-// brandKitCSS builds a :root CSS variable block from the brand for the AI to
-// reference (surfaced via the system prompt context, not injected here).
-func brandKitCSS(brandID string) string {
-	logo := ""
-	if b, err := loadBrand(brandID); err == nil && b != nil && b.Image != nil {
-		logo = *b.Image
-	}
-	return fmt.Sprintf(":root{--brand-navy:#054463;--brand-accent:#02537D;--brand-ink:#16242E;--brand-logo:url(%q)}", logo)
 }

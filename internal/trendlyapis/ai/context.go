@@ -40,6 +40,12 @@ func verifyBrandAccess(brandID, managerID string) bool {
 }
 
 func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID string) string {
+	// The brand's Design System is its single declared design/brand standard. It
+	// is loaded once here and woven into every conversation: its voice supersedes
+	// the legacy AIVoice string, its identity/rules/imagery ride the prose block
+	// below, and (for the design module) its colors/fonts ride the brand-kit CSS.
+	ds := loadDesignSystem(brandID)
+
 	var sb strings.Builder
 	sb.WriteString("You are an AI assistant for ")
 	if brand != nil {
@@ -55,7 +61,9 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 	// "today", "this week/month", and the fetch tools' date-relative defaults
 	// consistently. UTC matches how calendar/content timestamps are stored.
 	sb.WriteString("Current date: " + time.Now().UTC().Format("Monday, 2 January 2006") + " (UTC).\n")
-	if brand != nil && brand.AIVoice != nil && *brand.AIVoice != "" {
+	// Legacy AIVoice is only used when the Design System has no Voice & Tone yet —
+	// the Design System's voice is the single source of truth once set.
+	if brand != nil && brand.AIVoice != nil && *brand.AIVoice != "" && !designSystemHasVoice(ds) {
 		sb.WriteString("Brand voice: ")
 		sb.WriteString(*brand.AIVoice)
 		sb.WriteString("\n")
@@ -70,6 +78,13 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 		}
 		sb.WriteString("Brand memory (durable facts the user has shared before — always honor these and do not re-ask for anything already stated here):\n")
 		sb.WriteString(mem)
+		sb.WriteString("\n")
+	}
+	// The Design System block (identity, voice & tone, content rules, imagery,
+	// per-platform overrides) is injected for every module — a brand with no
+	// Design System yet renders nothing here, so this is backward-compatible.
+	if dsBlock := designSystemPromptBlock(ds); dsBlock != "" {
+		sb.WriteString(dsBlock)
 		sb.WriteString("\n")
 	}
 	if module != "" {
@@ -121,7 +136,25 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 	if moduleHasImageGen(module) {
 		sb.WriteString(imageGenInstructions)
 	}
+	// The design module (content) authors HTML designs — give it the brand-kit
+	// CSS custom properties so generate_design/apply_design_edits use the real
+	// brand colors and fonts instead of the old hardcoded defaults.
+	if moduleHasStudio(module) {
+		if css := brandKitCSS(ds, brandLogoURL(brand)); css != "" {
+			sb.WriteString("\n\nBrand kit CSS variables — use these custom properties in any design you create so colors and fonts match the brand:\n")
+			sb.WriteString(css)
+		}
+	}
 	return sb.String()
+}
+
+// brandLogoURL returns the brand's avatar image URL (the logo fallback used when
+// the Design System has no logo of its own yet), or "" when unset.
+func brandLogoURL(brand *trendlymodels.Brand) string {
+	if brand == nil || brand.Image == nil {
+		return ""
+	}
+	return *brand.Image
 }
 
 // imageGenInstructions tells the model it can both SEE images the user attaches

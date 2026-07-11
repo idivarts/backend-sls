@@ -198,6 +198,19 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ── Design System ────────────────────────────────────────────────────
+      // The brand's single design/brand standard (one doc, id "main"): colors,
+      // typography, logos, imagery style, voice & tone and content rules, fed
+      // into every AI generation so output stays on-brand. Read: any brand
+      // member. Mutate: content managers (canManageContent) — the same holders
+      // who tune how content is produced. The editor UI writes this doc directly
+      // (client-writable); the AI reads it via the backend model and may write a
+      // draft via the Admin SDK (which bypasses these rules).
+      match /designSystem/{docId} {
+        allow read:                   if isAuthenticated() && isBrandMember(brandId);
+        allow create, update, delete: if isAuthenticated() && canManageContent(brandId);
+      }
+
       // ── Strategies ───────────────────────────────────────────────────────
       // Read: any brand member. Mutate: content-strategy capability holders
       // (owner / admin / content_manager).
