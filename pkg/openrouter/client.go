@@ -406,7 +406,10 @@ func doRequest(ctx context.Context, path string, payload interface{}) (io.ReadCl
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	// Per-call ceiling. A single agentic step (streamed completion or image
+	// generation) can legitimately run for minutes on a large model; this stays
+	// under the WS lambda's overall timeout while giving one call room to finish.
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	httpReq, err := http.NewRequestWithContext(reqCtx, http.MethodPost, baseURL+path, bytes.NewReader(buf))
 	if err != nil {
 		cancel()

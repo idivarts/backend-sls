@@ -41,6 +41,13 @@ func handleMessageWS(req WSRequest) {
 		return
 	}
 
+	// Keep the client's streaming watchdog alive for the whole turn. The turn
+	// runs synchronously here and can go silent for a while (a slow server tool,
+	// a slow model round-trip between tool steps) with no token deltas; the
+	// heartbeat means the watchdog only fires when the turn is genuinely dead.
+	stopHeartbeat := startHeartbeat(req.ConnectionID, conv.ID)
+	defer stopHeartbeat()
+
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
 
 	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID)
@@ -213,6 +220,9 @@ func handleMessageWS(req WSRequest) {
 				ToolCalls: echo,
 			})
 			for _, sc := range serverCalls {
+				// Tell the user what's happening during this (token-silent) tool
+				// call — also re-arms the client watchdog.
+				wsStatus(req.ConnectionID, conv.ID, toolStatusLabel(sc.Function.Name))
 				var result string
 				var complete bool
 				var derr error

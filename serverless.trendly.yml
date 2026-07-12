@@ -491,7 +491,13 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
-    timeout: 300
+    # AI chat turns run synchronously in this lambda (see internal/websocket
+    # receive.go → ai.HandleWS). A turn with several agentic tool steps +
+    # image/design generation can run for minutes, so we allow the lambda max
+    # (900s) rather than cutting a live turn off at 5 minutes. Streaming reaches
+    # the client out-of-band via PostToConnection, so the API Gateway 29s
+    # integration timeout does not apply.
+    timeout: 900
     events:
       - websocket: $connect
       - websocket: $disconnect
