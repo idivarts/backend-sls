@@ -18,6 +18,39 @@ import (
 // calling server tools without ever producing a user-facing turn.
 const maxToolSteps = 8
 
+// handleStopWS records a cancel request for the conversation's in-flight turn.
+// The turn runs synchronously in a different WS (Lambda) invocation, so we can't
+// touch its context directly — we drop a Firestore marker the streaming loop
+// polls and honors. The client returns control to the user immediately on its
+// side; this just makes the server actually stop generating (and stop billing
+// tokens) instead of running to completion in the background.
+func handleStopWS(req WSRequest) {
+	ctx := context.Background()
+	if req.ConversationID == "" {
+		wsErrorTo(req.ConnectionID, "conversationId is required")
+		return
+	}
+	conv, err := openrouter.GetConversation(ctx, req.ConversationID)
+	if err != nil {
+		wsErrorTo(req.ConnectionID, "conversation not found")
+		return
+	}
+	if conv.UserID != req.UserID {
+		wsErrorTo(req.ConnectionID, "forbidden")
+		return
+	}
+	if err := openrouter.RequestCancel(ctx, conv.ID); err != nil {
+		log.Printf("ai chat: request cancel: %v", err)
+	}
+	// Ack so the client knows the stop was received. The running turn emits its
+	// own terminal `done` (with `stopped: true`) once it actually breaks; if the
+	// turn had already finished, this ack is the only reply — harmless.
+	wsSend(req.ConnectionID, map[string]any{
+		"type":           "stop_ack",
+		"conversationId": conv.ID,
+	})
+}
+
 func handleMessageWS(req WSRequest) {
 	ctx := context.Background()
 	if req.ConversationID == "" {
@@ -142,6 +175,31 @@ func handleMessageWS(req WSRequest) {
 
 	tools := toolsForModule(conv.Module)
 
+	// ── Cooperative cancellation ──────────────────────────────────────────
+	// The user can interrupt this turn from the composer (Stop button). The stop
+	// arrives on a separate WS invocation as a `cancelRequestedAt` marker on the
+	// conversation; we poll it (throttled to ~1/s so it costs ~one Firestore read
+	// per second of streaming) and, when it's newer than this turn's start, cancel
+	// the model stream and break — committing whatever streamed so far.
+	turnStart := time.Now().UnixMilli()
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+	cancelled := false
+	lastCancelCheck := time.Now()
+	checkCancel := func() {
+		if cancelled {
+			return
+		}
+		if time.Since(lastCancelCheck) < time.Second {
+			return
+		}
+		lastCancelCheck = time.Now()
+		if at, err := openrouter.GetCancelRequestedAt(ctx, conv.ID); err == nil && at >= turnStart {
+			cancelled = true
+			cancelStream()
+		}
+	}
+
 	var fullText strings.Builder // cumulative across steps — matches what the client accumulates
 	var finalUsage *openrouter.Usage
 	var pendingControl *trendlymodels.AIControl
@@ -153,11 +211,18 @@ func handleMessageWS(req WSRequest) {
 	completed := false
 
 	for step := 0; step < maxToolSteps; step++ {
+		// Honor a cancel requested between steps (e.g. during a token-silent
+		// server-tool phase, where OnDelta isn't firing).
+		checkCancel()
+		if cancelled {
+			break
+		}
+
 		var stepText strings.Builder
 		var toolCalls []openrouter.ToolCall
 		var streamErr error
 
-		err := openrouter.ChatCompletionStream(ctx, openrouter.ChatRequest{
+		err := openrouter.ChatCompletionStream(streamCtx, openrouter.ChatRequest{
 			Model:    model,
 			Messages: msgs,
 			Tools:    tools,
@@ -170,6 +235,7 @@ func handleMessageWS(req WSRequest) {
 					"conversationId": conv.ID,
 					"delta":          delta,
 				})
+				checkCancel()
 			},
 			OnToolCall: func(call openrouter.ToolCall) {
 				toolCalls = append(toolCalls, call)
@@ -179,6 +245,11 @@ func handleMessageWS(req WSRequest) {
 		})
 		if err != nil {
 			streamErr = err
+		}
+		// A cancel tears down streamCtx, which surfaces as a context error here —
+		// that's an intended stop, not a failure. Break and commit the partial.
+		if cancelled {
+			break
 		}
 		if streamErr != nil {
 			log.Printf("ai chat stream: %v", streamErr)
@@ -281,17 +352,23 @@ func handleMessageWS(req WSRequest) {
 		tokens = finalUsage.TotalTokens
 	}
 	meterAIUsage(orgID, finalUsage)
-	assistantMsgID, _ := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
-		Role:       "assistant",
-		UserID:     conv.UserID,
-		BrandID:    conv.BrandID,
-		Content:    fullText.String(),
-		Images:     genImages,
-		Model:      model,
-		TokenCount: tokens,
-		Control:    pendingControl,
-		Timestamp:  time.Now().UnixMilli(),
-	})
+	// On a cancel we still persist whatever streamed so it isn't lost — unless
+	// nothing came through yet (interrupted during "Thinking…"), in which case
+	// there's no assistant bubble to write.
+	var assistantMsgID string
+	if !(cancelled && strings.TrimSpace(fullText.String()) == "" && len(genImages) == 0 && pendingControl == nil) {
+		assistantMsgID, _ = openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
+			Role:       "assistant",
+			UserID:     conv.UserID,
+			BrandID:    conv.BrandID,
+			Content:    fullText.String(),
+			Images:     genImages,
+			Model:      model,
+			TokenCount: tokens,
+			Control:    pendingControl,
+			Timestamp:  time.Now().UnixMilli(),
+		})
+	}
 
 	if pendingControl != nil {
 		wsSend(req.ConnectionID, map[string]any{
@@ -321,6 +398,7 @@ func handleMessageWS(req WSRequest) {
 		"clientMsgId":    req.ClientMsgID,
 		"images":         genImages,
 		"usage":          finalUsage,
+		"stopped":        cancelled,
 	})
 }
 

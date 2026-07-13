@@ -258,6 +258,12 @@ func ChatCompletionStream(ctx context.Context, req ChatRequest, cb StreamCallbac
 	toolAccum := map[int]*ToolCall{}
 	var toolOrder []int
 	for scanner.Scan() {
+		// Stop reading as soon as the caller cancels ctx (e.g. the user
+		// interrupted the turn) — the deferred body.Close() unblocks any pending
+		// read too, but this exits cleanly on the next line boundary.
+		if ctx.Err() != nil {
+			break
+		}
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
 			continue

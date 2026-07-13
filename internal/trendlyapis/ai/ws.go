@@ -41,6 +41,8 @@ func HandleWS(req WSRequest) {
 	switch req.Type {
 	case "message":
 		handleMessageWS(req)
+	case "stop":
+		handleStopWS(req)
 	case "quick_edit":
 		handleQuickEditWS(req)
 	case "content_gen":

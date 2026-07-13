@@ -148,6 +148,32 @@ func UpdateConversationTitle(ctx context.Context, conversationID, title string) 
 	return err
 }
 
+// RequestCancel marks the conversation so its in-flight AI turn cooperatively
+// aborts. The stop signal arrives on a separate WS (Lambda) invocation from the
+// one running the turn, so the marker is the cross-invocation channel: the
+// streaming loop polls it (throttled) and bails when it sees a request newer than
+// its own start time.
+func RequestCancel(ctx context.Context, conversationID string) error {
+	_, err := conversationsRef().Doc(conversationID).Update(ctx, []firestore.Update{
+		{Path: "cancelRequestedAt", Value: time.Now().UnixMilli()},
+	})
+	return err
+}
+
+// GetCancelRequestedAt returns the conversation's current cancel-request
+// timestamp (0 when none). Read by the streaming loop to decide whether to abort.
+func GetCancelRequestedAt(ctx context.Context, conversationID string) (int64, error) {
+	snap, err := conversationsRef().Doc(conversationID).Get(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var conv trendlymodels.AIConversation
+	if err := snap.DataTo(&conv); err != nil {
+		return 0, err
+	}
+	return conv.CancelRequestedAt, nil
+}
+
 func UpdateConversationModel(ctx context.Context, conversationID, model string) error {
 	_, err := conversationsRef().Doc(conversationID).Update(ctx, []firestore.Update{
 		{Path: "currentModel", Value: model},

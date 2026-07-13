@@ -42,7 +42,7 @@ func messageHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequ
 	}
 
 	switch env.Type {
-	case "message", "quick_edit", "content_gen", "push_to_calendar":
+	case "message", "stop", "quick_edit", "content_gen", "push_to_calendar":
 		userID, ok := lookupUserID(connectionID)
 		if !ok {
 			sendError(connectionID, "unauthenticated")
