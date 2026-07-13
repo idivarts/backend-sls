@@ -15,6 +15,11 @@ type AIConversation struct {
 	CurrentModel string `json:"currentModel" firestore:"currentModel"`
 	CreatedAt    int64  `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt    int64  `json:"updatedAt" firestore:"updatedAt"`
+	// CancelRequestedAt is set (epoch millis) when the user asks to interrupt the
+	// in-flight AI turn. A running turn started before this timestamp cooperatively
+	// aborts (see the ai chat streaming loop). Stale values are harmless: a new
+	// turn only honors a marker whose timestamp is >= its own start time.
+	CancelRequestedAt int64 `json:"cancelRequestedAt,omitempty" firestore:"cancelRequestedAt,omitempty"`
 }
 
 type AIMessage struct {
