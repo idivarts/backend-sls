@@ -654,6 +654,29 @@ resources:
               AllowedMethods: ["GET", "PUT", "POST", "DELETE", "HEAD"]
               AllowedOrigins: ["*"]
 
+    # Shared CORS policy for the asset CloudFront distributions. CloudFront
+    # applies these response headers at the edge on EVERY viewer response
+    # (including already-cached objects), so a crossOrigin="anonymous" request —
+    # e.g. html2canvas rendering a design that embeds the brand logo — gets a
+    # valid Access-Control-Allow-Origin and can rasterize the image. Without it
+    # the legacy ForwardedValues below never forward the Origin header to S3, so
+    # S3 never emits CORS headers and cross-origin canvas reads fail silently.
+    AssetsCorsResponseHeadersPolicy:
+      Condition: IsDev
+      Type: AWS::CloudFront::ResponseHeadersPolicy
+      Properties:
+        ResponseHeadersPolicyConfig:
+          Name: ${self:service}-assets-cors
+          CorsConfig:
+            AccessControlAllowCredentials: false
+            AccessControlAllowHeaders:
+              Items: ["*"]
+            AccessControlAllowMethods:
+              Items: ["GET", "HEAD", "OPTIONS"]
+            AccessControlAllowOrigins:
+              Items: ["*"]
+            OriginOverride: true
+
     CloudFrontDistribution:
       Condition: IsDev
       Type: AWS::CloudFront::Distribution
@@ -669,10 +692,12 @@ resources:
           DefaultCacheBehavior:
             TargetOriginId: S3Origin
             ViewerProtocolPolicy: "redirect-to-https"
-            AllowedMethods: ["GET", "HEAD"]
+            ResponseHeadersPolicyId: !Ref AssetsCorsResponseHeadersPolicy
+            AllowedMethods: ["GET", "HEAD", "OPTIONS"]
             CachedMethods:
               - GET
               - HEAD
+              - OPTIONS
             ForwardedValues:
               QueryString: false
               Cookies:
@@ -743,10 +768,12 @@ resources:
           DefaultCacheBehavior:
             TargetOriginId: S3ImageOrigin
             ViewerProtocolPolicy: "redirect-to-https"
-            AllowedMethods: ["GET", "HEAD"]
+            ResponseHeadersPolicyId: !Ref AssetsCorsResponseHeadersPolicy
+            AllowedMethods: ["GET", "HEAD", "OPTIONS"]
             CachedMethods:
               - GET
               - HEAD
+              - OPTIONS
             ForwardedValues:
               QueryString: false
               Cookies:
@@ -816,10 +843,12 @@ resources:
           DefaultCacheBehavior:
             TargetOriginId: S3AttachmentOrigin
             ViewerProtocolPolicy: "redirect-to-https"
-            AllowedMethods: ["GET", "HEAD"]
+            ResponseHeadersPolicyId: !Ref AssetsCorsResponseHeadersPolicy
+            AllowedMethods: ["GET", "HEAD", "OPTIONS"]
             CachedMethods:
               - GET
               - HEAD
+              - OPTIONS
             ForwardedValues:
               QueryString: false
               Cookies:
