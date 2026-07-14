@@ -19,6 +19,7 @@ import (
 const (
 	toolGenerateDesign   = "generate_design"
 	toolApplyDesignEdits = "apply_design_edits"
+	toolGetDesignHTML    = "get_design_html"
 )
 
 // moduleHasStudio reports whether a module's chat may drive the design editor.
@@ -72,12 +73,27 @@ func designServerTools() []openrouter.Tool {
 		openrouter.NewFunctionTool(
 			toolApplyDesignEdits,
 			"Revise the current design's HTML to apply the user's pinned comments/"+
-				"instructions. You are given the current HTML in context; return the FULL "+
-				"revised HTML in `html`, preserving data-el ids and keeping all text inside "+
-				"the frame. Make only the requested changes.",
+				"instructions. The current HTML is NOT in your context — first call "+
+				"get_design_html to fetch it, then return the FULL revised HTML in `html`, "+
+				"preserving data-el ids and keeping all text inside the frame. Make only the "+
+				"requested changes.",
 			openrouter.ObjectSchema(map[string]any{
 				"html": openrouter.StringProp("The full revised HTML document."),
 			}, []string{"html"}),
+		),
+		openrouter.NewFunctionTool(
+			toolGetDesignHTML,
+			"Fetch the FULL, current HTML of this content's design (never truncated). The "+
+				"design HTML is deliberately NOT in your context (it is large) — only a "+
+				"reference is. So you MUST call this FIRST to read or edit an existing design: "+
+				"run it whenever the user asks about or wants to change the current design, "+
+				"then use the returned `html` with apply_design_edits. Returns "+
+				"{ html, revisionId, docType, slideCount, width, height, durationMs }.",
+			openrouter.ObjectSchema(map[string]any{
+				"revisionId": openrouter.StringProp(
+					"Optional. A specific design revision id to fetch; omit to get the content's current design.",
+				),
+			}, []string{}),
 		),
 	}
 }
@@ -177,6 +193,45 @@ func runApplyDesignEdits(ctx context.Context, brandID, contentID, arguments stri
 		"ok":         true,
 		"revisionId": revID,
 		"note":       "edits applied and re-rendered; the user can revert to the previous revision.",
+	}), nil
+}
+
+type getDesignHTMLArgs struct {
+	RevisionID string `json:"revisionId"`
+}
+
+// runGetDesignHTML returns the FULL current design HTML on demand. The design
+// HTML is intentionally kept OUT of the system context (it is large and would
+// truncate the prompt); the model fetches the complete document here right
+// before reading or editing it. Not truncated — the model needs the whole thing
+// to return a faithful revised document via apply_design_edits.
+func runGetDesignHTML(ctx context.Context, brandID, contentID, arguments string) (string, error) {
+	if contentID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "no content in context"}), nil
+	}
+	content, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil || content == nil || content.DesignRef == nil || content.DesignRef.RevisionID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "no design yet; call generate_design first"}), nil
+	}
+	var a getDesignHTMLArgs
+	_ = json.Unmarshal([]byte(arguments), &a)
+	revID := strings.TrimSpace(a.RevisionID)
+	if revID == "" {
+		revID = content.DesignRef.RevisionID
+	}
+	rev, err := trendlymodels.GetDesignRevision(brandID, contentID, revID)
+	if err != nil || rev == nil {
+		return jsonResult(map[string]any{"ok": false, "error": "design revision not found"}), nil
+	}
+	return jsonResult(map[string]any{
+		"ok":         true,
+		"revisionId": rev.ID,
+		"docType":    rev.DocType,
+		"slideCount": rev.SlideCount,
+		"width":      rev.Width,
+		"height":     rev.Height,
+		"durationMs": rev.DurationMs,
+		"html":       rev.HTML,
 	}), nil
 }
 

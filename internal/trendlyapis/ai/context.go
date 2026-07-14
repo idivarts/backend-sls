@@ -297,31 +297,26 @@ func loadContentBrief(brandID, contentID string) string {
 	return contentBriefText(ct)
 }
 
-// currentDesignBrief returns the content's CURRENT AI-design HTML so the chat
-// model always knows exactly what design is on screen and can revise it (via
-// apply_design_edits) in the ongoing conversation. Bounded so the prompt stays
-// small. Returns "" when the content has no design.
+// currentDesignBrief tells the chat model that this content already has a design
+// and how to work with it — WITHOUT inlining the HTML. Designs are large and
+// would truncate the prompt, so we pass only a reference (revision id + shape)
+// and instruct the model to fetch the full HTML on demand via get_design_html
+// right before it reads or edits the design. Returns "" when there is no design.
 func currentDesignBrief(brandID, contentID string) string {
 	ct, err := trendlymodels.GetContent(brandID, contentID)
 	if err != nil || ct.DesignRef == nil || ct.DesignRef.RevisionID == "" {
 		return ""
 	}
-	rev, err := trendlymodels.GetDesignRevision(brandID, contentID, ct.DesignRef.RevisionID)
-	if err != nil || rev == nil || strings.TrimSpace(rev.HTML) == "" {
-		return ""
-	}
-	html := rev.HTML
-	const maxHTML = 14000
-	if len(html) > maxHTML {
-		html = html[:maxHTML] + "\n<!-- …truncated… -->"
-	}
+	dr := ct.DesignRef
 	return fmt.Sprintf(
-		"CURRENT DESIGN: this content already has an AI-generated HTML design (%d slide(s)). "+
-			"When the user asks to change the visual/design (\"make the headline bigger\", "+
-			"\"use my logo\", \"change slide 2\"…), call apply_design_edits and return the FULL "+
-			"revised HTML — preserve the data-carousel/data-slide structure and every data-el id. "+
-			"Here is the current HTML:\n```html\n%s\n```",
-		ct.DesignRef.SlideCount, html,
+		"CURRENT DESIGN: this content already has an AI-generated HTML design "+
+			"(revisionId %q, docType %s, %d slide(s), %dx%d). The design HTML is NOT included "+
+			"here — it is large — so when the user asks to read or change the visual/design "+
+			"(\"make the headline bigger\", \"use my logo\", \"change slide 2\"…), FIRST call "+
+			"get_design_html to fetch the complete current HTML, THEN call apply_design_edits "+
+			"with the FULL revised HTML — preserve the data-carousel/data-slide structure and "+
+			"every data-el id.",
+		dr.RevisionID, dr.DocType, dr.SlideCount, dr.Width, dr.Height,
 	)
 }
 
