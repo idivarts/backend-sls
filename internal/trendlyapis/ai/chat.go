@@ -95,9 +95,10 @@ func handleMessageWS(req WSRequest) {
 			}
 		}
 	}
-	// Always give the content chat the CURRENT design HTML (both the live-edit and
-	// persisted-doc prompt paths) so the AI knows what's on screen and can revise
-	// it when the user comments / asks for a change.
+	// Tell the content chat there's a design and how to work with it — a small
+	// REFERENCE only (revision id + shape), not the HTML itself. The model fetches
+	// the full HTML on demand via get_design_html so a large design never truncates
+	// the prompt.
 	if conv.Module == moduleContent && conv.ContextID != "" {
 		if design := currentDesignBrief(conv.BrandID, conv.ContextID); design != "" {
 			systemPrompt = systemPrompt + "\n\n" + design

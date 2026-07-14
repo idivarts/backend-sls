@@ -114,6 +114,9 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 	case toolApplyDesignEdits:
 		r, err := runApplyDesignEdits(ctx, brandID, contextID, arguments)
 		return r, false, err
+	case toolGetDesignHTML:
+		r, err := runGetDesignHTML(ctx, brandID, contextID, arguments)
+		return r, false, err
 	case toolGenerateMusic:
 		orgID, _ := orgIDForBrand(brandID)
 		r, err := runGenerateMusic(ctx, brandID, contextID, orgID, arguments)
