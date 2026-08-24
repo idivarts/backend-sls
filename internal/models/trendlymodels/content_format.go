@@ -1,6 +1,10 @@
 package trendlymodels
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/idivarts/backend-sls/internal/constants"
+)
 
 // ─── ContentFormat constants ─────────────────────────────────────────────────
 
@@ -72,13 +76,28 @@ func NormalizeContentFormat(v string) ContentFormat {
 }
 
 // PlatformsForFormat returns the platforms that support the given format.
+// LinkedIn Page is filtered out while constants.LinkedInPageEnabled is false
+// (its CMA app review is pending) — this is the single choke point every
+// content-generation path (AI tools, calendar push, manual create/update)
+// resolves target platforms through, so gating it here keeps LinkedIn Page
+// out of generated content without touching personal LinkedIn.
 func PlatformsForFormat(f ContentFormat) []Platform {
-	return FormatPlatformSupport[f]
+	all := FormatPlatformSupport[f]
+	if constants.LinkedInPageEnabled {
+		return all
+	}
+	out := make([]Platform, 0, len(all))
+	for _, p := range all {
+		if p != PlatformLinkedInPage {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // IsFormatPlatformCompatible reports whether a (format, platform) pair is allowed.
 func IsFormatPlatformCompatible(f ContentFormat, p Platform) bool {
-	for _, allowed := range FormatPlatformSupport[f] {
+	for _, allowed := range PlatformsForFormat(f) {
 		if allowed == p {
 			return true
 		}
@@ -108,7 +127,15 @@ func NormalizePlatform(v string) (Platform, bool) {
 	switch s {
 	case "x", "x / twitter", "twitter/x":
 		return PlatformTwitter, true
-	case PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformLinkedInPage, PlatformTwitter, PlatformReddit:
+	case PlatformLinkedInPage:
+		// Gated — see constants.LinkedInPageEnabled. Treated as unrecognised
+		// while the CMA app review is pending, so it's dropped by
+		// NormalizePlatforms rather than ever reaching generated content.
+		if !constants.LinkedInPageEnabled {
+			return "", false
+		}
+		return s, true
+	case PlatformInstagram, PlatformFacebook, PlatformYouTube, PlatformLinkedIn, PlatformTwitter, PlatformReddit:
 		return s, true
 	default:
 		return "", false
