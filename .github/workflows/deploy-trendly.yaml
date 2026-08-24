@@ -50,6 +50,8 @@ jobs:
           WEBHOOK_VERIFY_TOKEN_INSTAGRAM: ${{ secrets.WEBHOOK_VERIFY_TOKEN_INSTAGRAM }}
           WEBHOOK_VERIFY_TOKEN_FACEBOOK: ${{ secrets.WEBHOOK_VERIFY_TOKEN_FACEBOOK }}
           WEBHOOK_STRICT_SIGNATURE: ${{ vars.WEBHOOK_STRICT_SIGNATURE }}
+          # RevenueCat native IAP webhook auth (see docs/revenuecat-iap-setup.md)
+          REVENUECAT_WEBHOOK_AUTH: ${{ secrets.REVENUECAT_WEBHOOK_AUTH }}
           TWITTER_CLIENT_ID: ${{ vars.TWITTER_CLIENT_ID }}
           TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
           STREAM_SECRET: ${{ secrets.STREAM_SECRET }}
