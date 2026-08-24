@@ -380,6 +380,13 @@ service cloud.firestore {
       }
     }
 
+    // Webhook idempotency ledger (RevenueCat / Razorpay processed event ids).
+    // Written only by the backend (Admin SDK bypasses rules); never exposed to
+    // clients. Explicit server-only block to document intent.
+    match /webhookEvents/{eventId} {
+      allow read, write: if false;
+    }
+
     // Stores all collaborations
     match /collaborations/{collaborationId} {
       allow read: if isAuthenticated();
