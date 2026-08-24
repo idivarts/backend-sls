@@ -40,6 +40,10 @@ provider:
     SENDGRID_NAME: Trendly
     SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
+    # RevenueCat native IAP webhook shared secret. Must match the Authorization
+    # header value configured in the RevenueCat dashboard webhook. See the IAP
+    # ticket + docs/revenuecat-iap-setup.md.
+    REVENUECAT_WEBHOOK_AUTH: ${env:REVENUECAT_WEBHOOK_AUTH, ''}
     # Social Connect V2 — new OAuth platform credentials
     FB_CLIENT_ID: ${env:FB_CLIENT_ID, '567254166026958'}
     FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
@@ -397,6 +401,16 @@ functions:
     # provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /payment_webhooks
+  trendly_revenuecat_webhook:
+    handler: functions/revenuecat/webhook/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /revenuecat/webhook
   trendly_social_webhooks:
     handler: functions/trendly_social_webhooks/main.go
     package:
