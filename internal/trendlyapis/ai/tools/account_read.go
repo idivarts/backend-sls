@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 
+	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
@@ -21,6 +22,11 @@ func connectedAccounts() Registered {
 			}
 			out := make([]map[string]any, 0, len(accs))
 			for _, a := range accs {
+				// LinkedIn Page is gated (CMA app review pending) — hide it from the
+				// AI's connected-accounts context so it never plans/generates for it.
+				if a.Platform == trendlymodels.PlatformLinkedInPage && !constants.LinkedInPageEnabled {
+					continue
+				}
 				tok, terr := trendlymodels.GetBrandSocialToken(brandID, a.ID)
 				hasToken := terr == nil && tok != nil && tok.AccessToken != ""
 				out = append(out, map[string]any{
@@ -51,6 +57,9 @@ func accountProfile() Registered {
 			a, err := trendlymodels.GetBrandSocialAccount(brandID, id)
 			if err != nil {
 				return nil, err
+			}
+			if a.Platform == trendlymodels.PlatformLinkedInPage && !constants.LinkedInPageEnabled {
+				return map[string]any{"error": "this account's platform is not currently available"}, nil
 			}
 			return map[string]any{
 				"id": a.ID, "platform": a.Platform, "username": a.Username, "displayName": a.DisplayName,
