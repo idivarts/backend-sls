@@ -29,6 +29,10 @@ var linkedinPageScopesRequired = strings.Join([]string{
 
 // LinkedInPageInit redirects to the CMA app's OAuth consent for Company Pages.
 func LinkedInPageInit(c *gin.Context) {
+	if !constants.LinkedInPageEnabled {
+		c.JSON(404, gin.H{"error": "linkedin page integration is not enabled"})
+		return
+	}
 	userId, _ := middlewares.GetUserId(c)
 	callbackScheme := c.Query("callbackScheme")
 	app := c.Query("app")

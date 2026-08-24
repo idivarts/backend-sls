@@ -40,6 +40,10 @@ func SnapshotBrand(brandID, date string) (written, failed int) {
 		if acc.Platform == trendlymodels.PlatformReddit && !constants.RedditEnabled {
 			continue
 		}
+		// LinkedIn Page is gated off (see internal/constants/features.go) — skip it.
+		if acc.Platform == trendlymodels.PlatformLinkedInPage && !constants.LinkedInPageEnabled {
+			continue
+		}
 		switch acc.Platform {
 		case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook,
 			trendlymodels.PlatformYouTube, trendlymodels.PlatformLinkedInPage,

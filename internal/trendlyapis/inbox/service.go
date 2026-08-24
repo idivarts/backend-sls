@@ -56,8 +56,10 @@ func isDMChannel(p trendlymodels.Platform) bool {
 func isCommentChannel(p trendlymodels.Platform) bool {
 	switch p {
 	case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook,
-		trendlymodels.PlatformLinkedInPage, trendlymodels.PlatformTwitter:
+		trendlymodels.PlatformTwitter:
 		return true
+	case trendlymodels.PlatformLinkedInPage:
+		return constants.LinkedInPageEnabled // gated — see internal/constants/features.go
 	case trendlymodels.PlatformReddit:
 		return constants.RedditEnabled // gated — see internal/constants/features.go
 	}

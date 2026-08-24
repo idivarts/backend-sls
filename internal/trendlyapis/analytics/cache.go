@@ -76,6 +76,11 @@ func fetchAccount(brandID string, acc trendlymodels.SocialAccount, r Range) Acco
 	case trendlymodels.PlatformLinkedInPage:
 		// Analytics are an ORG capability (page/follower/share stats). Personal
 		// LinkedIn has no analytics API and falls through to unsupported below.
+		if !constants.LinkedInPageEnabled { // gated — see internal/constants/features.go
+			a := baseAccount(acc, r)
+			a.Supported = false
+			return a
+		}
 		return fetchLinkedIn(acc, token, r)
 	case trendlymodels.PlatformTwitter:
 		return fetchTwitter(acc, token, r)

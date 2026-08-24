@@ -481,6 +481,9 @@ func publishDestination(brandID string, ct *trendlymodels.Content, dest trendlym
 	case "linkedin":
 		return publishToLinkedIn(account, token.AccessToken, eff)
 	case "linkedin_page":
+		if !constants.LinkedInPageEnabled {
+			return "", fmt.Errorf("linkedin page integration is not enabled")
+		}
 		return publishToLinkedInPage(account, token.AccessToken, eff)
 	case "twitter":
 		return publishToTwitter(token.AccessToken, eff)
