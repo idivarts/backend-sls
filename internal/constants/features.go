@@ -13,3 +13,15 @@ package constants
 // (trendly-brands `constants/features.ts` REDDIT_ENABLED, trendly-connect
 // `lib/config.ts` REDDIT_ENABLED).
 const RedditEnabled = false
+
+// LinkedInPageEnabled gates only the LinkedIn Page (Company/Showcase Page)
+// integration via the Community Management API — connect-init, publish
+// dispatch, inbox comment channel, and analytics fetch/snapshot. Personal
+// LinkedIn (PlatformLinkedIn) is NOT gated by this flag and stays available.
+// LinkedIn's CMA app review is taking too long, so this is PAUSED until that
+// review clears.
+//
+// To enable: flip this to true AND the frontend flags
+// (trendly-brands `constants/features.ts` LINKEDIN_PAGE_ENABLED, trendly-connect
+// `lib/config.ts` LINKEDIN_PAGE_ENABLED).
+const LinkedInPageEnabled = false
