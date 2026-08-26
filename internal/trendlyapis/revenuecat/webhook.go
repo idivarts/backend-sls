@@ -130,19 +130,28 @@ func process(e *rcEvent) error {
 		return nil
 
 	case "TRANSFER":
-		// The entitlement moved to a different app_user_id (org). The org(s) it
-		// moved away from no longer hold it, so they fall back to free (same
-		// reasoning as EXPIRATION); the destination org gets its own
-		// purchase/renewal events which apply the plan there.
-		for _, from := range e.TransferredFrom {
-			if from == "" {
-				continue
-			}
-			if err := downgradeToFree(from); err != nil {
-				return err
+		// Subscriptions are NOT transferable between orgs — the org it moved
+		// away from keeps its plan exactly as-is (untouched), and the org(s) it
+		// moved to do NOT get funded. Record a restore conflict on the
+		// destination org(s) instead, naming the org that already owns it, so
+		// the frontend paywall can explain why nothing changed rather than
+		// silently doing nothing (see trendlymodels.RecordRestoreConflict +
+		// BillingStatusBanner's restore-conflict popup).
+		from := ""
+		if len(e.TransferredFrom) > 0 {
+			from = e.TransferredFrom[0]
+		}
+		if from != "" {
+			for _, to := range e.TransferredTo {
+				if to == "" {
+					continue
+				}
+				if err := trendlymodels.RecordRestoreConflict(to, from); err != nil {
+					return err
+				}
 			}
 		}
-		log.Println("revenuecat webhook: transfer", e.TransferredFrom, "->", e.TransferredTo)
+		log.Println("revenuecat webhook: transfer blocked (subscriptions are not transferable)", e.TransferredFrom, "->", e.TransferredTo)
 		return nil
 
 	default:
@@ -167,6 +176,18 @@ func applyActiveSubscription(e *rcEvent) error {
 	if err := org.Get(orgID); err != nil {
 		log.Println("revenuecat webhook: org not found, ignoring", orgID, err)
 		return nil // ack — not our org (or deleted)
+	}
+
+	// Defense in depth alongside the TRANSFER handler above: a transaction id
+	// is claimed by whichever org activates it first, and never reassigned —
+	// subscriptions are not transferable between orgs. This mainly guards
+	// RENEWAL events arriving for an already-transferred subscription; a fresh
+	// restore-on-another-org normally surfaces as a TRANSFER event instead.
+	if owner, err := trendlymodels.ClaimTransactionOwner(e.OriginalTransactionID, orgID); err != nil {
+		return err
+	} else if owner != "" && owner != orgID {
+		log.Println("revenuecat webhook: transaction already owned by a different org, ignoring", e.OriginalTransactionID, "owner", owner, "attempted by", orgID)
+		return trendlymodels.RecordRestoreConflict(orgID, owner)
 	}
 
 	reset := e.ExpirationAtMs

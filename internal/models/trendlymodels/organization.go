@@ -47,6 +47,24 @@ type Organization struct {
 	// DeletedAt soft-deletes the org (epoch ms). Non-nil means deleted; such
 	// orgs are excluded from list/get surfaces.
 	DeletedAt *int64 `json:"deletedAt,omitempty" firestore:"deletedAt,omitempty"`
+
+	// IapRestoreConflict is set when this org attempted to purchase/restore a
+	// native IAP subscription that a store receipt shows as already owned by a
+	// DIFFERENT org. Subscriptions are not transferable between orgs (see
+	// RecordRestoreConflict) — this org's plan is left untouched (still free)
+	// and the frontend paywall reads this field to show an explanatory popup
+	// naming the org that already owns it. Cleared via the
+	// dismiss-restore-conflict endpoint once the user has seen it.
+	IapRestoreConflict *OrgIapRestoreConflict `json:"iapRestoreConflict,omitempty" firestore:"iapRestoreConflict,omitempty"`
+}
+
+// OrgIapRestoreConflict names the org that already owns a RevenueCat
+// subscription receipt this org just tried to purchase/restore.
+type OrgIapRestoreConflict struct {
+	ConflictingOrgID      string `json:"conflictingOrgId" firestore:"conflictingOrgId"`
+	ConflictingOrgName    string `json:"conflictingOrgName" firestore:"conflictingOrgName"`
+	ConflictingOwnerEmail string `json:"conflictingOwnerEmail" firestore:"conflictingOwnerEmail"`
+	OccurredAt            int64  `json:"occurredAt" firestore:"occurredAt"`
 }
 
 // OrgBilling is the org billing shell. It mirrors BrandBilling for now (the
@@ -249,6 +267,44 @@ func DowngradeToFree(orgID string) error {
 		{Path: "billing.accessState", Value: "active"},
 		{Path: "billing.status", Value: 1}, // ModelStatus.Accepted — free plan needs no acceptance step, but keep the legacy field consistent with the new planKey
 	})
+	return err
+}
+
+// RecordRestoreConflict marks orgID as having attempted to purchase/restore a
+// subscription receipt that already belongs to conflictingOrgID. Subscriptions
+// are NOT transferable between orgs: the caller must NOT fund/activate orgID's
+// plan when this fires — orgID stays exactly as it was (typically free) and
+// the conflicting org's plan is left untouched too. Looks up the conflicting
+// org's name + owner email so the frontend can show them directly without a
+// second round trip.
+func RecordRestoreConflict(orgID, conflictingOrgID string) error {
+	conflicting := &Organization{}
+	name := conflictingOrgID
+	email := ""
+	if err := conflicting.Get(conflictingOrgID); err == nil {
+		name = conflicting.Name
+		owner := &Manager{}
+		if err := owner.Get(conflicting.OwnerID); err == nil {
+			email = owner.Email
+		}
+	}
+
+	conflict := OrgIapRestoreConflict{
+		ConflictingOrgID:      conflictingOrgID,
+		ConflictingOrgName:    name,
+		ConflictingOwnerEmail: email,
+		OccurredAt:            time.Now().UnixMilli(),
+	}
+	_, err := firestoredb.Client.Collection(orgCollection).Doc(orgID).
+		Update(context.Background(), []firestore.Update{{Path: "iapRestoreConflict", Value: conflict}})
+	return err
+}
+
+// ClearRestoreConflict removes a previously recorded IapRestoreConflict once
+// the user has seen the popup.
+func ClearRestoreConflict(orgID string) error {
+	_, err := firestoredb.Client.Collection(orgCollection).Doc(orgID).
+		Update(context.Background(), []firestore.Update{{Path: "iapRestoreConflict", Value: firestore.Delete}})
 	return err
 }
 

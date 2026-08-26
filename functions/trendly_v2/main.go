@@ -45,6 +45,8 @@ func handleManagerAPIs() {
 	// Self-service switch to the free plan — the paywall/billing screen's
 	// always-available fallback when a subscription is stuck/unwanted/lapsed.
 	managerApisV1.POST("/organizations/:id/downgrade-to-free", trendlyapis.DowngradeOrgToFree)
+	// Dismiss the "someone else already owns this subscription" popup.
+	managerApisV1.POST("/organizations/:id/iap/dismiss-restore-conflict", trendlyapis.DismissIapRestoreConflict)
 
 	// ── Account (self-service account deletion — App Store / Play requirement) ──
 	// Blocked while the manager still solely owns an org with active brands or a

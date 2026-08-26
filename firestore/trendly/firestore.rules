@@ -387,6 +387,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // RevenueCat subscription-transaction ownership ledger (doc id = store
+    // original transaction id). Written only by the backend to enforce that
+    // subscriptions are not transferable between orgs; never exposed to
+    // clients. Explicit server-only block to document intent.
+    match /revenuecatTransactionOwners/{transactionId} {
+      allow read, write: if false;
+    }
+
     // Stores all collaborations
     match /collaborations/{collaborationId} {
       allow read: if isAuthenticated();

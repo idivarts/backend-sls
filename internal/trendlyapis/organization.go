@@ -282,6 +282,30 @@ func DowngradeOrgToFree(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Switched to the Free plan"})
 }
 
+// DismissIapRestoreConflict clears a previously recorded IAP restore conflict
+// (see trendlymodels.RecordRestoreConflict) once the frontend popup has shown
+// it to the user. Owner/admin only.
+func DismissIapRestoreConflict(c *gin.Context) {
+	userId, ok := middlewares.GetUserId(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	orgId := c.Param("id")
+
+	if role, found := getOrgRole(orgId, userId); !found || (role != trendlymodels.OrgRoleOwner && role != trendlymodels.OrgRoleAdmin) {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Only an org owner/admin can dismiss this"})
+		return
+	}
+
+	if err := trendlymodels.ClearRestoreConflict(orgId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to dismiss"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Dismissed"})
+}
+
 // DeleteBrand hard-deletes a brand: the doc and every subcollection beneath
 // it are permanently removed. Blocked while the brand has active contracts.
 // Also removes the brand from its org's brandIds so it stops counting against
