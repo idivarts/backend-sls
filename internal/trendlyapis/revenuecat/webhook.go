@@ -176,6 +176,12 @@ func applyActiveSubscription(e *rcEvent) error {
 	billing.AccessState = myutil.StrPtr("active")
 	billing.BillingMode = myutil.StrPtr("recurring")
 	billing.BillingStatus = myutil.StrPtr("active")
+	// Mirror the legacy status field the frontend paywall gate still reads
+	// (organization-context.provider.tsx checks billing.status ===
+	// ModelStatus.Accepted) — the Razorpay webhook sets this alongside
+	// AccessState for the same reason; without it an IAP-active org is
+	// permanently treated as "not accepted" and gets bounced to the paywall.
+	billing.Status = myutil.IntPtr(1) // ModelStatus.Accepted
 	billing.PlanKey = &planKey
 	billing.PeriodEnd = &reset
 	if s := storeLabel(e.Store); s != "" {
@@ -203,8 +209,10 @@ func applyTopup(e *rcEvent) error {
 	return trendlymodels.AddTopup(orgID, tokens)
 }
 
-// setAccessState updates just the billing access state for an org, no-op'ing
-// (ack) when the org is missing so RC stops retrying.
+// setAccessState updates the billing access state for an org (plus the mirrored
+// legacy status field the frontend paywall gate reads — see the comment in
+// applyActiveSubscription), no-op'ing (ack) when the org is missing so RC stops
+// retrying.
 func setAccessState(orgID, state string) error {
 	if orgID == "" {
 		return nil
@@ -214,5 +222,18 @@ func setAccessState(orgID, state string) error {
 		log.Println("revenuecat webhook: org not found for state change, ignoring", orgID, state, err)
 		return nil
 	}
-	return trendlymodels.SetOrgAccessState(orgID, state)
+	billing := org.Billing
+	if billing == nil {
+		billing = &trendlymodels.BrandBilling{}
+	}
+	billing.AccessState = myutil.StrPtr(state)
+	switch state {
+	case "active":
+		billing.Status = myutil.IntPtr(1) // ModelStatus.Accepted
+	case "past_due":
+		billing.Status = myutil.IntPtr(2) // mirrors Razorpay "halted"
+	case "canceled":
+		billing.Status = myutil.IntPtr(3) // mirrors Razorpay "cancelled"
+	}
+	return org.SetBilling(orgID, billing)
 }
