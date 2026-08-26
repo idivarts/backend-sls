@@ -115,8 +115,13 @@ func process(e *rcEvent) error {
 
 	case "EXPIRATION":
 		// Subscription lapsed (auto-renew off + period ended, or refund/billing
-		// failure resolved to expiry). Revoke access; the paywall/lock reads this.
-		return setAccessState(e.AppUserID, "canceled")
+		// failure resolved to expiry) — definitively over, not just pending. Fall
+		// back to the free tier rather than merely locking: the product is
+		// free-to-use and gated by credits, not a subscription (see
+		// organization-context.provider.tsx), so leaving billing.planKey stuck at
+		// the lapsed paid plan would permanently trap the org behind the paywall
+		// with no way back in.
+		return downgradeToFree(e.AppUserID)
 
 	case "CANCELLATION":
 		// Auto-renew disabled — the user keeps access until EXPIRATION. Leave the
@@ -125,14 +130,15 @@ func process(e *rcEvent) error {
 		return nil
 
 	case "TRANSFER":
-		// The entitlement moved to a different app_user_id (org). Revoke the orgs
-		// it moved away from; the destination org gets its own purchase/renewal
-		// events which reactivate it.
+		// The entitlement moved to a different app_user_id (org). The org(s) it
+		// moved away from no longer hold it, so they fall back to free (same
+		// reasoning as EXPIRATION); the destination org gets its own
+		// purchase/renewal events which apply the plan there.
 		for _, from := range e.TransferredFrom {
 			if from == "" {
 				continue
 			}
-			if err := setAccessState(from, "canceled"); err != nil {
+			if err := downgradeToFree(from); err != nil {
 				return err
 			}
 		}
@@ -236,4 +242,21 @@ func setAccessState(orgID, state string) error {
 		billing.Status = myutil.IntPtr(3) // mirrors Razorpay "cancelled"
 	}
 	return org.SetBilling(orgID, billing)
+}
+
+// downgradeToFree resets an org to the free tier (see
+// trendlymodels.DowngradeToFree), no-op'ing (ack) when the org is missing so
+// RC stops retrying. Used for terminal events (EXPIRATION, TRANSFER-revoked)
+// where the paid subscription is definitively gone, as opposed to
+// setAccessState's past_due/canceled-but-still-has-access-until-expiry states.
+func downgradeToFree(orgID string) error {
+	if orgID == "" {
+		return nil
+	}
+	org := &trendlymodels.Organization{}
+	if err := org.Get(orgID); err != nil {
+		log.Println("revenuecat webhook: org not found for downgrade, ignoring", orgID, err)
+		return nil
+	}
+	return trendlymodels.DowngradeToFree(orgID)
 }

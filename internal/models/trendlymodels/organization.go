@@ -232,6 +232,26 @@ func SetOrgAccessState(orgID, state string) error {
 	return err
 }
 
+// DowngradeToFree resets an org to the free tier when its paid subscription
+// definitively ends (RevenueCat EXPIRATION/TRANSFER-revoked, Razorpay
+// "cancelled"). It resets both the top-level PlanKey (via ApplyPlanToOrg —
+// entitlements + wallet) AND the nested billing.planKey, because the frontend
+// paywall gate (contexts/organization-context.provider.tsx) reads
+// billing.planKey, not the top-level field: a lapsed paid billing.planKey that
+// is never reset to "free" permanently traps the org behind the paywall with
+// no way back in, since the gate's free-plan exemption never matches.
+func DowngradeToFree(orgID string) error {
+	if err := ApplyPlanToOrg(orgID, "free", NextMonthlyReset(time.Now())); err != nil {
+		return err
+	}
+	_, err := firestoredb.Client.Collection(orgCollection).Doc(orgID).Update(context.Background(), []firestore.Update{
+		{Path: "billing.planKey", Value: "free"},
+		{Path: "billing.accessState", Value: "active"},
+		{Path: "billing.status", Value: 1}, // ModelStatus.Accepted — free plan needs no acceptance step, but keep the legacy field consistent with the new planKey
+	})
+	return err
+}
+
 // ResolveMaxBrands returns the brand cap for a plan key, defaulting to 1 (the
 // free-tier cap) for unknown/empty keys.
 func ResolveMaxBrands(planKey string) int {
