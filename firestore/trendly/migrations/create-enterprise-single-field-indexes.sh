@@ -132,6 +132,14 @@ idx messages COLLECTION field-path=timeStamp,order=descending
 idx messages COLLECTION field-path=timestamp,order=ascending
 
 # =============================================================================
+# teams  (subcollection of brands) — DELIBERATELY NOT INDEXED
+# =============================================================================
+# team.go GetDefaultTeamCreator — where isDefault == true, limit 1.
+# Scoped to one brand's teams subcollection, which holds a handful of documents
+# (see defaultTeamSpecs), so an unindexed scan on Enterprise is cheaper than the
+# write/storage cost of an index. Revisit only if teams-per-brand grows.
+
+# =============================================================================
 # yupdates  (covered already: isSnapshot)
 # =============================================================================
 # FirestoreYjsProvider.ts:225 — where createdAt < x, orderBy createdAt asc

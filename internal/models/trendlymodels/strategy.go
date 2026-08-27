@@ -113,6 +113,16 @@ func ListStrategies(ctx context.Context, brandID string, limit int) ([]Strategy,
 	return out, nil
 }
 
+// CountStrategies returns how many strategies a brand has created. Used by the
+// admin Brand CRM; ListStrategies is capped and ordered for display, so it
+// cannot answer this.
+func CountStrategies(ctx context.Context, brandID string) (int, error) {
+	if brandID == "" {
+		return 0, fmt.Errorf("CountStrategies: empty brandID")
+	}
+	return CountQuery(ctx, strategiesCollection(brandID).Query)
+}
+
 // UpdateStrategy applies a partial update to a strategy document. Callers build
 // the []firestore.Update (so they can use firestore.Increment, FieldPath edits,
 // etc.) — the Firestore call itself lives here in the model.

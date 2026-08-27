@@ -46,6 +46,17 @@ func CreateConversation(ctx context.Context, brandID, userID, module, contextID,
 	return &conv, nil
 }
 
+// CountConversationsByBrand returns how many AI conversations a brand has
+// started. Conversations live in one flat top-level collection keyed by
+// brandId (not under the brand), so this filters rather than scoping a
+// subcollection. Used by the admin Brand CRM.
+func CountConversationsByBrand(ctx context.Context, brandID string) (int, error) {
+	if brandID == "" {
+		return 0, fmt.Errorf("CountConversationsByBrand: empty brandID")
+	}
+	return trendlymodels.CountQuery(ctx, conversationsRef().Where("brandId", "==", brandID))
+}
+
 func GetConversation(ctx context.Context, conversationID string) (*trendlymodels.AIConversation, error) {
 	snap, err := conversationsRef().Doc(conversationID).Get(ctx)
 	if err != nil {
