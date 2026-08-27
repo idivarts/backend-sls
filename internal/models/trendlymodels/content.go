@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 // Content mirrors the brand-app content document at
@@ -301,6 +302,65 @@ func DeleteContentInRange(ctx context.Context, brandID string, start, end int64)
 		}
 	}
 	return removed, nil
+}
+
+// ContentUsage summarises how much content a brand has produced. Used by the
+// admin Brand CRM to profile product usage.
+type ContentUsage struct {
+	Total int `json:"total"`
+	// ByStatus counts documents per lifecycle status ("draft", "scheduled",
+	// "approved", "posted", …). Content with no status set is bucketed as
+	// "draft", which is how the apps treat it.
+	ByStatus map[string]int `json:"byStatus"`
+	// FromStrategy counts content that originated from a strategy's
+	// push-to-calendar (i.e. carries a strategyId). Push-to-calendar keeps no
+	// event log of its own, so this is the closest available proxy for how
+	// often that flow is used — it under-counts pushes that replaced an
+	// existing window without creating new documents.
+	FromStrategy int `json:"fromStrategy"`
+}
+
+// CountContent returns how many content documents a brand has.
+func CountContent(ctx context.Context, brandID string) (int, error) {
+	return CountQuery(ctx, contentsCollection(brandID).Query)
+}
+
+// GetContentUsage returns the brand's content total, its per-status breakdown
+// and its strategy-originated count.
+//
+// Deliberately one pass: a projection over just `status` and `strategyId`
+// answers all three, where per-status COUNT aggregations would need a query per
+// status and still miss statuses we didn't think to ask for.
+func GetContentUsage(ctx context.Context, brandID string) (*ContentUsage, error) {
+	iter := contentsCollection(brandID).
+		Select("status", "strategyId").
+		Documents(ctx)
+	defer iter.Stop()
+
+	usage := &ContentUsage{ByStatus: map[string]int{}}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		usage.Total++
+
+		data := doc.Data()
+		status, _ := data["status"].(string)
+		if status == "" {
+			status = "draft"
+		}
+		usage.ByStatus[status]++
+
+		if strategyID, _ := data["strategyId"].(string); strategyID != "" {
+			usage.FromStrategy++
+		}
+	}
+	return usage, nil
 }
 
 // ListContentByStatus returns a brand's content documents in the given status

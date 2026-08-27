@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/admin"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
@@ -42,6 +43,12 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/organizations/:id/brands/:brandId/transfer", trendlyapis.TransferBrand)
 	// Soft-delete a brand (blocked while it has active contracts).
 	managerApisV1.DELETE("/brands/:brandId", trendlyapis.DeleteBrand)
+
+	// ── Admin / internal ops (Brand CRM) ──────────────────────────────────────
+	// Cross-tenant product-usage metrics. Each handler gates on Manager.IsAdmin
+	// itself — the Firestore rules cannot protect these reads.
+	managerApisV1.GET("/admin/brands/usage", admin.ListBrandUsage)
+	managerApisV1.GET("/admin/brands/:brandId/usage", admin.GetBrandUsage)
 
 	// ── Account (self-service account deletion — App Store / Play requirement) ──
 	// Blocked while the manager still solely owns an org with active brands or a

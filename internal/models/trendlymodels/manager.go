@@ -2,6 +2,7 @@ package trendlymodels
 
 import (
 	"context"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
@@ -31,6 +32,16 @@ type Manager struct {
 
 	CreationTime int64 `json:"creationTime" firestore:"creationTime"`
 
+	// LastSeenPlatform is the client the manager most recently used, one of
+	// "ios" | "android" | "web-desktop" | "web-mobile". Captured from the
+	// X-Client-Platform request header (see middlewares.TrendlyMiddleware) and
+	// refreshed at most hourly, so it is a coarse "how do they use us" signal
+	// for the admin CRM — not a session log. Empty for managers who have not
+	// made a request since this shipped.
+	LastSeenPlatform string `json:"lastSeenPlatform,omitempty" firestore:"lastSeenPlatform,omitempty"`
+	// LastSeenAt is when LastSeenPlatform was last stamped (epoch ms).
+	LastSeenAt int64 `json:"lastSeenAt,omitempty" firestore:"lastSeenAt,omitempty"`
+
 	// DeletedAt soft-deletes the manager account (epoch ms). Non-nil means the
 	// user deleted their account (Firebase auth + Stream user are also removed and
 	// every brand/org membership is stripped). Kept as an audit marker.
@@ -52,6 +63,34 @@ func (u *Manager) Get(managerId string) error {
 func (u *Manager) Insert(managerId string) (*firestore.WriteResult, error) {
 	wr, err := firestoredb.Client.Collection("managers").Doc(managerId).Set(context.Background(), u)
 	return wr, err
+}
+
+// LastSeenRefreshInterval is how stale LastSeenAt must be before the middleware
+// bothers writing it again. This runs on every authenticated manager request,
+// so the throttle is what keeps it from becoming a write per request.
+const LastSeenRefreshInterval = int64(time.Hour / time.Millisecond)
+
+// ShouldRefreshLastSeen reports whether the manager's stored device info is
+// worth rewriting: the platform changed, or the last stamp has aged out.
+func (u *Manager) ShouldRefreshLastSeen(platform string, now int64) bool {
+	if platform == "" {
+		return false
+	}
+	if u.LastSeenPlatform != platform {
+		return true
+	}
+	return now-u.LastSeenAt >= LastSeenRefreshInterval
+}
+
+// TouchManagerLastSeen records which client the manager is currently using.
+// Callers must gate this with ShouldRefreshLastSeen.
+func TouchManagerLastSeen(ctx context.Context, managerID, platform string, at int64) error {
+	_, err := firestoredb.Client.Collection("managers").Doc(managerID).
+		Update(ctx, []firestore.Update{
+			{Path: "lastSeenPlatform", Value: platform},
+			{Path: "lastSeenAt", Value: at},
+		})
+	return err
 }
 
 // SoftDeleteManager stamps deletedAt on the manager doc. The DeleteManager

@@ -165,6 +165,40 @@ func (b *Brand) IsIndia() bool {
 	return strings.EqualFold(*b.Country, "IN")
 }
 
+// BrandRef is a lightweight brand row (id + owning org) for admin listings that
+// only need to fan work out per brand, not render brand detail.
+type BrandRef struct {
+	ID             string `json:"id"`
+	OrganizationID string `json:"organizationId,omitempty"`
+}
+
+// ListAllBrandRefs returns every non-deleted brand's id and organization id.
+// Projects just the two fields it needs so listing every brand stays cheap.
+func ListAllBrandRefs(ctx context.Context) ([]BrandRef, error) {
+	iter := firestoredb.Client.Collection("brands").
+		Select("organizationId", "deletedAt").
+		Documents(ctx)
+	defer iter.Stop()
+
+	refs := []BrandRef{}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		data := doc.Data()
+		if deletedAt, ok := data["deletedAt"]; ok && deletedAt != nil {
+			continue
+		}
+		orgID, _ := data["organizationId"].(string)
+		refs = append(refs, BrandRef{ID: doc.Ref.ID, OrganizationID: orgID})
+	}
+	return refs, nil
+}
+
 func (u *Brand) Get(brandId string) error {
 	res, err := firestoredb.Client.Collection("brands").Doc(brandId).Get((context.Background()))
 	if err != nil {
