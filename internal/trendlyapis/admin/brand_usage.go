@@ -14,10 +14,16 @@ import (
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
-// usageFanout bounds how many brands are aggregated concurrently. The list
-// endpoint touches every brand, so this keeps Lambda from opening an unbounded
-// number of simultaneous Firestore queries.
-const usageFanout = 8
+// usageFanout bounds how many brands are aggregated concurrently on the list
+// endpoint, and how many member manager lookups run concurrently on the detail
+// endpoint. These are small, independent Firestore reads (COUNT aggregations
+// and single-doc Gets) bottlenecked entirely on network round-trip time, not
+// CPU or Firestore throughput — a real single-brand detail call was observed
+// taking 3-9s over ~10 SEQUENTIAL round trips (see GetBrandUsage), so a high
+// number here buys real wall-clock time back. API Gateway hard-caps every
+// request at 29s with no override, so the list endpoint fanning out across
+// every brand has to fit inside that regardless of brand count.
+const usageFanout = 32
 
 // BrandOwner identifies the human accountable for a brand — the org owner where
 // the brand belongs to an organization, otherwise the brand's creator.
@@ -242,15 +248,31 @@ func ListBrandUsage(c *gin.Context) {
 			defer func() { <-sem }()
 
 			agg := &aggregate{}
-			// A failed count must not blank out the whole board — leave that
-			// metric at zero and keep the rest of the row.
-			if conversations, err := openrouter.CountConversationsByBrand(ctx, ref.ID); err == nil {
-				agg.conversations = conversations
-			}
-			if content, err := trendlymodels.CountContent(ctx, ref.ID); err == nil {
-				agg.content = content
-			}
-			agg.ownerID, agg.ownerSource = idx.resolveOwnerID(ctx, ref.ID)
+			// The 3 lookups below are independent Firestore round trips (two
+			// COUNT aggregations, one that only reads for brands with no
+			// organization). Running them concurrently means this brand's cost
+			// is the SLOWEST of the three, not their sum.
+			var inner sync.WaitGroup
+			inner.Add(3)
+			go func() {
+				defer inner.Done()
+				// A failed count must not blank out the whole board — leave
+				// that metric at zero and keep the rest of the row.
+				if conversations, err := openrouter.CountConversationsByBrand(ctx, ref.ID); err == nil {
+					agg.conversations = conversations
+				}
+			}()
+			go func() {
+				defer inner.Done()
+				if content, err := trendlymodels.CountContent(ctx, ref.ID); err == nil {
+					agg.content = content
+				}
+			}()
+			go func() {
+				defer inner.Done()
+				agg.ownerID, agg.ownerSource = idx.resolveOwnerID(ctx, ref.ID)
+			}()
+			inner.Wait()
 
 			mu.Lock()
 			aggregates[ref.ID] = agg
@@ -295,28 +317,67 @@ func GetBrandUsage(c *gin.Context) {
 		return
 	}
 
-	orgs, err := trendlymodels.ListAllOrganizations()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	// Resolve just this brand's own organization by id rather than scanning
+	// every organization document (trendlymodels.ListAllOrganizations) —
+	// buildOrgIndex works the same either way, since it only ever looks up by
+	// brand id, but this is a single Get instead of the whole collection.
+	var orgs []trendlymodels.OrganizationWithID
+	if brand.OrganizationID != nil && *brand.OrganizationID != "" {
+		var org trendlymodels.Organization
+		if err := org.Get(*brand.OrganizationID); err == nil {
+			orgs = append(orgs, trendlymodels.OrganizationWithID{
+				ID:           *brand.OrganizationID,
+				Organization: org,
+			})
+		}
 	}
 	idx := buildOrgIndex(orgs)
 
-	ownerID, ownerSource := idx.resolveOwnerID(ctx, brandID)
+	// The 4 lookups below are independent Firestore reads. A single-brand
+	// request was observed taking 3-9s run sequentially (see usageFanout);
+	// running them concurrently cuts that to roughly the slowest one.
+	var (
+		ownerID, ownerSource             string
+		conversations                    int
+		contentUsage                     *trendlymodels.ContentUsage
+		strategies                       int
+		members                          []BrandMemberUsage
+		convErr, contentErr, strategyErr error
+	)
+	var wg sync.WaitGroup
+	wg.Add(5)
+	go func() {
+		defer wg.Done()
+		ownerID, ownerSource = idx.resolveOwnerID(ctx, brandID)
+	}()
+	go func() {
+		defer wg.Done()
+		conversations, convErr = openrouter.CountConversationsByBrand(ctx, brandID)
+	}()
+	go func() {
+		defer wg.Done()
+		contentUsage, contentErr = trendlymodels.GetContentUsage(ctx, brandID)
+	}()
+	go func() {
+		defer wg.Done()
+		strategies, strategyErr = trendlymodels.CountStrategies(ctx, brandID)
+	}()
+	go func() {
+		defer wg.Done()
+		members = brandMemberUsage(ctx, brandID)
+	}()
+	wg.Wait()
 
-	conversations, err := openrouter.CountConversationsByBrand(ctx, brandID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if convErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": convErr.Error()})
 		return
 	}
-	contentUsage, err := trendlymodels.GetContentUsage(ctx, brandID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if contentErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": contentErr.Error()})
 		return
 	}
-	strategies, err := trendlymodels.CountStrategies(ctx, brandID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if strategyErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": strategyErr.Error()})
 		return
 	}
 
@@ -330,7 +391,7 @@ func GetBrandUsage(c *gin.Context) {
 		},
 		StrategiesTotal: strategies,
 		Content:         contentUsage,
-		Members:         brandMemberUsage(brandID),
+		Members:         members,
 	}
 
 	c.JSON(http.StatusOK, detail)
@@ -339,26 +400,49 @@ func GetBrandUsage(c *gin.Context) {
 // brandMemberUsage lists the brand's members with the device each was last seen
 // on. Members whose manager document is missing are skipped rather than
 // surfaced as blank rows.
-func brandMemberUsage(brandID string) []BrandMemberUsage {
+//
+// Each member needs its own Manager.Get — there is no batch-get in this
+// codebase's Firestore wrapper — so for a brand with several members this ran
+// as several SEQUENTIAL round trips. Fetching by index into a pre-sized slice
+// lets those run concurrently while still assembling the result in the
+// brand's original member order.
+func brandMemberUsage(ctx context.Context, brandID string) []BrandMemberUsage {
 	members, err := trendlymodels.GetAllBrandMembers(brandID)
 	if err != nil {
 		return []BrandMemberUsage{}
 	}
 
+	rows := make([]*BrandMemberUsage, len(members))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, usageFanout)
+	for i, member := range members {
+		wg.Add(1)
+		go func(i int, member trendlymodels.BrandMember) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			var manager trendlymodels.Manager
+			if err := manager.Get(member.ManagerID); err != nil {
+				return
+			}
+			rows[i] = &BrandMemberUsage{
+				ManagerID:        member.ManagerID,
+				Name:             manager.Name,
+				Email:            manager.Email,
+				ProfileImage:     manager.ProfileImage,
+				LastSeenPlatform: manager.LastSeenPlatform,
+				LastSeenAt:       manager.LastSeenAt,
+			}
+		}(i, member)
+	}
+	wg.Wait()
+
 	out := make([]BrandMemberUsage, 0, len(members))
-	for _, member := range members {
-		var manager trendlymodels.Manager
-		if err := manager.Get(member.ManagerID); err != nil {
-			continue
+	for _, row := range rows {
+		if row != nil {
+			out = append(out, *row)
 		}
-		out = append(out, BrandMemberUsage{
-			ManagerID:        member.ManagerID,
-			Name:             manager.Name,
-			Email:            manager.Email,
-			ProfileImage:     manager.ProfileImage,
-			LastSeenPlatform: manager.LastSeenPlatform,
-			LastSeenAt:       manager.LastSeenAt,
-		})
 	}
 	return out
 }
