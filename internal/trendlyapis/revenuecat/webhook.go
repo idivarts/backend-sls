@@ -115,8 +115,13 @@ func process(e *rcEvent) error {
 
 	case "EXPIRATION":
 		// Subscription lapsed (auto-renew off + period ended, or refund/billing
-		// failure resolved to expiry). Revoke access; the paywall/lock reads this.
-		return setAccessState(e.AppUserID, "canceled")
+		// failure resolved to expiry) — definitively over, not just pending. Fall
+		// back to the free tier rather than merely locking: the product is
+		// free-to-use and gated by credits, not a subscription (see
+		// organization-context.provider.tsx), so leaving billing.planKey stuck at
+		// the lapsed paid plan would permanently trap the org behind the paywall
+		// with no way back in.
+		return downgradeToFree(e.AppUserID)
 
 	case "CANCELLATION":
 		// Auto-renew disabled — the user keeps access until EXPIRATION. Leave the
@@ -125,18 +130,28 @@ func process(e *rcEvent) error {
 		return nil
 
 	case "TRANSFER":
-		// The entitlement moved to a different app_user_id (org). Revoke the orgs
-		// it moved away from; the destination org gets its own purchase/renewal
-		// events which reactivate it.
-		for _, from := range e.TransferredFrom {
-			if from == "" {
-				continue
-			}
-			if err := setAccessState(from, "canceled"); err != nil {
-				return err
+		// Subscriptions are NOT transferable between orgs — the org it moved
+		// away from keeps its plan exactly as-is (untouched), and the org(s) it
+		// moved to do NOT get funded. Record a restore conflict on the
+		// destination org(s) instead, naming the org that already owns it, so
+		// the frontend paywall can explain why nothing changed rather than
+		// silently doing nothing (see trendlymodels.RecordRestoreConflict +
+		// BillingStatusBanner's restore-conflict popup).
+		from := ""
+		if len(e.TransferredFrom) > 0 {
+			from = e.TransferredFrom[0]
+		}
+		if from != "" {
+			for _, to := range e.TransferredTo {
+				if to == "" {
+					continue
+				}
+				if err := trendlymodels.RecordRestoreConflict(to, from); err != nil {
+					return err
+				}
 			}
 		}
-		log.Println("revenuecat webhook: transfer", e.TransferredFrom, "->", e.TransferredTo)
+		log.Println("revenuecat webhook: transfer blocked (subscriptions are not transferable)", e.TransferredFrom, "->", e.TransferredTo)
 		return nil
 
 	default:
@@ -161,6 +176,18 @@ func applyActiveSubscription(e *rcEvent) error {
 	if err := org.Get(orgID); err != nil {
 		log.Println("revenuecat webhook: org not found, ignoring", orgID, err)
 		return nil // ack — not our org (or deleted)
+	}
+
+	// Defense in depth alongside the TRANSFER handler above: a transaction id
+	// is claimed by whichever org activates it first, and never reassigned —
+	// subscriptions are not transferable between orgs. This mainly guards
+	// RENEWAL events arriving for an already-transferred subscription; a fresh
+	// restore-on-another-org normally surfaces as a TRANSFER event instead.
+	if owner, err := trendlymodels.ClaimTransactionOwner(e.OriginalTransactionID, orgID); err != nil {
+		return err
+	} else if owner != "" && owner != orgID {
+		log.Println("revenuecat webhook: transaction already owned by a different org, ignoring", e.OriginalTransactionID, "owner", owner, "attempted by", orgID)
+		return trendlymodels.RecordRestoreConflict(orgID, owner)
 	}
 
 	reset := e.ExpirationAtMs
@@ -236,4 +263,21 @@ func setAccessState(orgID, state string) error {
 		billing.Status = myutil.IntPtr(3) // mirrors Razorpay "cancelled"
 	}
 	return org.SetBilling(orgID, billing)
+}
+
+// downgradeToFree resets an org to the free tier (see
+// trendlymodels.DowngradeToFree), no-op'ing (ack) when the org is missing so
+// RC stops retrying. Used for terminal events (EXPIRATION, TRANSFER-revoked)
+// where the paid subscription is definitively gone, as opposed to
+// setAccessState's past_due/canceled-but-still-has-access-until-expiry states.
+func downgradeToFree(orgID string) error {
+	if orgID == "" {
+		return nil
+	}
+	org := &trendlymodels.Organization{}
+	if err := org.Get(orgID); err != nil {
+		log.Println("revenuecat webhook: org not found for downgrade, ignoring", orgID, err)
+		return nil
+	}
+	return trendlymodels.DowngradeToFree(orgID)
 }

@@ -164,9 +164,18 @@ end-to-end before touching Prod at all.
    - Leave event types unfiltered (the handler ignores types it doesn't
      recognize — see `internal/trendlyapis/revenuecat/webhook.go`'s
      `process()` switch — so it's safe to send everything).
-7. **Transfer behavior**: set to "transfer to the new App User ID" for shared
-   purchases (an Apple ID used across two orgs). The backend revokes the org a
-   subscription transfers away from (`TRANSFER` event).
+7. **Transfer behavior**: subscriptions are intentionally **not transferable**
+   between orgs in this app (one org = one billing entity; a shared Apple/
+   Google account restoring on a second org should not silently move the
+   subscription away from the first). The backend enforces this regardless of
+   this dashboard setting — on a `TRANSFER` event it leaves the org the
+   subscription moved *away from* untouched and does **not** fund the org it
+   moved *to*; instead it records an `iapRestoreConflict` on the destination
+   org (naming the org that already owns it) which the frontend paywall reads
+   to show an explanatory popup with a "Contact support" WhatsApp deep link.
+   See `RecordRestoreConflict`/`ClaimTransactionOwner` in
+   `internal/models/trendlymodels/` and the `TRANSFER`/`applyActiveSubscription`
+   handling in `webhook.go`.
 
 Repeat step 6 with the dev-specific URL only for now — you'll create the Prod
 project (identical steps, prod URL/secret/keys) in §6 once dev is verified.
@@ -281,9 +290,9 @@ Cover every event type in the table below at least once against a real dev org
 | `RENEWAL` | Wait for accelerated sandbox renewal | Wallet refilled, `periodEnd` advances |
 | `NON_RENEWING_PURCHASE` (topup) | Buy `trendly_topup_1m` | `AddTopup` credits +1,000,000 tokens |
 | `BILLING_ISSUE` | RevenueCat test-event, or a sandbox card-decline simulation | `accessState=past_due` |
-| `EXPIRATION` | Cancel + wait for accelerated expiry, or test-event | `accessState=canceled` |
+| `EXPIRATION` | Cancel + wait for accelerated expiry, or test-event | Org falls back to the free plan (`planKey=free`, `accessState=active`) |
 | `CANCELLATION` | Cancel via Settings/Play Console | No state change (access retained until expiry) — confirm nothing broke |
-| `TRANSFER` | Purchase on the same sandbox Apple ID logged into a second dev org | Old org revoked |
+| `TRANSFER` | Restore the same sandbox Apple ID on a second dev org | Origin org untouched; destination org gets an `iapRestoreConflict` (not funded) — confirm the app shows the restore-conflict popup |
 | Duplicate delivery | Re-send the same event from RevenueCat's dashboard | Second delivery is a no-op (`webhookEvents` ledger dedupes by RevenueCat event id) |
 
 ---
@@ -381,9 +390,9 @@ Then in GitHub:
 | `INITIAL_PURCHASE`, `RENEWAL`, `PRODUCT_CHANGE`, `UNCANCELLATION` | `ApplyPlanToOrg` (refill wallet + entitlements), `AccessState=active`, `PeriodEnd=expiration` |
 | `NON_RENEWING_PURCHASE` | `AddTopup` (token pack) |
 | `BILLING_ISSUE` | `AccessState=past_due` |
-| `EXPIRATION` | `AccessState=canceled` |
+| `EXPIRATION` | `DowngradeToFree` (falls back to the free plan, not locked) |
 | `CANCELLATION` | no-op (access retained until expiry) |
-| `TRANSFER` | revoke the org(s) it moved away from |
+| `TRANSFER` | not transferable — origin org untouched; destination org gets an `iapRestoreConflict` instead of being funded |
 
 All events are idempotent — a retried delivery is deduped on the RevenueCat
 event id via the `webhookEvents` ledger (important so top-ups are never

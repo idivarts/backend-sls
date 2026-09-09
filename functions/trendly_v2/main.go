@@ -43,6 +43,11 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/organizations/:id/brands/:brandId/transfer", trendlyapis.TransferBrand)
 	// Soft-delete a brand (blocked while it has active contracts).
 	managerApisV1.DELETE("/brands/:brandId", trendlyapis.DeleteBrand)
+	// Self-service switch to the free plan — the paywall/billing screen's
+	// always-available fallback when a subscription is stuck/unwanted/lapsed.
+	managerApisV1.POST("/organizations/:id/downgrade-to-free", trendlyapis.DowngradeOrgToFree)
+	// Dismiss the "someone else already owns this subscription" popup.
+	managerApisV1.POST("/organizations/:id/iap/dismiss-restore-conflict", trendlyapis.DismissIapRestoreConflict)
 
 	// ── Admin / internal ops (Brand CRM) ──────────────────────────────────────
 	// Cross-tenant product-usage metrics. Each handler gates on Manager.IsAdmin
