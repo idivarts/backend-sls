@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/crm"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/hubspot"
-	"github.com/idivarts/backend-sls/pkg/myemail"
 	"google.golang.org/api/iterator"
 )
 
@@ -15,7 +15,7 @@ func main() {
 	iter := firestoredb.Client.Collection("users").Documents(context.Background())
 	defer iter.Stop()
 
-	contacts := []myemail.ContactDetails{}
+	contacts := []crm.ContactDetails{}
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -40,7 +40,7 @@ func main() {
 			if user.Profile != nil {
 				pCent = *user.Profile.CompletionPercentage
 			}
-			contacts = append(contacts, myemail.ContactDetails{
+			contacts = append(contacts, crm.ContactDetails{
 				Email:             *user.Email,
 				Name:              user.Name,
 				Phone:             phone,

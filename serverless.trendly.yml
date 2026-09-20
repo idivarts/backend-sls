@@ -36,9 +36,18 @@ provider:
     RENDER_QUEUE_URL: ${env:RENDER_QUEUE_URL, ''}
     BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
+    # ── Outbound email (Amazon SES) — see docs/ses-setup.md ─────────────────
+    EMAIL_SENDER_NAME: Trendly
+    EMAIL_SENDER_ADDRESS: no-reply@updates.trendly.now
+    EMAIL_REPLY_TO: support@trendly.now
+    SES_REGION: ${aws:region}
+    # Created by the EmailConfigurationSet resource below — one per stage, so
+    # dev and prod keep separate bounce/complaint event streams.
+    SES_CONFIGURATION_SET: !Ref EmailConfigurationSet
+    # SendGrid no longer sends mail. This key is still required by the marketing
+    # -contacts sync in pkg/mysendgrid/contact.go, which SES cannot replace —
+    # see docs/ses-setup.md §8.
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
-    SENDGRID_NAME: Trendly
-    SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
     # RevenueCat native IAP webhook shared secret. Must match the Authorization
     # header value configured in the RevenueCat dashboard webhook. See the IAP
@@ -134,6 +143,15 @@ provider:
           Action:
             - "sqs:SendMessage"
           Resource: { "Fn::GetAtt": ["SceneRenderQueue", "Arn"] }
+        # ── Outbound email via Amazon SES (pkg/myemail). Scoped to the verified
+        #    sending identity + the transactional configuration set. See
+        #    docs/ses-setup.md. ──
+        - Effect: "Allow"
+          Action:
+            - "ses:SendEmail"
+          Resource:
+            - "arn:aws:ses:${aws:region}:${aws:accountId}:identity/updates.trendly.now"
+            - "arn:aws:ses:${aws:region}:${aws:accountId}:configuration-set/trendly-transactional-${self:provider.stage}"
 plugins:
   - serverless-go-plugin
   - serverless-domain-manager
@@ -552,6 +570,64 @@ resources:
       Fn::Equals: ["${sls:stage}", "prod"]
 
   Resources:
+    # ── Outbound email (Amazon SES) ─────────────────────────────────────────
+    # The configuration set is what makes delivery/bounce/complaint events
+    # observable — SES does NOT create one for you, and a send naming a set that
+    # does not exist fails outright. Creating it here keeps it in lockstep with
+    # the IAM policy that references it. The sending IDENTITY (the verified
+    # domain + its DKIM/MAIL FROM DNS) is still a manual, one-time setup —
+    # see docs/ses-setup.md.
+    EmailConfigurationSet:
+      Type: AWS::SES::ConfigurationSet
+      Properties:
+        Name: trendly-transactional-${self:provider.stage}
+        ReputationOptions:
+          ReputationMetricsEnabled: true
+        SendingOptions:
+          SendingEnabled: true
+
+    EmailEventsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:service}-email-events-${self:provider.stage}
+        DisplayName: Trendly SES delivery events
+
+    # SES publishes as a service principal, so it needs an explicit grant on the
+    # topic; without this the event destination silently delivers nothing.
+    EmailEventsTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        Topics:
+          - !Ref EmailEventsTopic
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: ses.amazonaws.com
+              Action: "sns:Publish"
+              Resource: !Ref EmailEventsTopic
+              Condition:
+                StringEquals:
+                  AWS:SourceAccount: ${aws:accountId}
+
+    EmailConfigurationSetEventDestination:
+      Type: AWS::SES::ConfigurationSetEventDestination
+      Properties:
+        ConfigurationSetName: !Ref EmailConfigurationSet
+        EventDestination:
+          Name: sns-delivery-events
+          Enabled: true
+          MatchingEventTypes:
+            - send
+            - reject
+            - bounce
+            - complaint
+            - delivery
+            - renderingFailure
+          SnsDestination:
+            TopicARN: !Ref EmailEventsTopic
+
     DiscoveryMessageQueue:
       Type: AWS::SQS::Queue
       Properties:

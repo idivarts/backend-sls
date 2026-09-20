@@ -1,15 +1,16 @@
-package myemail_test
+package mysendgrid_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/crm"
+	"github.com/idivarts/backend-sls/pkg/mysendgrid"
 )
 
 func TestDataPush(t *testing.T) {
-	err := myemail.CreateOrUpdateContacts([]myemail.ContactDetails{{
+	err := mysendgrid.CreateOrUpdateContacts([]crm.ContactDetails{{
 		Email:             "rahul2@idiv.in",
 		Name:              "Rahul Sinha",
 		Phone:             "7604007156",
@@ -26,7 +27,7 @@ func TestDataPush(t *testing.T) {
 }
 
 func TestGetData(t *testing.T) {
-	contact, err := myemail.FetchContacts()
+	contact, err := mysendgrid.FetchContacts()
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -34,7 +35,7 @@ func TestGetData(t *testing.T) {
 }
 
 func TestGetJobStatus(t *testing.T) {
-	status, err := myemail.GetJobStatus("dfa71a35-a149-4f9d-890b-b1dfc9251f49")
+	status, err := mysendgrid.GetJobStatus("dfa71a35-a149-4f9d-890b-b1dfc9251f49")
 	if err != nil {
 		t.Error(err.Error())
 	}

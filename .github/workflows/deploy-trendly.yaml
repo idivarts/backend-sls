@@ -55,6 +55,9 @@ jobs:
           TWITTER_CLIENT_ID: ${{ vars.TWITTER_CLIENT_ID }}
           TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
           STREAM_SECRET: ${{ secrets.STREAM_SECRET }}
+          # Email sends via Amazon SES, authenticated by the Lambda execution
+          # role — no key needed. SENDGRID_API_KEY remains only for the
+          # marketing-contacts sync. See docs/ses-setup.md.
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_BASE64: ${{ secrets.TRENDLY_SERVICE_ACCOUNT }}
