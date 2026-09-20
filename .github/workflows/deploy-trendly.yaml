@@ -55,6 +55,12 @@ jobs:
           TWITTER_CLIENT_ID: ${{ vars.TWITTER_CLIENT_ID }}
           TWITTER_CLIENT_SECRET: ${{ secrets.TWITTER_CLIENT_SECRET }}
           STREAM_SECRET: ${{ secrets.STREAM_SECRET }}
+          # Outbound email. The job is bound to the `dev` / `prod` GitHub
+          # Environment above, so a single EMAIL_PROVIDER variable defined in
+          # each Environment resolves per-stage on its own. Unset ⇒ 'ses'
+          # (the default in serverless.trendly.yml); set it to 'sendgrid' in an
+          # Environment to roll that stage back. See docs/ses-setup.md.
+          EMAIL_PROVIDER: ${{ vars.EMAIL_PROVIDER }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
           FIREBASE_SERVICE_ACCOUNT_BASE64: ${{ secrets.TRENDLY_SERVICE_ACCOUNT }}
