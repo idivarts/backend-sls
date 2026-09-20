@@ -1,3 +1,9 @@
+// Package mysendgrid syncs marketing contacts to SendGrid.
+//
+// Email delivery moved to Amazon SES (pkg/myses) — this package no longer sends
+// mail. Marketing contacts stayed behind because SES has no equivalent: its
+// "contact lists" only do unsubscribe management. See docs/ses-setup.md §8 —
+// the intended resolution is to fold this into HubSpot and delete it.
 package mysendgrid
 
 import (
@@ -15,11 +21,6 @@ import (
 	"github.com/idivarts/backend-sls/pkg/crm"
 )
 
-// Marketing contacts are a SendGrid-only capability — SES has no equivalent
-// (its "contact lists" only do unsubscribe management). This therefore does NOT
-// follow the EMAIL_PROVIDER switch and always talks to SendGrid, so it keeps
-// reading SENDGRID_API_KEY directly. See docs/ses-setup.md §8 — the intended
-// resolution is to fold this into HubSpot and delete it.
 var marketingAPIKey = os.Getenv("SENDGRID_API_KEY")
 
 func CreateOrUpdateContacts(contacts []crm.ContactDetails) error {

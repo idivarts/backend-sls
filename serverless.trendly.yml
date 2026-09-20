@@ -36,12 +36,7 @@ provider:
     RENDER_QUEUE_URL: ${env:RENDER_QUEUE_URL, ''}
     BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
-    # ── Outbound email ──────────────────────────────────────────────────────
-    # EMAIL_PROVIDER selects the delivery path at runtime: 'ses' (Amazon SES,
-    # default) or 'sendgrid' (legacy rollback path). Override per stage with the
-    # EMAIL_PROVIDER variable in that stage's GitHub Environment. See
-    # docs/ses-setup.md.
-    EMAIL_PROVIDER: ${env:EMAIL_PROVIDER, 'ses'}
+    # ── Outbound email (Amazon SES) — see docs/ses-setup.md ─────────────────
     EMAIL_SENDER_NAME: Trendly
     EMAIL_SENDER_ADDRESS: no-reply@updates.trendly.now
     EMAIL_REPLY_TO: support@trendly.now
@@ -49,11 +44,10 @@ provider:
     # Created by the EmailConfigurationSet resource below — one per stage, so
     # dev and prod keep separate bounce/complaint event streams.
     SES_CONFIGURATION_SET: !Ref EmailConfigurationSet
-    # SendGrid — still required while any stage runs EMAIL_PROVIDER=sendgrid, and
-    # by the marketing-contacts sync in pkg/myemail/contact.go.
+    # SendGrid no longer sends mail. This key is still required by the marketing
+    # -contacts sync in pkg/mysendgrid/contact.go, which SES cannot replace —
+    # see docs/ses-setup.md §8.
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
-    SENDGRID_NAME: Trendly
-    SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
     # RevenueCat native IAP webhook shared secret. Must match the Authorization
     # header value configured in the RevenueCat dashboard webhook. See the IAP

@@ -1,8 +1,8 @@
 // Package myemail renders the HTML templates in templates/ and hands them to
-// whichever provider EMAIL_PROVIDER selects.
+// the configured mailer.Sender.
 //
-// It owns the template/content concerns only. Delivery lives in pkg/myses and
-// pkg/mysendgrid, behind the mailer.Sender interface.
+// It owns the template/content concerns only. Delivery lives in pkg/myses,
+// behind the mailer.Sender interface.
 package myemail
 
 import (
