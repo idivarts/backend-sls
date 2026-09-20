@@ -70,9 +70,9 @@ backend-sls/
 │   ├── facebook/       # Facebook Graph/Messenger client
 │   ├── payments/       # Razorpay wrappers
 │   ├── mailer/         # Message + Sender interface (provider-neutral)
-│   ├── myemail/        # Renders templates, picks the sender
+│   ├── myemail/        # Renders templates, owns the sender
 │   ├── myses/          # Amazon SES v2 delivery
-│   ├── mysendgrid/     # SendGrid delivery + marketing contacts (legacy)
+│   ├── mysendgrid/     # SendGrid marketing contacts only (no longer sends mail)
 │   ├── crm/            # ContactDetails shared by hubspot + mysendgrid
 │   ├── gemini/         # Google Gemini AI
 │   ├── myopenai/       # OpenAI assistant wrappers
@@ -207,8 +207,7 @@ if err := c.ShouldBindJSON(&req); err != nil {
 - `pkg/myemail/config.go` — sender identity + provider selection from env
 - `pkg/myemail/htmltext.go` — HTML → text/plain alternative part
 - `pkg/mailer/` — `Message` + `Sender` interface, depends on nothing
-- `pkg/myses/` — Amazon SES v2 delivery (default)
-- `pkg/mysendgrid/` — legacy SendGrid delivery, kept for rollback
+- `pkg/myses/` — Amazon SES v2 delivery
 
 ### Template Format Rules
 Every template HTML file **must** start with a comment block listing all dynamic variables:
@@ -255,14 +254,17 @@ err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.MyTempla
 
 ### Delivery Provider (Amazon SES)
 
-Outbound email goes through **Amazon SES v2**. `EMAIL_PROVIDER` selects the path
-at runtime (`ses` | `sendgrid`), **defaulting to `ses`**; override it per stage
-with the `EMAIL_PROVIDER` variable in that stage's GitHub Environment. Rollback
-is the same variable.
+Outbound email goes through **Amazon SES v2**, authenticated by the Lambda
+execution role — there is no API key and **no SendGrid fallback**. SES
+production access is granted on the account.
 
 `pkg/myemail` owns templates and content only — delivery lives behind
-`mailer.Sender`, so adding or swapping a provider touches one file
-(`pkg/myemail/config.go`) and never a handler.
+`mailer.Sender`, so adding or swapping a provider touches one assignment in
+`pkg/myemail/config.go` and never a handler.
+
+SendGrid still backs the **marketing-contacts sync only**
+(`pkg/mysendgrid/contact.go`), which is why `SENDGRID_API_KEY` survives. SES has
+no equivalent API — see `docs/ses-setup.md` §7.
 
 Templates are rendered locally with `html/template` — SES never sees them, so
 adding an email needs no provider-side setup. Every send also carries an
@@ -325,5 +327,5 @@ sls deploy --stage dev --config serverless.trendly.yml
 
 ## Key Env Vars
 `FB_CLIENT_SECRET`, `INSTA_CLIENT_SECRET`, `STREAM_SECRET`, `JWT_ENCODE_KEY`,
-`OPENAI_API_KEY`, `HUBSPOT_API_KEY`, `EMAIL_PROVIDER`, `SES_CONFIGURATION_SET`,
-`SENDGRID_API_KEY` (legacy: rollback path + marketing-contacts sync)
+`OPENAI_API_KEY`, `HUBSPOT_API_KEY`, `SES_CONFIGURATION_SET`,
+`SENDGRID_API_KEY` (marketing-contacts sync only)
