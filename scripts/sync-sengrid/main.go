@@ -8,8 +8,9 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/crm"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
-	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/mysendgrid"
 	"google.golang.org/api/iterator"
 )
 
@@ -36,7 +37,7 @@ func syncManagers() {
 	iter := firestoredb.Client.Collection("managers").Documents(context.Background())
 	defer iter.Stop()
 
-	contacts := []myemail.ContactDetails{}
+	contacts := []crm.ContactDetails{}
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -65,7 +66,7 @@ func syncManagers() {
 			if manager.CreationTime == 0 {
 				manager.CreationTime = time.Now().UnixMilli()
 			}
-			mContact := myemail.ContactDetails{
+			mContact := crm.ContactDetails{
 				Email:        manager.Email,
 				Name:         manager.Name,
 				IsManager:    true,
@@ -85,7 +86,7 @@ func syncManagers() {
 	}
 	log.Println("Got all docs", len(contacts))
 	for i := 0; i < len(contacts); i += 100 {
-		err := myemail.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
+		err := mysendgrid.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
 		if err != nil {
 			panic(err.Error())
 		}
@@ -98,7 +99,7 @@ func syncUsers() {
 	defer iter.Stop()
 
 	incompleteProfiles := 0
-	contacts := []myemail.ContactDetails{}
+	contacts := []crm.ContactDetails{}
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -148,7 +149,7 @@ func syncUsers() {
 			if user.Profile != nil {
 				pCent = *user.Profile.CompletionPercentage
 			}
-			contacts = append(contacts, myemail.ContactDetails{
+			contacts = append(contacts, crm.ContactDetails{
 				Email:             *user.Email,
 				Name:              user.Name,
 				Phone:             phone,
@@ -165,7 +166,7 @@ func syncUsers() {
 	}
 	log.Println("Got all docs", len(contacts), incompleteProfiles, ":", len(contacts)-incompleteProfiles)
 	for i := 0; i < len(contacts); i += 100 {
-		err := myemail.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
+		err := mysendgrid.CreateOrUpdateContacts(contacts[i:min(i+100, len(contacts))])
 		if err != nil {
 			log.Println("Error", err.Error())
 			panic(err.Error())

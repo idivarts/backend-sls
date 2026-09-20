@@ -1,4 +1,4 @@
-package myemail
+package mysendgrid
 
 import (
 	"bytes"
@@ -8,36 +8,22 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/idivarts/backend-sls/pkg/crm"
 )
 
-// CleanName removes all non-alphabetic characters and replaces them with a space
-func CleanName(name string) string {
-	// Replace all characters that are not A-Z, a-z, or space with a space
-	re := regexp.MustCompile(`[^a-zA-Z ]+`)
-	cleaned := re.ReplaceAllString(name, " ")
+// Marketing contacts are a SendGrid-only capability — SES has no equivalent
+// (its "contact lists" only do unsubscribe management). This therefore does NOT
+// follow the EMAIL_PROVIDER switch and always talks to SendGrid, so it keeps
+// reading SENDGRID_API_KEY directly. See docs/ses-setup.md §8 — the intended
+// resolution is to fold this into HubSpot and delete it.
+var marketingAPIKey = os.Getenv("SENDGRID_API_KEY")
 
-	// Replace multiple spaces with a single space and trim the result
-	reSpace := regexp.MustCompile(`\s+`)
-	return strings.TrimSpace(reSpace.ReplaceAllString(cleaned, " "))
-}
-
-type ContactDetails struct {
-	Email             string
-	Name              string // Will be split into First and Last name
-	Phone             string
-	IsManager         bool   // custom: user_type
-	CompanyName       string // custom: company
-	SocialLink        string
-	ProfileCompletion int    // custom: profile_completion
-	CreationTime      *int64 // custom: creation_time
-	LastActivityTime  *int64 // custom: last_use_time
-}
-
-func CreateOrUpdateContacts(contacts []ContactDetails) error {
-	sendgridAPIKey := apiKey // Set this to your SendGrid API key
+func CreateOrUpdateContacts(contacts []crm.ContactDetails) error {
+	sendgridAPIKey := marketingAPIKey
 
 	if len(contacts) == 0 {
 		return errors.New("empty-array")
@@ -50,9 +36,9 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 		}
 
 		if contact.Name != "" {
-			contact.Name = CleanName(contact.Name)
+			contact.Name = crm.CleanName(contact.Name)
 			contactPayload["first_name"] = strings.Split(contact.Name, " ")[0]
-			if parts := splitName(contact.Name); len(parts) > 1 {
+			if parts := crm.SplitName(contact.Name); len(parts) > 1 {
 				contactPayload["last_name"] = parts[1]
 			}
 		}
@@ -139,8 +125,8 @@ func CreateOrUpdateContacts(contacts []ContactDetails) error {
 	return nil
 }
 
-func FetchContacts() ([]ContactDetails, error) {
-	sendgridAPIKey := apiKey // Set this to your SendGrid API key
+func FetchContacts() ([]crm.ContactDetails, error) {
+	sendgridAPIKey := marketingAPIKey
 
 	url := "https://api.sendgrid.com/v3/marketing/contacts"
 	req, err := http.NewRequest("GET", url, nil)
@@ -178,9 +164,9 @@ func FetchContacts() ([]ContactDetails, error) {
 		return nil, err
 	}
 
-	var contacts []ContactDetails
+	var contacts []crm.ContactDetails
 	for _, res := range response.Result {
-		contact := ContactDetails{
+		contact := crm.ContactDetails{
 			Email: res.Email,
 			Name:  fmt.Sprintf("%s %s", res.FirstName, res.LastName),
 			Phone: res.PhoneNumber,
@@ -212,7 +198,7 @@ func FetchContacts() ([]ContactDetails, error) {
 }
 
 func GetJobStatus(jobID string) (string, error) {
-	sendgridAPIKey := apiKey // Set this to your SendGrid API key
+	sendgridAPIKey := marketingAPIKey
 
 	if jobID == "" {
 		return "", errors.New("jobID cannot be empty")
@@ -255,16 +241,4 @@ func GetJobStatus(jobID string) (string, error) {
 
 	log.Printf("Job ID %s status: %s\n", jobID, response["status"])
 	return response["status"].(string), nil
-}
-
-// Helper to split name into first and last
-func splitName(fullName string) []string {
-	parts := strings.Split(fullName, " ")
-	if len(parts) == 0 {
-		return []string{""}
-	} else if len(parts) == 1 {
-		return []string{parts[0]}
-	}
-	lName := strings.Join(parts[1:], " ")
-	return []string{parts[0], lName}
 }
