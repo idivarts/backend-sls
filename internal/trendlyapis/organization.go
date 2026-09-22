@@ -255,6 +255,57 @@ func DeleteOrganization(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Organization deleted"})
 }
 
+// DowngradeOrgToFree lets the org owner/admin self-service switch to the free
+// plan. Surfaced by the frontend paywall/billing screen as an always-available
+// fallback when a subscription is stuck (e.g. a purchase whose webhook never
+// landed), lapsed, or simply unwanted. Does NOT cancel any real store/Razorpay
+// subscription — if one is still genuinely active, the next billing webhook
+// simply re-applies the paid plan on top of this.
+func DowngradeOrgToFree(c *gin.Context) {
+	userId, ok := middlewares.GetUserId(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	orgId := c.Param("id")
+
+	if role, found := getOrgRole(orgId, userId); !found || (role != trendlymodels.OrgRoleOwner && role != trendlymodels.OrgRoleAdmin) {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Only an org owner/admin can change the plan"})
+		return
+	}
+
+	if err := trendlymodels.DowngradeToFree(orgId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to switch to the Free plan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Switched to the Free plan"})
+}
+
+// DismissIapRestoreConflict clears a previously recorded IAP restore conflict
+// (see trendlymodels.RecordRestoreConflict) once the frontend popup has shown
+// it to the user. Owner/admin only.
+func DismissIapRestoreConflict(c *gin.Context) {
+	userId, ok := middlewares.GetUserId(c)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	orgId := c.Param("id")
+
+	if role, found := getOrgRole(orgId, userId); !found || (role != trendlymodels.OrgRoleOwner && role != trendlymodels.OrgRoleAdmin) {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Only an org owner/admin can dismiss this"})
+		return
+	}
+
+	if err := trendlymodels.ClearRestoreConflict(orgId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Failed to dismiss"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Dismissed"})
+}
+
 // DeleteBrand hard-deletes a brand: the doc and every subcollection beneath
 // it are permanently removed. Blocked while the brand has active contracts.
 // Also removes the brand from its org's brandIds so it stops counting against

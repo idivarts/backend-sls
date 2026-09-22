@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/idivarts/backend-sls/pkg/crm"
 	"github.com/idivarts/backend-sls/pkg/hubspot"
-	"github.com/idivarts/backend-sls/pkg/myemail"
 )
 
 func TestDataPush(t *testing.T) {
-	err := hubspot.CreateOrUpdateContacts([]myemail.ContactDetails{{
+	err := hubspot.CreateOrUpdateContacts([]crm.ContactDetails{{
 		Email:             "rahul@idiv.in",
 		Name:              "Rahul Sinha",
 		Phone:             "7604007156",

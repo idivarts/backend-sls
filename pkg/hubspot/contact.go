@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
-	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/crm"
 )
 
 // type ContactDetails struct {
@@ -23,7 +22,7 @@ import (
 // 	LastActivityTime  *int64
 // }
 
-func CreateOrUpdateContacts(contacts []myemail.ContactDetails) error {
+func CreateOrUpdateContacts(contacts []crm.ContactDetails) error {
 	accessToken := apiKey
 
 	if len(contacts) == 0 {
@@ -34,7 +33,7 @@ func CreateOrUpdateContacts(contacts []myemail.ContactDetails) error {
 	for _, contact := range contacts {
 		// Split full name into first and last name
 		var firstName, lastName string
-		nameParts := splitName(contact.Name)
+		nameParts := crm.SplitName(contact.Name)
 		if len(nameParts) > 0 {
 			firstName = nameParts[0]
 		}
@@ -131,16 +130,4 @@ func CreateOrUpdateContacts(contacts []myemail.ContactDetails) error {
 
 	log.Printf("HubSpot batch upsert response status: %s\n", resp.Status)
 	return nil
-}
-
-// Helper to split name into first and last
-func splitName(fullName string) []string {
-	parts := strings.Split(fullName, " ")
-	if len(parts) == 0 {
-		return []string{""}
-	} else if len(parts) == 1 {
-		return []string{parts[0]}
-	}
-	lName := strings.Join(parts[1:], " ")
-	return []string{parts[0], lName}
 }

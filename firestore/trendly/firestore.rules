@@ -64,6 +64,30 @@ service cloud.firestore {
       }
     }
 
+    // ── Canva Connect OAuth tokens ────────────────────────────────────────
+    // canvaConnections/{managerId}. Holds a brand-member's Canva access/refresh
+    // tokens. FULLY backend-only — tokens must never reach the client, so both
+    // read and write are denied; the app learns connection state via a backend
+    // status endpoint, not by reading this doc.
+    match /canvaConnections/{managerId} {
+      allow read, write: if false;
+    }
+
+    // Transient OAuth-state records correlating a Canva auth attempt to its
+    // public callback. Backend-only.
+    match /canvaOauthStates/{state} {
+      allow read, write: if false;
+    }
+
+    // ── Music library (shared soundtrack catalog) ─────────────────────────
+    // musicLibrary/{trackId}. Curated, commercially-licensed tracks generated
+    // via the seed script (Admin SDK). Readable by any authenticated user for
+    // the soundtrack browser; clients never write.
+    match /musicLibrary/{trackId} {
+      allow read:  if isAuthenticated();
+      allow write: if false;
+    }
+
     // ── AI model config ───────────────────────────────────────────────────
     // Public catalog of available AI models + per-task allowed-model lists
     // (docs: ai_config/models, ai_config/tasks). Readable by ANY authenticated
@@ -174,6 +198,19 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ── Design System ────────────────────────────────────────────────────
+      // The brand's single design/brand standard (one doc, id "main"): colors,
+      // typography, logos, imagery style, voice & tone and content rules, fed
+      // into every AI generation so output stays on-brand. Read: any brand
+      // member. Mutate: content managers (canManageContent) — the same holders
+      // who tune how content is produced. The editor UI writes this doc directly
+      // (client-writable); the AI reads it via the backend model and may write a
+      // draft via the Admin SDK (which bypasses these rules).
+      match /designSystem/{docId} {
+        allow read:                   if isAuthenticated() && isBrandMember(brandId);
+        allow create, update, delete: if isAuthenticated() && canManageContent(brandId);
+      }
+
       // ── Strategies ───────────────────────────────────────────────────────
       // Read: any brand member. Mutate: content-strategy capability holders
       // (owner / admin / content_manager).
@@ -240,6 +277,38 @@ service cloud.firestore {
           allow update, delete: if isAuthenticated() && isCommentAuthor() &&
                            (isBrandMember(brandId) || contentShared(brandId, contentId));
         }
+
+        // Per-platform content variations (one doc per platform; doc ID == the
+        // platform key). Same access policy as the parent content: any brand
+        // member may read, AND any public viewer (anonymous included) when the
+        // content is shared — mirroring the parent content's isResourcePublic()
+        // read so the public share view can show the right per-platform copy.
+        // manage_content holders create/update/delete.
+        match /variations/{platform} {
+          allow read:                   if (isAuthenticated() && isBrandMember(brandId))
+                                           || contentShared(brandId, contentId);
+          allow create, update, delete: if isAuthenticated() && canManageContent(brandId);
+        }
+
+        // ── AI Studio HTML design revisions (immutable) ────────────────────
+        // brands/{brandId}/contents/{contentId}/designs/{revisionId}. Each holds
+        // a self-contained HTML document. CLIENT-WRITABLE (HTML is not sensitive)
+        // so deterministic text edits + the frontend-captured render (renderUrl)
+        // are written directly by the app; the AI also writes via the Admin SDK.
+        // Readable by any brand member, and by a public viewer when shared.
+        match /designs/{revisionId} {
+          allow read:           if (isAuthenticated() && isBrandMember(brandId))
+                                   || contentShared(brandId, contentId);
+          allow create, update: if isAuthenticated() && canManageContent(brandId);
+        }
+      }
+
+      // ── Generated audio (ElevenLabs music / voiceovers) ──────────────────
+      // brands/{brandId}/generatedAudio/{audioId}. Written ONLY by the backend
+      // (Admin SDK) after a metered generation; brand members read to preview.
+      match /generatedAudio/{audioId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
       }
 
       // ── Calendar month public share toggle ───────────────────────────────
@@ -309,6 +378,21 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isAuthenticated();
       }
+    }
+
+    // Webhook idempotency ledger (RevenueCat / Razorpay processed event ids).
+    // Written only by the backend (Admin SDK bypasses rules); never exposed to
+    // clients. Explicit server-only block to document intent.
+    match /webhookEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    // RevenueCat subscription-transaction ownership ledger (doc id = store
+    // original transaction id). Written only by the backend to enforce that
+    // subscriptions are not transferable between orgs; never exposed to
+    // clients. Explicit server-only block to document intent.
+    match /revenuecatTransactionOwners/{transactionId} {
+      allow read, write: if false;
     }
 
     // Stores all collaborations

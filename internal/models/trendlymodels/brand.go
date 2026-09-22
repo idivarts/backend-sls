@@ -110,12 +110,20 @@ type BrandBilling struct {
 	// fields above without breaking existing webhook code. `BillingStatus` still
 	// holds the raw Razorpay status; `AccessState` is OUR app-level state that the
 	// paywall/lock + cron drive.
-	Provider           *string `json:"provider,omitempty" firestore:"provider,omitempty"`                     // "razorpay" now; future MoR
+	Provider           *string `json:"provider,omitempty" firestore:"provider,omitempty"`                     // "razorpay" (web) | "revenuecat" (native IAP); future MoR
 	AccessState        *string `json:"accessState,omitempty" firestore:"accessState,omitempty"`               // "active" | "past_due" | "locked" | "canceled"
 	BillingMode        *string `json:"billingMode,omitempty" firestore:"billingMode,omitempty"`               // "recurring" | "invoice"
 	BillingAnchorDay   *int    `json:"billingAnchorDay,omitempty" firestore:"billingAnchorDay,omitempty"`     // always 1
-	PeriodEnd          *int64  `json:"periodEnd,omitempty" firestore:"periodEnd,omitempty"`                   // end of current paid month (next 1st)
+	PeriodEnd          *int64  `json:"periodEnd,omitempty" firestore:"periodEnd,omitempty"`                   // end of current paid month (next 1st, or IAP expiry)
 	ProratedFirstMonth *bool   `json:"proratedFirstMonth,omitempty" firestore:"proratedFirstMonth,omitempty"`
+
+	// ── Native In-App Purchase (RevenueCat) fields ──
+	// Set when Provider == "revenuecat". Store tells the frontend where the
+	// subscription is managed (cancel/manage must deep-link there); ProviderRef
+	// holds the store's original transaction id (for support/debugging). See the
+	// IAP ticket + docs/revenuecat-iap-setup.md.
+	Store       *string `json:"store,omitempty" firestore:"store,omitempty"`             // "apple" | "google" (Provider == "revenuecat")
+	ProviderRef *string `json:"providerRef,omitempty" firestore:"providerRef,omitempty"` // store original transaction id
 }
 
 type BrandProfile struct {
@@ -155,6 +163,40 @@ func (b *Brand) IsIndia() bool {
 		return true
 	}
 	return strings.EqualFold(*b.Country, "IN")
+}
+
+// BrandRef is a lightweight brand row (id + owning org) for admin listings that
+// only need to fan work out per brand, not render brand detail.
+type BrandRef struct {
+	ID             string `json:"id"`
+	OrganizationID string `json:"organizationId,omitempty"`
+}
+
+// ListAllBrandRefs returns every non-deleted brand's id and organization id.
+// Projects just the two fields it needs so listing every brand stays cheap.
+func ListAllBrandRefs(ctx context.Context) ([]BrandRef, error) {
+	iter := firestoredb.Client.Collection("brands").
+		Select("organizationId", "deletedAt").
+		Documents(ctx)
+	defer iter.Stop()
+
+	refs := []BrandRef{}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		data := doc.Data()
+		if deletedAt, ok := data["deletedAt"]; ok && deletedAt != nil {
+			continue
+		}
+		orgID, _ := data["organizationId"].(string)
+		refs = append(refs, BrandRef{ID: doc.Ref.ID, OrganizationID: orgID})
+	}
+	return refs, nil
 }
 
 func (u *Brand) Get(brandId string) error {

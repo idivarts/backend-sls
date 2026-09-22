@@ -1,131 +1,107 @@
+// Package myemail renders the HTML templates in templates/ and hands them to
+// the configured mailer.Sender.
+//
+// It owns the template/content concerns only. Delivery lives in pkg/myses,
+// behind the mailer.Sender interface.
 package myemail
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"html/template"
 	"log"
-	"os"
+	"strings"
 
-	"github.com/sendgrid/sendgrid-go"
-	"github.com/sendgrid/sendgrid-go/helpers/mail"
+	"github.com/idivarts/backend-sls/pkg/mailer"
 )
 
 type TemplatePath string
 
-var (
-	senderName  = os.Getenv("SENDGRID_NAME")
-	senderEmail = os.Getenv("SENDGRID_EMAIL")
-	apiKey      = ""
-)
-
-func init() {
-	if os.Getenv("SENDGRID_API_KEY") == "" {
-		senderName = "Trendly Support"
-		senderEmail = "no-reply@idiv.in"
-		apiKey = os.Getenv("SENDGRID_API_KEY")
-	} else {
-		apiKey = os.Getenv("SENDGRID_API_KEY")
+// SendCustomHTMLEmail renders templatePath with data and sends it to a single
+// recipient via the configured provider.
+func SendCustomHTMLEmail(toEmail string, templatePath TemplatePath, subject string, data map[string]interface{}) error {
+	htmlBody, textBody, err := render(templatePath, data)
+	if err != nil {
+		return err
 	}
+	return send(toEmail, subject, htmlBody, textBody)
 }
 
-// SendEmailUsingTemplate This will be used to send email using template
-func SendEmailUsingTemplate(toEmail, templateID string, dynamicData map[string]interface{}) error {
-
-	// Sender details
-	from := mail.NewEmail(senderName, senderEmail)
-
-	// Recipient details
-	to := mail.NewEmail("", toEmail)
-
-	// Create the mail object
-	message := mail.NewV3Mail()
-	message.SetFrom(from)
-
-	// Add recipient
-	personalization := mail.NewPersonalization()
-	personalization.AddTos(to)
-
-	// Add dynamic template data
-	for key, value := range dynamicData {
-		personalization.SetDynamicTemplateData(key, value)
-	}
-	message.AddPersonalizations(personalization)
-
-	// Set the template ID
-	message.SetTemplateID(templateID)
-
-	// Send the email
-	client := sendgrid.NewSendClient(apiKey)
-	response, err := client.Send(message)
+// SendCustomHTMLEmailToMultipleRecipients renders templatePath once and sends a
+// separate copy to each recipient.
+//
+// The per-recipient loop is deliberate: recipients must never see each other's
+// addresses. SendGrid achieved that with one personalization per address; SES's
+// SendEmail would instead put every address into a single visible To: header,
+// leaking brand managers' emails to one another.
+//
+// Partial failures are logged, not returned — SendGrid accepted a batch (202)
+// even when individual addresses were bad, and several callers turn a non-nil
+// error into an HTTP 400 for the whole request. An error is returned only when
+// every recipient failed.
+func SendCustomHTMLEmailToMultipleRecipients(toEmails []string, templatePath TemplatePath, subject string, data map[string]interface{}) error {
+	htmlBody, textBody, err := render(templatePath, data)
 	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+		return err
 	}
 
-	// Log response for debugging
-	log.Printf("Response status: %d\nResponse body: %s\nResponse headers: %v\n",
-		response.StatusCode, response.Body, response.Headers)
+	var (
+		attempted int
+		failures  []string
+	)
+	for _, toEmail := range toEmails {
+		if strings.TrimSpace(toEmail) == "" {
+			continue
+		}
+		attempted++
 
+		if err := send(toEmail, subject, htmlBody, textBody); err != nil {
+			log.Printf("myemail: send to %s failed (subject %q): %v", toEmail, subject, err)
+			failures = append(failures, fmt.Sprintf("%s: %v", toEmail, err))
+		}
+	}
+
+	if attempted == 0 {
+		return fmt.Errorf("no valid recipients for subject %q", subject)
+	}
+	if len(failures) == attempted {
+		return fmt.Errorf("failed to send to all %d recipients: %s", attempted, strings.Join(failures, "; "))
+	}
+	if len(failures) > 0 {
+		log.Printf("myemail: %d of %d recipients failed for subject %q", len(failures), attempted, subject)
+	}
 	return nil
 }
 
-func SendCustomHTMLEmail(toEmail string, templatePath TemplatePath, subject string, data map[string]interface{}) error {
-	// Load and parse the HTML template
-	tmpl, err := template.ParseFiles(string(templatePath))
-	if err != nil {
-		return err
+func send(toEmail, subject, htmlBody, textBody string) error {
+	toEmail = strings.TrimSpace(toEmail)
+	if toEmail == "" {
+		return fmt.Errorf("recipient email is empty")
 	}
 
-	var body bytes.Buffer
-	if err := tmpl.Execute(&body, data); err != nil {
-		return err
-	}
-
-	from := mail.NewEmail(senderName, senderEmail)
-	to := mail.NewEmail("", toEmail)
-	message := mail.NewSingleEmail(from, subject, to, "", body.String())
-
-	client := sendgrid.NewSendClient(apiKey)
-	mLog, err := client.Send(message)
-	log.Println("Mail Delivery:", mLog.StatusCode, mLog.Body)
-	if mLog.StatusCode >= 300 {
-		return errors.New(mLog.Body)
-	}
-	return err
+	return sender.Send(mailer.Message{
+		From:     from,
+		ReplyTo:  replyTo,
+		To:       toEmail,
+		Subject:  subject,
+		HTMLBody: htmlBody,
+		TextBody: textBody,
+	})
 }
 
-func SendCustomHTMLEmailToMultipleRecipients(toEmails []string, templatePath TemplatePath, subject string, data map[string]interface{}) error {
-	// Load and parse the HTML template
+// render parses and executes a template, returning the HTML body alongside the
+// text/plain alternative derived from it.
+func render(templatePath TemplatePath, data map[string]interface{}) (htmlBody, textBody string, err error) {
 	tmpl, err := template.ParseFiles(string(templatePath))
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	var body bytes.Buffer
-	if err := tmpl.Execute(&body, data); err != nil {
-		return err
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", "", err
 	}
 
-	from := mail.NewEmail(senderName, senderEmail)
-	message := mail.NewV3Mail()
-	message.SetFrom(from)
-	message.Subject = subject
-	message.AddContent(mail.NewContent("text/html", body.String()))
-
-	// Create one personalization object for all recipients
-	for _, email := range toEmails {
-		to := mail.NewEmail("", email)
-		personalization := mail.NewPersonalization()
-		personalization.AddTos(to)
-		message.AddPersonalizations(personalization)
-	}
-
-	client := sendgrid.NewSendClient(apiKey)
-	_, err = client.Send(message)
-	if err != nil {
-		log.Printf("Failed to send bulk email: %v", err)
-	}
-	// log.Println("Mail Data", x)
-	return err
+	htmlBody = buf.String()
+	return htmlBody, htmlToText(htmlBody), nil
 }

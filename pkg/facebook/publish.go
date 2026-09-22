@@ -102,6 +102,24 @@ func extForContentType(ct string) string {
 	}
 }
 
+// PublishPageVideo publishes a video to a Facebook Page by handing the Graph API
+// the hosted video URL (`file_url`), so Facebook pulls the file itself rather than
+// us streaming potentially-large video bytes through the Lambda. Used for
+// reel/video content. Returns the created video's id.
+//
+// Note: this posts a standard Page video (playable in-feed). Publishing as a
+// native Reel object uses the separate 3-step /video_reels API — a later refinement.
+func PublishPageVideo(pageID, videoURL, caption, pageAccessToken string) (*FBPublishResponse, error) {
+	apiURL := fmt.Sprintf("%s/%s/%s/videos", BaseURL, ApiVersion, pageID)
+	data := url.Values{}
+	data.Set("file_url", videoURL)
+	if caption != "" {
+		data.Set("description", caption)
+	}
+	data.Set("access_token", pageAccessToken)
+	return fbPost(apiURL, data)
+}
+
 // PublishPageFeed posts a text (optionally with a link) status to a Page feed.
 func PublishPageFeed(pageID, message, link, pageAccessToken string) (*FBPublishResponse, error) {
 	apiURL := fmt.Sprintf("%s/%s/%s/feed", BaseURL, ApiVersion, pageID)

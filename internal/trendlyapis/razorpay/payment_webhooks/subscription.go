@@ -98,6 +98,19 @@ func HandleSubscription(event *webhook.Event) error {
 		billing.AccessState = myutil.StrPtr("past_due")
 	case "cancelled":
 		billing.AccessState = myutil.StrPtr("canceled")
+		// The subscription is definitively over — fall back to the free tier
+		// instead of leaving billing.PlanKey stuck at the lapsed paid plan. The
+		// frontend paywall gate (organization-context.provider.tsx) reads
+		// billing.planKey and only exempts orgs already on "free"; a stale paid
+		// planKey with no matching entitlement permanently traps the org behind
+		// the paywall with no way back in (same fix as the RevenueCat EXPIRATION
+		// handler — see trendlymodels.DowngradeToFree).
+		freePlanKey := "free"
+		billing.PlanKey = &freePlanKey
+		billing.Status = myutil.IntPtr(1) // ModelStatus.Accepted — free plan needs no acceptance step
+		if err := trendlymodels.ApplyPlanToOrg(target.orgID, freePlanKey, trendlymodels.NextMonthlyReset(time.Now())); err != nil {
+			log.Println("downgrade to free failed", target.orgID, err)
+		}
 	}
 
 	log.Println("Updating Subscription Status to", event.Event, *billing.BillingStatus, billing.PlanKey)

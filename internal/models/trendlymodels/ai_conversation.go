@@ -1,5 +1,10 @@
 package trendlymodels
 
+import (
+	"fmt"
+	"strings"
+)
+
 type AIConversation struct {
 	ID           string `json:"id,omitempty" firestore:"-"`
 	BrandID      string `json:"brandId" firestore:"brandId"`
@@ -10,6 +15,11 @@ type AIConversation struct {
 	CurrentModel string `json:"currentModel" firestore:"currentModel"`
 	CreatedAt    int64  `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt    int64  `json:"updatedAt" firestore:"updatedAt"`
+	// CancelRequestedAt is set (epoch millis) when the user asks to interrupt the
+	// in-flight AI turn. A running turn started before this timestamp cooperatively
+	// aborts (see the ai chat streaming loop). Stale values are harmless: a new
+	// turn only honors a marker whose timestamp is >= its own start time.
+	CancelRequestedAt int64 `json:"cancelRequestedAt,omitempty" firestore:"cancelRequestedAt,omitempty"`
 }
 
 type AIMessage struct {
@@ -25,7 +35,15 @@ type AIMessage struct {
 	ClientMsgID string `json:"clientMsgId,omitempty" firestore:"clientMsgId,omitempty"`
 	Content     string `json:"content" firestore:"content"`
 	Model       string `json:"model,omitempty" firestore:"model,omitempty"`
+	// FocusedText is the legacy plain-string focus (kept for back-compat). New
+	// clients send the structured Focus list below; the string is still derived
+	// and sent as a prompt fallback so an un-migrated backend/reader still works.
 	FocusedText string `json:"focusedText,omitempty" firestore:"focusedText,omitempty"`
+	// Focus is the structured "what the user pointed the AI at" for this message
+	// (design element / strategy passage / calendar post / comment, with optional
+	// inheritance). Persisted so the reference survives reload and can be rendered
+	// back into the UI. Mirror of the frontend `Focus` type (types/focus.ts).
+	Focus []AIFocus `json:"focus,omitempty" firestore:"focus,omitempty"`
 	// ImageURL is the legacy single-image field (kept for back-compat). New code
 	// uses Images (multi). On a user message Images are vision input the user
 	// attached; on an assistant message they are generated/referenced image URLs.
@@ -60,4 +78,135 @@ type AIControl struct {
 type AIControlOption struct {
 	Label string `json:"label" firestore:"label"`
 	Value string `json:"value" firestore:"value"`
+}
+
+// AIFocus mirrors the frontend `Focus` (types/focus.ts): a structured target the
+// user pointed the AI at, plus its human display label.
+type AIFocus struct {
+	ID        string      `json:"id,omitempty" firestore:"id,omitempty"`
+	FocusText string      `json:"focusText,omitempty" firestore:"focusText,omitempty"`
+	FocusArea AIFocusArea `json:"focusArea" firestore:"focusArea"`
+}
+
+// AIFocusArea mirrors the frontend `FocusArea` discriminated union. Fields are
+// flattened with a `Type` discriminator; only the fields relevant to a given
+// Type are populated. `Inherits` supports a comment focus that itself points at
+// another area (a design element, a strategy passage, …).
+type AIFocusArea struct {
+	Type string `json:"type" firestore:"type"`
+
+	// content / design / calendar
+	ContentID   string `json:"contentId,omitempty" firestore:"contentId,omitempty"`
+	Title       string `json:"title,omitempty" firestore:"title,omitempty"`
+	ContentType string `json:"contentType,omitempty" firestore:"contentType,omitempty"`
+	Date        string `json:"date,omitempty" firestore:"date,omitempty"`
+
+	// design-element
+	RevisionID string `json:"revisionId,omitempty" firestore:"revisionId,omitempty"`
+	ElementID  string `json:"elementId,omitempty" firestore:"elementId,omitempty"`
+	SlideIndex *int   `json:"slideIndex,omitempty" firestore:"slideIndex,omitempty"`
+	SlideCount *int   `json:"slideCount,omitempty" firestore:"slideCount,omitempty"`
+	DocType    string `json:"docType,omitempty" firestore:"docType,omitempty"`
+	Text       string `json:"text,omitempty" firestore:"text,omitempty"`
+
+	// strategy-snippet
+	StrategyID  string `json:"strategyId,omitempty" firestore:"strategyId,omitempty"`
+	Snippet     string `json:"snippet,omitempty" firestore:"snippet,omitempty"`
+	AnchorStart *int   `json:"anchorStart,omitempty" firestore:"anchorStart,omitempty"`
+	AnchorEnd   *int   `json:"anchorEnd,omitempty" firestore:"anchorEnd,omitempty"`
+
+	// comment
+	CommentID string       `json:"commentId,omitempty" firestore:"commentId,omitempty"`
+	Inherits  *AIFocusArea `json:"inherits,omitempty" firestore:"inherits,omitempty"`
+}
+
+func clipFocusStr(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
+}
+
+// Describe returns a precise human description of a focus target. Mirror of the
+// frontend describeFocusArea (types/focus.ts).
+func (a AIFocusArea) Describe() string {
+	switch a.Type {
+	case "design-element":
+		where := ""
+		if a.SlideIndex != nil {
+			where = fmt.Sprintf(" on slide %d", *a.SlideIndex+1)
+			if a.SlideCount != nil {
+				where += fmt.Sprintf("/%d", *a.SlideCount)
+			}
+		}
+		reads := ""
+		if strings.TrimSpace(a.Text) != "" {
+			reads = fmt.Sprintf(", which reads: %q", clipFocusStr(a.Text, 160))
+		}
+		return fmt.Sprintf("a design element (id: %s)%s of content %s%s", a.ElementID, where, a.ContentID, reads)
+	case "strategy-snippet":
+		return fmt.Sprintf("a passage in strategy %s: %q", a.StrategyID, clipFocusStr(a.Snippet, 160))
+	case "calendar-content":
+		bits := []string{}
+		if a.Title != "" {
+			bits = append(bits, fmt.Sprintf("%q", clipFocusStr(a.Title, 80)))
+		}
+		if a.ContentType != "" {
+			bits = append(bits, a.ContentType)
+		}
+		if a.Date != "" {
+			bits = append(bits, a.Date)
+		}
+		extra := ""
+		if len(bits) > 0 {
+			extra = " (" + strings.Join(bits, ", ") + ")"
+		}
+		return fmt.Sprintf("the scheduled post %s%s", a.ContentID, extra)
+	case "content":
+		title := ""
+		if a.Title != "" {
+			title = fmt.Sprintf(" (%q)", clipFocusStr(a.Title, 80))
+		}
+		return fmt.Sprintf("content %s%s", a.ContentID, title)
+	case "comment":
+		t := ""
+		if strings.TrimSpace(a.Text) != "" {
+			t = fmt.Sprintf(": %q", clipFocusStr(a.Text, 160))
+		}
+		inh := ""
+		if a.Inherits != nil {
+			inh = ", which refers to " + a.Inherits.Describe()
+		}
+		return fmt.Sprintf("comment %s%s%s", a.CommentID, t, inh)
+	default:
+		return "the referenced item"
+	}
+}
+
+// RenderFocusList joins a focus list into one description string.
+func RenderFocusList(focus []AIFocus) string {
+	if len(focus) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(focus))
+	for _, f := range focus {
+		parts = append(parts, f.FocusArea.Describe())
+	}
+	return strings.Join(parts, "; ")
+}
+
+// FocusNote is the compact inline prefix carrying a (user) message's focus into
+// the conversation history the model reads — so a focused reference persists
+// across turns (a later "move this" still knows which element/slide). Empty when
+// the message has no focus. Prefers the structured focus, falls back to the
+// legacy plain string.
+func (m AIMessage) FocusNote() string {
+	if s := RenderFocusList(m.Focus); s != "" {
+		return "[Focused on: " + s + "]"
+	}
+	if s := strings.TrimSpace(m.FocusedText); s != "" {
+		return "[Focused on: " + s + "]"
+	}
+	return ""
 }

@@ -39,7 +39,13 @@ func verifyBrandAccess(brandID, managerID string) bool {
 	return member.Get(brandID, managerID) == nil
 }
 
-func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, focusedText string) string {
+func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID string) string {
+	// The brand's Design System is its single declared design/brand standard. It
+	// is loaded once here and woven into every conversation: its voice supersedes
+	// the legacy AIVoice string, its identity/rules/imagery ride the prose block
+	// below, and (for the design module) its colors/fonts ride the brand-kit CSS.
+	ds := loadDesignSystem(brandID)
+
 	var sb strings.Builder
 	sb.WriteString("You are an AI assistant for ")
 	if brand != nil {
@@ -51,7 +57,13 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		sb.WriteString(" brand")
 	}
 	sb.WriteString(".\n")
-	if brand != nil && brand.AIVoice != nil && *brand.AIVoice != "" {
+	// Anchor EVERY conversation to the current date so the AI can reason about
+	// "today", "this week/month", and the fetch tools' date-relative defaults
+	// consistently. UTC matches how calendar/content timestamps are stored.
+	sb.WriteString("Current date: " + time.Now().UTC().Format("Monday, 2 January 2006") + " (UTC).\n")
+	// Legacy AIVoice is only used when the Design System has no Voice & Tone yet —
+	// the Design System's voice is the single source of truth once set.
+	if brand != nil && brand.AIVoice != nil && *brand.AIVoice != "" && !designSystemHasVoice(ds) {
 		sb.WriteString("Brand voice: ")
 		sb.WriteString(*brand.AIVoice)
 		sb.WriteString("\n")
@@ -66,6 +78,13 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		}
 		sb.WriteString("Brand memory (durable facts the user has shared before — always honor these and do not re-ask for anything already stated here):\n")
 		sb.WriteString(mem)
+		sb.WriteString("\n")
+	}
+	// The Design System block (identity, voice & tone, content rules, imagery,
+	// per-platform overrides) is injected for every module — a brand with no
+	// Design System yet renders nothing here, so this is backward-compatible.
+	if dsBlock := designSystemPromptBlock(ds); dsBlock != "" {
+		sb.WriteString(dsBlock)
 		sb.WriteString("\n")
 	}
 	if module != "" {
@@ -83,11 +102,12 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 		sb.WriteString("\n")
 	}
 
-	if focusedText != "" {
-		sb.WriteString("The user is focused on this text: \"")
-		sb.WriteString(focusedText)
-		sb.WriteString("\"\n")
-	}
+	// NOTE: focus targets are NOT injected here. Models weight the system prompt
+	// as background/stale, so the actual focus rides on the USER turn itself (a
+	// "[Focused on: …]" prefix added in chat.go for the current turn and in
+	// ToOpenRouterMessages for history). This is just the convention note so the
+	// model knows how to read that prefix.
+	sb.WriteString("When a user turn begins with \"[Focused on: …]\", that line names the exact target (element/slide/content/comment) the rest of that message applies to — apply the change to exactly that target, and resolve follow-up references like \"this\"/\"it\"/\"move it\" from the most recent focus WITHOUT asking which item/slide the user means.\n")
 
 	// Memory-writing capability is available in every module — appended here,
 	// before the per-module instruction blocks that return early below.
@@ -116,7 +136,25 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID, f
 	if moduleHasImageGen(module) {
 		sb.WriteString(imageGenInstructions)
 	}
+	// The design module (content) authors HTML designs — give it the brand-kit
+	// CSS custom properties so generate_design/apply_design_edits use the real
+	// brand colors and fonts instead of the old hardcoded defaults.
+	if moduleHasStudio(module) {
+		if css := brandKitCSS(ds, brandLogoURL(brand)); css != "" {
+			sb.WriteString("\n\nBrand kit CSS variables — use these custom properties in any design you create so colors and fonts match the brand:\n")
+			sb.WriteString(css)
+		}
+	}
 	return sb.String()
+}
+
+// brandLogoURL returns the brand's avatar image URL (the logo fallback used when
+// the Design System has no logo of its own yet), or "" when unset.
+func brandLogoURL(brand *trendlymodels.Brand) string {
+	if brand == nil || brand.Image == nil {
+		return ""
+	}
+	return *brand.Image
 }
 
 // imageGenInstructions tells the model it can both SEE images the user attaches
@@ -259,6 +297,29 @@ func loadContentBrief(brandID, contentID string) string {
 	return contentBriefText(ct)
 }
 
+// currentDesignBrief tells the chat model that this content already has a design
+// and how to work with it — WITHOUT inlining the HTML. Designs are large and
+// would truncate the prompt, so we pass only a reference (revision id + shape)
+// and instruct the model to fetch the full HTML on demand via get_design_html
+// right before it reads or edits the design. Returns "" when there is no design.
+func currentDesignBrief(brandID, contentID string) string {
+	ct, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil || ct.DesignRef == nil || ct.DesignRef.RevisionID == "" {
+		return ""
+	}
+	dr := ct.DesignRef
+	return fmt.Sprintf(
+		"CURRENT DESIGN: this content already has an AI-generated HTML design "+
+			"(revisionId %q, docType %s, %d slide(s), %dx%d). The design HTML is NOT included "+
+			"here — it is large — so when the user asks to read or change the visual/design "+
+			"(\"make the headline bigger\", \"use my logo\", \"change slide 2\"…), FIRST call "+
+			"get_design_html to fetch the complete current HTML, THEN call apply_design_edits "+
+			"with the FULL revised HTML — preserve the data-carousel/data-slide structure and "+
+			"every data-el id.",
+		dr.RevisionID, dr.DocType, dr.SlideCount, dr.Width, dr.Height,
+	)
+}
+
 // contentBriefText renders a content doc into the compact brief the AI prompts
 // use. Shared by the persisted-doc path (loadContentBrief) and the live-edits
 // path (briefFromFields) so both produce an identical shape.
@@ -313,10 +374,108 @@ func briefFromFields(title, platform, format, description, caption, hashtags, sc
 	return contentBriefText(ct)
 }
 
+// variationBrief is one per-platform variation summarised for the AI: the values
+// that will actually publish to that platform (generic fields already resolved
+// through any override on the client), plus which fields the user explicitly
+// overrode so the model can tell a tailored value apart from an inherited one.
+// Mirrors the frontend LiveContentVariation.
+type variationBrief struct {
+	Platform         string         `json:"platform"`
+	Caption          string         `json:"caption"`
+	Hashtags         string         `json:"hashtags"`
+	OverriddenFields []string       `json:"overriddenFields"`
+	PlatformOptions  map[string]any `json:"platformOptions"`
+}
+
+// variationsBriefText renders the full set of per-platform variations into a
+// compact block appended to the content brief, so the AI is aware of every
+// tailored variant (not just the generic body). Returns "" when there are none.
+func variationsBriefText(vs []variationBrief) string {
+	if len(vs) == 0 {
+		return ""
+	}
+	var lines []string
+	lines = append(lines, "Per-platform variations (what will actually publish to each platform):")
+	for _, v := range vs {
+		platform := strings.TrimSpace(v.Platform)
+		if platform == "" {
+			continue
+		}
+		seg := "- " + platform
+		if len(v.OverriddenFields) > 0 {
+			seg += fmt.Sprintf(" (overridden: %s)", strings.Join(v.OverriddenFields, ", "))
+		}
+		var parts []string
+		if c := strings.TrimSpace(v.Caption); c != "" {
+			parts = append(parts, "Caption: "+c)
+		}
+		if h := strings.TrimSpace(v.Hashtags); h != "" {
+			parts = append(parts, "Hashtags: "+h)
+		}
+		if len(v.PlatformOptions) > 0 {
+			var opts []string
+			for k, val := range v.PlatformOptions {
+				if val == nil || val == "" {
+					continue
+				}
+				opts = append(opts, fmt.Sprintf("%s=%v", k, val))
+			}
+			if len(opts) > 0 {
+				parts = append(parts, "Options: "+strings.Join(opts, ", "))
+			}
+		}
+		if len(parts) > 0 {
+			seg += ": " + strings.Join(parts, " | ")
+		}
+		lines = append(lines, seg)
+	}
+	if len(lines) <= 1 {
+		return ""
+	}
+	return strings.Join(lines, "\n")
+}
+
+// enrichLiveBrief appends the per-platform variation block and (for a
+// generate/enhance request tied to a variation) the target hint to a live
+// content brief, so caption/hashtag generation sees the full set of variants and
+// knows exactly which platform + field it is producing.
+func enrichLiveBrief(liveBrief string, vs []variationBrief, targetPlatform, targetField string) string {
+	if vb := variationsBriefText(vs); vb != "" {
+		if liveBrief != "" {
+			liveBrief += "\n\n"
+		}
+		liveBrief += vb
+	}
+	if hint := variationTargetHint(targetPlatform, targetField); hint != "" {
+		if liveBrief != "" {
+			liveBrief += "\n\n"
+		}
+		liveBrief += hint
+	}
+	return liveBrief
+}
+
+// variationTargetHint tells the AI which specific platform + field a
+// generate/enhance request is for, so it tailors the result to that variation
+// while staying consistent with the brand and the sibling variations. Returns ""
+// for a generic (non-variation) request.
+func variationTargetHint(platform, field string) string {
+	platform = strings.TrimSpace(platform)
+	field = strings.TrimSpace(field)
+	if platform == "" {
+		return ""
+	}
+	if field == "" {
+		return fmt.Sprintf("You are tailoring content specifically for the %s variation of this piece. Optimise for %s while keeping it consistent with the brand and the other variations.", platform, platform)
+	}
+	return fmt.Sprintf("You are generating the %s specifically for the %s variation of this piece. Tailor it to %s's audience and format while keeping it consistent with the brand and the other variations.", field, platform, platform)
+}
+
 // liveContentPayload carries the current (possibly unsaved) content-editor state
 // the brand app sends alongside a chat message in the content module. It mirrors
 // the live-editor fields used by content generation, plus the on-screen
-// attachments, so the chat AI reasons about exactly what's on screen now rather
+// attachments and every per-platform variation, so the chat AI reasons about
+// exactly what's on screen now — generic body AND each tailored variant — rather
 // than the last-saved Firestore doc.
 type liveContentPayload struct {
 	Title       string                            `json:"title"`
@@ -328,11 +487,13 @@ type liveContentPayload struct {
 	Hashtags    string                            `json:"hashtags"`
 	Script      string                            `json:"script"`
 	Attachments []trendlymodels.ContentAttachment `json:"attachments"`
+	Variations  []variationBrief                  `json:"variations"`
 }
 
 // briefFromLiveContent renders the live editor payload into the same compact
 // brief shape used elsewhere (contentBriefText), including a media summary built
-// from the current on-screen attachments. Returns "" when nothing usable is set.
+// from the current on-screen attachments and a per-platform variation block.
+// Returns "" when nothing usable is set.
 func briefFromLiveContent(p liveContentPayload) string {
 	ct := &trendlymodels.Content{
 		Title:         strings.TrimSpace(p.Title),
@@ -345,7 +506,14 @@ func briefFromLiveContent(p liveContentPayload) string {
 		Script:        strings.TrimSpace(p.Script),
 		Attachments:   p.Attachments,
 	}
-	return contentBriefText(ct)
+	brief := contentBriefText(ct)
+	if vb := variationsBriefText(p.Variations); vb != "" {
+		if brief != "" {
+			brief += "\n\n"
+		}
+		brief += vb
+	}
+	return brief
 }
 
 // summariseAttachments produces a short, model-friendly description of the media

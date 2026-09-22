@@ -75,6 +75,47 @@ func RefreshAccessToken(refreshToken string) (*TokenResponse, error) {
 	return &t, nil
 }
 
+// ExchangeCodeCM exchanges an authorization code for an access token using the
+// dedicated Community Management API app credentials (linkedin_page provider).
+func ExchangeCodeCM(code, redirectURI string) (*TokenResponse, error) {
+	return tokenRequest(url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {redirectURI},
+		"client_id":     {CMClientID},
+		"client_secret": {CMClientSecret},
+	})
+}
+
+// RefreshAccessTokenCM refreshes a token minted by the CMA app.
+func RefreshAccessTokenCM(refreshToken string) (*TokenResponse, error) {
+	return tokenRequest(url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {CMClientID},
+		"client_secret": {CMClientSecret},
+	})
+}
+
+// tokenRequest POSTs a token-endpoint request and parses the response.
+func tokenRequest(data url.Values) (*TokenResponse, error) {
+	resp, err := http.Post(TokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("linkedin: token request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("linkedin: token endpoint returned %d: %s", resp.StatusCode, string(body))
+	}
+	var t TokenResponse
+	if err := json.Unmarshal(body, &t); err != nil {
+		return nil, fmt.Errorf("linkedin: failed to parse token response: %w", err)
+	}
+	return &t, nil
+}
+
 // ExpiresAt returns the absolute Unix timestamp when the access token expires.
 func (t *TokenResponse) ExpiresAt() int64 {
 	return time.Now().Add(time.Duration(t.ExpiresIn) * time.Second).Unix()

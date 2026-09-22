@@ -1,0 +1,282 @@
+package ai
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/openrouter"
+)
+
+// The AI-Studio design tools make the chat AI the editor by having it author
+// HTML/CSS — which LLMs do exceptionally well — instead of layout JSON. The app
+// renders the HTML in a WebView (WYSIWYG) and captures it to PNG on approve.
+//
+// generate_design → a fresh self-contained HTML document.
+// apply_design_edits → the same document, revised from the user's comments.
+
+const (
+	toolGenerateDesign   = "generate_design"
+	toolApplyDesignEdits = "apply_design_edits"
+	toolGetDesignHTML    = "get_design_html"
+)
+
+// moduleHasStudio reports whether a module's chat may drive the design editor.
+func moduleHasStudio(module string) bool {
+	return module == moduleContent
+}
+
+func designServerTools() []openrouter.Tool {
+	return []openrouter.Tool{
+		openrouter.NewFunctionTool(
+			toolGenerateDesign,
+			"Design an on-brand social post as a SINGLE self-contained HTML document "+
+				"(inline CSS only, no external files or scripts). This is the preferred way "+
+				"to create a polished image/carousel/story post.\n"+
+				"STRUCTURE (required): wrap everything in <div data-carousel style=\"display:flex\">. "+
+				"Inside it put EXACTLY `slides` sibling slides, each "+
+				"<section data-slide=\"N\" style=\"flex:0 0 {width}px;width:{width}px;height:{height}px;position:relative;overflow:hidden\"> "+
+				"(N = 0,1,2…). A single post is just slides=1. Each slide is a self-contained "+
+				"width×height frame.\n"+
+				"RULES: keep all text WELL INSIDE each slide (size fonts to fit, never overflow); "+
+				"give every editable text element a data-el=\"<unique-id>\" attribute; use the brand "+
+				"colors/font from context. For a carousel, tell a story across slides (hook → points "+
+				"→ CTA).\n"+
+				"VIDEO (docType=video): build it as a SEQUENCE OF SCENES, exactly like a carousel — "+
+				"one [data-carousel] wrapping N [data-slide] SCENES, each a COMPLETE standalone "+
+				"full-frame layout (do NOT stack all scenes' content into one frame — that overlaps). "+
+				"Give EACH scene a data-duration=\"<ms>\" (how long it stays on screen, e.g. 3000-5000). "+
+				"Inside each scene, use CSS @keyframes so its OWN elements animate in when the scene "+
+				"appears (animation-fill-mode:both; short delays). Scenes play in sequence; only one is "+
+				"visible at a time. Set `slides` = number of scenes and `durationMs` = the TOTAL "+
+				"(sum of scene durations).\n"+
+				"RENDER-SAFE CSS (the design is rasterized to PNG with html2canvas — unsupported CSS "+
+				"renders garbled): use ONLY solid text colors — NEVER gradient text / "+
+				"background-clip:text / -webkit-text-fill-color:transparent (use a solid brand color "+
+				"for accent words instead). NO backdrop-filter, NO mix-blend-mode, NO CSS filter on "+
+				"text, NO position:sticky, NO external @import web fonts (use a system font stack like "+
+				"font-family:'Helvetica Neue',Arial,sans-serif, or a bold weight). Gradients/solid "+
+				"colors as element BACKGROUNDS are fine; box-shadow is fine. Set each slide's "+
+				"background explicitly (don't rely on transparency).\n"+
+				"Return the full HTML in `html`.",
+			openrouter.ObjectSchema(map[string]any{
+				"html":    openrouter.StringProp("The complete self-contained HTML document (a data-carousel with `slides` data-slide sections)."),
+				"docType": openrouter.EnumProp("image or video.", []string{"image", "video"}),
+				"format":  openrouter.EnumProp("Content format.", []string{"post", "reel", "story", "video", "carousel"}),
+				"width":      openrouter.NumberProp("Per-slide width in px (e.g. 1080)."),
+				"height":     openrouter.NumberProp("Per-slide height in px (e.g. 1350)."),
+				"slides":     openrouter.NumberProp("Number of slides (1 for a single post/video; 2-10 for a carousel)."),
+				"durationMs": openrouter.NumberProp("For video: total animation length in ms (e.g. 6000). 0 for images."),
+			}, []string{"html"}),
+		),
+		openrouter.NewFunctionTool(
+			toolApplyDesignEdits,
+			"Revise the current design's HTML to apply the user's pinned comments/"+
+				"instructions. The current HTML is NOT in your context — first call "+
+				"get_design_html to fetch it, then return the FULL revised HTML in `html`, "+
+				"preserving data-el ids and keeping all text inside the frame. Make only the "+
+				"requested changes.",
+			openrouter.ObjectSchema(map[string]any{
+				"html": openrouter.StringProp("The full revised HTML document."),
+			}, []string{"html"}),
+		),
+		openrouter.NewFunctionTool(
+			toolGetDesignHTML,
+			"Fetch the FULL, current HTML of this content's design (never truncated). The "+
+				"design HTML is deliberately NOT in your context (it is large) — only a "+
+				"reference is. So you MUST call this FIRST to read or edit an existing design: "+
+				"run it whenever the user asks about or wants to change the current design, "+
+				"then use the returned `html` with apply_design_edits. Returns "+
+				"{ html, revisionId, docType, slideCount, width, height, durationMs }.",
+			openrouter.ObjectSchema(map[string]any{
+				"revisionId": openrouter.StringProp(
+					"Optional. A specific design revision id to fetch; omit to get the content's current design.",
+				),
+			}, []string{}),
+		),
+	}
+}
+
+type generateDesignArgs struct {
+	HTML       string `json:"html"`
+	DocType    string `json:"docType"`
+	Format     string `json:"format"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	Slides     int    `json:"slides"`
+	DurationMs int    `json:"durationMs"`
+}
+
+// countSlides returns the number of data-slide sections in the HTML (min 1).
+func countSlides(html string) int {
+	n := strings.Count(html, "data-slide")
+	if n < 1 {
+		return 1
+	}
+	return n
+}
+
+func runGenerateDesign(ctx context.Context, brandID, contentID, arguments string) (string, error) {
+	if contentID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "no content in context"}), nil
+	}
+	var a generateDesignArgs
+	if err := json.Unmarshal([]byte(arguments), &a); err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not parse arguments"}), nil
+	}
+	html := strings.TrimSpace(a.HTML)
+	if html == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "html is required"}), nil
+	}
+	w, h := a.Width, a.Height
+	if w == 0 || h == 0 {
+		w, h = sizeForFormatPx(a.Format)
+	}
+	docType := a.DocType
+	if docType == "" {
+		docType = "image"
+	}
+	slides := a.Slides
+	if slides < 1 {
+		slides = countSlides(html)
+	}
+	duration := a.DurationMs
+	if docType == "video" && duration <= 0 {
+		duration = 6000
+	}
+	revID, err := persistDesign(brandID, contentID, wrapHTML(html), w, h, slides, duration, docType, "generate", "")
+	if err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), err
+	}
+	return jsonResult(map[string]any{
+		"ok":         true,
+		"revisionId": revID,
+		"note":       "design created and shown to the user; describe it briefly and invite them to edit text or pin comments.",
+	}), nil
+}
+
+type applyDesignArgs struct {
+	HTML string `json:"html"`
+}
+
+func runApplyDesignEdits(ctx context.Context, brandID, contentID, arguments string) (string, error) {
+	if contentID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "no content in context"}), nil
+	}
+	content, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil || content.DesignRef == nil {
+		return jsonResult(map[string]any{"ok": false, "error": "no design to edit; call generate_design first"}), nil
+	}
+	cur, err := trendlymodels.GetDesignRevision(brandID, contentID, content.DesignRef.RevisionID)
+	if err != nil || cur == nil {
+		return jsonResult(map[string]any{"ok": false, "error": "current design not found"}), nil
+	}
+	var a applyDesignArgs
+	if err := json.Unmarshal([]byte(arguments), &a); err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not parse arguments"}), nil
+	}
+	html := strings.TrimSpace(a.HTML)
+	if html == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "html is required"}), nil
+	}
+	// Preserve the slide count unless the revised HTML changed it.
+	slides := cur.SlideCount
+	if s := countSlides(html); s != slides && s >= 1 {
+		slides = s
+	}
+	revID, err := persistDesign(brandID, contentID, wrapHTML(html), cur.Width, cur.Height, slides, cur.DurationMs, cur.DocType, "edit", cur.ID)
+	if err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), err
+	}
+	return jsonResult(map[string]any{
+		"ok":         true,
+		"revisionId": revID,
+		"note":       "edits applied and re-rendered; the user can revert to the previous revision.",
+	}), nil
+}
+
+type getDesignHTMLArgs struct {
+	RevisionID string `json:"revisionId"`
+}
+
+// runGetDesignHTML returns the FULL current design HTML on demand. The design
+// HTML is intentionally kept OUT of the system context (it is large and would
+// truncate the prompt); the model fetches the complete document here right
+// before reading or editing it. Not truncated — the model needs the whole thing
+// to return a faithful revised document via apply_design_edits.
+func runGetDesignHTML(ctx context.Context, brandID, contentID, arguments string) (string, error) {
+	if contentID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "no content in context"}), nil
+	}
+	content, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil || content == nil || content.DesignRef == nil || content.DesignRef.RevisionID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "no design yet; call generate_design first"}), nil
+	}
+	var a getDesignHTMLArgs
+	_ = json.Unmarshal([]byte(arguments), &a)
+	revID := strings.TrimSpace(a.RevisionID)
+	if revID == "" {
+		revID = content.DesignRef.RevisionID
+	}
+	rev, err := trendlymodels.GetDesignRevision(brandID, contentID, revID)
+	if err != nil || rev == nil {
+		return jsonResult(map[string]any{"ok": false, "error": "design revision not found"}), nil
+	}
+	return jsonResult(map[string]any{
+		"ok":         true,
+		"revisionId": rev.ID,
+		"docType":    rev.DocType,
+		"slideCount": rev.SlideCount,
+		"width":      rev.Width,
+		"height":     rev.Height,
+		"durationMs": rev.DurationMs,
+		"html":       rev.HTML,
+	}), nil
+}
+
+// persistDesign writes an immutable HTML revision and points the content at it.
+func persistDesign(brandID, contentID, html string, w, h, slides, durationMs int, docType, origin, parentRev string) (string, error) {
+	if slides < 1 {
+		slides = 1
+	}
+	revID, err := trendlymodels.CreateDesignRevision(brandID, contentID, &trendlymodels.ContentDesignRevision{
+		HTML: html, Width: w, Height: h, SlideCount: slides, DurationMs: durationMs, DocType: docType, Origin: origin, ParentRevisionID: parentRev,
+	})
+	if err != nil {
+		return "", err
+	}
+	if err := trendlymodels.SetContentDesignRef(brandID, contentID, &trendlymodels.ContentDesignRef{
+		RevisionID: revID, DocType: docType, Width: w, Height: h, SlideCount: slides, DurationMs: durationMs,
+	}); err != nil {
+		return "", err
+	}
+	return revID, nil
+}
+
+func sizeForFormatPx(format string) (int, int) {
+	switch format {
+	case "reel", "story":
+		return 1080, 1920
+	case "video":
+		return 1920, 1080
+	case "post", "carousel":
+		return 1080, 1350
+	default:
+		return 1080, 1080
+	}
+}
+
+// wrapHTML ensures the design is a full document with a deterministic base
+// (box-sizing reset + zero margins) so every render is consistent. If the model
+// already returned a full document, it is returned unchanged.
+func wrapHTML(html string) string {
+	low := strings.ToLower(strings.TrimSpace(html))
+	if strings.HasPrefix(low, "<!doctype") || strings.HasPrefix(low, "<html") {
+		return html
+	}
+	return "<!doctype html><html><head><meta charset=\"utf-8\">" +
+		"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+		"<style>*{box-sizing:border-box;margin:0;padding:0}html,body{margin:0;padding:0}</style>" +
+		"</head><body>" + html + "</body></html>"
+}

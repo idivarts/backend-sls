@@ -19,6 +19,10 @@ var youtubeScopesRequired = strings.Join([]string{
 	youtube.ScopeYTAnalytics,
 	youtube.ScopeUserInfoProfile,
 	youtube.ScopeUserInfoEmail,
+	// Upload + force-ssl power video/Shorts posting and thumbnail set. Sensitive
+	// scopes — require Google OAuth verification (see dashboard setup doc §2).
+	youtube.ScopeYouTubeUpload,
+	youtube.ScopeYouTubeForceSSL,
 }, " ")
 
 // YouTubeInit redirects to Google's OAuth consent screen.
@@ -47,8 +51,14 @@ func YouTubeInit(c *gin.Context) {
 
 	redirectURI := fmt.Sprintf("%s/connect/youtube/callback", constants.GetTrendlyBE())
 	authURL := fmt.Sprintf(
+		// prompt=select_account+consent: "select_account" forces Google's native
+		// channel chooser so users can pick their personal channel OR any Brand
+		// Account channel they manage (YouTube has no API to enumerate these — the
+		// chooser is the only way). "consent" is kept so we still get a refresh
+		// token. To connect several channels, the user repeats this flow and picks
+		// a different channel each time.
 		"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s"+
-			"&access_type=offline&prompt=consent",
+			"&access_type=offline&prompt=select_account%%20consent",
 		youtube.AuthURL,
 		url.QueryEscape(youtube.ClientID),
 		url.QueryEscape(redirectURI),

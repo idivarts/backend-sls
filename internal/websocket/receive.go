@@ -16,19 +16,20 @@ type Envelope struct {
 	Action string `json:"action,omitempty"`
 	Data   string `json:"data,omitempty"`
 
-	BrandID        string         `json:"brandId,omitempty"`
-	ConversationID string         `json:"conversationId,omitempty"`
-	ClientMsgID    string         `json:"clientMsgId,omitempty"`
-	Content        string         `json:"content,omitempty"`
-	Images         []string       `json:"images,omitempty"`
-	FocusedText    string         `json:"focusedText,omitempty"`
-	Model          string         `json:"model,omitempty"`
-	Module         string         `json:"module,omitempty"`
-	ContextID      string         `json:"contextId,omitempty"`
-	SelectedText   string         `json:"selectedText,omitempty"`
-	Prompt         string         `json:"prompt,omitempty"`
-	Task           string         `json:"task,omitempty"`
-	Payload        map[string]any `json:"payload,omitempty"`
+	BrandID        string                  `json:"brandId,omitempty"`
+	ConversationID string                  `json:"conversationId,omitempty"`
+	ClientMsgID    string                  `json:"clientMsgId,omitempty"`
+	Content        string                  `json:"content,omitempty"`
+	Images         []string                `json:"images,omitempty"`
+	FocusedText    string                  `json:"focusedText,omitempty"`
+	Focus          []trendlymodels.AIFocus `json:"focus,omitempty"`
+	Model          string                  `json:"model,omitempty"`
+	Module         string                  `json:"module,omitempty"`
+	ContextID      string                  `json:"contextId,omitempty"`
+	SelectedText   string                  `json:"selectedText,omitempty"`
+	Prompt         string                  `json:"prompt,omitempty"`
+	Task           string                  `json:"task,omitempty"`
+	Payload        map[string]any          `json:"payload,omitempty"`
 }
 
 func messageHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -41,7 +42,7 @@ func messageHandler(_ context.Context, event events.APIGatewayWebsocketProxyRequ
 	}
 
 	switch env.Type {
-	case "message", "quick_edit", "content_gen", "push_to_calendar":
+	case "message", "stop", "quick_edit", "content_gen", "push_to_calendar":
 		userID, ok := lookupUserID(connectionID)
 		if !ok {
 			sendError(connectionID, "unauthenticated")

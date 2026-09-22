@@ -258,6 +258,12 @@ func ChatCompletionStream(ctx context.Context, req ChatRequest, cb StreamCallbac
 	toolAccum := map[int]*ToolCall{}
 	var toolOrder []int
 	for scanner.Scan() {
+		// Stop reading as soon as the caller cancels ctx (e.g. the user
+		// interrupted the turn) — the deferred body.Close() unblocks any pending
+		// read too, but this exits cleanly on the next line boundary.
+		if ctx.Err() != nil {
+			break
+		}
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
 			continue
@@ -406,7 +412,10 @@ func doRequest(ctx context.Context, path string, payload interface{}) (io.ReadCl
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	// Per-call ceiling. A single agentic step (streamed completion or image
+	// generation) can legitimately run for minutes on a large model; this stays
+	// under the WS lambda's overall timeout while giving one call room to finish.
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	httpReq, err := http.NewRequestWithContext(reqCtx, http.MethodPost, baseURL+path, bytes.NewReader(buf))
 	if err != nil {
 		cancel()

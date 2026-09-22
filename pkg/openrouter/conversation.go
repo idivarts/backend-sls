@@ -46,6 +46,17 @@ func CreateConversation(ctx context.Context, brandID, userID, module, contextID,
 	return &conv, nil
 }
 
+// CountConversationsByBrand returns how many AI conversations a brand has
+// started. Conversations live in one flat top-level collection keyed by
+// brandId (not under the brand), so this filters rather than scoping a
+// subcollection. Used by the admin Brand CRM.
+func CountConversationsByBrand(ctx context.Context, brandID string) (int, error) {
+	if brandID == "" {
+		return 0, fmt.Errorf("CountConversationsByBrand: empty brandID")
+	}
+	return trendlymodels.CountQuery(ctx, conversationsRef().Where("brandId", "==", brandID))
+}
+
 func GetConversation(ctx context.Context, conversationID string) (*trendlymodels.AIConversation, error) {
 	snap, err := conversationsRef().Doc(conversationID).Get(ctx)
 	if err != nil {
@@ -148,6 +159,32 @@ func UpdateConversationTitle(ctx context.Context, conversationID, title string) 
 	return err
 }
 
+// RequestCancel marks the conversation so its in-flight AI turn cooperatively
+// aborts. The stop signal arrives on a separate WS (Lambda) invocation from the
+// one running the turn, so the marker is the cross-invocation channel: the
+// streaming loop polls it (throttled) and bails when it sees a request newer than
+// its own start time.
+func RequestCancel(ctx context.Context, conversationID string) error {
+	_, err := conversationsRef().Doc(conversationID).Update(ctx, []firestore.Update{
+		{Path: "cancelRequestedAt", Value: time.Now().UnixMilli()},
+	})
+	return err
+}
+
+// GetCancelRequestedAt returns the conversation's current cancel-request
+// timestamp (0 when none). Read by the streaming loop to decide whether to abort.
+func GetCancelRequestedAt(ctx context.Context, conversationID string) (int64, error) {
+	snap, err := conversationsRef().Doc(conversationID).Get(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var conv trendlymodels.AIConversation
+	if err := snap.DataTo(&conv); err != nil {
+		return 0, err
+	}
+	return conv.CancelRequestedAt, nil
+}
+
 func UpdateConversationModel(ctx context.Context, conversationID, model string) error {
 	_, err := conversationsRef().Doc(conversationID).Update(ctx, []firestore.Update{
 		{Path: "currentModel", Value: model},
@@ -159,14 +196,23 @@ func UpdateConversationModel(ctx context.Context, conversationID, model string) 
 func ToOpenRouterMessages(history []trendlymodels.AIMessage) []Message {
 	out := make([]Message, 0, len(history))
 	for _, m := range history {
+		content := m.Content
+		// Carry a user turn's focus into its content so the referenced target
+		// (element/slide/content/comment) persists across turns — otherwise a
+		// later "move this" loses the reference and the model asks "which one?".
+		if m.Role == "user" {
+			if note := m.FocusNote(); note != "" {
+				content = note + "\n" + content
+			}
+		}
 		// Replay a user turn's attached images as multimodal vision input so the
 		// model keeps visual context across the thread. Assistant/tool turns stay
 		// text-only (their generated images are surfaced as URLs in the prose).
 		if m.Role == "user" && len(m.Images) > 0 {
-			out = append(out, UserMessageWithImages(m.Content, m.Images))
+			out = append(out, UserMessageWithImages(content, m.Images))
 			continue
 		}
-		out = append(out, Message{Role: m.Role, Content: m.Content})
+		out = append(out, Message{Role: m.Role, Content: content})
 	}
 	return out
 }

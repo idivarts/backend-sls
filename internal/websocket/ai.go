@@ -15,6 +15,7 @@ func dispatchAI(connectionID, userID string, env Envelope) {
 		Content:        env.Content,
 		Images:         env.Images,
 		FocusedText:    env.FocusedText,
+		Focus:          env.Focus,
 		Model:          env.Model,
 		Module:         env.Module,
 		ContextID:      env.ContextID,

@@ -25,12 +25,34 @@ provider:
     JWT_ENCODE_KEY: ${env:JWT_ENCODE_KEY}
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
     OPENROUTER_API_KEY: ${env:OPENROUTER_API_KEY, ''}
+    # AI Studio — ElevenLabs (music + voiceover) and Canva Connect deep-edit
+    # bridge. See docs/elevenlabs-setup.md and docs/canva-setup.md.
+    ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY, ''}
+    CANVA_CLIENT_ID: ${env:CANVA_CLIENT_ID, ''}
+    CANVA_CLIENT_SECRET: ${env:CANVA_CLIENT_SECRET, ''}
+    CANVA_REDIRECT_URI: ${env:CANVA_REDIRECT_URI, 'https://be.trendly.now/api/integrations/canva/callback'}
+    # Async scene render worker queue (Fargate consumer). Empty ⇒ enqueue is a
+    # no-op (FE renders scene previews itself). See docs/render-worker.md.
+    RENDER_QUEUE_URL: ${env:RENDER_QUEUE_URL, ''}
     BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
+    # ── Outbound email (Amazon SES) — see docs/ses-setup.md ─────────────────
+    EMAIL_SENDER_NAME: Trendly
+    EMAIL_SENDER_ADDRESS: no-reply@updates.trendly.now
+    EMAIL_REPLY_TO: support@trendly.now
+    SES_REGION: ${aws:region}
+    # Created by the EmailConfigurationSet resource below — one per stage, so
+    # dev and prod keep separate bounce/complaint event streams.
+    SES_CONFIGURATION_SET: !Ref EmailConfigurationSet
+    # SendGrid no longer sends mail. This key is still required by the marketing
+    # -contacts sync in pkg/mysendgrid/contact.go, which SES cannot replace —
+    # see docs/ses-setup.md §8.
     SENDGRID_API_KEY: ${env:SENDGRID_API_KEY}
-    SENDGRID_NAME: Trendly
-    SENDGRID_EMAIL: no-reply@updates.trendly.now
     HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY}
+    # RevenueCat native IAP webhook shared secret. Must match the Authorization
+    # header value configured in the RevenueCat dashboard webhook. See the IAP
+    # ticket + docs/revenuecat-iap-setup.md.
+    REVENUECAT_WEBHOOK_AUTH: ${env:REVENUECAT_WEBHOOK_AUTH, ''}
     # Social Connect V2 — new OAuth platform credentials
     FB_CLIENT_ID: ${env:FB_CLIENT_ID, '567254166026958'}
     FB_CLIENT_SECRET: ${env:FB_CLIENT_SECRET}
@@ -46,8 +68,19 @@ provider:
     YOUTUBE_CLIENT_SECRET: ${env:YOUTUBE_CLIENT_SECRET, ''}
     LINKEDIN_CLIENT_ID: ${env:LINKEDIN_CLIENT_ID, ''}
     LINKEDIN_CLIENT_SECRET: ${env:LINKEDIN_CLIENT_SECRET, ''}
+    # Dedicated Community Management API app (Company Pages / linkedin_page
+    # provider) — MUST be a separate LinkedIn app (CMA must be its only product).
+    # See docs/linkedin-pages-cma-setup.md.
+    LINKEDIN_CM_CLIENT_ID: ${env:LINKEDIN_CM_CLIENT_ID, ''}
+    LINKEDIN_CM_CLIENT_SECRET: ${env:LINKEDIN_CM_CLIENT_SECRET, ''}
     TWITTER_CLIENT_ID: ${env:TWITTER_CLIENT_ID, ''}
     TWITTER_CLIENT_SECRET: ${env:TWITTER_CLIENT_SECRET, ''}
+    # Reddit Data API (OAuth confidential web app). REDDIT_USER_AGENT is mandatory
+    # and must be unique — Reddit bans generic/spoofed UAs. See
+    # docs/social-expansion-dashboard-setup.md §4.
+    REDDIT_CLIENT_ID: ${env:REDDIT_CLIENT_ID, ''}
+    REDDIT_CLIENT_SECRET: ${env:REDDIT_CLIENT_SECRET, ''}
+    REDDIT_USER_AGENT: ${env:REDDIT_USER_AGENT, 'web:trendly-ai-social-planner:v1.0 (by /u/trendlyapp)'}
     # All Razorpay related variables
     GROWTH_PLAN_ID: plan_QywVXV2flgIY7N
     BUSINESS_PLAN_ID: plan_QywX8bnObf3P42
@@ -105,6 +138,20 @@ provider:
           Action:
             - "sqs:SendMessage"
           Resource: { "Fn::GetAtt": ["SocialSyncQueue", "Arn"] }
+        # ── AI-Studio: enqueue scene render jobs for the Fargate render worker ──
+        - Effect: "Allow"
+          Action:
+            - "sqs:SendMessage"
+          Resource: { "Fn::GetAtt": ["SceneRenderQueue", "Arn"] }
+        # ── Outbound email via Amazon SES (pkg/myemail). Scoped to the verified
+        #    sending identity + the transactional configuration set. See
+        #    docs/ses-setup.md. ──
+        - Effect: "Allow"
+          Action:
+            - "ses:SendEmail"
+          Resource:
+            - "arn:aws:ses:${aws:region}:${aws:accountId}:identity/updates.trendly.now"
+            - "arn:aws:ses:${aws:region}:${aws:accountId}:configuration-set/trendly-transactional-${self:provider.stage}"
 plugins:
   - serverless-go-plugin
   - serverless-domain-manager
@@ -317,6 +364,18 @@ functions:
     events:
       - http: ANY /api/ai/{proxy+}
       - http: ANY /api/content-strategy/{proxy+}
+  trendly_studio_apis:
+    handler: functions/trendly_studio/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      # ElevenLabs audio (music + voiceover) and Canva Connect deep-edit bridge.
+      - http: ANY /api/media/{proxy+}
+      - http: ANY /api/integrations/canva/{proxy+}
   trendly_matchmaking_apis:
     handler: functions/trendly_matchmaking/main.go
     package:
@@ -360,6 +419,16 @@ functions:
     # provisionedConcurrency: 1  # Adjust this number as per traffic/load
     events:
       - http: ANY /payment_webhooks
+  trendly_revenuecat_webhook:
+    handler: functions/revenuecat/webhook/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+        - 'templates/*'
+    timeout: 30
+    events:
+      - http: ANY /revenuecat/webhook
   trendly_social_webhooks:
     handler: functions/trendly_social_webhooks/main.go
     package:
@@ -391,7 +460,12 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
-    timeout: 120
+    # Also serves instant publish-now / retry jobs, which publish to every
+    # destination concurrently and may upload large video (YouTube/IG/FB) — well
+    # beyond the 30s HTTP limit, hence the queue. Set to the Lambda max (900s) so a
+    # slow multi-platform video fan-out (incl. LinkedIn's up-to-120s processing
+    # wait) never times out mid-publish.
+    timeout: 900
     events:
       - sqs:
           arn:
@@ -449,7 +523,13 @@ functions:
         - 'service-account.json'
         - 'key-secrets.json'
         - 'templates/*'
-    timeout: 300
+    # AI chat turns run synchronously in this lambda (see internal/websocket
+    # receive.go → ai.HandleWS). A turn with several agentic tool steps +
+    # image/design generation can run for minutes, so we allow the lambda max
+    # (900s) rather than cutting a live turn off at 5 minutes. Streaming reaches
+    # the client out-of-band via PostToConnection, so the API Gateway 29s
+    # integration timeout does not apply.
+    timeout: 900
     events:
       - websocket: $connect
       - websocket: $disconnect
@@ -490,6 +570,64 @@ resources:
       Fn::Equals: ["${sls:stage}", "prod"]
 
   Resources:
+    # ── Outbound email (Amazon SES) ─────────────────────────────────────────
+    # The configuration set is what makes delivery/bounce/complaint events
+    # observable — SES does NOT create one for you, and a send naming a set that
+    # does not exist fails outright. Creating it here keeps it in lockstep with
+    # the IAM policy that references it. The sending IDENTITY (the verified
+    # domain + its DKIM/MAIL FROM DNS) is still a manual, one-time setup —
+    # see docs/ses-setup.md.
+    EmailConfigurationSet:
+      Type: AWS::SES::ConfigurationSet
+      Properties:
+        Name: trendly-transactional-${self:provider.stage}
+        ReputationOptions:
+          ReputationMetricsEnabled: true
+        SendingOptions:
+          SendingEnabled: true
+
+    EmailEventsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:service}-email-events-${self:provider.stage}
+        DisplayName: Trendly SES delivery events
+
+    # SES publishes as a service principal, so it needs an explicit grant on the
+    # topic; without this the event destination silently delivers nothing.
+    EmailEventsTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        Topics:
+          - !Ref EmailEventsTopic
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: ses.amazonaws.com
+              Action: "sns:Publish"
+              Resource: !Ref EmailEventsTopic
+              Condition:
+                StringEquals:
+                  AWS:SourceAccount: ${aws:accountId}
+
+    EmailConfigurationSetEventDestination:
+      Type: AWS::SES::ConfigurationSetEventDestination
+      Properties:
+        ConfigurationSetName: !Ref EmailConfigurationSet
+        EventDestination:
+          Name: sns-delivery-events
+          Enabled: true
+          MatchingEventTypes:
+            - send
+            - reject
+            - bounce
+            - complaint
+            - delivery
+            - renderingFailure
+          SnsDestination:
+            TopicARN: !Ref EmailEventsTopic
+
     DiscoveryMessageQueue:
       Type: AWS::SQS::Queue
       Properties:
@@ -523,6 +661,18 @@ resources:
         QueueName: SocialSyncQueue-${self:provider.stage}
         VisibilityTimeout: 660   # ≥ social_sqs timeout (600s) + buffer
 
+    # AI-Studio scene render worker queue. Consumed by an out-of-band Fargate
+    # container (CanvasKit + FFmpeg) — NOT a Lambda (video render exceeds the
+    # 15-min/10-GB/no-GPU Lambda envelope). The AI/scene handlers enqueue here;
+    # the worker writes renderUrl back onto the content's sceneRef. Set
+    # RENDER_QUEUE_URL to this queue's URL once the worker exists. See
+    # docs/render-worker.md.
+    SceneRenderQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SceneRenderQueue-${self:provider.stage}
+        VisibilityTimeout: 1000  # long-running container render + buffer
+
     # --------------------------------------------------------------------------------------
     # ------------- Scheduled content publishing (delayed_sqs via Step Functions) ----------
     # --------------------------------------------------------------------------------------
@@ -530,7 +680,7 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ContentPublishQueue-${self:provider.stage}
-        VisibilityTimeout: 180   # ≥ scheduled_publish_sqs timeout (120s) + buffer
+        VisibilityTimeout: 960   # ≥ scheduled_publish_sqs timeout (900s, Lambda max) + buffer
 
     ContentPublishStateMachineRole:
       Type: AWS::IAM::Role
@@ -594,6 +744,29 @@ resources:
               AllowedMethods: ["GET", "PUT", "POST", "DELETE", "HEAD"]
               AllowedOrigins: ["*"]
 
+    # Shared CORS policy for the asset CloudFront distributions. CloudFront
+    # applies these response headers at the edge on EVERY viewer response
+    # (including already-cached objects), so a crossOrigin="anonymous" request —
+    # e.g. html2canvas rendering a design that embeds the brand logo — gets a
+    # valid Access-Control-Allow-Origin and can rasterize the image. Without it
+    # the legacy ForwardedValues below never forward the Origin header to S3, so
+    # S3 never emits CORS headers and cross-origin canvas reads fail silently.
+    AssetsCorsResponseHeadersPolicy:
+      Condition: IsDev
+      Type: AWS::CloudFront::ResponseHeadersPolicy
+      Properties:
+        ResponseHeadersPolicyConfig:
+          Name: ${self:service}-assets-cors
+          CorsConfig:
+            AccessControlAllowCredentials: false
+            AccessControlAllowHeaders:
+              Items: ["*"]
+            AccessControlAllowMethods:
+              Items: ["GET", "HEAD", "OPTIONS"]
+            AccessControlAllowOrigins:
+              Items: ["*"]
+            OriginOverride: true
+
     CloudFrontDistribution:
       Condition: IsDev
       Type: AWS::CloudFront::Distribution
@@ -609,10 +782,12 @@ resources:
           DefaultCacheBehavior:
             TargetOriginId: S3Origin
             ViewerProtocolPolicy: "redirect-to-https"
-            AllowedMethods: ["GET", "HEAD"]
+            ResponseHeadersPolicyId: !Ref AssetsCorsResponseHeadersPolicy
+            AllowedMethods: ["GET", "HEAD", "OPTIONS"]
             CachedMethods:
               - GET
               - HEAD
+              - OPTIONS
             ForwardedValues:
               QueryString: false
               Cookies:
@@ -683,10 +858,12 @@ resources:
           DefaultCacheBehavior:
             TargetOriginId: S3ImageOrigin
             ViewerProtocolPolicy: "redirect-to-https"
-            AllowedMethods: ["GET", "HEAD"]
+            ResponseHeadersPolicyId: !Ref AssetsCorsResponseHeadersPolicy
+            AllowedMethods: ["GET", "HEAD", "OPTIONS"]
             CachedMethods:
               - GET
               - HEAD
+              - OPTIONS
             ForwardedValues:
               QueryString: false
               Cookies:
@@ -756,10 +933,12 @@ resources:
           DefaultCacheBehavior:
             TargetOriginId: S3AttachmentOrigin
             ViewerProtocolPolicy: "redirect-to-https"
-            AllowedMethods: ["GET", "HEAD"]
+            ResponseHeadersPolicyId: !Ref AssetsCorsResponseHeadersPolicy
+            AllowedMethods: ["GET", "HEAD", "OPTIONS"]
             CachedMethods:
               - GET
               - HEAD
+              - OPTIONS
             ForwardedValues:
               QueryString: false
               Cookies:

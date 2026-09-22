@@ -15,6 +15,10 @@ const (
 	ScopeTweetRead     = "tweet.read"
 	ScopeUsersRead     = "users.read"
 	ScopeOfflineAccess = "offline.access" // required for refresh tokens
+	ScopeTweetWrite    = "tweet.write"    // create tweets / replies (posting + media inbox)
+	ScopeMediaWrite    = "media.write"    // v2 chunked media upload (posting)
+	ScopeDMRead        = "dm.read"        // read DM events (messaging inbox)
+	ScopeDMWrite       = "dm.write"       // send DMs (messaging inbox)
 )
 
 var (

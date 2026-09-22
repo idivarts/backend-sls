@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/admin"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
@@ -42,6 +43,17 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/organizations/:id/brands/:brandId/transfer", trendlyapis.TransferBrand)
 	// Soft-delete a brand (blocked while it has active contracts).
 	managerApisV1.DELETE("/brands/:brandId", trendlyapis.DeleteBrand)
+	// Self-service switch to the free plan — the paywall/billing screen's
+	// always-available fallback when a subscription is stuck/unwanted/lapsed.
+	managerApisV1.POST("/organizations/:id/downgrade-to-free", trendlyapis.DowngradeOrgToFree)
+	// Dismiss the "someone else already owns this subscription" popup.
+	managerApisV1.POST("/organizations/:id/iap/dismiss-restore-conflict", trendlyapis.DismissIapRestoreConflict)
+
+	// ── Admin / internal ops (Brand CRM) ──────────────────────────────────────
+	// Cross-tenant product-usage metrics. Each handler gates on Manager.IsAdmin
+	// itself — the Firestore rules cannot protect these reads.
+	managerApisV1.GET("/admin/brands/usage", admin.ListBrandUsage)
+	managerApisV1.GET("/admin/brands/:brandId/usage", admin.GetBrandUsage)
 
 	// ── Account (self-service account deletion — App Store / Play requirement) ──
 	// Blocked while the manager still solely owns an org with active brands or a
@@ -65,6 +77,7 @@ func handleManagerAPIs() {
 
 	// ── Content publishing + scheduling (brands/{brandId}/contents) ───────────
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish", publishing.PublishNow)
+	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish/retry", publishing.RetryPublish)
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/schedule", publishing.SchedulePublish)
 	managerApisV1.DELETE("/brands/:brandId/contents/:contentId/schedule", publishing.CancelSchedule)
 

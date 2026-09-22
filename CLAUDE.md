@@ -39,7 +39,7 @@ This repository is the **Go serverless backend** for Trendly — a platform conn
   - **PostgreSQL/RDS** — analytics and discovery (via GORM)
   - **BigQuery** — social data warehouse
   - DynamoDB — legacy only, not actively used for core models
-- **External Services**: Stream Chat, Razorpay, SendGrid, Firebase Auth/FCM, OpenAI, Gemini, HubSpot, Apify, n8n
+- **External Services**: Stream Chat, Razorpay, Amazon SES (email), Firebase Auth/FCM, OpenAI, Gemini, HubSpot, Apify, n8n
 
 ---
 
@@ -69,7 +69,11 @@ backend-sls/
 │   ├── instagram/      # Instagram Graph API client
 │   ├── facebook/       # Facebook Graph/Messenger client
 │   ├── payments/       # Razorpay wrappers
-│   ├── myemail/        # SendGrid helpers
+│   ├── mailer/         # Message + Sender interface (provider-neutral)
+│   ├── myemail/        # Renders templates, owns the sender
+│   ├── myses/          # Amazon SES v2 delivery
+│   ├── mysendgrid/     # SendGrid marketing contacts only (no longer sends mail)
+│   ├── crm/            # ContactDetails shared by hubspot + mysendgrid
 │   ├── gemini/         # Google Gemini AI
 │   ├── myopenai/       # OpenAI assistant wrappers
 │   ├── mys3/           # S3 upload/get
@@ -77,7 +81,7 @@ backend-sls/
 │   ├── n8n/            # n8n automation webhooks
 │   ├── apify/          # Apify Instagram scraper
 │   └── delayed_sqs/    # SQS delayed message helpers
-├── templates/          # SendGrid HTML email templates (30+)
+├── templates/          # HTML email templates, rendered locally (60+)
 ├── scripts/            # Standalone scripts / cron handlers
 ├── postman/            # Postman collection JSONs
 └── serverless.trendly.yml  # Primary infra config
@@ -199,7 +203,11 @@ if err := c.ShouldBindJSON(&req); err != nil {
 - `templates/` — HTML files (one per email event)
 - `templates/init.go` — `TemplatePath` constants for each template file
 - `templates/subject.go` — Subject line string constants
-- `pkg/myemail/main.go` — SendGrid sending helpers
+- `pkg/myemail/main.go` — sending helpers (public API — call these)
+- `pkg/myemail/config.go` — sender identity + provider selection from env
+- `pkg/myemail/htmltext.go` — HTML → text/plain alternative part
+- `pkg/mailer/` — `Message` + `Sender` interface, depends on nothing
+- `pkg/myses/` — Amazon SES v2 delivery
 
 ### Template Format Rules
 Every template HTML file **must** start with a comment block listing all dynamic variables:
@@ -237,7 +245,33 @@ err = myemail.SendCustomHTMLEmailToMultipleRecipients(emails, templates.MyTempla
 ### Available Sending Functions (`pkg/myemail/main.go`)
 - `SendCustomHTMLEmail(toEmail string, templatePath TemplatePath, subject string, data map[string]interface{}) error`
 - `SendCustomHTMLEmailToMultipleRecipients(toEmails []string, templatePath TemplatePath, subject string, data map[string]interface{}) error`
-- `SendEmailUsingTemplate(toEmail, templateID string, dynamicData map[string]interface{}) error` — SendGrid dynamic templates (less common)
+  - Sends **one message per recipient** so addresses are never disclosed to each
+    other. Partial failures are logged; an error is returned only if *every*
+    recipient failed.
+
+> `SendEmailUsingTemplate` (SendGrid dynamic templates) was removed during the
+> SES migration — it had no callers, and SES has no equivalent API.
+
+### Delivery Provider (Amazon SES)
+
+Outbound email goes through **Amazon SES v2**, authenticated by the Lambda
+execution role — there is no API key and **no SendGrid fallback**. SES
+production access is granted on the account.
+
+`pkg/myemail` owns templates and content only — delivery lives behind
+`mailer.Sender`, so adding or swapping a provider touches one assignment in
+`pkg/myemail/config.go` and never a handler.
+
+SendGrid still backs the **marketing-contacts sync only**
+(`pkg/mysendgrid/contact.go`), which is why `SENDGRID_API_KEY` survives. SES has
+no equivalent API — see `docs/ses-setup.md` §7.
+
+Templates are rendered locally with `html/template` — SES never sees them, so
+adding an email needs no provider-side setup. Every send also carries an
+auto-generated `text/plain` alternative.
+
+**Full setup, DNS, sandbox exit, bounce handling and cutover runbook:
+`docs/ses-setup.md`.**
 
 ---
 
@@ -293,4 +327,5 @@ sls deploy --stage dev --config serverless.trendly.yml
 
 ## Key Env Vars
 `FB_CLIENT_SECRET`, `INSTA_CLIENT_SECRET`, `STREAM_SECRET`, `JWT_ENCODE_KEY`,
-`OPENAI_API_KEY`, `SENDGRID_API_KEY`, `HUBSPOT_API_KEY`
+`OPENAI_API_KEY`, `HUBSPOT_API_KEY`, `SES_CONFIGURATION_SET`,
+`SENDGRID_API_KEY` (marketing-contacts sync only)

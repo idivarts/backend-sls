@@ -6,8 +6,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/crm"
 	"github.com/idivarts/backend-sls/pkg/hubspot"
-	"github.com/idivarts/backend-sls/pkg/myemail"
+	"github.com/idivarts/backend-sls/pkg/mysendgrid"
 )
 
 func updateContact(isManager bool, userId string, userObject map[string]interface{}) error {
@@ -44,7 +45,7 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 					socialUrl = "https://www.facebook.com/" + social.FBProfile.ID
 				}
 			}
-			contacts := []myemail.ContactDetails{{
+			contacts := []crm.ContactDetails{{
 				Email:             *user.Email,
 				Name:              user.Name,
 				Phone:             phone,
@@ -55,7 +56,7 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 				SocialLink:        socialUrl,
 			}}
 			// go hubspot.CreateOrUpdateContacts(contacts)
-			err := myemail.CreateOrUpdateContacts(contacts)
+			err := mysendgrid.CreateOrUpdateContacts(contacts)
 			if err != nil {
 				return err
 			}
@@ -73,7 +74,7 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 			brandName = brand.Name
 		}
 
-		contacts := []myemail.ContactDetails{{
+		contacts := []crm.ContactDetails{{
 			Email:            manager.Email,
 			Name:             manager.Name,
 			IsManager:        true,
@@ -89,7 +90,7 @@ func updateContact(isManager bool, userId string, userObject map[string]interfac
 		}
 
 		go hubspot.CreateOrUpdateContacts(contacts)
-		err = myemail.CreateOrUpdateContacts(contacts)
+		err = mysendgrid.CreateOrUpdateContacts(contacts)
 		if err != nil {
 			return err
 		}

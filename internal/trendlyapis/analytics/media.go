@@ -1,6 +1,7 @@
 package analytics
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -8,9 +9,39 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/facebook"
+	"github.com/idivarts/backend-sls/pkg/instagram"
 )
+
+// PostAnalyticsFor returns live per-post analytics for a single published media,
+// reusing the same Meta clients as the dashboard. Exposed for non-HTTP callers
+// (e.g. the AI fetch tools). channel defaults to Instagram; only Instagram and
+// Facebook are supported.
+func PostAnalyticsFor(brandID, socialID, mediaID, channel string) (PostAnalytics, error) {
+	if brandID == "" || socialID == "" || mediaID == "" {
+		return PostAnalytics{}, errors.New("brandId, socialId and mediaId are required")
+	}
+	switch channel {
+	case "":
+		channel = trendlymodels.PlatformInstagram
+	case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook:
+		// ok
+	default:
+		return PostAnalytics{}, errors.New("unsupported channel")
+	}
+	acc, err := trendlymodels.GetBrandSocialAccount(brandID, socialID)
+	if err != nil {
+		return PostAnalytics{}, errors.New("connected account not found")
+	}
+	tok, err := trendlymodels.GetBrandSocialToken(brandID, socialID)
+	if err != nil || tok == nil || tok.AccessToken == "" {
+		return PostAnalytics{}, errors.New("connected account has no usable token")
+	}
+	if channel == trendlymodels.PlatformFacebook {
+		return fetchFacebookPost(mediaID, tok.AccessToken), nil
+	}
+	return fetchInstagramPost(*acc, tok.AccessToken, mediaID), nil
+}
 
 // Per-post (single media) basic analytics. Reuses the same Meta insight + media
 // clients as the brand dashboard — the Content details page passes the published

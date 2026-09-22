@@ -78,6 +78,9 @@ func runChatImageTool(ctx context.Context, brandID, orgID, connID, convID, reque
 	if prompt == "" {
 		return jsonResult(map[string]any{"ok": false, "error": "prompt is required"}), nil, nil
 	}
+	// Fold the brand's imagery style (mood, treatment, palette) and its "avoid"
+	// list into the prompt so generated visuals stay on-brand.
+	prompt = designSystemImageryGuidance(loadDesignSystem(brandID), prompt)
 
 	// Premium gate: image generation needs a plan that unlocks an image model.
 	model, locked := pickModel(ctx, brandID, openrouter.TaskImage, requestedModel)

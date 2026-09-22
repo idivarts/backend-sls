@@ -93,6 +93,29 @@ func DeleteTeam(brandID, teamID string) error {
 	return err
 }
 
+// GetDefaultTeamCreator returns the manager id that created the brand's default
+// team, which is the brand's creator. Returns "" when the brand predates teams
+// or the field was never stamped.
+//
+// This is the fallback owner signal for brands with no organization (all brands
+// created before the Organization rollout) — Organization.OwnerID is the real
+// answer wherever it exists.
+func GetDefaultTeamCreator(ctx context.Context, brandID string) string {
+	iter := teamsCol(brandID).
+		Where("isDefault", "==", true).
+		Limit(1).
+		Select("createdBy").
+		Documents(ctx)
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err != nil {
+		return ""
+	}
+	createdBy, _ := doc.Data()["createdBy"].(string)
+	return createdBy
+}
+
 // defaultTeamSpec describes one of the teams seeded for every new brand. The
 // first spec (Admin) is the team used wherever a single team is needed for
 // auto-assignment (the brand creator, invited members, etc.).

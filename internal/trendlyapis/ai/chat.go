@@ -10,12 +10,46 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	readtools "github.com/idivarts/backend-sls/internal/trendlyapis/ai/tools"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
 // maxToolSteps caps the agentic loop so a misbehaving model can't spin forever
 // calling server tools without ever producing a user-facing turn.
 const maxToolSteps = 8
+
+// handleStopWS records a cancel request for the conversation's in-flight turn.
+// The turn runs synchronously in a different WS (Lambda) invocation, so we can't
+// touch its context directly — we drop a Firestore marker the streaming loop
+// polls and honors. The client returns control to the user immediately on its
+// side; this just makes the server actually stop generating (and stop billing
+// tokens) instead of running to completion in the background.
+func handleStopWS(req WSRequest) {
+	ctx := context.Background()
+	if req.ConversationID == "" {
+		wsErrorTo(req.ConnectionID, "conversationId is required")
+		return
+	}
+	conv, err := openrouter.GetConversation(ctx, req.ConversationID)
+	if err != nil {
+		wsErrorTo(req.ConnectionID, "conversation not found")
+		return
+	}
+	if conv.UserID != req.UserID {
+		wsErrorTo(req.ConnectionID, "forbidden")
+		return
+	}
+	if err := openrouter.RequestCancel(ctx, conv.ID); err != nil {
+		log.Printf("ai chat: request cancel: %v", err)
+	}
+	// Ack so the client knows the stop was received. The running turn emits its
+	// own terminal `done` (with `stopped: true`) once it actually breaks; if the
+	// turn had already finished, this ack is the only reply — harmless.
+	wsSend(req.ConnectionID, map[string]any{
+		"type":           "stop_ack",
+		"conversationId": conv.ID,
+	})
+}
 
 func handleMessageWS(req WSRequest) {
 	ctx := context.Background()
@@ -40,9 +74,16 @@ func handleMessageWS(req WSRequest) {
 		return
 	}
 
+	// Keep the client's streaming watchdog alive for the whole turn. The turn
+	// runs synchronously here and can go silent for a while (a slow server tool,
+	// a slow model round-trip between tool steps) with no token deltas; the
+	// heartbeat means the watchdog only fires when the turn is genuinely dead.
+	stopHeartbeat := startHeartbeat(req.ConnectionID, conv.ID)
+	defer stopHeartbeat()
+
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
 
-	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText)
+	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID)
 	// Content module: prefer the live (possibly unsaved) editor state the client
 	// sends with the message over the last-saved Firestore doc, so the AI reasons
 	// about exactly what's on screen right now (same pattern as content generation).
@@ -54,15 +95,32 @@ func handleMessageWS(req WSRequest) {
 			}
 		}
 	}
+	// Tell the content chat there's a design and how to work with it — a small
+	// REFERENCE only (revision id + shape), not the HTML itself. The model fetches
+	// the full HTML on demand via get_design_html so a large design never truncates
+	// the prompt.
+	if conv.Module == moduleContent && conv.ContextID != "" {
+		if design := currentDesignBrief(conv.BrandID, conv.ContextID); design != "" {
+			systemPrompt = systemPrompt + "\n\n" + design
+		}
+	}
 
 	msgs := make([]openrouter.Message, 0, len(history)+2)
 	msgs = append(msgs, openrouter.Message{Role: "system", Content: systemPrompt})
 	msgs = append(msgs, openrouter.ToOpenRouterMessages(history)...)
+	// Attach the focus to THIS (latest) user turn — not the system prompt. Models
+	// weight the newest message most, so a "[Focused on: …]" prefix on the current
+	// turn is respected, whereas the same info in the system prompt is often
+	// treated as stale and the model re-asks "which one?".
+	userContent := req.Content
+	if note := (trendlymodels.AIMessage{Focus: req.Focus, FocusedText: req.FocusedText}).FocusNote(); note != "" {
+		userContent = note + "\n" + req.Content
+	}
 	// When the user attached images, send the turn as multimodal vision input.
 	if len(req.Images) > 0 {
-		msgs = append(msgs, openrouter.UserMessageWithImages(req.Content, req.Images))
+		msgs = append(msgs, openrouter.UserMessageWithImages(userContent, req.Images))
 	} else {
-		msgs = append(msgs, openrouter.Message{Role: "user", Content: req.Content})
+		msgs = append(msgs, openrouter.Message{Role: "user", Content: userContent})
 	}
 
 	if _, err := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
@@ -73,6 +131,7 @@ func handleMessageWS(req WSRequest) {
 		Content:     req.Content,
 		Images:      req.Images,
 		FocusedText: req.FocusedText,
+		Focus:       req.Focus,
 		Timestamp:   time.Now().UnixMilli(),
 	}); err != nil {
 		log.Printf("ai chat: persist user msg: %v", err)
@@ -117,6 +176,31 @@ func handleMessageWS(req WSRequest) {
 
 	tools := toolsForModule(conv.Module)
 
+	// ── Cooperative cancellation ──────────────────────────────────────────
+	// The user can interrupt this turn from the composer (Stop button). The stop
+	// arrives on a separate WS invocation as a `cancelRequestedAt` marker on the
+	// conversation; we poll it (throttled to ~1/s so it costs ~one Firestore read
+	// per second of streaming) and, when it's newer than this turn's start, cancel
+	// the model stream and break — committing whatever streamed so far.
+	turnStart := time.Now().UnixMilli()
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+	cancelled := false
+	lastCancelCheck := time.Now()
+	checkCancel := func() {
+		if cancelled {
+			return
+		}
+		if time.Since(lastCancelCheck) < time.Second {
+			return
+		}
+		lastCancelCheck = time.Now()
+		if at, err := openrouter.GetCancelRequestedAt(ctx, conv.ID); err == nil && at >= turnStart {
+			cancelled = true
+			cancelStream()
+		}
+	}
+
 	var fullText strings.Builder // cumulative across steps — matches what the client accumulates
 	var finalUsage *openrouter.Usage
 	var pendingControl *trendlymodels.AIControl
@@ -128,11 +212,18 @@ func handleMessageWS(req WSRequest) {
 	completed := false
 
 	for step := 0; step < maxToolSteps; step++ {
+		// Honor a cancel requested between steps (e.g. during a token-silent
+		// server-tool phase, where OnDelta isn't firing).
+		checkCancel()
+		if cancelled {
+			break
+		}
+
 		var stepText strings.Builder
 		var toolCalls []openrouter.ToolCall
 		var streamErr error
 
-		err := openrouter.ChatCompletionStream(ctx, openrouter.ChatRequest{
+		err := openrouter.ChatCompletionStream(streamCtx, openrouter.ChatRequest{
 			Model:    model,
 			Messages: msgs,
 			Tools:    tools,
@@ -145,6 +236,7 @@ func handleMessageWS(req WSRequest) {
 					"conversationId": conv.ID,
 					"delta":          delta,
 				})
+				checkCancel()
 			},
 			OnToolCall: func(call openrouter.ToolCall) {
 				toolCalls = append(toolCalls, call)
@@ -154,6 +246,11 @@ func handleMessageWS(req WSRequest) {
 		})
 		if err != nil {
 			streamErr = err
+		}
+		// A cancel tears down streamCtx, which surfaces as a context error here —
+		// that's an intended stop, not a failure. Break and commit the partial.
+		if cancelled {
+			break
 		}
 		if streamErr != nil {
 			log.Printf("ai chat stream: %v", streamErr)
@@ -195,6 +292,9 @@ func handleMessageWS(req WSRequest) {
 				ToolCalls: echo,
 			})
 			for _, sc := range serverCalls {
+				// Tell the user what's happening during this (token-silent) tool
+				// call — also re-arms the client watchdog.
+				wsStatus(req.ConnectionID, conv.ID, toolStatusLabel(sc.Function.Name))
 				var result string
 				var complete bool
 				var derr error
@@ -253,17 +353,23 @@ func handleMessageWS(req WSRequest) {
 		tokens = finalUsage.TotalTokens
 	}
 	meterAIUsage(orgID, finalUsage)
-	assistantMsgID, _ := openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
-		Role:       "assistant",
-		UserID:     conv.UserID,
-		BrandID:    conv.BrandID,
-		Content:    fullText.String(),
-		Images:     genImages,
-		Model:      model,
-		TokenCount: tokens,
-		Control:    pendingControl,
-		Timestamp:  time.Now().UnixMilli(),
-	})
+	// On a cancel we still persist whatever streamed so it isn't lost — unless
+	// nothing came through yet (interrupted during "Thinking…"), in which case
+	// there's no assistant bubble to write.
+	var assistantMsgID string
+	if !(cancelled && strings.TrimSpace(fullText.String()) == "" && len(genImages) == 0 && pendingControl == nil) {
+		assistantMsgID, _ = openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
+			Role:       "assistant",
+			UserID:     conv.UserID,
+			BrandID:    conv.BrandID,
+			Content:    fullText.String(),
+			Images:     genImages,
+			Model:      model,
+			TokenCount: tokens,
+			Control:    pendingControl,
+			Timestamp:  time.Now().UnixMilli(),
+		})
+	}
 
 	if pendingControl != nil {
 		wsSend(req.ConnectionID, map[string]any{
@@ -293,6 +399,7 @@ func handleMessageWS(req WSRequest) {
 		"clientMsgId":    req.ClientMsgID,
 		"images":         genImages,
 		"usage":          finalUsage,
+		"stopped":        cancelled,
 	})
 }
 
@@ -317,13 +424,26 @@ func toolsForModule(module string) []openrouter.Tool {
 	if moduleHasImageGen(module) {
 		tools = append(tools, imageGenServerTools()...)
 	}
+	// The AI-Studio HTML design editor + audio generation live on the content module.
+	if moduleHasStudio(module) {
+		tools = append(tools, designServerTools()...)
+		tools = append(tools, audioServerTools()...)
+	}
+	// On-demand read-only fetch tools (content, analytics, inbox, strategy,
+	// account, assets, billing) let the AI ground its output in the brand's real
+	// data. Available on the planner surfaces — not during onboarding (no data
+	// yet) nor on the lean media image-gen surface.
+	if module != moduleOnboarding && module != moduleMedia {
+		tools = append(tools, readtools.AllTools()...)
+	}
 	return tools
 }
 
 type httpMessageReq struct {
-	Content     string `json:"content" binding:"required"`
-	FocusedText string `json:"focusedText"`
-	Model       string `json:"model"`
+	Content     string                  `json:"content" binding:"required"`
+	FocusedText string                  `json:"focusedText"`
+	Focus       []trendlymodels.AIFocus `json:"focus"`
+	Model       string                  `json:"model"`
 }
 
 func HTTPMessage(c *gin.Context) {
@@ -358,11 +478,17 @@ func HTTPMessage(c *gin.Context) {
 	}
 
 	history, _ := openrouter.LoadHistory(ctx, conv.ID)
-	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID, req.FocusedText)
+	systemPrompt := buildSystemPrompt(brand, conv.Module, conv.BrandID, conv.ContextID)
 
 	msgs := []openrouter.Message{{Role: "system", Content: systemPrompt}}
 	msgs = append(msgs, openrouter.ToOpenRouterMessages(history)...)
-	msgs = append(msgs, openrouter.Message{Role: "user", Content: req.Content})
+	// Attach focus to the latest user turn (not the system prompt) — see the WS
+	// handler for why.
+	httpUserContent := req.Content
+	if note := (trendlymodels.AIMessage{Focus: req.Focus, FocusedText: req.FocusedText}).FocusNote(); note != "" {
+		httpUserContent = note + "\n" + req.Content
+	}
+	msgs = append(msgs, openrouter.Message{Role: "user", Content: httpUserContent})
 
 	model, locked := pickModel(ctx, conv.BrandID, openrouter.TaskChat, req.Model)
 	if locked {
@@ -392,7 +518,7 @@ func HTTPMessage(c *gin.Context) {
 	}
 
 	_, _ = openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{
-		Role: "user", Content: req.Content, FocusedText: req.FocusedText,
+		Role: "user", Content: req.Content, FocusedText: req.FocusedText, Focus: req.Focus,
 		Timestamp: time.Now().UnixMilli(),
 	})
 	_, _ = openrouter.AppendMessage(ctx, conv.ID, trendlymodels.AIMessage{

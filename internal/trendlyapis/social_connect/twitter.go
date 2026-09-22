@@ -21,6 +21,13 @@ var twitterScopesRequired = strings.Join([]string{
 	twitter.ScopeTweetRead,
 	twitter.ScopeUsersRead,
 	twitter.ScopeOfflineAccess,
+	// Write + DM scopes power posting, the replies/mentions media inbox and the
+	// DM messaging inbox. They require the X app to be set to "Read and write and
+	// Direct message" — see docs/social-expansion-dashboard-setup.md §1.
+	twitter.ScopeTweetWrite,
+	twitter.ScopeMediaWrite,
+	twitter.ScopeDMRead,
+	twitter.ScopeDMWrite,
 }, " ")
 
 // TwitterInit redirects to Twitter's OAuth 2.0 PKCE consent screen.

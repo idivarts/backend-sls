@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
 )
 
 // Content mirrors the brand-app content document at
@@ -24,6 +25,65 @@ type ContentDestination struct {
 	SocialAccountID string `json:"socialAccountId" firestore:"socialAccountId"`
 	Platform        string `json:"platform" firestore:"platform"`
 	Username        string `json:"username,omitempty" firestore:"username"`
+}
+
+// ContentPlatformOptions holds per-platform publishing extras that don't fit the
+// shared caption/attachment model. Optional; only the fields for a content's
+// targeted platforms are read at publish time. Mirrors the frontend
+// IPlatformOptions (a flat, prefix-namespaced bag) — keep the two in sync.
+type ContentPlatformOptions struct {
+	// Instagram
+	InstagramLocation     string `json:"instagramLocation,omitempty" firestore:"instagramLocation,omitempty"`
+	InstagramAltText      string `json:"instagramAltText,omitempty" firestore:"instagramAltText,omitempty"`
+	InstagramFirstComment string `json:"instagramFirstComment,omitempty" firestore:"instagramFirstComment,omitempty"`
+	// Facebook
+	FacebookFirstComment string `json:"facebookFirstComment,omitempty" firestore:"facebookFirstComment,omitempty"`
+	// LinkedIn (personal + page)
+	LinkedInVisibility   string `json:"linkedinVisibility,omitempty" firestore:"linkedinVisibility,omitempty"` // PUBLIC|CONNECTIONS|LOGGED_IN
+	LinkedInFirstComment string `json:"linkedinFirstComment,omitempty" firestore:"linkedinFirstComment,omitempty"`
+	LinkedInAltText      string `json:"linkedinAltText,omitempty" firestore:"linkedinAltText,omitempty"`
+	// Twitter / X — a thread of >1 entry publishes as a self-reply chain.
+	TwitterThread        []string `json:"twitterThread,omitempty" firestore:"twitterThread,omitempty"`
+	TwitterReplySettings string   `json:"twitterReplySettings,omitempty" firestore:"twitterReplySettings,omitempty"`
+	TwitterQuoteTweetID  string   `json:"twitterQuoteTweetId,omitempty" firestore:"twitterQuoteTweetId,omitempty"`
+	TwitterAltText       string   `json:"twitterAltText,omitempty" firestore:"twitterAltText,omitempty"`
+	// YouTube — a video needs a title + visibility distinct from the caption.
+	YouTubeTitle       string   `json:"youtubeTitle,omitempty" firestore:"youtubeTitle,omitempty"`
+	YouTubeDescription string   `json:"youtubeDescription,omitempty" firestore:"youtubeDescription,omitempty"`
+	YouTubeTags        []string `json:"youtubeTags,omitempty" firestore:"youtubeTags,omitempty"`
+	YouTubeCategoryID  string   `json:"youtubeCategoryId,omitempty" firestore:"youtubeCategoryId,omitempty"`
+	YouTubePrivacy     string   `json:"youtubePrivacy,omitempty" firestore:"youtubePrivacy,omitempty"` // public|private|unlisted
+	YouTubeMadeForKids bool     `json:"youtubeMadeForKids,omitempty" firestore:"youtubeMadeForKids,omitempty"`
+	YouTubePlaylistID  string   `json:"youtubePlaylistId,omitempty" firestore:"youtubePlaylistId,omitempty"`
+	// Reddit — a submission needs a target subreddit + title (+ optional flair).
+	RedditSubreddit   string `json:"redditSubreddit,omitempty" firestore:"redditSubreddit,omitempty"`
+	RedditTitle       string `json:"redditTitle,omitempty" firestore:"redditTitle,omitempty"`
+	RedditFlairID     string `json:"redditFlairId,omitempty" firestore:"redditFlairId,omitempty"`
+	RedditFlairText   string `json:"redditFlairText,omitempty" firestore:"redditFlairText,omitempty"`
+	RedditNSFW        bool   `json:"redditNsfw,omitempty" firestore:"redditNsfw,omitempty"`
+	RedditSpoiler     bool   `json:"redditSpoiler,omitempty" firestore:"redditSpoiler,omitempty"`
+	RedditSendReplies bool   `json:"redditSendReplies,omitempty" firestore:"redditSendReplies,omitempty"`
+}
+
+// ContentPublishResult is the per-destination outcome of a publish run, written
+// back onto the content doc so the brand app can show which socials went live,
+// which are still in flight, and which failed (with a human error). One entry
+// per targeted destination. The frontend renders these rows live via its
+// Firestore subscription; see trendly-brands PublishStatusPanel.
+type ContentPublishResult struct {
+	SocialAccountID string `json:"socialAccountId,omitempty" firestore:"socialAccountId,omitempty"`
+	Platform        string `json:"platform" firestore:"platform"`
+	Username        string `json:"username,omitempty" firestore:"username,omitempty"`
+	// Status: "publishing" (in flight) | "published" | "failed" | "skipped".
+	Status string `json:"status" firestore:"status"`
+	PostID string `json:"postId,omitempty" firestore:"postId,omitempty"`
+	URL    string `json:"url,omitempty" firestore:"url,omitempty"`
+	Error  string `json:"error,omitempty" firestore:"error,omitempty"`
+	// ErrorKind lets the UI pick the right recovery action:
+	// "validation" (user must fix the content) | "transient" (retry) | "auth"
+	// (reconnect the account).
+	ErrorKind string `json:"errorKind,omitempty" firestore:"errorKind,omitempty"`
+	At        int64  `json:"at,omitempty" firestore:"at,omitempty"`
 }
 
 // ContentImageGeneration tracks the live state of an AI image-generation job on
@@ -58,20 +118,42 @@ type Content struct {
 	Platform         string                  `json:"platform,omitempty" firestore:"platform"`
 	ManagerID        string                  `json:"managerId,omitempty" firestore:"managerId"`
 	StrategyID       string                  `json:"strategyId,omitempty" firestore:"strategyId"`
+	// ContentPillars is AI-write-only: populated when content is authored by AI
+	// (push-to-calendar or the calendar chat's create_content tool). No UI may
+	// let a user add or edit this field.
+	ContentPillars   []string                `json:"contentPillars,omitempty" firestore:"contentPillars,omitempty"`
 	PostingTimeStamp int64                   `json:"postingTimeStamp,omitempty" firestore:"postingTimeStamp"`
 	IsArchived       bool                    `json:"isArchived,omitempty" firestore:"isArchived"`
 	Attachments      []ContentAttachment     `json:"attachments,omitempty" firestore:"attachments"`
 	Destinations     []ContentDestination    `json:"destinations,omitempty" firestore:"destinations"`
+	PlatformOptions  *ContentPlatformOptions `json:"platformOptions,omitempty" firestore:"platformOptions,omitempty"`
 	ImageGeneration  *ContentImageGeneration `json:"imageGeneration,omitempty" firestore:"imageGeneration"`
 	// MediaConversationID is the dedicated AI thread (ai_conversations doc,
 	// module="media") for this content's image generate/enhance iterations.
 	// Stamped on first generation, loaded directly on enhance (no index needed).
 	MediaConversationID  string                 `json:"mediaConversationId,omitempty" firestore:"mediaConversationId,omitempty"`
+
+	// ── AI Studio (scene-graph editor) ──
+	// Source records how the current media was produced: "ai" (scene graph),
+	// "upload", "canva", or "" (legacy). Drives the MediaStage rendering path.
+	Source string `json:"source,omitempty" firestore:"source,omitempty"`
+	// DesignRef points at the CURRENT HTML design revision + its captured render.
+	DesignRef *ContentDesignRef `json:"designRef,omitempty" firestore:"designRef,omitempty"`
+	// Audio holds the generated music/voiceover attached to a video content.
+	Audio *ContentAudio `json:"audio,omitempty" firestore:"audio,omitempty"`
+	// Canva deep-edit bridge references (Module 3).
+	CanvaDesignID    string `json:"canvaDesignId,omitempty" firestore:"canvaDesignId,omitempty"`
+	ExportedAssetRef string `json:"exportedAssetRef,omitempty" firestore:"exportedAssetRef,omitempty"`
+
 	ScheduleMode         string                 `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
 	ScheduledAt          int64                  `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
 	ScheduleExecutionArn string                 `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
 	PublishedIds         map[string]string      `json:"publishedIds,omitempty" firestore:"publishedIds"`
 	PublishError         string                 `json:"publishError,omitempty" firestore:"publishError"`
+	// PublishResults holds the per-destination outcome of the latest publish run
+	// (in-flight, published, or failed with a reason). Source of truth for the
+	// brand app's per-social publish status UI.
+	PublishResults       []ContentPublishResult `json:"publishResults,omitempty" firestore:"publishResults"`
 	PostedURL            string                 `json:"postedUrl,omitempty" firestore:"postedUrl"`
 	Metrics              map[string]interface{} `json:"metrics,omitempty" firestore:"metrics"`
 	CreatedAt            int64                  `json:"createdAt,omitempty" firestore:"createdAt"`
@@ -220,6 +302,65 @@ func DeleteContentInRange(ctx context.Context, brandID string, start, end int64)
 		}
 	}
 	return removed, nil
+}
+
+// ContentUsage summarises how much content a brand has produced. Used by the
+// admin Brand CRM to profile product usage.
+type ContentUsage struct {
+	Total int `json:"total"`
+	// ByStatus counts documents per lifecycle status ("draft", "scheduled",
+	// "approved", "posted", …). Content with no status set is bucketed as
+	// "draft", which is how the apps treat it.
+	ByStatus map[string]int `json:"byStatus"`
+	// FromStrategy counts content that originated from a strategy's
+	// push-to-calendar (i.e. carries a strategyId). Push-to-calendar keeps no
+	// event log of its own, so this is the closest available proxy for how
+	// often that flow is used — it under-counts pushes that replaced an
+	// existing window without creating new documents.
+	FromStrategy int `json:"fromStrategy"`
+}
+
+// CountContent returns how many content documents a brand has.
+func CountContent(ctx context.Context, brandID string) (int, error) {
+	return CountQuery(ctx, contentsCollection(brandID).Query)
+}
+
+// GetContentUsage returns the brand's content total, its per-status breakdown
+// and its strategy-originated count.
+//
+// Deliberately one pass: a projection over just `status` and `strategyId`
+// answers all three, where per-status COUNT aggregations would need a query per
+// status and still miss statuses we didn't think to ask for.
+func GetContentUsage(ctx context.Context, brandID string) (*ContentUsage, error) {
+	iter := contentsCollection(brandID).
+		Select("status", "strategyId").
+		Documents(ctx)
+	defer iter.Stop()
+
+	usage := &ContentUsage{ByStatus: map[string]int{}}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		usage.Total++
+
+		data := doc.Data()
+		status, _ := data["status"].(string)
+		if status == "" {
+			status = "draft"
+		}
+		usage.ByStatus[status]++
+
+		if strategyID, _ := data["strategyId"].(string); strategyID != "" {
+			usage.FromStrategy++
+		}
+	}
+	return usage, nil
 }
 
 // ListContentByStatus returns a brand's content documents in the given status

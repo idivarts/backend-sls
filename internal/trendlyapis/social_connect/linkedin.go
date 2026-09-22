@@ -14,6 +14,11 @@ import (
 	"github.com/idivarts/backend-sls/pkg/linkedin"
 )
 
+// Personal-profile connect ONLY. Organization/Company-Page features live on a
+// separate provider (linkedin_page) backed by a dedicated Community Management
+// API app — the CMA product cannot coexist with OIDC on this app, so org scopes
+// MUST NOT be requested here. See social_connect/linkedin_page.go +
+// docs/linkedin-pages-cma-setup.md.
 var linkedinScopesRequired = strings.Join([]string{
 	linkedin.ScopeOpenID,
 	linkedin.ScopeProfile,

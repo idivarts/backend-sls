@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	wshandler "github.com/idivarts/backend-sls/pkg/ws_handler"
 )
 
@@ -19,6 +20,7 @@ type WSRequest struct {
 	Content        string
 	Images         []string
 	FocusedText    string
+	Focus          []trendlymodels.AIFocus
 	Model          string
 	Module         string
 	ContextID      string
@@ -39,6 +41,8 @@ func HandleWS(req WSRequest) {
 	switch req.Type {
 	case "message":
 		handleMessageWS(req)
+	case "stop":
+		handleStopWS(req)
 	case "quick_edit":
 		handleQuickEditWS(req)
 	case "content_gen":

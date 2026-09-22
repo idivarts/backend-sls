@@ -3,12 +3,14 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"cloud.google.com/go/firestore"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	readtools "github.com/idivarts/backend-sls/internal/trendlyapis/ai/tools"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -106,8 +108,35 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 		return dispatchStrategyTool(ctx, brandID, contextID, name, arguments)
 	case toolListCalendar, toolCreateContent, toolUpdateContent, toolMoveContent, toolRemoveContent:
 		return dispatchCalendarTool(ctx, brandID, managerID, name, arguments)
+	case toolGenerateDesign:
+		r, err := runGenerateDesign(ctx, brandID, contextID, arguments)
+		return r, false, err
+	case toolApplyDesignEdits:
+		r, err := runApplyDesignEdits(ctx, brandID, contextID, arguments)
+		return r, false, err
+	case toolGetDesignHTML:
+		r, err := runGetDesignHTML(ctx, brandID, contextID, arguments)
+		return r, false, err
+	case toolGenerateMusic:
+		orgID, _ := orgIDForBrand(brandID)
+		r, err := runGenerateMusic(ctx, brandID, contextID, orgID, arguments)
+		return r, false, err
+	case toolGenerateVoiceover:
+		orgID, _ := orgIDForBrand(brandID)
+		r, err := runGenerateVoiceover(ctx, brandID, contextID, orgID, arguments)
+		return r, false, err
 	default:
-		return jsonResult(map[string]any{"ok": false, "error": "unknown tool: " + name}), false, nil
+		// Read-only fetch tools (content/analytics/inbox/strategy/account/assets/
+		// billing) live in the tools registry. They execute and loop back so the
+		// model can use the fetched data in its reply.
+		res, err := readtools.Dispatch(ctx, brandID, name, arguments)
+		if err != nil {
+			if errors.Is(err, readtools.ErrToolNotFound) {
+				return jsonResult(map[string]any{"ok": false, "error": "unknown tool: " + name}), false, nil
+			}
+			return jsonResult(map[string]any{"ok": false, "error": err.Error()}), false, nil
+		}
+		return res, false, nil
 	}
 }
 

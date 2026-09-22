@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
-	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/facebook"
+	"github.com/idivarts/backend-sls/pkg/instagram"
 )
 
 // Media-tab support. Unlike conversations (Firestore-backed, webhook-fed), the
@@ -98,7 +98,7 @@ func ListMedia(brandID string, count int) ([]MediaItem, error) {
 		if !isInboxChannel(s.Platform) {
 			continue
 		}
-		tok, err := trendlymodels.GetBrandSocialToken(brandID, s.ID)
+		tok, err := trendlymodels.GetBrandSocialTokenForAccount(brandID, &s)
 		if err != nil {
 			record(err)
 			continue
@@ -138,6 +138,15 @@ func ListMedia(brandID string, count int) ([]MediaItem, error) {
 					out = append(out, igMediaItem(m, s.ID))
 				}
 			}
+			continue
+		}
+
+		// Non-Meta platforms (LinkedIn org posts, X tweets, Reddit submissions).
+		if s.Platform != trendlymodels.PlatformInstagram {
+			items, perr := listPlatformMedia(&s, token, count)
+			logMediaErr(brandID, s.ID, s.Platform, perr)
+			record(perr)
+			out = append(out, items...)
 			continue
 		}
 
@@ -221,6 +230,11 @@ func ListMediaComments(brandID, socialID, channel, mediaID string, count int) ([
 		return out, nil
 	}
 
+	// Non-Meta platforms fetch comments via their own clients.
+	if channel != trendlymodels.PlatformInstagram {
+		return listPlatformComments(sa, channel, mediaID)
+	}
+
 	// Instagram comments.
 	items, err := instagram.GetComments(mediaID, sa.token, instagram.IGetCommentsParams{
 		GraphType: graphTypeForIG(sa.account),
@@ -262,6 +276,9 @@ func ReplyToMediaComment(brandID, socialID, channel, commentID, text string) err
 		_, err = facebook.CreateCommentReply(commentID, text, sa.token)
 		return err
 	}
+	if channel != trendlymodels.PlatformInstagram {
+		return replyPlatformComment(sa, channel, commentID, text)
+	}
 	_, err = instagram.ReplyToIGComment(commentID, text, sa.token)
 	return err
 }
@@ -275,6 +292,11 @@ func SetMediaCommentHidden(brandID, socialID, channel, commentID string, hidden 
 	if channel == trendlymodels.PlatformFacebook {
 		return facebook.SetCommentHidden(commentID, hidden, sa.token)
 	}
+	if channel != trendlymodels.PlatformInstagram {
+		// LinkedIn / X / Reddit have no general "hide comment" capability for
+		// arbitrary authors — the frontend hides this action for these channels.
+		return errUnsupported("hiding comments is not supported for channel " + channel)
+	}
 	return instagram.SetIGCommentHidden(commentID, hidden, sa.token)
 }
 
@@ -287,13 +309,18 @@ func DeleteMediaComment(brandID, socialID, channel, commentID string) error {
 	if channel == trendlymodels.PlatformFacebook {
 		return facebook.DeleteObject(commentID, sa.token)
 	}
+	if channel != trendlymodels.PlatformInstagram {
+		return deletePlatformComment(sa, channel, commentID)
+	}
 	return instagram.DeleteIGObject(commentID, sa.token)
 }
 
 // channelOrDefault validates a channel string, defaulting to instagram.
 func channelOrDefault(ch string) (string, error) {
 	switch ch {
-	case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook:
+	case trendlymodels.PlatformInstagram, trendlymodels.PlatformFacebook,
+		trendlymodels.PlatformLinkedIn, trendlymodels.PlatformTwitter,
+		trendlymodels.PlatformReddit:
 		return ch, nil
 	case "":
 		return trendlymodels.PlatformInstagram, nil

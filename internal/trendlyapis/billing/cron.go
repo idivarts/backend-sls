@@ -35,6 +35,15 @@ func RunMonthlyBilling() error {
 			skipped++
 			continue
 		}
+		// Native IAP (RevenueCat) orgs renew on the store's purchase anniversary,
+		// NOT the 1st-of-month anchor. RevenueCat webhook events own their entire
+		// lifecycle (wallet refill on RENEWAL, past_due on BILLING_ISSUE, lock on
+		// EXPIRATION), so the monthly cron must not touch them — refilling here
+		// would reset their wallet off-cycle. Free orgs stay on the cron below.
+		if o.Billing != nil && o.Billing.Provider != nil && *o.Billing.Provider == "revenuecat" {
+			skipped++
+			continue
+		}
 		planKey := resolvePlanKey(o)
 		state, mode, periodEnd := billingState(o)
 
