@@ -11,6 +11,9 @@ provider:
     STAGE: ${self:provider.stage}
     GIN_MODE: ${self:custom.ginMode.${self:provider.stage}}
     FIRESTORE_DATABASE_ID: ${env:FIRESTORE_DATABASE_ID, '(default)'}
+    # Error reporting (pkg/mysentry). Empty ⇒ every capture is a silent no-op,
+    # so an unconfigured stage deploys and runs exactly as before.
+    SENTRY_DSN: ${env:SENTRY_DSN, ''}
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads

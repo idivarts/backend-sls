@@ -25,6 +25,7 @@ import (
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/instagram"
 	"github.com/idivarts/backend-sls/pkg/linkedin"
+	"github.com/idivarts/backend-sls/pkg/mysentry"
 	"github.com/idivarts/backend-sls/pkg/twitter"
 	"github.com/idivarts/backend-sls/pkg/youtube"
 )
@@ -32,7 +33,11 @@ import (
 const refreshWindowDays = 7
 
 func main() {
-	lambda.Start(handler)
+	// Non-Gin entry point, so it never passes through the Sentry middleware on
+	// the shared Gin engine. Wrap captures errors and panics and — the part
+	// that matters — flushes before Lambda freezes the environment.
+	mysentry.Init()
+	lambda.Start(mysentry.WrapCtx(handler))
 }
 
 func handler(ctx context.Context) error {
