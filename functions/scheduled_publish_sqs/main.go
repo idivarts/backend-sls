@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
+	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
 
 // handler consumes content-publish messages — delivered either by the delayed_sqs
@@ -21,6 +22,7 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 		var msg publishing.ScheduleMessage
 		if err := json.Unmarshal([]byte(record.Body), &msg); err != nil {
 			log.Println("scheduled_publish_sqs: bad message:", err, record.Body)
+			mysentry.Capture(err, map[string]string{"lambda": "scheduled_publish_sqs", "op": "unmarshal"})
 			continue
 		}
 		if msg.Action != "PUBLISH" {
@@ -29,11 +31,16 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 		if err := publishing.PublishContent(msg.BrandID, msg.ContentID, msg.OnlyDestinations...); err != nil {
 			log.Printf("scheduled_publish_sqs: publish failed for %s/%s: %v",
 				msg.BrandID, msg.ContentID, err)
+			mysentry.Capture(err, map[string]string{"lambda": "scheduled_publish_sqs", "op": "publish"})
 		}
 	}
 	return nil
 }
 
 func main() {
-	lambda.Start(handler)
+	// Non-Gin entry point, so it never passes through the Sentry middleware on
+	// the shared Gin engine. Wrap captures errors and panics and — the part
+	// that matters — flushes before Lambda freezes the environment.
+	mysentry.Init()
+	lambda.Start(mysentry.Wrap(handler))
 }

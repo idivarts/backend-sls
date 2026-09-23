@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	eventhandling "github.com/idivarts/backend-sls/internal/message_sqs/event_handling"
 	sqsevents "github.com/idivarts/backend-sls/internal/message_sqs/events"
+	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
 
 func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
@@ -17,6 +18,11 @@ func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 		err := sendMessage(message.Body)
 		if err != nil {
 			log.Println(err.Error())
+			// Deliberately not returned — one bad record must not replay the
+			// whole batch — so Sentry is the only place this becomes visible.
+			mysentry.Capture(err, map[string]string{
+				"lambda": "message_sqs", "messageId": message.MessageId,
+			})
 		}
 	}
 	return nil

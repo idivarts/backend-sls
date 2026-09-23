@@ -3,8 +3,13 @@ package main
 import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/s3/videos"
+	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
 
 func main() {
-	lambda.Start(videos.VideoProcessHandler)
+	// Non-Gin entry point, so it never passes through the Sentry middleware on
+	// the shared Gin engine. Wrap captures errors and panics and — the part
+	// that matters — flushes before Lambda freezes the environment.
+	mysentry.Init()
+	lambda.Start(mysentry.WrapVoid(videos.VideoProcessHandler))
 }
