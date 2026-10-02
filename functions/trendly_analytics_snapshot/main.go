@@ -17,10 +17,15 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
 
 func main() {
-	lambda.Start(handler)
+	// Non-Gin entry point, so it never passes through the Sentry middleware on
+	// the shared Gin engine. Wrap captures errors and panics and — the part
+	// that matters — flushes before Lambda freezes the environment.
+	mysentry.Init()
+	lambda.Start(mysentry.WrapCtx(handler))
 }
 
 func handler(ctx context.Context) error {
