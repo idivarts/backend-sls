@@ -37,6 +37,16 @@ provider:
     # Async scene render worker queue (Fargate consumer). Empty ⇒ enqueue is a
     # no-op (FE renders scene previews itself). See docs/render-worker.md.
     RENDER_QUEUE_URL: ${env:RENDER_QUEUE_URL, ''}
+    # ── Branch deep links (pkg/branch) — public share links for strategy /
+    #    calendar / content. BRANCH_BRAND_* is the BRAND app's Branch app; the
+    #    influencer app gets its own BRANCH_USER_* pair when it needs one.
+    #    Key + domain are non-secret (the key ships in the mobile bundle) and come
+    #    from GitHub Actions ENVIRONMENT variables, so dev gets the test Branch app
+    #    and prod the live one under the same names. Empty ⇒ sharing silently falls
+    #    back to the plain web URL.
+    BRANCH_BRAND_KEY: ${env:BRANCH_BRAND_KEY, ''}
+    BRANCH_BRAND_SECRET: ${env:BRANCH_BRAND_SECRET, ''}
+    BRANCH_BRAND_DOMAIN: ${env:BRANCH_BRAND_DOMAIN, ''}
     BRAND_LOGIN_URL: "/login"
     SELF_BASE_URL: "https://be.trendly.now"
     # ── Outbound email (Amazon SES) — see docs/ses-setup.md ─────────────────
