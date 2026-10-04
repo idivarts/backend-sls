@@ -77,6 +77,11 @@ jobs:
           CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
           CANVA_REDIRECT_URI: ${{ vars.CANVA_REDIRECT_URI }}
           RENDER_QUEUE_URL: ${{ vars.RENDER_QUEUE_URL }}
+          # Branch deep links (pkg/branch). Environment-scoped vars/secrets, so the
+          # `environment:` binding above picks the TEST Branch app on dev and the
+          # LIVE one on prod — no per-stage ternary needed here.
+          BRANCH_BRAND_KEY: ${{ vars.BRANCH_BRAND_KEY }}
+          BRANCH_BRAND_SECRET: ${{ secrets.BRANCH_BRAND_SECRET }}
           YOUTUBE_CLIENT_ID: ${{ vars.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           LINKEDIN_CLIENT_ID: ${{ vars.LINKEDIN_CLIENT_ID }}

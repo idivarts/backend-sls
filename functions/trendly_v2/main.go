@@ -7,6 +7,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/sharing"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
 )
@@ -80,6 +81,12 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish/retry", publishing.RetryPublish)
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/schedule", publishing.SchedulePublish)
 	managerApisV1.DELETE("/brands/:brandId/contents/:contentId/schedule", publishing.CancelSchedule)
+
+	// ── Public sharing (Branch deep links for a share token) ──────────────────
+	// The token + `enabled` toggle are owned by the app (it writes shareLinks/
+	// {token} directly); only the Branch link is minted here, because it needs the
+	// Branch key/secret. Idempotent — the minted link is cached on the doc.
+	managerApisV1.POST("/brands/:brandId/share-links/:token/deep-link", sharing.CreateShareDeepLink)
 
 	// ── Analytics / Reporting (unified Meta insights) ─────────────────────────
 	managerApisV1.GET("/brands/:brandId/analytics/overview", analytics.GetBrandAnalyticsOverview)
