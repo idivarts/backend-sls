@@ -81,7 +81,6 @@ jobs:
           # `environment:` binding above picks the TEST Branch app on dev and the
           # LIVE one on prod — no per-stage ternary needed here.
           BRANCH_BRAND_KEY: ${{ vars.BRANCH_BRAND_KEY }}
-          BRANCH_BRAND_DOMAIN: ${{ vars.BRANCH_BRAND_DOMAIN }}
           BRANCH_BRAND_SECRET: ${{ secrets.BRANCH_BRAND_SECRET }}
           YOUTUBE_CLIENT_ID: ${{ vars.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}

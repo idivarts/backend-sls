@@ -13,9 +13,13 @@
 //
 //	BRANCH_BRAND_KEY     key_live_… / key_test_…  — required to CREATE a link
 //	BRANCH_BRAND_SECRET  secret_live_… / secret_test_…  — required to READ/UPDATE
-//	BRANCH_BRAND_DOMAIN  zgh4c.app.link / zgh4c.test-app.link (informational)
 //
 // The key is not a secret (it is compiled into the mobile bundle); the secret is.
+//
+// There is deliberately no domain setting. Which host a link is minted on is the
+// app's default link domain in the Branch dashboard, and CreateLink returns the
+// finished URL — so carrying a domain here could only ever drift out of step
+// with Branch.
 //
 // Naming: BRANCH_BRAND_* is the brand app's Branch app. The influencer app gets
 // its own Branch app and its own BRANCH_USER_* credentials, so a second
@@ -42,14 +46,12 @@ var httpClient = &http.Client{Timeout: 20 * time.Second}
 type Credentials struct {
 	Key    string
 	Secret string
-	Domain string
 }
 
 // Brand holds the credentials for the brand app's Branch app (BRANCH_BRAND_*).
 var Brand = Credentials{
 	Key:    os.Getenv("BRANCH_BRAND_KEY"),
 	Secret: os.Getenv("BRANCH_BRAND_SECRET"),
-	Domain: os.Getenv("BRANCH_BRAND_DOMAIN"),
 }
 
 // Configured reports whether links can be created for this app. Only the key is
