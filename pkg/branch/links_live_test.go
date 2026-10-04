@@ -70,3 +70,56 @@ func TestCreateLinkLive(t *testing.T) {
 		t.Errorf("shareToken = %v, want livetest-token", data["shareToken"])
 	}
 }
+
+// TestUpdateLinkLive covers the refresh path: a share whose resource was renamed
+// keeps its URL and gets a new card. Same gating as the create test above.
+func TestUpdateLinkLive(t *testing.T) {
+	key := os.Getenv("BRANCH_BRAND_KEY")
+	secret := os.Getenv("BRANCH_BRAND_SECRET")
+	if key == "" || secret == "" {
+		t.Skip("BRANCH_BRAND_KEY/SECRET not set — skipping live Branch API test")
+	}
+	if strings.HasPrefix(key, "key_live_") {
+		t.Skip("refusing to touch links on the LIVE Branch app")
+	}
+	creds := Credentials{Key: key, Secret: secret}
+	ctx := context.Background()
+
+	req := LinkRequest{
+		Channel: "app-share",
+		Feature: "public-share",
+		Type:    TypeDefault,
+		Data: LinkData{
+			OGTitle:      "Old name",
+			DeeplinkPath: "/share/updatetest",
+			FallbackURL:  "https://dev.brands.trendly.now/share/updatetest",
+		},
+	}
+	url, err := creds.CreateLink(ctx, req)
+	if err != nil {
+		t.Fatalf("CreateLink: %v", err)
+	}
+
+	req.Data.OGTitle = "Renamed · Acme"
+	req.Data.OGImageURL = "https://example.com/cover.png"
+	if err := creds.UpdateLink(ctx, url, req); err != nil {
+		t.Fatalf("UpdateLink: %v", err)
+	}
+
+	got, err := creds.ReadLink(ctx, url)
+	if err != nil {
+		t.Fatalf("ReadLink: %v", err)
+	}
+	data, _ := got["data"].(map[string]interface{})
+	if data == nil {
+		t.Fatalf("no data in read-back: %+v", got)
+	}
+	if data["$og_title"] != "Renamed · Acme" {
+		t.Errorf("$og_title = %v, want the updated title", data["$og_title"])
+	}
+	if data["$og_image_url"] != "https://example.com/cover.png" {
+		t.Errorf("$og_image_url = %v, want the added image", data["$og_image_url"])
+	}
+	// The URL is what people have already copied — it must not change.
+	t.Logf("link kept its URL across the update: %s", url)
+}

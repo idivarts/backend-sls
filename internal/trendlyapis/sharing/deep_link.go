@@ -9,6 +9,7 @@ package sharing
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -87,21 +88,63 @@ func CreateShareDeepLink(c *gin.Context) {
 		c.JSON(http.StatusOK, body)
 	}
 
-	// Already minted — hand back the cached link.
+	// No Branch credentials on this stage: the web URL still works everywhere, so
+	// degrade instead of failing the share. Checked before the preview is built so
+	// an unconfigured stage does no resource reads at all. A link minted while the
+	// stage WAS configured stays valid, so it is still preferred over the web URL.
+	if !branch.Brand.Configured() {
+		if link.DeepLink != "" {
+			respond(link.DeepLink, true, false, nil)
+		} else {
+			respond(webURL, false, false, nil)
+		}
+		return
+	}
+
+	// Building the card costs one or two resource reads (plus the month query for a
+	// calendar share). Worth it on a share-sheet open: it is both what the link is
+	// minted with and how a since-renamed resource is detected below.
+	preview := buildPreview(ctx, link)
+	linkReq := shareLinkRequest(token, webURL, link, preview)
+
+	// Already minted — hand back the same URL. Copies of it are already out in the
+	// world, so the URL must not change; only the card behind it is refreshed, and
+	// only when the resource has actually been renamed or has gained an image.
 	if link.DeepLink != "" {
+		if link.DeepLinkPreview != preview.fingerprint() && branch.Brand.Secret != "" {
+			if err := branch.Brand.UpdateLink(ctx, link.DeepLink, linkReq); err != nil {
+				// Leave the fingerprint alone so the next open retries; a stale
+				// card is not worth failing the share over.
+				log.Printf("sharing: refresh deep link %s: %v", token, err)
+			} else if err := trendlymodels.SetShareLinkPreview(ctx, token, preview.fingerprint()); err != nil {
+				log.Printf("sharing: record deep link preview %s: %v", token, err)
+			}
+		}
 		respond(link.DeepLink, true, false, nil)
 		return
 	}
 
-	// No Branch credentials on this stage: the web URL still works everywhere, so
-	// degrade instead of failing the share.
-	if !branch.Brand.Configured() {
-		respond(webURL, false, false, nil)
+	deepLink, err := branch.Brand.CreateLink(ctx, linkReq)
+	if err != nil {
+		// A Branch outage must not break sharing — the web URL is the fallback.
+		respond(webURL, false, false, gin.H{"error": err.Error()})
 		return
 	}
 
-	preview := buildPreview(ctx, link)
-	deepLink, err := branch.Brand.CreateLink(ctx, branch.LinkRequest{
+	if err := trendlymodels.SetShareLinkDeepLink(ctx, token, deepLink, preview.fingerprint(), time.Now().UnixMilli()); err != nil {
+		// Cache write failed: the link itself is valid, so return it. The next
+		// call just mints another one.
+		respond(deepLink, true, true, gin.H{"cached": false})
+		return
+	}
+
+	respond(deepLink, true, true, nil)
+}
+
+// shareLinkRequest is the Branch link for a share token — one definition, used
+// both to mint and to re-point, so the two can never drift apart.
+func shareLinkRequest(token, webURL string, link *trendlymodels.ShareLink, preview sharePreview) branch.LinkRequest {
+	return branch.LinkRequest{
 		Channel:  "app-share",
 		Feature:  "public-share",
 		Stage:    link.Type,
@@ -126,93 +169,5 @@ func CreateShareDeepLink(c *gin.Context) {
 				"month":      link.Month,
 			},
 		},
-	})
-	if err != nil {
-		// A Branch outage must not break sharing — the web URL is the fallback.
-		respond(webURL, false, false, gin.H{"error": err.Error()})
-		return
 	}
-
-	if err := trendlymodels.SetShareLinkDeepLink(ctx, token, deepLink, time.Now().UnixMilli()); err != nil {
-		// Cache write failed: the link itself is valid, so return it. The next
-		// call just mints another one.
-		respond(deepLink, true, true, gin.H{"cached": false})
-		return
-	}
-
-	respond(deepLink, true, true, nil)
-}
-
-// sharePreview is the unfurl card a chat app or social network shows for the link.
-type sharePreview struct {
-	title       string
-	description string
-	imageURL    string
-}
-
-// buildPreview reads the shared resource for its title/image. Every lookup is
-// best-effort: a missing name costs a nicer preview, not the link.
-func buildPreview(ctx context.Context, link *trendlymodels.ShareLink) sharePreview {
-	brandName := ""
-	brandImage := ""
-	brand := trendlymodels.Brand{}
-	if err := brand.Get(link.BrandID); err == nil {
-		brandName = brand.Name
-		if brand.Image != nil {
-			brandImage = *brand.Image
-		}
-	}
-
-	p := sharePreview{imageURL: brandImage}
-	// byBrand suffixes the brand name when there is one, so the card says whose
-	// plan this is rather than just "Content calendar".
-	byBrand := func(s string) string {
-		if brandName == "" {
-			return s
-		}
-		return s + " · " + brandName
-	}
-
-	switch link.Type {
-	case trendlymodels.ShareTypeStrategy:
-		p.title = "Content strategy"
-		p.description = byBrand("A shared content strategy, read-only.")
-		if s, err := trendlymodels.GetStrategy(ctx, link.BrandID, link.ResourceID); err == nil && s != nil {
-			if s.Name != "" {
-				p.title = s.Name
-			}
-			if s.Objective != "" {
-				p.description = s.Objective
-			}
-		}
-
-	case trendlymodels.ShareTypeContent:
-		p.title = "Content"
-		p.description = byBrand("A shared post, read-only.")
-		if ct, err := trendlymodels.GetContent(link.BrandID, link.ResourceID); err == nil && ct != nil {
-			if ct.Title != "" {
-				p.title = ct.Title
-			}
-			if ct.Description != "" {
-				p.description = ct.Description
-			} else if ct.Caption != "" {
-				p.description = ct.Caption
-			}
-			for _, a := range ct.Attachments {
-				if a.ImageURL != "" {
-					p.imageURL = a.ImageURL
-					break
-				}
-			}
-		}
-
-	case trendlymodels.ShareTypeCalendarMonth:
-		p.title = "Content calendar"
-		if month, err := time.Parse("2006-01", link.Month); err == nil {
-			p.title = month.Format("January 2006") + " content calendar"
-		}
-		p.description = byBrand("A shared month of planned posts, read-only.")
-	}
-
-	return p
 }
