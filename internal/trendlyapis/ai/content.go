@@ -557,7 +557,10 @@ func runMediaEnhance(req WSRequest, p imagePayload, model, orgID, convID string,
 		next = []trendlymodels.ContentAttachment{att}
 	}
 	if p.ContextID != "" {
-		if err := trendlymodels.UpdateContentFields(p.BrandID, p.ContextID, map[string]any{"attachments": next}); err != nil {
+		if err := trendlymodels.UpdateContentFields(p.BrandID, p.ContextID, map[string]any{
+			"attachments": next,
+			"source":      trendlymodels.ContentSourceAIImage,
+		}); err != nil {
 			log.Printf("ai media enhance persist: %v", err)
 		}
 	}
@@ -785,6 +788,10 @@ func setImageGenStatus(brandID, contentID string, fields map[string]any) {
 // persistGeneratedImages writes the content doc's attachments so generated
 // images are saved without the user pressing Save. Carousels append to the
 // existing set; single-image types replace it.
+//
+// It also stamps source="ai-image" so the app can tell a generated image from an
+// uploaded one — both land as a plain image attachment with no designRef, so the
+// lane is not derivable from the data alone.
 func persistGeneratedImages(brandID, contentID string, existing, generated []trendlymodels.ContentAttachment, multi bool) {
 	if contentID == "" {
 		return
@@ -798,6 +805,7 @@ func persistGeneratedImages(brandID, contentID string, existing, generated []tre
 	}
 	if err := trendlymodels.UpdateContentFields(brandID, contentID, map[string]any{
 		"attachments": next,
+		"source":      trendlymodels.ContentSourceAIImage,
 	}); err != nil {
 		log.Printf("ai image-gen attachments update: %v", err)
 	}

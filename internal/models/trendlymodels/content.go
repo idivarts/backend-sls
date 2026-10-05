@@ -14,6 +14,19 @@ import (
 // brands/{brandId}/contents/{contentId}. Only the fields the backend
 // publishing pipeline needs are modelled here.
 
+// Media-lane values for Content.Source — how the current media was produced.
+// Keep in sync with shared-libs firestore/trendly-pro/models/contents.ts.
+const (
+	// ContentSourceAIDesign is an HTML design authored in the Design Studio.
+	ContentSourceAIDesign = "ai"
+	// ContentSourceAIImage is photoreal image(s) from AI image generation.
+	ContentSourceAIImage = "ai-image"
+	// ContentSourceUpload is asset(s) the user picked themselves.
+	ContentSourceUpload = "upload"
+	// ContentSourceCanva is a design made in Canva via the deep-edit bridge.
+	ContentSourceCanva = "canva"
+)
+
 type ContentAttachment struct {
 	Type     string `json:"type" firestore:"type"`
 	ImageURL string `json:"imageUrl,omitempty" firestore:"imageUrl"`
@@ -133,9 +146,16 @@ type Content struct {
 	// Stamped on first generation, loaded directly on enhance (no index needed).
 	MediaConversationID  string                 `json:"mediaConversationId,omitempty" firestore:"mediaConversationId,omitempty"`
 
-	// ── AI Studio (scene-graph editor) ──
-	// Source records how the current media was produced: "ai" (scene graph),
-	// "upload", "canva", or "" (legacy). Drives the MediaStage rendering path.
+	// ── AI Studio (HTML design editor) ──
+	// Source records how the current media was produced — the authoritative
+	// "media lane" of a content, driving which creation surface the app shows:
+	//   "ai"       → HTML design authored in the Design Studio (render via DesignRef)
+	//   "ai-image" → photoreal image(s) from AI image generation (see ImageGeneration)
+	//   "upload"   → asset(s) the user picked themselves
+	//   "canva"    → designed in Canva via the deep-edit bridge
+	//   ""         → legacy content written before this field was stamped; the app
+	//                falls back to deriving the lane from DesignRef/Attachments.
+	// Keep in sync with shared-libs firestore/trendly-pro/models/contents.ts.
 	Source string `json:"source,omitempty" firestore:"source,omitempty"`
 	// DesignRef points at the CURRENT HTML design revision + its captured render.
 	DesignRef *ContentDesignRef `json:"designRef,omitempty" firestore:"designRef,omitempty"`
