@@ -14,6 +14,11 @@ import (
 	sqshandler "github.com/idivarts/backend-sls/pkg/sqs_handler"
 )
 
+// schedulePastGraceSeconds is how far into the past a requested scheduledAt may
+// land before SchedulePublish rejects it. Covers client/server clock skew and
+// the request round-trip, so "schedule for one minute from now" still succeeds.
+const schedulePastGraceSeconds int64 = 120
+
 // ScheduleMessage is the payload placed on the content-publish queue (for both
 // scheduled publishes and instant publish-now / retry jobs).
 type ScheduleMessage struct {
@@ -123,7 +128,24 @@ func SchedulePublish(c *gin.Context) {
 		return
 	}
 
+	// A past timestamp must NOT be silently treated as "publish now". Clamping
+	// the delay to 0 (what this used to do) turned an accidental past schedule
+	// into an immediate, irreversible live publish — and because it came in
+	// through the schedule path, it skipped the publish-now confirmation
+	// entirely. Reject it instead and let the client re-pick a time.
+	//
+	// SCHEDULE_PAST_GRACE absorbs clock skew between the client and Lambda plus
+	// the round-trip, so a user scheduling "in a minute" isn't rejected for
+	// being a few seconds stale by the time we see it.
 	delaySeconds := (req.ScheduledAt - time.Now().UnixMilli()) / 1000
+	if delaySeconds < -schedulePastGraceSeconds {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "scheduledAt is in the past",
+			"message": "That time has already passed. Pick a future time, or publish now instead.",
+			"reason":  "scheduled_at_in_past",
+		})
+		return
+	}
 	if delaySeconds < 0 {
 		delaySeconds = 0
 	}
