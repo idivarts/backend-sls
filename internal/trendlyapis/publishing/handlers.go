@@ -29,6 +29,10 @@ type ScheduleMessage struct {
 	// socialAccountIds (Retry re-publishes just the failed socials). Empty =
 	// publish to every destination.
 	OnlyDestinations []string `json:"onlyDestinations,omitempty"`
+	// RenderWaitAttempt counts how many times this publish has been deferred
+	// waiting for the design to render. Bounded, so a render that never lands
+	// surfaces as a failure instead of a post that is forever "publishing".
+	RenderWaitAttempt int `json:"renderWaitAttempt,omitempty"`
 }
 
 // enqueuePublish hands a publish job to the shared content-publish queue with no

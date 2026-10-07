@@ -36,7 +36,6 @@ provider:
     CANVA_REDIRECT_URI: ${env:CANVA_REDIRECT_URI, 'https://be.trendly.now/api/integrations/canva/callback'}
     # Async scene render worker queue (Fargate consumer). Empty ⇒ enqueue is a
     # no-op (FE renders scene previews itself). See docs/render-worker.md.
-    RENDER_QUEUE_URL: ${env:RENDER_QUEUE_URL, ''}
     # ── Branch deep links (pkg/branch) — public share links for strategy /
     #    calendar / content. BRANCH_BRAND_* is the BRAND app's Branch app; the
     #    influencer app gets its own BRANCH_USER_* pair when it needs one.
@@ -153,11 +152,19 @@ provider:
           Action:
             - "sqs:SendMessage"
           Resource: { "Fn::GetAtt": ["SocialSyncQueue", "Arn"] }
-        # ── AI-Studio: enqueue scene render jobs for the Fargate render worker ──
+        # ── Design rendering: images go to SQS, video goes straight to Batch ──
+        #    (Batch IS the queue for video — it already provides ordering,
+        #    retries and Spot-interruption handling.)
         - Effect: "Allow"
           Action:
             - "sqs:SendMessage"
-          Resource: { "Fn::GetAtt": ["SceneRenderQueue", "Arn"] }
+          Resource: { "Fn::GetAtt": ["ImageRenderQueue", "Arn"] }
+        - Effect: "Allow"
+          Action:
+            - "batch:SubmitJob"
+          Resource:
+            - { "Ref": "RenderJobQueue" }
+            - { "Ref": "RenderJobDefinition" }
         # ── Outbound email via Amazon SES (pkg/myemail). Scoped to the verified
         #    sending identity + the transactional configuration set. See
         #    docs/ses-setup.md. ──
@@ -245,6 +252,18 @@ functions:
       - schedule:
           rate: cron(0 2 1 * ? *)  # 02:00 UTC on the 1st of every month
           # enabled: ${self:custom.isProd.${self:provider.stage}}
+  render_reconcile:
+    handler: functions/trendly_render_reconcile/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+    timeout: 300
+    memorySize: 256
+    description: "Fails renders that stopped reporting, so nothing waits on a dead job"
+    events:
+      - schedule:
+          rate: cron(*/15 * * * ? *)  # every 15 minutes
   social_token_refresh:
     handler: functions/trendly_social_refresh/main.go
     package:
@@ -350,6 +369,15 @@ functions:
         Ref: ContentPublishQueue   # Ref returns the queue URL (QueueUrl for sqs:sendMessage)
       SOCIAL_SYNC_QUEUE_URL:
         Ref: SocialSyncQueue       # shared async queue for slow Meta work (see social_sqs worker)
+      # Server-side design rendering. Without these the render route reports a
+      # clear "not configured" error rather than silently accepting a job that
+      # no worker will ever pick up.
+      IMAGE_RENDER_QUEUE_URL:
+        Ref: ImageRenderQueue      # Ref returns the queue URL
+      VIDEO_RENDER_JOB_QUEUE:
+        Ref: RenderJobQueue
+      VIDEO_RENDER_JOB_DEFINITION:
+        Ref: RenderJobDefinition
     package:
       include:
         - 'service-account.json'
@@ -572,6 +600,44 @@ functions:
   #         rules:
   #           - prefix: "uploads/"  # Only triggers when an object is uploaded directly in the root
             
+  # ── Design render worker (images) ─────────────────────────────────────────
+  # A CONTAINER function, not a Go handler: it runs the Node worker image that
+  # carries Chromium and FFmpeg. Images get Lambda rather than Batch purely
+  # because of billing shape — Fargate bills a one-minute minimum AND bills the
+  # image pull, so a four-second carousel would cost like a sixty-second job and
+  # make the user wait ~35s before rendering even starts.
+  #
+  # ENTRYPOINT is overridden to the AWS Runtime Interface Client because, unlike
+  # a Go binary, Node does not implement the Lambda Runtime API itself. The same
+  # image runs unmodified on Batch, where the default ENTRYPOINT (cli.js) applies.
+  #
+  # RENDER_IMAGE_URI is pushed by CI before `sls deploy` — see the container
+  # build step in .github/workflows/deploy-trendly.yaml.
+  render_image:
+    image:
+      uri: ${env:RENDER_IMAGE_URI, ''}
+      entryPoint: ["/usr/local/bin/npx", "aws-lambda-ric"]
+      command: ["dist/services/render-worker/src/lambda.handler"]
+    # 4 GB buys ~2.3 vCPU, which is what makes Chromium start fast; the cost of
+    # the extra memory is more than repaid by the shorter run.
+    memorySize: 4096
+    timeout: 120
+    # A cap, not a target: renders are bursty and this keeps a bad day bounded.
+    reservedConcurrency: 20
+    environment:
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${env:FIREBASE_SERVICE_ACCOUNT_JSON, ''}
+      RENDER_SCALE: ${env:RENDER_SCALE, '1'}
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - ImageRenderQueue
+              - Arn
+          # One message per invocation: a thrown error then fails exactly that
+          # render, SQS redrives it, and the DLQ catches anything that keeps
+          # failing — rather than one bad design poisoning a batch of ten.
+          batchSize: 1
+
 package:
   patterns:
     - "!./**"
@@ -676,17 +742,257 @@ resources:
         QueueName: SocialSyncQueue-${self:provider.stage}
         VisibilityTimeout: 660   # ≥ social_sqs timeout (600s) + buffer
 
-    # AI-Studio scene render worker queue. Consumed by an out-of-band Fargate
-    # container (CanvasKit + FFmpeg) — NOT a Lambda (video render exceeds the
-    # 15-min/10-GB/no-GPU Lambda envelope). The AI/scene handlers enqueue here;
-    # the worker writes renderUrl back onto the content's sceneRef. Set
-    # RENDER_QUEUE_URL to this queue's URL once the worker exists. See
-    # docs/render-worker.md.
-    SceneRenderQueue:
+    # ══════════════════════════════════════════════════════════════════════
+    # Server-side design rendering
+    # ══════════════════════════════════════════════════════════════════════
+    # Replaces the orphaned SceneRenderQueue, which belonged to the deleted
+    # CanvasKit scene-graph plan and was never consumed by anything.
+    #
+    # Two lanes, one container image:
+    #   images → ImageRenderQueue → the render_image Lambda
+    #   video  → RenderJobQueue (Batch) → a Fargate Spot task that exits
+    #
+    # Nothing runs while nothing is queued, so idle cost is zero. The only
+    # standing charges are ECR image storage and, while a task is actually
+    # running, its public IPv4 (~$0.005/hr, about $0.0001 per render).
+
+    ImageRenderDLQ:
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: SceneRenderQueue-${self:provider.stage}
-        VisibilityTimeout: 1000  # long-running container render + buffer
+        QueueName: ImageRenderDLQ-${self:provider.stage}
+        MessageRetentionPeriod: 1209600   # 14 days, to debug a bad design slowly
+
+    ImageRenderQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ImageRenderQueue-${self:provider.stage}
+        VisibilityTimeout: 180   # >= render_image timeout (120s) + buffer
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - ImageRenderDLQ
+              - Arn
+          maxReceiveCount: 3
+
+    # ── Network ───────────────────────────────────────────────────────────
+    # Fargate tasks must live in a VPC; every Lambda in this stack runs outside
+    # one, so this VPC exists ONLY for the render tasks. Public subnets with
+    # assignPublicIp, deliberately: a NAT gateway would cost ~$32/month whether
+    # or not anything renders, which defeats the point of a queue that scales to
+    # zero. The S3 gateway endpoint (free) keeps uploads off the public path.
+    RenderVpc:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 10.42.0.0/16
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        Tags:
+          - Key: Name
+            Value: trendly-render-${self:provider.stage}
+
+    RenderInternetGateway:
+      Type: AWS::EC2::InternetGateway
+
+    RenderVpcGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref RenderVpc
+        InternetGatewayId: !Ref RenderInternetGateway
+
+    # Two AZs so a zonal Spot shortage doesn't stall every video render.
+    RenderSubnetA:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref RenderVpc
+        CidrBlock: 10.42.1.0/24
+        AvailabilityZone: !Select [0, !GetAZs ""]
+        MapPublicIpOnLaunch: true
+
+    RenderSubnetB:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref RenderVpc
+        CidrBlock: 10.42.2.0/24
+        AvailabilityZone: !Select [1, !GetAZs ""]
+        MapPublicIpOnLaunch: true
+
+    RenderRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref RenderVpc
+
+    RenderDefaultRoute:
+      Type: AWS::EC2::Route
+      DependsOn: RenderVpcGatewayAttachment
+      Properties:
+        RouteTableId: !Ref RenderRouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref RenderInternetGateway
+
+    RenderSubnetARouteAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId: !Ref RenderSubnetA
+        RouteTableId: !Ref RenderRouteTable
+
+    RenderSubnetBRouteAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        SubnetId: !Ref RenderSubnetB
+        RouteTableId: !Ref RenderRouteTable
+
+    RenderS3Endpoint:
+      Type: AWS::EC2::VPCEndpoint
+      Properties:
+        VpcId: !Ref RenderVpc
+        ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+        VpcEndpointType: Gateway
+        RouteTableIds:
+          - !Ref RenderRouteTable
+
+    # Outbound only. A render task calls Firestore, the CDN and S3; nothing
+    # ever needs to reach IN to it.
+    RenderSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Trendly render worker tasks (egress only)
+        VpcId: !Ref RenderVpc
+        SecurityGroupEgress:
+          - IpProtocol: "-1"
+            CidrIp: 0.0.0.0/0
+
+    # ── Roles ─────────────────────────────────────────────────────────────
+    # Execution role = what Fargate itself needs (pull the image, write logs).
+    # Job role = what OUR code may do (write the render to S3). Split so the
+    # worker can never pull or push images.
+    RenderTaskExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: ecs-tasks.amazonaws.com
+              Action: ["sts:AssumeRole"]
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+    RenderTaskRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: ecs-tasks.amazonaws.com
+              Action: ["sts:AssumeRole"]
+        Policies:
+          - PolicyName: RenderWorkerS3Write
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: ["s3:PutObject"]
+                  Resource: "arn:aws:s3:::${self:service}-attachment-uploads/uploads/*"
+
+    # ── Batch (video) ─────────────────────────────────────────────────────
+    # Spot first, on-demand second. Batch falls through to the second compute
+    # environment when Spot capacity is short, so a render is delayed rather
+    # than failed — and retried automatically when Spot reclaims a task.
+    RenderComputeEnvSpot:
+      Type: AWS::Batch::ComputeEnvironment
+      Properties:
+        Type: MANAGED
+        State: ENABLED
+        ComputeResources:
+          Type: FARGATE_SPOT
+          MaxvCpus: 64   # ~16 concurrent renders: a cap, so a bad day is bounded
+          Subnets:
+            - !Ref RenderSubnetA
+            - !Ref RenderSubnetB
+          SecurityGroupIds:
+            - !GetAtt RenderSecurityGroup.GroupId
+
+    RenderComputeEnvOnDemand:
+      Type: AWS::Batch::ComputeEnvironment
+      Properties:
+        Type: MANAGED
+        State: ENABLED
+        ComputeResources:
+          Type: FARGATE
+          MaxvCpus: 32
+          Subnets:
+            - !Ref RenderSubnetA
+            - !Ref RenderSubnetB
+          SecurityGroupIds:
+            - !GetAtt RenderSecurityGroup.GroupId
+
+    RenderJobQueue:
+      Type: AWS::Batch::JobQueue
+      Properties:
+        JobQueueName: RenderJobQueue-${self:provider.stage}
+        Priority: 1
+        State: ENABLED
+        ComputeEnvironmentOrder:
+          - Order: 1
+            ComputeEnvironment: !Ref RenderComputeEnvSpot
+          - Order: 2
+            ComputeEnvironment: !Ref RenderComputeEnvOnDemand
+
+    RenderJobDefinition:
+      Type: AWS::Batch::JobDefinition
+      Properties:
+        JobDefinitionName: RenderJobDefinition-${self:provider.stage}
+        Type: container
+        PlatformCapabilities: [FARGATE]
+        # Retry what is worth retrying. A Spot reclaim or a task that never
+        # started is infrastructure and retries; exit code 1 is the worker
+        # reporting a design it genuinely cannot render, and burning two more
+        # attempts on it only delays the error the user is waiting for.
+        RetryStrategy:
+          Attempts: 3
+          EvaluateOnExit:
+            - Action: RETRY
+              OnStatusReason: "*Spot*"
+            - Action: RETRY
+              OnStatusReason: "Task failed to start*"
+            - Action: EXIT
+              OnExitCode: "1"
+        Timeout:
+          AttemptDurationSeconds: 1800
+        ContainerProperties:
+          Image: ${env:RENDER_IMAGE_URI, ''}
+          # Overridden per job by batch:SubmitJob, which appends the job JSON.
+          Command: ["node", "dist/services/render-worker/src/cli.js"]
+          # 4 vCPU: FFmpeg scales with cores and is the back half of every video.
+          ResourceRequirements:
+            - Type: VCPU
+              Value: "4"
+            - Type: MEMORY
+              Value: "8192"
+          ExecutionRoleArn: !GetAtt RenderTaskExecutionRole.Arn
+          JobRoleArn: !GetAtt RenderTaskRole.Arn
+          NetworkConfiguration:
+            AssignPublicIp: ENABLED
+          # Graviton: same Chromium build as everywhere else (Playwright ships
+          # an arm64 Linux browser), ~20% cheaper, and matches the stack's
+          # provider.architecture.
+          RuntimePlatform:
+            CpuArchitecture: ARM64
+            OperatingSystemFamily: LINUX
+          Environment:
+            - Name: ATTACHMENT_S3_BUCKET_NAME
+              Value: ${self:service}-attachment-uploads
+            - Name: ATTACHMENT_CF_DISTRIBUTION_URL
+              Value: https://d1u20zdoqkyuuq.cloudfront.net
+            - Name: FIRESTORE_DATABASE_ID
+              Value: ${env:FIRESTORE_DATABASE_ID, '(default)'}
+            - Name: FIREBASE_SERVICE_ACCOUNT_JSON
+              Value: ${env:FIREBASE_SERVICE_ACCOUNT_JSON, ''}
+            - Name: RENDER_SCALE
+              Value: ${env:RENDER_SCALE, '1'}
 
     # --------------------------------------------------------------------------------------
     # ------------- Scheduled content publishing (delayed_sqs via Step Functions) ----------

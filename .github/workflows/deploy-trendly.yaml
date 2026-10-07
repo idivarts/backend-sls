@@ -24,6 +24,11 @@ jobs:
     
     steps:
       - uses: actions/checkout@v3
+        with:
+          # shared-libs is a submodule now: the render worker imports the design
+          # runtime from it, and the Docker build COPYs it. Without this the
+          # image build fails on a missing path.
+          submodules: true
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -35,6 +40,37 @@ jobs:
       - run: npm i
       - run: go version
       - run: go mod download
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push the render worker image
+        # Built for linux/arm64 to match provider.architecture and to take the
+        # Graviton discount on both Lambda and Fargate. The ECR repository is
+        # created on first run rather than declared in the stack: the Lambda
+        # references the image by URI, so the image has to exist BEFORE
+        # `sls deploy` runs — a repo created by the same stack would deadlock.
+        env:
+          ECR_REPO: trendly-render-worker
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGISTRY="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr describe-repositories --repository-names "$ECR_REPO" >/dev/null 2>&1 \
+            || aws ecr create-repository --repository-name "$ECR_REPO" \
+                 --image-scanning-configuration scanOnPush=true >/dev/null
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY"
+          TAG="${STAGE}-${GITHUB_SHA::12}"
+          docker buildx build --platform linux/arm64 \
+            -f services/render-worker/Dockerfile \
+            -t "$REGISTRY/$ECR_REPO:$TAG" --push .
+          echo "RENDER_IMAGE_URI=$REGISTRY/$ECR_REPO:$TAG" >> "$GITHUB_ENV"
       - name: Add Service JSON and Deploy
         env:
           # Schema-less WS API Gateway host, picked per-stage from org-level action variables
@@ -71,12 +107,11 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # AI Studio — ElevenLabs (music + voiceover) and Canva Connect bridge.
           # ELEVENLABS_API_KEY + CANVA_CLIENT_SECRET are secrets; CANVA_CLIENT_ID +
-          # CANVA_REDIRECT_URI + RENDER_QUEUE_URL are non-secret vars.
+          # CANVA_REDIRECT_URI are non-secret vars.
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           CANVA_CLIENT_ID: ${{ vars.CANVA_CLIENT_ID }}
           CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
           CANVA_REDIRECT_URI: ${{ vars.CANVA_REDIRECT_URI }}
-          RENDER_QUEUE_URL: ${{ vars.RENDER_QUEUE_URL }}
           # Branch deep links (pkg/branch). Environment-scoped vars/secrets, so the
           # `environment:` binding above picks the TEST Branch app on dev and the
           # LIVE one on prod — no per-stage ternary needed here.
@@ -97,5 +132,9 @@ jobs:
         run: |
           echo $FIREBASE_SERVICE_ACCOUNT_BASE64 | base64 -d > service-account.json
           echo $TRENDLY_KEY_SECRETS_BASE64 | base64 -d > key-secrets.json
+          # The Node render worker can't read the bundled service-account.json
+          # (it is packaged with the Go functions), so the same credential is
+          # handed to it as an environment value.
+          export FIREBASE_SERVICE_ACCOUNT_JSON="$(cat service-account.json)"
           npm run build:trendly
           npx sls deploy --config serverless.trendly.yml --stage ${{ env.STAGE }}

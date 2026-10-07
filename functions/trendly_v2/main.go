@@ -7,6 +7,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/sharing"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
@@ -81,6 +82,11 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/publish/retry", publishing.RetryPublish)
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/schedule", publishing.SchedulePublish)
 	managerApisV1.DELETE("/brands/:brandId/contents/:contentId/schedule", publishing.CancelSchedule)
+
+	// ── Server-side design rendering (brands/{brandId}/contents) ──────────────
+	// Queues a render of the content's current design revision and returns 202;
+	// the app watches renderStatus on the revision it already subscribes to.
+	managerApisV1.POST("/brands/:brandId/contents/:contentId/render", rendering.StartRender)
 
 	// ── Public sharing (Branch deep links for a share token) ──────────────────
 	// The token + `enabled` toggle are owned by the app (it writes shareLinks/

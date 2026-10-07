@@ -13,7 +13,8 @@ import (
 
 // handler consumes content-publish messages — delivered either by the delayed_sqs
 // Step Functions state machine (a scheduled time was reached) or enqueued with no
-// delay by publish-now / retry — and publishes the referenced content. A message
+// delay by publish-now / retry — and publishes the referenced content, first
+// making sure its design has actually been rendered (publishing.PublishOrDeferForRender). A message
 // may carry OnlyDestinations to re-run just the failed socials (retry). Errors are
 // swallowed per-record because PublishContent already records per-social results
 // on the document, and we don't want one failing post to replay the whole batch.
@@ -28,7 +29,7 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 		if msg.Action != "PUBLISH" {
 			continue
 		}
-		if err := publishing.PublishContent(msg.BrandID, msg.ContentID, msg.OnlyDestinations...); err != nil {
+		if err := publishing.PublishOrDeferForRender(msg); err != nil {
 			log.Printf("scheduled_publish_sqs: publish failed for %s/%s: %v",
 				msg.BrandID, msg.ContentID, err)
 			mysentry.Capture(err, map[string]string{"lambda": "scheduled_publish_sqs", "op": "publish"})
