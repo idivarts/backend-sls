@@ -3,8 +3,10 @@
 # ONE image serves both front doors:
 #   • AWS Batch (video)  → default ENTRYPOINT runs cli.js and the task exits,
 #                          which is what keeps Fargate costing nothing when idle
-#   • Lambda (images)    → the function's ImageConfig overrides ENTRYPOINT to the
-#                          AWS Runtime Interface Client and CMD to the handler
+#   • Lambda (images)    → the function's ImageConfig overrides ENTRYPOINT to
+#                          lambda-bootstrap.js, which long-polls the Lambda
+#                          Runtime API itself (see src/lambda-bootstrap.ts for
+#                          why aws-lambda-ric is not used)
 #
 # Built for linux/arm64 to match the rest of the stack (provider.architecture is
 # already arm64) and to take the ~20% Graviton discount on both Lambda and
@@ -18,12 +20,9 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
-# aws-lambda-ric compiles from source, so the toolchain is needed here and
-# thrown away with this stage.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
+# Nothing here compiles: tsc only, and every dependency with a native component
+# (sharp) ships a prebuilt linux-arm64 binary, which is why --ignore-scripts is
+# safe on both stages.
 COPY services/render-worker/package.json services/render-worker/package-lock.json ./services/render-worker/
 RUN cd services/render-worker && npm ci --ignore-scripts
 
@@ -50,7 +49,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY services/render-worker/package.json services/render-worker/package-lock.json ./services/render-worker/
 RUN cd services/render-worker && npm ci --omit=dev --ignore-scripts \
-    && npm i --no-save aws-lambda-ric \
     && npx playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/*
 

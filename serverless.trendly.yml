@@ -607,17 +607,20 @@ functions:
   # image pull, so a four-second carousel would cost like a sixty-second job and
   # make the user wait ~35s before rendering even starts.
   #
-  # ENTRYPOINT is overridden to the AWS Runtime Interface Client because, unlike
-  # a Go binary, Node does not implement the Lambda Runtime API itself. The same
-  # image runs unmodified on Batch, where the default ENTRYPOINT (cli.js) applies.
+  # ENTRYPOINT is overridden because, unlike a Go binary, Node does not implement
+  # the Lambda Runtime API itself — lambda-bootstrap.js is the worker's own
+  # long-poll loop against it. The same image runs unmodified on Batch, where the
+  # default ENTRYPOINT (cli.js) applies.
   #
   # RENDER_IMAGE_URI is pushed by CI before `sls deploy` — see the container
   # build step in .github/workflows/deploy-trendly.yaml.
   render_image:
     image:
       uri: ${env:RENDER_IMAGE_URI, ''}
-      entryPoint: ["/usr/local/bin/npx", "aws-lambda-ric"]
-      command: ["dist/services/render-worker/src/lambda.handler"]
+      # The image's own Runtime API loop, not aws-lambda-ric — see
+      # services/render-worker/src/lambda-bootstrap.ts for why. It takes no
+      # handler argument, so there is no `command` to override.
+      entryPoint: ["node", "dist/services/render-worker/src/lambda-bootstrap.js"]
     # 4 GB buys ~2.3 vCPU, which is what makes Chromium start fast; the cost of
     # the extra memory is more than repaid by the shorter run.
     memorySize: 4096
