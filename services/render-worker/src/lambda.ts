@@ -22,7 +22,14 @@ interface SQSEvent {
     Records: SQSRecord[];
 }
 
-export async function handler(event: SQSEvent, context?: { awsRequestId?: string }) {
+/** The slice of the Lambda context object this worker actually reads. Supplied by lambda-bootstrap. */
+export interface LambdaContext {
+    awsRequestId?: string;
+    invokedFunctionArn?: string;
+    getRemainingTimeInMillis?: () => number;
+}
+
+export async function handler(event: SQSEvent, context?: LambdaContext) {
     for (const record of event.Records) {
         const job = JSON.parse(record.body) as RenderJob;
         await runJob({ ...job, jobId: job.jobId ?? context?.awsRequestId });
