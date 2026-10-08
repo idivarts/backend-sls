@@ -81,7 +81,14 @@ export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage>
     const parts: string[] = [];
     if (labels.music !== undefined && labels.voice !== undefined) {
         parts.push(`[${labels.music}:a]volume=${musicVol}[m]`);
-        parts.push(`[${labels.voice}:a]volume=${voiceVol}[v]`);
+        // apad is load-bearing, not cosmetic. sidechaincompress reads its two
+        // inputs in lockstep, and the music is infinite (-stream_loop -1) while
+        // a voiceover is not. When the voice hit EOF the compressor stopped
+        // producing, the mix stalled behind it, FFmpeg's queues filled and it
+        // stopped draining the frame pipe — hanging the render mid-encode with
+        // no error. Padding the voice with silence keeps both sides alive; the
+        // output length is bounded by -t on the encode instead.
+        parts.push(`[${labels.voice}:a]volume=${voiceVol},apad[v]`);
         if (duck) {
             // One copy of the voice drives the compressor, the other is heard.
             parts.push(`[v]asplit=2[vkey][vout]`);
@@ -93,7 +100,9 @@ export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage>
     } else if (labels.music !== undefined) {
         parts.push(`[${labels.music}:a]volume=${musicVol}[aout]`);
     } else if (labels.voice !== undefined) {
-        parts.push(`[${labels.voice}:a]volume=${voiceVol}[aout]`);
+        // Padded for the same reason as above, and because -shortest used to
+        // truncate the whole video to the voiceover when it was the only track.
+        parts.push(`[${labels.voice}:a]volume=${voiceVol},apad[aout]`);
     }
 
     return {

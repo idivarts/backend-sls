@@ -70,7 +70,12 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
         "-preset", config.x264Preset,
         "-crf", String(config.x264Crf),
         "-pix_fmt", "yuv420p",
-        "-shortest",
+        // An explicit duration, not -shortest. Every audio chain here is now
+        // endless by construction (looping music, apadded voice), so -shortest
+        // had nothing finite to stop on except the video — and in the one case
+        // it did bite, a voiceover-only track, it truncated the video to the
+        // voiceover. frames/fps is exact and matches what is written to the pipe.
+        "-t", (frames / fps).toFixed(3),
         "-movflags", "+faststart",
         "-y", outPath,
     ];
