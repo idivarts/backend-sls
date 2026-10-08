@@ -1017,8 +1017,13 @@ resources:
           AttemptDurationSeconds: 1800
         ContainerProperties:
           Image: ${env:RENDER_IMAGE_URI, ''}
-          # Overridden per job by batch:SubmitJob, which appends the job JSON.
-          Command: ["node", "dist/services/render-worker/src/cli.js"]
+          # Deliberately NO Command. Batch's `command` is Docker CMD, which is
+          # appended as ARGUMENTS to the image's ENTRYPOINT — and the entrypoint
+          # is already `node dist/services/render-worker/src/cli.js`. Repeating
+          # it here produced `node cli.js node cli.js`, so cli.js read argv[2] as
+          # the literal "node" and died on JSON.parse. The job itself arrives as
+          # the RENDER_JOB environment override that batch:SubmitJob sets; see
+          # submitBatchJob in internal/trendlyapis/rendering/handlers.go.
           # 4 vCPU: FFmpeg scales with cores and is the back half of every video.
           ResourceRequirements:
             - Type: VCPU

@@ -188,8 +188,18 @@ func submitBatchJob(job RenderJob, body string) error {
 		JobName:       aws.String("render-" + job.RevisionID),
 		JobQueue:      aws.String(queue),
 		JobDefinition: aws.String(definition),
+		// The job travels as an environment variable, NOT a command override.
+		// Batch's `command` is Docker CMD, which Docker appends as ARGUMENTS to
+		// the image's ENTRYPOINT — and that entrypoint is already
+		// `node .../cli.js`. Passing the full command here produced
+		//     node cli.js node cli.js {"brandId":...}
+		// so cli.js read argv[2] as the literal string "node" and died on
+		// JSON.parse. RENDER_JOB is the other input cli.ts accepts and it is
+		// immune to the entrypoint ever changing shape again.
 		ContainerOverrides: &batch.ContainerOverrides{
-			Command: []*string{aws.String("node"), aws.String("dist/services/render-worker/src/cli.js"), aws.String(body)},
+			Environment: []*batch.KeyValuePair{
+				{Name: aws.String("RENDER_JOB"), Value: aws.String(body)},
+			},
 		},
 	})
 	return err
