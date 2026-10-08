@@ -635,9 +635,11 @@ functions:
     timeout: 120
     # A cap, not a target: renders are bursty and this keeps a bad day bounded.
     reservedConcurrency: 20
-    environment:
-      FIREBASE_SERVICE_ACCOUNT_JSON: ${env:FIREBASE_SERVICE_ACCOUNT_JSON, ''}
-      RENDER_SCALE: ${env:RENDER_SCALE, '1'}
+    # Environment is NOT declared here. Serverless merges provider.environment
+    # into every function, and all 55 Go secrets plus the 2.4 KB service-account
+    # JSON came to 5512 bytes — past Lambda's hard 4 KB ceiling. The worker reads
+    # five variables, so they are set as a wholesale REPLACEMENT further down, in
+    # `resources.extensions.RenderUnderscoreimageLambdaFunction`. Keep them there.
     events:
       - sqs:
           arn:
@@ -655,6 +657,33 @@ package:
   individually: true
 
 resources:
+  # ── Container function environment (replaces, does not extend) ─────────────
+  # Serverless merges provider.environment into every function and offers no
+  # per-function opt-out. For the Go functions that is exactly right; for the
+  # render worker it meant inheriting all 55 shared secrets on top of the 2.4 KB
+  # service-account JSON — 5512 bytes against Lambda's hard 4 KB limit, so the
+  # function could not be created at all.
+  #
+  # An extension's `Properties` are applied with Object.assign, which is shallow,
+  # so naming `Environment` here REPLACES the compiled one rather than merging
+  # into it (serverless/lib/plugins/aws/package/lib/merge-custom-provider-resources.js).
+  # That is the only way to shrink a single function's environment, and it also
+  # makes the worker permanently immune to provider.environment growing again.
+  #
+  # The list below is the worker's whole surface — services/render-worker/src/config.ts
+  # plus firestore.ts — and deliberately mirrors RenderJobDefinition's Environment,
+  # since the same image runs on Batch. AWS_REGION is injected by Lambda itself.
+  extensions:
+    RenderUnderscoreimageLambdaFunction:
+      Properties:
+        Environment:
+          Variables:
+            ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
+            ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
+            FIRESTORE_DATABASE_ID: ${env:FIRESTORE_DATABASE_ID, '(default)'}
+            FIREBASE_SERVICE_ACCOUNT_JSON: ${env:FIREBASE_SERVICE_ACCOUNT_JSON, ''}
+            RENDER_SCALE: ${env:RENDER_SCALE, '1'}
+
   Conditions:
     IsDev:
       Fn::Equals: ["${sls:stage}", "dev"]
