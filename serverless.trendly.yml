@@ -615,6 +615,14 @@ functions:
   # RENDER_IMAGE_URI is pushed by CI before `sls deploy` — see the container
   # build step in .github/workflows/deploy-trendly.yaml.
   render_image:
+    # NOT the managed Node runtime — this is a container function and Serverless
+    # drops `runtime` entirely for one (it only emits Runtime on the zip path, so
+    # this never reaches CloudFormation). It is here purely to opt out of
+    # serverless-go-plugin: the plugin builds any function whose runtime — its
+    # own or the provider's — is in custom.go.supportedRuntimes, and inheriting
+    # provider.runtime: provided.al2 made it try `go build -o .bin/render_image
+    # undefined` on a function that has no Go handler at all.
+    runtime: nodejs20.x
     image:
       uri: ${env:RENDER_IMAGE_URI, ''}
       # The image's own Runtime API loop, not aws-lambda-ric — see
