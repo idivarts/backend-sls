@@ -958,17 +958,21 @@ resources:
         JobDefinitionName: RenderJobDefinition-${self:provider.stage}
         Type: container
         PlatformCapabilities: [FARGATE]
-        # Retry what is worth retrying. A Spot reclaim or a task that never
-        # started is infrastructure and retries; exit code 1 is the worker
-        # reporting a design it genuinely cannot render, and burning two more
-        # attempts on it only delays the error the user is waiting for.
+        # Retry what is worth retrying. Exit code 1 is the worker reporting a
+        # design it genuinely cannot render, and burning two more attempts on it
+        # only delays the error the user is waiting for. Everything else — a
+        # Spot reclaim, a task that never started, an OOM kill — matches no
+        # condition and so falls through to a retry, which is Batch's documented
+        # behaviour when no EvaluateOnExit entry matches.
+        #
+        # Expressed as fall-through rather than as explicit RETRY rules because
+        # Batch only accepts a wildcard at the END of OnStatusReason: a leading
+        # one is rejected outright ("Evaluate on exit condition contains
+        # restricted characters"), so there is no way to match a substring like
+        # Spot, and no reliable prefix to match it on either.
         RetryStrategy:
           Attempts: 3
           EvaluateOnExit:
-            - Action: RETRY
-              OnStatusReason: "*Spot*"
-            - Action: RETRY
-              OnStatusReason: "Task failed to start*"
             - Action: EXIT
               OnExitCode: "1"
         Timeout:
