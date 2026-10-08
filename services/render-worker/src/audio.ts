@@ -11,7 +11,7 @@
  * old path resolved null and shipped a silent video with no error, which is
  * indistinguishable to the user from "the soundtrack feature is broken".
  */
-import { writeFile } from "node:fs/promises";
+import { unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ContentAudio } from "./types";
@@ -23,6 +23,14 @@ export interface AudioStage {
     filter: string | null;
     /** Args that map and encode the mixed track. */
     outputArgs: string[];
+    /**
+     * Temp files this stage downloaded. The caller MUST unlink them once FFmpeg
+     * has exited — they are inputs to a running process, so they cannot be
+     * cleaned up here. On Batch the task exits and takes them with it, but the
+     * same code runs in a warm Lambda where /tmp is 512 MB and survives between
+     * invocations, so leaking them would eventually fill the disk.
+     */
+    tempFiles: string[];
 }
 
 async function download(url: string, name: string): Promise<string> {
@@ -36,7 +44,7 @@ async function download(url: string, name: string): Promise<string> {
 }
 
 export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage> {
-    const empty: AudioStage = { inputArgs: [], filter: null, outputArgs: ["-an"] };
+    const empty: AudioStage = { inputArgs: [], filter: null, outputArgs: ["-an"], tempFiles: [] };
     if (!audio || (!audio.musicUrl && !audio.voiceoverUrl)) return empty;
 
     const musicVol = audio.musicVolume ?? 0.7;
@@ -44,20 +52,30 @@ export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage>
     const duck = audio.duckMusic !== false;
 
     const inputArgs: string[] = [];
+    const tempFiles: string[] = [];
     const labels: { music?: number; voice?: number } = {};
     let index = 1; // 0 is the frame pipe
 
-    if (audio.musicUrl) {
-        const path = await download(audio.musicUrl, "music");
-        // -stream_loop before the input: the bed repeats for the whole video
-        // rather than ending halfway through a longer reel.
-        inputArgs.push("-stream_loop", "-1", "-i", path);
-        labels.music = index++;
-    }
-    if (audio.voiceoverUrl) {
-        const path = await download(audio.voiceoverUrl, "voiceover");
-        inputArgs.push("-i", path);
-        labels.voice = index++;
+    try {
+        if (audio.musicUrl) {
+            const path = await download(audio.musicUrl, "music");
+            tempFiles.push(path);
+            // -stream_loop before the input: the bed repeats for the whole video
+            // rather than ending halfway through a longer reel.
+            inputArgs.push("-stream_loop", "-1", "-i", path);
+            labels.music = index++;
+        }
+        if (audio.voiceoverUrl) {
+            const path = await download(audio.voiceoverUrl, "voiceover");
+            tempFiles.push(path);
+            inputArgs.push("-i", path);
+            labels.voice = index++;
+        }
+    } catch (err) {
+        // A failed voiceover fetch must not strand the music file: nothing
+        // downstream will ever see tempFiles if we throw from here.
+        await Promise.all(tempFiles.map((p) => unlink(p).catch(() => undefined)));
+        throw err;
     }
 
     const parts: string[] = [];
@@ -82,5 +100,6 @@ export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage>
         inputArgs,
         filter: parts.join(";"),
         outputArgs: ["-map", "[aout]", "-c:a", "aac", "-b:a", "128k"],
+        tempFiles,
     };
 }

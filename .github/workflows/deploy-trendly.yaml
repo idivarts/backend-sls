@@ -77,7 +77,18 @@ jobs:
           # not checked out this fails loudly rather than reusing a stale image.
           WORKER_TREE=$(git rev-parse "HEAD:services/render-worker")
           DESIGN_TREE=$(git -C shared-libs rev-parse "HEAD:design")
-          TAG="src-$(printf '%s %s' "$WORKER_TREE" "$DESIGN_TREE" | sha256sum | cut -c1-16)"
+
+          # How the image is BUILT is an input too, not just what goes into it.
+          # Bump RECIPE whenever the buildx invocation below changes in a way
+          # that changes the artifact — otherwise an identical worker resolves to
+          # a tag that already exists and the new flags never take effect, which
+          # is exactly how a bad manifest survived one deploy. Not the workflow
+          # file's own hash, so editing an unrelated step doesn't force a rebuild.
+          #   1 = original
+          #   2 = --provenance=false (single image manifest; Lambda rejects an index)
+          RECIPE=2
+
+          TAG="src-$(printf '%s %s %s' "$WORKER_TREE" "$DESIGN_TREE" "$RECIPE" | sha256sum | cut -c1-16)"
 
           echo "RENDER_IMAGE_URI=$REGISTRY/$ECR_REPO:$TAG" >> "$GITHUB_ENV"
           echo "uri=$REGISTRY/$ECR_REPO:$TAG" >> "$GITHUB_OUTPUT"
@@ -112,7 +123,15 @@ jobs:
             || aws ecr create-repository --repository-name "$ECR_REPO" \
                  --image-scanning-configuration scanOnPush=true >/dev/null
           aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY"
+          # --provenance=false is load-bearing, not hygiene. With it on (the
+          # buildx default when pushing) BuildKit publishes an OCI image INDEX
+          # carrying the arm64 manifest plus an attestation-manifest, and Lambda
+          # rejects an index outright: "The image manifest, config or layer media
+          # type for the source image ... is not supported." Batch and ECS accept
+          # it, which is why only the Lambda front door broke. --sbom=false is
+          # already the default and is stated so nothing turns it on later.
           docker buildx build --platform linux/arm64 \
+            --provenance=false --sbom=false \
             -f services/render-worker/Dockerfile \
             -t "$IMAGE_URI" --push .
         env:
