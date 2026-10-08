@@ -29,21 +29,43 @@ const ARGS = [
     "--autoplay-policy=no-user-gesture-required",
 ];
 
+/**
+ * Lambda only. Fargate runs the multi-process browser happily — it renders
+ * video all day — so these are NOT applied there, where the extra isolation is
+ * worth having and costs nothing.
+ *
+ * On Lambda the browser launched fine and then died creating a page:
+ *     browserContext.newPage: Target crashed
+ * which is the renderer process failing to spawn, not the browser failing to
+ * start. --no-zygote is the one that matters: the zygote Chromium forks
+ * renderers from relies on IPC that Lambda's sandbox does not reliably allow.
+ *
+ * Deliberately NOT --single-process. It is widely repeated as mandatory here,
+ * but it is also a documented source of crashes of its own, and it would be a
+ * much bigger behavioural change than the problem warrants.
+ */
+const LAMBDA_ARGS = [
+    "--no-zygote",
+    "--disable-setuid-sandbox",
+    "--disable-gpu",
+];
+
 let browser: Browser | null = null;
 
 export async function getBrowser(): Promise<Browser> {
     if (browser && browser.isConnected()) return browser;
 
-    // Lambda mounts everything read-only except /tmp, and Chromium writes under
-    // $HOME as it starts (.config, .cache, .pki). Pointed anywhere read-only it
-    // dies during launch, and what surfaces is not a filesystem error but a
-    // broken CDP connection:
-    //     Error: Assertion error at _CRSession._onMessage
-    // Fargate is unaffected (its whole filesystem is writable), which is why the
-    // same image renders video happily and failed only on the image path.
-    if (process.env.AWS_LAMBDA_FUNCTION_NAME) process.env.HOME = "/tmp";
+    const onLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 
-    browser = await chromium.launch({ headless: true, args: ARGS });
+    // Lambda mounts everything read-only except /tmp, and Chromium writes under
+    // $HOME as it starts (.config, .cache, .pki). Defensive rather than the
+    // known cause — launch itself was succeeding — but the constraint is real.
+    if (onLambda) process.env.HOME = "/tmp";
+
+    browser = await chromium.launch({
+        headless: true,
+        args: onLambda ? [...ARGS, ...LAMBDA_ARGS] : ARGS,
+    });
 
     // A crashed renderer otherwise leaves no trace but a Playwright assertion
     // thrown from whatever call happened to be in flight.

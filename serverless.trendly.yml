@@ -632,6 +632,12 @@ functions:
     # 4 GB buys ~2.3 vCPU, which is what makes Chromium start fast; the cost of
     # the extra memory is more than repaid by the shorter run.
     memorySize: 4096
+    # /tmp, not just scratch space. --disable-dev-shm-usage moves Chromium's
+    # shared memory off the container's small /dev/shm and onto /tmp, so the
+    # default 512 MB is what the compositor's surfaces have to live in — and a
+    # 1920x1080 design is not a small page. Fargate never hit this because its
+    # ephemeral volume is 20 GB.
+    ephemeralStorageSize: 2048
     timeout: 120
     # A cap, not a target: renders are bursty and this keeps a bad day bounded.
     reservedConcurrency: 20
