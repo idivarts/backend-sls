@@ -7,7 +7,7 @@
  * code avoided by sharing `useDesignRender` between the Studio and the Media
  * Stage, kept here.
  */
-import { getBrowser } from "./browser";
+import { closeBrowser, getBrowser } from "./browser";
 import { config } from "./config";
 import { captureSlides } from "./image";
 import { loadDesign } from "./page";
@@ -44,7 +44,49 @@ function userFacing(err: unknown): string {
     return "Something went wrong while rendering this design. Please try again.";
 }
 
+/**
+ * Enforce config.jobTimeoutMs — the "hard ceiling on a single job" that was
+ * declared and then never applied to anything, which is how a render sat at 69%
+ * indefinitely instead of failing.
+ *
+ * A rejected promise alone would not be enough: the work behind it keeps
+ * running, and on a warm Lambda the next invocation would inherit a wedged
+ * Chromium. So the browser is torn down on the way out, which also unblocks
+ * whatever CDP call was hanging and lets the real error surface.
+ */
+async function withJobTimeout<T>(work: Promise<T>, revisionId: string): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    const ceiling = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+            console.error(`[render] ${revisionId} hit the ${config.jobTimeoutMs}ms job ceiling — tearing down`);
+            void closeBrowser();
+            reject(new Error(`render timeout after ${config.jobTimeoutMs}ms`));
+        }, config.jobTimeoutMs);
+        timer.unref?.();
+    });
+    try {
+        return await Promise.race([work, ceiling]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
 export async function runJob(job: RenderJob): Promise<void> {
+    try {
+        await withJobTimeout(runJobInner(job), job.revisionId);
+    } catch (err) {
+        // runJobInner marks its own failures, but the ceiling fires OUTSIDE it,
+        // so without this the revision would sit in "rendering" until the
+        // reconcile cron swept it 45 minutes later.
+        if (err instanceof Error && err.message.startsWith("render timeout")) {
+            await markFailed(job.brandId, job.contentId, job.revisionId, userFacing(err))
+                .catch(() => undefined);
+        }
+        throw err;
+    }
+}
+
+async function runJobInner(job: RenderJob): Promise<void> {
     const { brandId, contentId, revisionId } = job;
     const startedAt = Date.now();
 

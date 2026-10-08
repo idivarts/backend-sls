@@ -11,7 +11,7 @@
  * yielding, H.264 level probing, even-dimension rounding. A screenshot is tens
  * of milliseconds and FFmpeg applies its own backpressure through the pipe.
  */
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -70,7 +70,12 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
         "-preset", config.x264Preset,
         "-crf", String(config.x264Crf),
         "-pix_fmt", "yuv420p",
-        "-shortest",
+        // An explicit duration, not -shortest. Every audio chain here is now
+        // endless by construction (looping music, apadded voice), so -shortest
+        // had nothing finite to stop on except the video — and in the one case
+        // it did bite, a voiceover-only track, it truncated the video to the
+        // voiceover. frames/fps is exact and matches what is written to the pipe.
+        "-t", (frames / fps).toFixed(3),
         "-movflags", "+faststart",
         "-y", outPath,
     ];
@@ -81,18 +86,44 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
     // but a warm Lambda keeps its 512 MB /tmp between invocations.
     const tempFiles = [outPath, ...audioStage.tempFiles];
 
+    // Hoisted so the outer finally can reach it, whatever went wrong.
+    let ffmpeg: ChildProcess | null = null;
+
     try {
+        console.log(
+            `[render] encoding ${frames} frames @ ${fps}fps, ${rect.width}x${rect.height}, ` +
+                `${totalMs}ms, audio=${audioStage.filter ? "yes" : "no"}`
+        );
+
         const ff = spawn("ffmpeg", args, { stdio: ["pipe", "ignore", "pipe"] });
+        ffmpeg = ff;
         let ffErr = "";
         ff.stderr.on("data", (d) => {
             ffErr += String(d);
         });
+        // Once FFmpeg is gone its stdin emits EPIPE, and a stream 'error' with
+        // no listener takes the whole process down with it. The write loop below
+        // detects the exit properly, via ffGone.
+        ff.stdin.on("error", () => undefined);
+
         const done = new Promise<void>((resolve, reject) => {
             ff.on("error", reject);
             ff.on("close", (code) =>
                 code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${ffErr.trim()}`))
             );
         });
+
+        // A dead FFmpeg never drains its pipe again, so awaiting "drain" alone
+        // blocks the frame loop FOREVER — no error, no exit, just a render
+        // frozen at whatever percentage it had reached. This turns that into the
+        // real failure, with FFmpeg's own stderr attached.
+        const ffGone = done.then(
+            () => Promise.reject(new Error(`ffmpeg exited before all ${frames} frames were written`)),
+            (err) => Promise.reject(err)
+        );
+        // The race below is its only consumer; without this an unraced rejection
+        // would surface as an unhandled rejection instead of the real error.
+        ffGone.catch(() => undefined);
 
         let poster: Buffer | null = null;
         let lastReported = -1;
@@ -107,14 +138,21 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
                 if (i === 0) poster = frame;
 
                 // Respect the pipe's backpressure: if FFmpeg hasn't drained, wait
-                // rather than buffering the whole video in memory.
+                // rather than buffering the whole video in memory — but never
+                // wait on a process that has already gone away.
                 if (!ff.stdin.write(frame)) {
-                    await new Promise<void>((resolve) => ff.stdin.once("drain", () => resolve()));
+                    await Promise.race([
+                        new Promise<void>((resolve) => ff.stdin.once("drain", () => resolve())),
+                        ffGone,
+                    ]);
                 }
 
                 const pct = Math.floor(((i + 1) / frames) * 100);
                 if (pct - lastReported >= config.progressStepPct) {
                     lastReported = pct;
+                    // Logged as well as written to Firestore: when a render
+                    // stalls, this is the only record of where it got to.
+                    console.log(`[render] frame ${i + 1}/${frames} (${pct}%)`);
                     onProgress?.((i + 1) / frames);
                 }
             }
@@ -126,6 +164,10 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
         const mp4 = await readFile(outPath);
         return { mp4, poster: poster ?? Buffer.alloc(0) };
     } finally {
+        // A job that failed part-way can leave FFmpeg alive holding the pipe.
+        // On Batch the task exits anyway, but a warm Lambda would accumulate one
+        // orphaned encoder per failed render.
+        if (ffmpeg && ffmpeg.exitCode === null && !ffmpeg.killed) ffmpeg.kill("SIGKILL");
         await Promise.all(tempFiles.map((p) => unlink(p).catch(() => undefined)));
     }
 }

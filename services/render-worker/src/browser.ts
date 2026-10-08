@@ -33,7 +33,24 @@ let browser: Browser | null = null;
 
 export async function getBrowser(): Promise<Browser> {
     if (browser && browser.isConnected()) return browser;
+
+    // Lambda mounts everything read-only except /tmp, and Chromium writes under
+    // $HOME as it starts (.config, .cache, .pki). Pointed anywhere read-only it
+    // dies during launch, and what surfaces is not a filesystem error but a
+    // broken CDP connection:
+    //     Error: Assertion error at _CRSession._onMessage
+    // Fargate is unaffected (its whole filesystem is writable), which is why the
+    // same image renders video happily and failed only on the image path.
+    if (process.env.AWS_LAMBDA_FUNCTION_NAME) process.env.HOME = "/tmp";
+
     browser = await chromium.launch({ headless: true, args: ARGS });
+
+    // A crashed renderer otherwise leaves no trace but a Playwright assertion
+    // thrown from whatever call happened to be in flight.
+    browser.on("disconnected", () => {
+        console.error("[render] chromium disconnected");
+        browser = null;
+    });
     return browser;
 }
 

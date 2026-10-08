@@ -18,7 +18,26 @@
  * Node equivalent, and it is the container's ENTRYPOINT for the image path.
  */
 import * as http from "node:http";
-import { handler, LambdaContext } from "./lambda";
+import type { LambdaContext } from "./lambda";
+
+/**
+ * The handler module is loaded LAZILY, on the first invocation.
+ *
+ * Lambda caps a container image's init phase at 10 seconds, and importing this
+ * module eagerly pulls in Playwright, firebase-admin and the S3 client before
+ * the loop can reach /invocation/next — which overran it every cold start:
+ *
+ *     INIT_REPORT Init Duration: 10000.36 ms  Phase: init  Status: timeout
+ *
+ * Deferring it makes init almost free (node:http only) and moves the cost into
+ * the invoke, which has the function's full 120s. The promise is cached, so it
+ * is paid once per execution environment, not once per render.
+ */
+let handlerModule: Promise<typeof import("./lambda")> | null = null;
+function loadHandler(): Promise<typeof import("./lambda")> {
+    if (!handlerModule) handlerModule = import("./lambda");
+    return handlerModule;
+}
 
 const API = process.env.AWS_LAMBDA_RUNTIME_API;
 const BASE = "/2018-06-01/runtime";
@@ -95,6 +114,7 @@ async function loop() {
         };
 
         try {
+            const { handler } = await loadHandler();
             const result = await handler(JSON.parse(next.body || "{}"), context);
             await call("POST", `${BASE}/invocation/${requestId}/response`, JSON.stringify(result ?? null));
         } catch (err) {
