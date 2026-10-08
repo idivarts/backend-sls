@@ -981,6 +981,15 @@ resources:
           - Order: 2
             ComputeEnvironment: !Ref RenderComputeEnvOnDemand
 
+    # 30 days: long enough to debug a render a user complains about days later,
+    # short enough that a pathological design looping in FFmpeg can't bill for
+    # log storage forever.
+    RenderJobLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/batch/trendly-render-${self:provider.stage}
+        RetentionInDays: 30
+
     RenderJobDefinition:
       Type: AWS::Batch::JobDefinition
       Properties:
@@ -1018,6 +1027,19 @@ resources:
               Value: "8192"
           ExecutionRoleArn: !GetAtt RenderTaskExecutionRole.Arn
           JobRoleArn: !GetAtt RenderTaskRole.Arn
+          # Without this Batch logs to its own /aws/batch/job group, which is
+          # shared by every job in the account and — because nothing in CFN owns
+          # it — never expires. A dedicated group keeps video renders findable
+          # and lets the retention below actually apply. No extra IAM needed:
+          # AmazonECSTaskExecutionRolePolicy already grants CreateLogStream and
+          # PutLogEvents on *, and the group itself is created here because that
+          # policy deliberately does NOT grant logs:CreateLogGroup.
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref RenderJobLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: render
           NetworkConfiguration:
             AssignPublicIp: ENABLED
           # Graviton: same Chromium build as everywhere else (Playwright ships

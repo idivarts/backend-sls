@@ -75,48 +75,57 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
         "-y", outPath,
     ];
 
-    const ff = spawn("ffmpeg", args, { stdio: ["pipe", "ignore", "pipe"] });
-    let ffErr = "";
-    ff.stderr.on("data", (d) => {
-        ffErr += String(d);
-    });
-    const done = new Promise<void>((resolve, reject) => {
-        ff.on("error", reject);
-        ff.on("close", (code) =>
-            code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${ffErr.trim()}`))
-        );
-    });
-
-    let poster: Buffer | null = null;
-    let lastReported = -1;
+    // Everything this job wrote to disk: the encode target plus whatever the
+    // audio stage downloaded. Cleared in the outer finally so a design that
+    // throws mid-encode leaves nothing behind — on Batch the task exits anyway,
+    // but a warm Lambda keeps its 512 MB /tmp between invocations.
+    const tempFiles = [outPath, ...audioStage.tempFiles];
 
     try {
-        for (let i = 0; i < frames; i++) {
-            const t = (i * 1000) / fps;
-            const idx = sceneAt(offsets, t);
-            await page.evaluate(seekScene, { index: idx, localMs: t - offsets[idx] });
+        const ff = spawn("ffmpeg", args, { stdio: ["pipe", "ignore", "pipe"] });
+        let ffErr = "";
+        ff.stderr.on("data", (d) => {
+            ffErr += String(d);
+        });
+        const done = new Promise<void>((resolve, reject) => {
+            ff.on("error", reject);
+            ff.on("close", (code) =>
+                code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${ffErr.trim()}`))
+            );
+        });
 
-            const frame = await page.screenshot({ type: "png", clip: rect });
-            if (i === 0) poster = frame;
+        let poster: Buffer | null = null;
+        let lastReported = -1;
 
-            // Respect the pipe's backpressure: if FFmpeg hasn't drained, wait
-            // rather than buffering the whole video in memory.
-            if (!ff.stdin.write(frame)) {
-                await new Promise<void>((resolve) => ff.stdin.once("drain", () => resolve()));
+        try {
+            for (let i = 0; i < frames; i++) {
+                const t = (i * 1000) / fps;
+                const idx = sceneAt(offsets, t);
+                await page.evaluate(seekScene, { index: idx, localMs: t - offsets[idx] });
+
+                const frame = await page.screenshot({ type: "png", clip: rect });
+                if (i === 0) poster = frame;
+
+                // Respect the pipe's backpressure: if FFmpeg hasn't drained, wait
+                // rather than buffering the whole video in memory.
+                if (!ff.stdin.write(frame)) {
+                    await new Promise<void>((resolve) => ff.stdin.once("drain", () => resolve()));
+                }
+
+                const pct = Math.floor(((i + 1) / frames) * 100);
+                if (pct - lastReported >= config.progressStepPct) {
+                    lastReported = pct;
+                    onProgress?.((i + 1) / frames);
+                }
             }
-
-            const pct = Math.floor(((i + 1) / frames) * 100);
-            if (pct - lastReported >= config.progressStepPct) {
-                lastReported = pct;
-                onProgress?.((i + 1) / frames);
-            }
+        } finally {
+            ff.stdin.end();
         }
-    } finally {
-        ff.stdin.end();
-    }
 
-    await done;
-    const mp4 = await readFile(outPath);
-    await unlink(outPath).catch(() => undefined);
-    return { mp4, poster: poster ?? Buffer.alloc(0) };
+        await done;
+        const mp4 = await readFile(outPath);
+        return { mp4, poster: poster ?? Buffer.alloc(0) };
+    } finally {
+        await Promise.all(tempFiles.map((p) => unlink(p).catch(() => undefined)));
+    }
 }
