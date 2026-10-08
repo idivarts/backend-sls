@@ -167,13 +167,21 @@ func updateDesignRevisionFields(brandID, contentID, revisionID string, fields ma
 // MarkDesignRenderQueued stamps a revision the moment a render is submitted, so
 // the UI can show "queued" before any worker has picked the job up. Clears the
 // previous error and progress — a retry must not inherit the last failure.
+//
+// renderStartedAt is SET here, not deleted. It means "when this attempt entered
+// the pipeline", and the worker overwrites it with the real start time on
+// pickup. It used to be cleared, which left a job that died before any worker
+// touched it — a bad command, an image that won't start, a message that
+// vanished — sitting in "queued" forever: ListStuckRenders only sees documents
+// that HAVE the field, because a Firestore range filter skips documents missing
+// it entirely. The UI showed "Queued…" with no way out.
 func MarkDesignRenderQueued(brandID, contentID, revisionID, jobID string) error {
 	return updateDesignRevisionFields(brandID, contentID, revisionID, map[string]interface{}{
 		"renderStatus":    DesignRenderQueued,
 		"renderJobId":     jobID,
 		"renderError":     firestore.Delete,
 		"renderProgress":  firestore.Delete,
-		"renderStartedAt": firestore.Delete,
+		"renderStartedAt": time.Now().UnixMilli(),
 	})
 }
 
@@ -266,18 +274,25 @@ type StuckRender struct {
 	StartedAt  int64
 }
 
-// ListStuckRenders finds revisions that have been "rendering" since before
-// `cutoffMs` — a worker that died, a task killed after its last retry, or a
-// message that vanished.
+// ListStuckRenders finds revisions sitting in `status` since before `cutoffMs`.
 //
-// Without this, such a render stays "rendering" forever: the app shows a
-// spinner nobody can cancel, and the publish gate blocks on a job that is never
-// coming back. The query is a collection-group scan over `designs`, so it needs
-// the composite index on (renderStatus, renderStartedAt) that ships in both
-// index files.
-func ListStuckRenders(ctx context.Context, cutoffMs int64, limit int) ([]StuckRender, error) {
+// Both unfinished statuses can strand a document, for different reasons:
+//
+//	"rendering" — a worker picked the job up and then vanished: killed after its
+//	              last Spot retry, OOM, Lambda timeout.
+//	"queued"    — the job never started at all: a container that exits before it
+//	              can report, an image that will not run, an SQS message that
+//	              never arrived. Nothing in the pipeline has written to the
+//	              document at this point, so only this sweep can close it.
+//
+// Without this, such a render stays unfinished forever: the app shows a spinner
+// nobody can cancel, and the publish gate blocks on a job that is never coming
+// back. The query is a collection-group scan over `designs`, so it needs the
+// composite index on (renderStatus, renderStartedAt) that ships in both index
+// files — one index serves both statuses, since only the equality value differs.
+func ListStuckRenders(ctx context.Context, status string, cutoffMs int64, limit int) ([]StuckRender, error) {
 	q := firestoredb.Client.CollectionGroup("designs").
-		Where("renderStatus", "==", DesignRenderRendering).
+		Where("renderStatus", "==", status).
 		Where("renderStartedAt", "<", cutoffMs)
 	if limit > 0 {
 		q = q.Limit(limit)
