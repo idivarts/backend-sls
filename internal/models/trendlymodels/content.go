@@ -14,11 +14,28 @@ import (
 // brands/{brandId}/contents/{contentId}. Only the fields the backend
 // publishing pipeline needs are modelled here.
 
+// Media-lane values for Content.Source — how the current media was produced.
+// Keep in sync with shared-libs firestore/trendly-pro/models/contents.ts.
+const (
+	// ContentSourceAIDesign is an HTML design authored in the Design Studio.
+	ContentSourceAIDesign = "ai"
+	// ContentSourceAIImage is photoreal image(s) from AI image generation.
+	ContentSourceAIImage = "ai-image"
+	// ContentSourceUpload is asset(s) the user picked themselves.
+	ContentSourceUpload = "upload"
+	// ContentSourceCanva is a design made in Canva via the deep-edit bridge.
+	ContentSourceCanva = "canva"
+)
+
 type ContentAttachment struct {
 	Type     string `json:"type" firestore:"type"`
 	ImageURL string `json:"imageUrl,omitempty" firestore:"imageUrl"`
 	PlayURL  string `json:"playUrl,omitempty" firestore:"playUrl"`
 	AppleURL string `json:"appleUrl,omitempty" firestore:"appleUrl"`
+	// ThumbURL is a small WebP copy of ImageURL written by the render worker,
+	// for the strips and calendars that draw a 1080px render at ~128px.
+	// Optional everywhere: uploads and older renders have none.
+	ThumbURL string `json:"thumbUrl,omitempty" firestore:"thumbUrl,omitempty"`
 }
 
 type ContentDestination struct {
@@ -115,9 +132,9 @@ type Content struct {
 	// Platform is the deprecated legacy single-platform field (capitalised
 	// string, e.g. "Instagram"). Superseded by Platforms; read for back-compat
 	// coercion of old docs only — never written by new code.
-	Platform         string                  `json:"platform,omitempty" firestore:"platform"`
-	ManagerID        string                  `json:"managerId,omitempty" firestore:"managerId"`
-	StrategyID       string                  `json:"strategyId,omitempty" firestore:"strategyId"`
+	Platform   string `json:"platform,omitempty" firestore:"platform"`
+	ManagerID  string `json:"managerId,omitempty" firestore:"managerId"`
+	StrategyID string `json:"strategyId,omitempty" firestore:"strategyId"`
 	// ContentPillars is AI-write-only: populated when content is authored by AI
 	// (push-to-calendar or the calendar chat's create_content tool). No UI may
 	// let a user add or edit this field.
@@ -131,11 +148,18 @@ type Content struct {
 	// MediaConversationID is the dedicated AI thread (ai_conversations doc,
 	// module="media") for this content's image generate/enhance iterations.
 	// Stamped on first generation, loaded directly on enhance (no index needed).
-	MediaConversationID  string                 `json:"mediaConversationId,omitempty" firestore:"mediaConversationId,omitempty"`
+	MediaConversationID string `json:"mediaConversationId,omitempty" firestore:"mediaConversationId,omitempty"`
 
-	// ── AI Studio (scene-graph editor) ──
-	// Source records how the current media was produced: "ai" (scene graph),
-	// "upload", "canva", or "" (legacy). Drives the MediaStage rendering path.
+	// ── AI Studio (HTML design editor) ──
+	// Source records how the current media was produced — the authoritative
+	// "media lane" of a content, driving which creation surface the app shows:
+	//   "ai"       → HTML design authored in the Design Studio (render via DesignRef)
+	//   "ai-image" → photoreal image(s) from AI image generation (see ImageGeneration)
+	//   "upload"   → asset(s) the user picked themselves
+	//   "canva"    → designed in Canva via the deep-edit bridge
+	//   ""         → legacy content written before this field was stamped; the app
+	//                falls back to deriving the lane from DesignRef/Attachments.
+	// Keep in sync with shared-libs firestore/trendly-pro/models/contents.ts.
 	Source string `json:"source,omitempty" firestore:"source,omitempty"`
 	// DesignRef points at the CURRENT HTML design revision + its captured render.
 	DesignRef *ContentDesignRef `json:"designRef,omitempty" firestore:"designRef,omitempty"`
@@ -145,19 +169,19 @@ type Content struct {
 	CanvaDesignID    string `json:"canvaDesignId,omitempty" firestore:"canvaDesignId,omitempty"`
 	ExportedAssetRef string `json:"exportedAssetRef,omitempty" firestore:"exportedAssetRef,omitempty"`
 
-	ScheduleMode         string                 `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
-	ScheduledAt          int64                  `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
-	ScheduleExecutionArn string                 `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
-	PublishedIds         map[string]string      `json:"publishedIds,omitempty" firestore:"publishedIds"`
-	PublishError         string                 `json:"publishError,omitempty" firestore:"publishError"`
+	ScheduleMode         string            `json:"scheduleMode,omitempty" firestore:"scheduleMode"`
+	ScheduledAt          int64             `json:"scheduledAt,omitempty" firestore:"scheduledAt"`
+	ScheduleExecutionArn string            `json:"scheduleExecutionArn,omitempty" firestore:"scheduleExecutionArn"`
+	PublishedIds         map[string]string `json:"publishedIds,omitempty" firestore:"publishedIds"`
+	PublishError         string            `json:"publishError,omitempty" firestore:"publishError"`
 	// PublishResults holds the per-destination outcome of the latest publish run
 	// (in-flight, published, or failed with a reason). Source of truth for the
 	// brand app's per-social publish status UI.
-	PublishResults       []ContentPublishResult `json:"publishResults,omitempty" firestore:"publishResults"`
-	PostedURL            string                 `json:"postedUrl,omitempty" firestore:"postedUrl"`
-	Metrics              map[string]interface{} `json:"metrics,omitempty" firestore:"metrics"`
-	CreatedAt            int64                  `json:"createdAt,omitempty" firestore:"createdAt"`
-	UpdatedAt            int64                  `json:"updatedAt,omitempty" firestore:"updatedAt"`
+	PublishResults []ContentPublishResult `json:"publishResults,omitempty" firestore:"publishResults"`
+	PostedURL      string                 `json:"postedUrl,omitempty" firestore:"postedUrl"`
+	Metrics        map[string]interface{} `json:"metrics,omitempty" firestore:"metrics"`
+	CreatedAt      int64                  `json:"createdAt,omitempty" firestore:"createdAt"`
+	UpdatedAt      int64                  `json:"updatedAt,omitempty" firestore:"updatedAt"`
 }
 
 func contentsCollection(brandID string) *firestore.CollectionRef {

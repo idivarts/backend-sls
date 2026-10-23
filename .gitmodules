@@ -1,0 +1,3 @@
+[submodule "shared-libs"]
+	path = shared-libs
+	url = git@github.com:idivarts/shared-libs.git
