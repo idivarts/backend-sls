@@ -16,7 +16,13 @@ import (
 
 // maxToolSteps caps the agentic loop so a misbehaving model can't spin forever
 // calling server tools without ever producing a user-facing turn.
-const maxToolSteps = 8
+//
+// 14, not 8, since design work became a render-and-look loop: authoring costs a
+// step, every look costs another, and a correction costs a third, so even two
+// rounds of "render, inspect, fix" plus a get_design_html and the closing reply
+// runs past 8. The real ceiling on a runaway turn is the WS Lambda's 900s
+// timeout; this only has to stop a model that loops with nothing to say.
+const maxToolSteps = 14
 
 // handleStopWS records a cancel request for the conversation's in-flight turn.
 // The turn runs synchronously in a different WS (Lambda) invocation, so we can't
@@ -148,7 +154,15 @@ func handleMessageWS(req WSRequest) {
 	// Image-bearing turns must run on a vision-capable model — route them through
 	// the multimodal task (its allowed models are all vision-capable).
 	chatTask := openrouter.TaskChat
-	if len(req.Images) > 0 {
+	switch {
+	case moduleHasStudio(conv.Module):
+		// The design surface authors HTML layouts and animation timings, which a
+		// fast chat model is measurably worse at than a reasoning one — and it
+		// has to be able to SEE its own render to correct them. TaskDesign is
+		// both: reasoning-grade and all vision-capable, so it also covers an
+		// image-bearing turn without falling back to the multimodal lane.
+		chatTask = openrouter.TaskDesign
+	case len(req.Images) > 0:
 		chatTask = openrouter.TaskMultimodal
 	}
 	model, locked := pickModel(ctx, conv.BrandID, chatTask, req.Model)
@@ -207,6 +221,11 @@ func handleMessageWS(req WSRequest) {
 	// Images produced by generate_image tool calls this turn — attached to the
 	// committed assistant message so the chat bubble renders them from Firestore.
 	var genImages []string
+	// Rendered design frames produced by render_design_preview this step. They
+	// are handed to the model as a following user turn, not stored on the
+	// message: they are the model's working view of its own output, not content
+	// the brand manager asked for.
+	var previewFrames []string
 	// completed is set by a terminal server tool (complete_onboarding /
 	// generate_strategy_doc); the matching WS signal is chosen by module below.
 	completed := false
@@ -224,9 +243,10 @@ func handleMessageWS(req WSRequest) {
 		var streamErr error
 
 		err := openrouter.ChatCompletionStream(streamCtx, openrouter.ChatRequest{
-			Model:    model,
-			Messages: msgs,
-			Tools:    tools,
+			Model:     model,
+			Messages:  msgs,
+			Tools:     tools,
+			Reasoning: reasoningFor(chatTask),
 		}, openrouter.StreamCallbacks{
 			OnDelta: func(delta string) {
 				stepText.WriteString(delta)
@@ -302,6 +322,10 @@ func handleMessageWS(req WSRequest) {
 					var urls []string
 					result, urls, derr = runChatImageTool(ctx, conv.BrandID, orgID, req.ConnectionID, conv.ID, req.Model, sc.Function.Arguments)
 					genImages = append(genImages, urls...)
+				} else if sc.Function.Name == toolRenderDesignPreview {
+					// The frames are collected here and appended as a user turn
+					// below, because a tool message carries text only.
+					result, previewFrames, derr = runRenderDesignPreview(ctx, conv.BrandID, conv.ContextID, sc.Function.Arguments)
 				} else {
 					result, complete, derr = dispatchServerTool(ctx, conv.BrandID, conv.UserID, conv.ContextID, sc.Function.Name, sc.Function.Arguments)
 				}
@@ -317,6 +341,36 @@ func handleMessageWS(req WSRequest) {
 					Name:       sc.Function.Name,
 					Content:    result,
 				})
+			}
+			// Rendered design frames can't travel on the tool message — the
+			// OpenAI-compatible tool role is text-only — so they follow as a user
+			// turn carrying image parts. Without this the model gets a tool
+			// result that says "here are the frames" and no frames, and
+			// cheerfully reports on a design it has not seen.
+			//
+			// This runs AFTER every tool result is appended, not beside the one
+			// that produced the frames: a provider requires one tool message per
+			// tool_call_id contiguously after the assistant message, and slipping
+			// a user turn into the middle of that block is a 400.
+			if len(previewFrames) > 0 {
+				msgs = append(msgs, openrouter.UserMessageWithImages(
+					"Rendered frames of the current design, in the order listed by "+
+						toolRenderDesignPreview+". Inspect them and fix anything wrong.",
+					previewFrames,
+				))
+				previewFrames = nil
+				// Looking is only worth anything on a model that can see. The
+				// design lane is all vision-capable, so this is normally a no-op
+				// — but it is NOT unconditional, because the multimodal lane is
+				// not always the better model. Swapping a Pro brand's Opus for
+				// the multimodal fallback would buy sight at the cost of the
+				// reasoning that made the design good. Only rescue a model that
+				// genuinely cannot see.
+				if !openrouter.SupportsVision(model) {
+					if visionModel, locked := pickModel(ctx, conv.BrandID, openrouter.TaskMultimodal, ""); !locked && visionModel != model {
+						model = visionModel
+					}
+				}
 			}
 		}
 

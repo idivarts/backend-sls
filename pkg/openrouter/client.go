@@ -173,11 +173,37 @@ type ChatRequest struct {
 	MaxTokens      int             `json:"max_tokens,omitempty"`
 	Plugins        []Plugin        `json:"plugins,omitempty"`
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+	// Reasoning asks the model to think before answering. OpenRouter normalizes
+	// this across providers (Anthropic extended thinking, OpenAI reasoning
+	// effort, Gemini thinking budget), and a model with no reasoning mode simply
+	// ignores it — so it is safe to set on any model, and omitted means the
+	// provider default.
+	Reasoning *Reasoning `json:"reasoning,omitempty"`
 	// Modalities requests non-text output. For image generation send
 	// ["image","text"] — the generated image comes back on the assistant
 	// message's Images field.
 	Modalities []string `json:"modalities,omitempty"`
 }
+
+// Reasoning controls how much the model thinks before it answers.
+//
+// Effort is "low" | "medium" | "high"; MaxTokens is the alternative, absolute
+// form. Send one or the other, not both — OpenRouter rejects a request carrying
+// both. Exclude hides the thinking from the response while still paying for it,
+// which is what we want everywhere: the reasoning is for the model's benefit,
+// not the brand manager's, and it must not stream into a chat bubble.
+type Reasoning struct {
+	Effort    string `json:"effort,omitempty"`
+	MaxTokens int    `json:"max_tokens,omitempty"`
+	Exclude   bool   `json:"exclude,omitempty"`
+}
+
+// Effort levels accepted by Reasoning.Effort.
+const (
+	EffortLow    = "low"
+	EffortMedium = "medium"
+	EffortHigh   = "high"
+)
 
 // ResponseFormat asks the model to constrain its output. Type is "json_object"
 // (free-form JSON) or "json_schema" (validated against JSONSchema). Support

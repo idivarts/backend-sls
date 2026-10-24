@@ -144,6 +144,11 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 			sb.WriteString("\n\nBrand kit CSS variables — use these custom properties in any design you create so colors and fonts match the brand:\n")
 			sb.WriteString(css)
 		}
+		// The craft standards are the floor, not the identity: the brand's own
+		// Design System block above outranks them wherever it says something
+		// specific. The block states that precedence itself rather than relying
+		// on ordering, since it is appended last.
+		sb.WriteString(designCraftInstructions)
 	}
 	return sb.String()
 }
@@ -314,8 +319,9 @@ func currentDesignBrief(brandID, contentID string) string {
 			"here — it is large — so when the user asks to read or change the visual/design "+
 			"(\"make the headline bigger\", \"use my logo\", \"change slide 2\"…), FIRST call "+
 			"get_design_html to fetch the complete current HTML, THEN call apply_design_edits "+
-			"with the FULL revised HTML — preserve the data-carousel/data-slide structure and "+
-			"every data-el id.",
+			"with a list of targeted `edits` ({oldText, newText}) quoted from it — not a "+
+			"re-typed document. Preserve the data-carousel/data-slide structure and every "+
+			"data-el id. Then call render_design_preview and look at what you changed.",
 		dr.RevisionID, dr.DocType, dr.SlideCount, dr.Width, dr.Height,
 	)
 }

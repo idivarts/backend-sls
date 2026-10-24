@@ -67,6 +67,9 @@ func main() {
 			"multimodal": map[string]any{"allowed": []string{"google/gemini-3.1-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
 			"reasoning":  map[string]any{"allowed": []string{"openai/gpt-5.5", "anthropic/claude-opus-4.8", "openai/gpt-5.4"}},
 			"image":      map[string]any{"allowed": []string{"google/gemini-3-pro-image", "google/gemini-3.1-flash-image"}},
+			// Every design model must be vision-capable — the design loop looks at
+			// its own render. That is why claude-sonnet-4.6 is not here.
+			"design": map[string]any{"allowed": []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3.1-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
 		},
 	}
 

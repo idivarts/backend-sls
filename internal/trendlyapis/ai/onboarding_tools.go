@@ -114,6 +114,12 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 	case toolApplyDesignEdits:
 		r, err := runApplyDesignEdits(ctx, brandID, contextID, arguments)
 		return r, false, err
+	case toolRenderDesignPreview:
+		// Handled inline in handleMessageWS, which needs the frames alongside
+		// the text result. Reaching here means a caller outside the chat loop
+		// asked for it; answer rather than falling through to "unknown tool".
+		r, _, err := runRenderDesignPreview(ctx, brandID, contextID, arguments)
+		return r, false, err
 	case toolGetDesignHTML:
 		r, err := runGetDesignHTML(ctx, brandID, contextID, arguments)
 		return r, false, err

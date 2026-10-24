@@ -16,7 +16,7 @@ import { readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Page } from "playwright";
-import { sceneAt, seekScene } from "../../../shared-libs/design/design-runtime";
+import { seekAt } from "../../../shared-libs/design/design-runtime";
 import { buildAudioStage } from "./audio";
 import { config } from "./config";
 import type { ContentAudio } from "./types";
@@ -30,8 +30,11 @@ export interface Rect {
 
 export interface VideoInput {
     page: Page;
-    /** Scene start offsets in ms and the total length, from measureDesign(). */
-    offsets: number[];
+    /**
+     * Total length in ms, from measureDesign(). Scene offsets are NOT passed:
+     * seekAt reads the timeline off the DOM itself, so there is one place that
+     * decides where a scene starts rather than two that can disagree.
+     */
     totalMs: number;
     /** Capture box of a single scene — every frame is clipped to this. */
     rect: Rect;
@@ -46,7 +49,7 @@ export interface VideoOutput {
 }
 
 export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
-    const { page, offsets, totalMs, rect, audio, onProgress } = input;
+    const { page, totalMs, rect, audio, onProgress } = input;
     const fps = config.fps;
     const frames = Math.max(1, Math.round((totalMs / 1000) * fps));
 
@@ -131,8 +134,11 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
         try {
             for (let i = 0; i < frames; i++) {
                 const t = (i * 1000) / fps;
-                const idx = sceneAt(offsets, t);
-                await page.evaluate(seekScene, { index: idx, localMs: t - offsets[idx] });
+                // seekAt, not sceneAt + seekScene: a scene boundary may now be an
+                // OVERLAP rather than a cut, and placing one scene at a time
+                // cannot express two of them composited. seekAt owns the whole
+                // timeline, so a frame inside a transition is as exact as any other.
+                await page.evaluate(seekAt, { ms: t });
 
                 const frame = await page.screenshot({ type: "png", clip: rect });
                 if (i === 0) poster = frame;

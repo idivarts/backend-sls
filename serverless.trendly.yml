@@ -129,6 +129,18 @@ provider:
           Action:
             - "iam:PassRole"
           Resource: arn:aws:iam::730335628944:role/service-role/MediaConvert_Default_Role
+        # The AI design loop invokes the preview renderer synchronously and waits
+        # on the frames. Scoped to that one function: nothing else in this
+        # service calls a Lambda directly.
+        #
+        # The ARN is spelled out rather than Fn::GetAtt'd on purpose. Every
+        # function in this service shares IamRoleLambdaExecution, so a GetAtt
+        # here would make the role depend on a function that depends on the role
+        # — a circular reference CloudFormation refuses outright.
+        - Effect: "Allow"
+          Action:
+            - "lambda:InvokeFunction"
+          Resource: "arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${sls:stage}-render_preview"
         - Effect: "Allow"
           Action:
             - "sqs:sendmessage"
@@ -561,6 +573,19 @@ functions:
       - http: ANY /connect/{proxy+}
   t_websocket:
     handler: functions/websocket/main.go
+    environment:
+      # The AI design loop renders the design it just authored and looks at the
+      # frames before telling the user it is ready — see pkg/designpreview. The
+      # whole loop runs inside this lambda, so this is the function that needs it.
+      #
+      # The name is spelled out rather than Ref'd on purpose: a Ref would put
+      # this function behind the preview function in the dependency graph, and
+      # the preview function is already behind the shared execution role that
+      # grants this one permission to invoke it.
+      #
+      # Unset ⇒ pkg/designpreview reports "not configured" and the model is told
+      # to carry on without looking, rather than the turn failing.
+      DESIGN_PREVIEW_FUNCTION: ${self:service}-${sls:stage}-render_preview
     package:
       include:
         - 'service-account.json'
@@ -657,6 +682,37 @@ functions:
           # failing — rather than one bad design poisoning a batch of ten.
           batchSize: 1
 
+  # ── Design preview (synchronous inspection renders) ───────────────────────
+  # The same worker image, invoked directly instead of through a queue, so the
+  # AI can LOOK at a design inside the chat turn that authored it. It answers
+  # with a few small JPEGs rather than writing anything to S3 or Firestore.
+  #
+  # Why its own function rather than a second trigger on render_image:
+  #   • an inspection must never queue behind a batch of publish renders, and
+  #     render_image's reservedConcurrency is exactly such a queue;
+  #   • a chat turn is blocked on this one, so it wants a short timeout and a
+  #     fast failure, not SQS redrive.
+  # It shares the image's Chromium startup cost profile, which is why it keeps
+  # the same memory: a cold 1 GB function would spend longer booting the browser
+  # than rendering the frames.
+  render_preview:
+    # Container function — see render_image above for why `runtime` is declared.
+    runtime: nodejs20.x
+    image:
+      uri: ${env:RENDER_IMAGE_URI, ''}
+      entryPoint: ["node", "dist/services/render-worker/src/lambda-bootstrap.js"]
+    memorySize: 4096
+    ephemeralStorageSize: 2048
+    # Short on purpose: a caller is waiting. A design that cannot produce eight
+    # small frames in 60s is one the model should be told about, not wait on.
+    timeout: 60
+    # Lower than the publish lane's: inspection is bursty per-turn, and a runaway
+    # loop should hit this before it hits the AI token wallet.
+    reservedConcurrency: 10
+    # Environment is replaced wholesale below, for the same 4 KB reason as
+    # render_image — see resources.extensions.
+    # No events: invoked directly (RequestResponse) by pkg/designpreview.
+
 package:
   patterns:
     - "!./**"
@@ -681,6 +737,21 @@ resources:
   # since the same image runs on Batch. AWS_REGION is injected by Lambda itself.
   extensions:
     RenderUnderscoreimageLambdaFunction:
+      Properties:
+        Environment:
+          Variables:
+            ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
+            ATTACHMENT_CF_DISTRIBUTION_URL: https://d1u20zdoqkyuuq.cloudfront.net
+            FIRESTORE_DATABASE_ID: ${env:FIRESTORE_DATABASE_ID, '(default)'}
+            FIREBASE_SERVICE_ACCOUNT_JSON: ${env:FIREBASE_SERVICE_ACCOUNT_JSON, ''}
+            RENDER_SCALE: ${env:RENDER_SCALE, '1'}
+
+    # The preview function runs the same image and reads the same config, so it
+    # needs the same replacement for the same 4 KB reason. It never uploads, but
+    # config.ts resolves the bucket/CDN lazily and the preview path never calls
+    # those getters — they are kept here so one image can serve both functions
+    # without a second config shape to reason about.
+    RenderUnderscorepreviewLambdaFunction:
       Properties:
         Environment:
           Variables:
