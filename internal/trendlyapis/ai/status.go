@@ -96,11 +96,12 @@ var curatedToolLabels = map[string]string{
 	"move_content":   "Rescheduling your content…",
 	"remove_content": "Removing content…",
 	// Studio (design / media)
-	"generate_design":    "Designing your visual…",
-	"apply_design_edits": "Editing your design…",
-	"generate_image":     "Generating an image…",
-	"generate_music":     "Composing music…",
-	"generate_voiceover": "Recording the voiceover…",
+	"generate_design":       "Designing your visual…",
+	"apply_design_edits":    "Editing your design…",
+	"render_design_preview": "Reviewing the design…",
+	"generate_image":        "Generating an image…",
+	"generate_music":        "Composing music…",
+	"generate_voiceover":    "Recording the voiceover…",
 }
 
 // humanizeToolName turns a snake_case tool name into a friendly progress phrase

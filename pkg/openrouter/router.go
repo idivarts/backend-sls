@@ -16,10 +16,16 @@ const (
 	TaskMultimodal TaskType = "multimodal"
 	TaskReasoning  TaskType = "reasoning"
 	TaskImage      TaskType = "image"
+	// TaskDesign authors and inspects HTML designs. It is split out from
+	// TaskChat because laying out a frame and timing a scene are spatial
+	// reasoning, not conversation: on a fast chat model the text is fine and the
+	// design overflows its slide. Every model allowed for it must be
+	// vision-capable, since the design loop renders the result and looks at it.
+	TaskDesign TaskType = "design"
 )
 
 // AllTaskTypes is the canonical list of tasks, used when seeding/validating config.
 var AllTaskTypes = []TaskType{
 	TaskChat, TaskQuickEdit, TaskCaption, TaskHashtag, TaskStrategy,
-	TaskScript, TaskMultimodal, TaskReasoning, TaskImage,
+	TaskScript, TaskMultimodal, TaskReasoning, TaskImage, TaskDesign,
 }

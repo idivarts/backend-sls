@@ -32,8 +32,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
-	github.com/getsentry/sentry-go v0.42.0 // indirect
-	github.com/getsentry/sentry-go/gin v0.42.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
@@ -87,7 +85,6 @@ require (
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
@@ -110,6 +107,8 @@ require (
 	github.com/GetStream/stream-chat-go/v5 v5.8.1
 	github.com/aws/aws-sdk-go v1.52.1
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
+	github.com/getsentry/sentry-go v0.42.0
+	github.com/getsentry/sentry-go/gin v0.42.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-resty/resty/v2 v2.12.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
@@ -118,6 +117,7 @@ require (
 	github.com/lib/pq v1.11.1
 	github.com/openai/openai-go/v3 v3.8.1
 	github.com/razorpay/razorpay-go v1.4.0
+	golang.org/x/net v0.39.0
 	google.golang.org/api v0.232.0
 	google.golang.org/grpc v1.72.0
 	gorm.io/driver/postgres v1.6.0

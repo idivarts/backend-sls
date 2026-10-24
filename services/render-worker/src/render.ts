@@ -112,7 +112,6 @@ async function runJobInner(job: RenderJob): Promise<void> {
                 const audio = await getContentAudio(brandId, contentId);
                 const { mp4, poster } = await renderVideo({
                     page: loaded.page,
-                    offsets: loaded.measurement.offsets,
                     totalMs: loaded.measurement.total,
                     rect: loaded.rects[0],
                     audio,

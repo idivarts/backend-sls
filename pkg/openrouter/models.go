@@ -91,6 +91,15 @@ func (r Registry) modelByID(id string) (ModelInfo, bool) {
 	return ModelInfo{}, false
 }
 
+// SupportsVision reports whether a model can read images.
+//
+// An id the catalog does not describe answers false: a model we know nothing
+// about is not one to hand pictures to.
+func SupportsVision(id string) bool {
+	m, ok := currentRegistry().modelByID(id)
+	return ok && m.Vision
+}
+
 // Unlocked reports whether a model is available to a plan.
 func Unlocked(m ModelInfo, plan Plan) bool {
 	return planRank[plan] >= planRank[m.MinPlan]
@@ -124,6 +133,13 @@ func defaultRegistry() Registry {
 			TaskMultimodal: {Allowed: []string{"google/gemini-3.1-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
 			TaskReasoning:  {Allowed: []string{"openai/gpt-5.5", "anthropic/claude-opus-4.8", "openai/gpt-5.4"}},
 			TaskImage:      {Allowed: []string{"google/gemini-3-pro-image", "google/gemini-3.1-flash-image"}},
+			// Reasoning-grade first, and EVERY entry is vision-capable: the design
+			// loop renders what it authored and looks at it, which a text-only
+			// model cannot do. claude-sonnet-4.6 is absent for exactly that reason
+			// (vision: false in this catalog), so a free brand falls through to
+			// gemini-3.5-flash — the same model it had before, but one that can at
+			// least see its own render.
+			TaskDesign: {Allowed: []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3.1-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
 		},
 	}
 }

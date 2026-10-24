@@ -15,6 +15,7 @@ import type { AddressInfo } from "node:net";
 import type { Browser, Page } from "playwright";
 import {
     measureDesign,
+    type DesignMeasurement,
     prepareForCapture,
     slideRects,
     waitForPaint,
@@ -28,15 +29,11 @@ export interface LoadedDesign {
     rects: { x: number; y: number; width: number; height: number }[];
 }
 
-type Measurement = {
-    count: number;
-    offsets: number[];
-    total: number;
-    width: number;
-    height: number;
-};
-
-async function measure(page: Page): Promise<Measurement> {
+// The measurement type is NOT restated here. It used to be a hand-written copy
+// of DesignMeasurement, which silently went stale the moment the runtime grew
+// per-scene durations and transitions — a local type that merely LOOKS like the
+// real one hides exactly the fields a caller needs.
+async function measure(page: Page): Promise<DesignMeasurement> {
     return page.evaluate(measureDesign);
 }
 
@@ -57,13 +54,17 @@ export async function loadDesign(
     browser: Browser,
     html: string,
     width: number,
-    height: number
+    height: number,
+    // Overrides config.scale. The preview path renders small on purpose, so
+    // Chromium paints once at the size we want instead of painting full size
+    // and throwing most of the pixels away.
+    scale?: number
 ): Promise<LoadedDesign> {
     const { url, server } = await serve(html);
 
     const context = await browser.newContext({
         viewport: { width, height },
-        deviceScaleFactor: config.scale,
+        deviceScaleFactor: scale ?? config.scale,
         // The design decides its own colours; a forced scheme would repaint a
         // design the user never saw that way.
         colorScheme: "light",
