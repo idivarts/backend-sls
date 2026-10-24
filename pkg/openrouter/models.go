@@ -118,28 +118,28 @@ func defaultRegistry() Registry {
 			{ID: "anthropic/claude-sonnet-4.6", DisplayName: "Claude Sonnet 4.6", Provider: "Anthropic", MinPlan: PlanFree},
 			{ID: "openai/gpt-5.4", DisplayName: "GPT-5.4", Provider: "OpenAI", MinPlan: PlanPro, Vision: true},
 			{ID: "anthropic/claude-opus-4.8", DisplayName: "Claude Opus 4.8", Provider: "Anthropic", MinPlan: PlanPro, Vision: true},
-			{ID: "google/gemini-3.1-pro-preview", DisplayName: "Gemini 3 Pro", Provider: "Google", MinPlan: PlanTeam, Vision: true},
+			{ID: "google/gemini-3-pro-preview", DisplayName: "Gemini 3 Pro", Provider: "Google", MinPlan: PlanTeam, Vision: true},
 			{ID: "openai/gpt-5.5", DisplayName: "GPT-5.5", Provider: "OpenAI", MinPlan: PlanTeam, Vision: true},
-			{ID: "google/gemini-3.1-flash-image", DisplayName: "Gemini 3.1 Flash Image", Provider: "Google", MinPlan: PlanPro, Vision: true, ImageGen: true},
-			{ID: "google/gemini-3-pro-image", DisplayName: "Gemini 3 Pro Image", Provider: "Google", MinPlan: PlanTeam, Vision: true, ImageGen: true},
+			{ID: "google/gemini-3.1-flash-image-preview", DisplayName: "Gemini 3.1 Flash Image", Provider: "Google", MinPlan: PlanPro, Vision: true, ImageGen: true},
+			{ID: "google/gemini-3-pro-image-preview", DisplayName: "Gemini 3 Pro Image", Provider: "Google", MinPlan: PlanTeam, Vision: true, ImageGen: true},
 		},
 		Tasks: map[TaskType]TaskConfig{
-			TaskChat:       {Allowed: []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4", "anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3.1-pro-preview"}},
+			TaskChat:       {Allowed: []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4", "anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3-pro-preview"}},
 			TaskQuickEdit:  {Allowed: []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6"}},
 			TaskCaption:    {Allowed: []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4"}},
 			TaskHashtag:    {Allowed: []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6"}},
 			TaskStrategy:   {Allowed: []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "anthropic/claude-sonnet-4.6", "google/gemini-3.5-flash"}},
 			TaskScript:     {Allowed: []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "openai/gpt-5.4"}},
-			TaskMultimodal: {Allowed: []string{"google/gemini-3.1-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
+			TaskMultimodal: {Allowed: []string{"google/gemini-3-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
 			TaskReasoning:  {Allowed: []string{"openai/gpt-5.5", "anthropic/claude-opus-4.8", "openai/gpt-5.4"}},
-			TaskImage:      {Allowed: []string{"google/gemini-3-pro-image", "google/gemini-3.1-flash-image"}},
+			TaskImage:      {Allowed: []string{"google/gemini-3-pro-image-preview", "google/gemini-3.1-flash-image-preview"}},
 			// Reasoning-grade first, and EVERY entry is vision-capable: the design
 			// loop renders what it authored and looks at it, which a text-only
 			// model cannot do. claude-sonnet-4.6 is absent for exactly that reason
 			// (vision: false in this catalog), so a free brand falls through to
 			// gemini-3.5-flash — the same model it had before, but one that can at
 			// least see its own render.
-			TaskDesign: {Allowed: []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3.1-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
+			TaskDesign: {Allowed: []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
 		},
 	}
 }
@@ -307,25 +307,65 @@ func AllowedModels(task TaskType) []string {
 //   - Otherwise the first allowed model the plan unlocks (best -> fallback) wins.
 func Resolve(task TaskType, plan Plan, requested string) (model string, locked bool) {
 	reg := currentRegistry()
+
 	tc, ok := reg.Tasks[task]
-	if !ok || len(tc.Allowed) == 0 {
+	if ok && len(tc.Allowed) > 0 {
+		if id, found := pickAllowed(reg, tc.Allowed, plan, requested); found {
+			return id, false
+		}
+		// The task IS configured and this plan unlocks nothing in it. That is a
+		// real entitlement answer, and the only case that should ever reach the
+		// user as "upgrade to continue".
 		return "", true
 	}
 
+	// The live ai_config predates this task — it was deployed before anyone
+	// reseeded ai_config/tasks. Locking here was a bug with two faces: the
+	// feature was dead on EVERY plan, including the highest, and the user was
+	// told to go and buy a plan that could not possibly fix it. Deploy order is
+	// not a billing problem, so fall back to the built-in entry for the task.
+	d := defaultRegistry()
+	dc, dok := d.Tasks[task]
+	if !dok || len(dc.Allowed) == 0 {
+		// Nothing in Firestore and nothing built in: the task genuinely has no
+		// configuration anywhere, so there is nothing to run it on.
+		return "", true
+	}
+	log.Printf("[openrouter] ai_config/tasks has no %q entry — falling back to the built-in "+
+		"default. Reseed or add the task to keep Firestore authoritative.", task)
+
+	// Prefer the LIVE catalog when resolving the fallback: the built-in default
+	// drifts from what is actually deployed, and returning a model id the live
+	// catalog has never heard of just moves the failure to OpenRouter.
+	if id, found := pickAllowed(reg, dc.Allowed, plan, requested); found {
+		return id, false
+	}
+	return pickAllowedOrLocked(d, dc.Allowed, plan, requested)
+}
+
+// pickAllowed returns the first model in `allowed` that `reg` describes and
+// `plan` unlocks, preferring `requested` when it is itself allowed and unlocked.
+func pickAllowed(reg Registry, allowed []string, plan Plan, requested string) (string, bool) {
 	if requested != "" {
-		for _, id := range tc.Allowed {
+		for _, id := range allowed {
 			if id == requested {
 				if m, ok := reg.modelByID(id); ok && Unlocked(m, plan) {
-					return id, false
+					return id, true
 				}
 			}
 		}
 	}
-
-	for _, id := range tc.Allowed {
+	for _, id := range allowed {
 		if m, ok := reg.modelByID(id); ok && Unlocked(m, plan) {
-			return id, false
+			return id, true
 		}
+	}
+	return "", false
+}
+
+func pickAllowedOrLocked(reg Registry, allowed []string, plan Plan, requested string) (string, bool) {
+	if id, found := pickAllowed(reg, allowed, plan, requested); found {
+		return id, false
 	}
 	return "", true
 }
