@@ -247,6 +247,7 @@ func handleMessageWS(req WSRequest) {
 			Messages:  msgs,
 			Tools:     tools,
 			Reasoning: reasoningFor(chatTask),
+			MaxTokens: maxTokensFor(chatTask),
 		}, openrouter.StreamCallbacks{
 			OnDelta: func(delta string) {
 				stepText.WriteString(delta)
@@ -273,8 +274,14 @@ func handleMessageWS(req WSRequest) {
 			break
 		}
 		if streamErr != nil {
-			log.Printf("ai chat stream: %v", streamErr)
-			wsErrorTo(req.ConnectionID, streamErr.Error())
+			// The full error (status + provider body) goes to CloudWatch; the
+			// user gets a sentence. Sending the raw body would be worse than the
+			// silence it replaces — a 402's is several hundred characters of
+			// nested JSON.
+			log.Printf("ai chat stream: model=%s task=%s: %v", model, chatTask, streamErr)
+			if msg := userFacingStreamError(streamErr); msg != "" {
+				wsErrorTo(req.ConnectionID, msg)
+			}
 			return
 		}
 
