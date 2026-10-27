@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -173,11 +174,63 @@ type ChatRequest struct {
 	MaxTokens      int             `json:"max_tokens,omitempty"`
 	Plugins        []Plugin        `json:"plugins,omitempty"`
 	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+	// Reasoning asks the model to think before answering. OpenRouter normalizes
+	// this across providers (Anthropic extended thinking, OpenAI reasoning
+	// effort, Gemini thinking budget), and a model with no reasoning mode simply
+	// ignores it — so it is safe to set on any model, and omitted means the
+	// provider default.
+	Reasoning *Reasoning `json:"reasoning,omitempty"`
 	// Modalities requests non-text output. For image generation send
 	// ["image","text"] — the generated image comes back on the assistant
 	// message's Images field.
 	Modalities []string `json:"modalities,omitempty"`
 }
+
+// APIError is a non-2xx answer from OpenRouter, with the status kept separate
+// from the body.
+//
+// It used to be a flat fmt.Errorf, which meant the only way to tell "out of
+// credits" from "model is down" was to match on the text of a message — and
+// the caller did not, so every failure reached the user as the same silence.
+// A status code is the thing worth branching on; the body is for the log.
+type APIError struct {
+	Status int
+	Body   string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("openrouter status %d: %s", e.Status, e.Body)
+}
+
+// StatusOf returns the HTTP status behind err, or 0 if it was not an OpenRouter
+// API error.
+func StatusOf(err error) int {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.Status
+	}
+	return 0
+}
+
+// Reasoning controls how much the model thinks before it answers.
+//
+// Effort is "low" | "medium" | "high"; MaxTokens is the alternative, absolute
+// form. Send one or the other, not both — OpenRouter rejects a request carrying
+// both. Exclude hides the thinking from the response while still paying for it,
+// which is what we want everywhere: the reasoning is for the model's benefit,
+// not the brand manager's, and it must not stream into a chat bubble.
+type Reasoning struct {
+	Effort    string `json:"effort,omitempty"`
+	MaxTokens int    `json:"max_tokens,omitempty"`
+	Exclude   bool   `json:"exclude,omitempty"`
+}
+
+// Effort levels accepted by Reasoning.Effort.
+const (
+	EffortLow    = "low"
+	EffortMedium = "medium"
+	EffortHigh   = "high"
+)
 
 // ResponseFormat asks the model to constrain its output. Type is "json_object"
 // (free-form JSON) or "json_schema" (validated against JSONSchema). Support
@@ -435,7 +488,7 @@ func doRequest(ctx context.Context, path string, payload interface{}) (io.ReadCl
 		defer resp.Body.Close()
 		errBody, _ := io.ReadAll(resp.Body)
 		cancel()
-		return nil, fmt.Errorf("openrouter status %d: %s", resp.StatusCode, string(errBody))
+		return nil, &APIError{Status: resp.StatusCode, Body: string(errBody)}
 	}
 
 	return &cancelCloser{ReadCloser: resp.Body, cancel: cancel}, nil
