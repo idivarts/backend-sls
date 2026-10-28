@@ -39,7 +39,11 @@ func verifyBrandAccess(brandID, managerID string) bool {
 	return member.Get(brandID, managerID) == nil
 }
 
-func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID string) string {
+// `platforms` is optional: callers that already know which surfaces a piece
+// targets (script generation, which works from the live editor and may be
+// looking at unsaved edits) pass them so the right platform playbooks load.
+// Callers that do not are resolved against the saved content doc instead.
+func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID string, platforms ...trendlymodels.Platform) string {
 	// The brand's Design System is its single declared design/brand standard. It
 	// is loaded once here and woven into every conversation: its voice supersedes
 	// the legacy AIVoice string, its identity/rules/imagery ride the prose block
@@ -113,6 +117,12 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 	// before the per-module instruction blocks that return early below.
 	sb.WriteString(memoryInstructions)
 
+	// What gets distributed: the craft contract, the pattern menu, and the
+	// playbooks for this piece's platforms. Computed once here because the
+	// module branches below return early, and appended inside each branch that
+	// authors content so onboarding never pays for it.
+	virality := viralityBlocks(module, brandID, contextID, platforms)
+
 	if module == moduleOnboarding {
 		sb.WriteString(onboardingInstructions)
 		return sb.String()
@@ -121,6 +131,7 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 	if module == moduleStrategy {
 		sb.WriteString(strategyInstructions)
 		sb.WriteString(controlsInstructions)
+		sb.WriteString(virality)
 		return sb.String()
 	}
 
@@ -128,11 +139,13 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 		sb.WriteString(calendarInstructions)
 		sb.WriteString(controlsInstructions)
 		sb.WriteString(imageGenInstructions)
+		sb.WriteString(virality)
 		return sb.String()
 	}
 
 	sb.WriteString("\nAnswer concisely. Match the brand voice. If a question is ambiguous, ask one clarifying question.")
 	sb.WriteString(controlsInstructions)
+	sb.WriteString(virality)
 	if moduleHasImageGen(module) {
 		sb.WriteString(imageGenInstructions)
 	}

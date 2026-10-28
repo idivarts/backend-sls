@@ -76,7 +76,7 @@ func HTTPCaption(c *gin.Context) {
 
 	liveBrief := briefFromFields(req.Title, req.Platform, req.Format, req.Description, req.Caption, req.Hashtags, req.Script)
 	liveBrief = enrichLiveBrief(liveBrief, req.Variations, req.TargetPlatform, req.TargetField)
-	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief)
+	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief, targetPlatformList(req.TargetPlatform, req.Platform)...)
 	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskCaption, req.Model)
 	if locked {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskCaption})
@@ -178,7 +178,7 @@ func HTTPHashtags(c *gin.Context) {
 
 	liveBrief := briefFromFields(req.Title, req.Platform, req.Format, req.Description, req.Caption, req.Hashtags, req.Script)
 	liveBrief = enrichLiveBrief(liveBrief, req.Variations, req.TargetPlatform, req.TargetField)
-	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief)
+	sys := systemPromptWithLiveContent(brand, req.BrandID, req.ContextID, liveBrief, targetPlatformList(req.TargetPlatform, req.Platform)...)
 	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskHashtag, req.Model)
 	if locked {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskHashtag})
@@ -254,12 +254,23 @@ type scriptPayload struct {
 // the live (possibly unsaved) editor brief over the last-saved Firestore doc.
 // When a live brief is supplied we suppress the persisted-doc load (contextID)
 // so the AI doesn't get two conflicting versions of the same piece.
-func systemPromptWithLiveContent(brand *trendlymodels.Brand, brandID, contextID, liveBrief string) string {
+// Platforms are passed through rather than resolved: suppressing contextID
+// above also suppresses the saved-doc lookup the platform playbooks would
+// otherwise use, so the live path has to supply them itself.
+func systemPromptWithLiveContent(brand *trendlymodels.Brand, brandID, contextID, liveBrief string, platforms ...trendlymodels.Platform) string {
 	ctxID := contextID
 	if liveBrief != "" {
 		ctxID = ""
+		// Blanking ctxID also blanks the saved-doc platform lookup inside
+		// buildSystemPrompt. Normally the caller has supplied platforms and
+		// that is fine; when it has not — an older client that omits the
+		// field, or a request built before the editor had one — fall back to
+		// the saved doc rather than silently dropping the platform rules.
+		if len(platforms) == 0 {
+			platforms = platformsForContext(moduleContent, brandID, contextID)
+		}
 	}
-	sys := buildSystemPrompt(brand, "content", brandID, ctxID)
+	sys := buildSystemPrompt(brand, "content", brandID, ctxID, platforms...)
 	if liveBrief != "" {
 		sys += "\nThe content the user is working on right now (may include unsaved edits — treat this as the current state of the piece):\n" + liveBrief + "\n"
 	}
@@ -285,7 +296,7 @@ func handleScriptGenWS(req WSRequest) {
 		return
 	}
 	liveBrief := briefFromFields(p.Title, p.Platform, p.Format, p.Description, p.Caption, p.Hashtags, p.Script)
-	sys := systemPromptWithLiveContent(brand, p.BrandID, p.ContextID, liveBrief)
+	sys := systemPromptWithLiveContent(brand, p.BrandID, p.ContextID, liveBrief, platformList(p.Platform, nil)...)
 	model, locked := pickModel(context.Background(), p.BrandID, openrouter.TaskScript, req.Model)
 	if locked {
 		wsSend(req.ConnectionID, map[string]any{"type": "upgrade_required", "task": string(openrouter.TaskScript)})
