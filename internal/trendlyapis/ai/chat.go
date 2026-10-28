@@ -97,7 +97,8 @@ func handleMessageWS(req WSRequest) {
 		var live liveContentPayload
 		if err := decodePayload(req.Payload, &live); err == nil {
 			if brief := briefFromLiveContent(live); brief != "" {
-				systemPrompt = systemPromptWithLiveContent(brand, conv.BrandID, conv.ContextID, brief)
+				systemPrompt = systemPromptWithLiveContent(brand, conv.BrandID, conv.ContextID, brief,
+					platformList(live.Platform, live.Platforms)...)
 			}
 		}
 	}
