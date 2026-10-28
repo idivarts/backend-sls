@@ -80,7 +80,7 @@ func Signup(c *gin.Context) {
 		// The account exists but the mail did not go out, which is the one
 		// failure mode the app cannot see: it only learns the request failed,
 		// not that a user is now stranded with an unverifiable account.
-		analytics.CaptureAsync(userRecord.UID, "signup_verification_email_failed", map[string]interface{}{
+		analytics.Capture(c.Request.Context(), userRecord.UID, "signup_verification_email_failed", map[string]interface{}{
 			"reason": err.Error(),
 		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error sending verification email"})
@@ -90,7 +90,19 @@ func Signup(c *gin.Context) {
 	// E3 of the email funnel. Keyed on the Firebase uid so it stitches to the
 	// app's own identify() for the same user — the email itself is deliberately
 	// not sent as a property.
-	analytics.CaptureAsync(userRecord.UID, "signup_verification_email_sent", nil)
+	//
+	// Synchronous, not CaptureAsync. The async version lost this event outright
+	// on dev: the client fired signup_email_submitted and signup_email_registered
+	// and the mail went out, but nothing arrived from here. A goroutine is not
+	// guaranteed to run once the handler returns — Lambda freezes the execution
+	// environment on response, which kills the in-flight POST. The package doc
+	// warned about this; the signup path turns out to be exactly the case it
+	// warned about.
+	//
+	// The cost is one short POST before responding, bounded by the client's 5s
+	// timeout and swallowed on failure, which is the right trade for the event
+	// that opens the funnel.
+	analytics.Capture(c.Request.Context(), userRecord.UID, "signup_verification_email_sent", nil)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Account created successfully. Please check your email to verify your account."})
 }

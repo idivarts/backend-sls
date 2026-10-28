@@ -151,11 +151,15 @@ func Capture(ctx context.Context, distinctID, event string, props map[string]int
 // moment the handler returns, which would abort the in-flight POST. It gets its
 // own short-lived one instead.
 //
-// Note for the Lambda runtime: a goroutine is not guaranteed to finish once the
-// handler returns and the execution environment is frozen. In practice the POST
-// is issued immediately and completes within the same invocation, and losing an
-// occasional event is an acceptable trade for never delaying a signup. Where an
-// event must not be lost, call Capture directly.
+// ⚠️ On Lambda this loses events, and not occasionally. A goroutine is not
+// guaranteed to run once the handler returns: Lambda freezes the execution
+// environment on response, which kills the in-flight POST. Verified on dev —
+// the signup path emitted here and nothing arrived, while the synchronous
+// emit in EmailRedirection landed every time.
+//
+// So prefer Capture in a request handler. This is kept for a caller that is
+// genuinely willing to lose the event, such as one running outside a request
+// (a queue consumer or a cron) where the process stays alive on its own.
 func CaptureAsync(distinctID, event string, props map[string]interface{}) {
 	if !Configured() || distinctID == "" {
 		return
