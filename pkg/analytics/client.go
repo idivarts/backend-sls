@@ -34,6 +34,15 @@
 //
 // An unconfigured stage makes every call a silent no-op. That is deliberate:
 // analytics must never be able to fail a signup.
+//
+// ⚠️ These two variables are set PER FUNCTION in serverless.trendly.yml, not at
+// provider level, so a new lambda that calls this package reports nothing until
+// it declares them itself. That is not an oversight — a provider-level variable
+// fails the whole stack deploy, because the two container functions
+// (render_image, render_preview) replace their entire Environment block to stay
+// under Lambda's 4 KB ceiling, and Serverless still mints a new
+// AWS::Lambda::Version for them off the pre-override config. The yml comment on
+// unauth_apis has the full error. Copy those two lines onto the new function.
 package analytics
 
 import (
