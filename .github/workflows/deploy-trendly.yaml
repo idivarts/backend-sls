@@ -144,6 +144,23 @@ jobs:
           # One Sentry project for both stages — dev and prod are separated by the
           # `environment` tag (pkg/mysentry reads STAGE), not by separate DSNs.
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          # PostHog project key for the backend-emitted funnel events
+          # (pkg/analytics). Reuses the SAME org-level variables the apps are
+          # built with, so the backend reports into the same project and the two
+          # halves of the email funnel stitch together by Firebase uid.
+          #
+          # vars, not secrets: a PostHog project key is a client-side key that
+          # ships inside the mobile bundle, so it is not a secret and is stored
+          # as an org variable (see trendly-brands' deploy-action.yaml, which
+          # reads these exact names).
+          #
+          # ⚠️ These are SELECTED-scope org variables. backend-sls has to be on
+          # their repository list or they resolve to an empty string here,
+          # POSTHOG_API_KEY deploys empty, and pkg/analytics no-ops in silence.
+          POSTHOG_API_KEY: ${{ env.STAGE == 'prod' && vars.POSTHOG_KEY_PROD || vars.POSTHOG_KEY_DEV }}
+          # Unset org-wide today, so this is empty and pkg/analytics falls back
+          # to https://us.i.posthog.com — the same default the apps use.
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
           JWT_ENCODE_KEY: ${{ secrets.JWT_ENCODE_KEY }}
           FB_CLIENT_ID: ${{ vars.FB_CLIENT_ID }}
           FB_CLIENT_SECRET: ${{ secrets.FB_CLIENT_SECRET }}

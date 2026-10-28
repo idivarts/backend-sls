@@ -14,6 +14,15 @@ provider:
     # Error reporting (pkg/mysentry). Empty ⇒ every capture is a silent no-op,
     # so an unconfigured stage deploys and runs exactly as before.
     SENTRY_DSN: ${env:SENTRY_DSN, ''}
+    # Product analytics (pkg/analytics). Same project key the apps use, so the
+    # two email-funnel steps only the backend can see stitch onto the same
+    # person by Firebase uid. Empty ⇒ every capture is a silent no-op.
+    #
+    # Declared at PROVIDER level, not per function: a per-function env var that
+    # is forgotten makes the emit no-op in total silence, which is exactly how
+    # SOCIAL_SYNC_QUEUE_URL was once lost. Every lambda gets it.
+    POSTHOG_API_KEY: ${env:POSTHOG_API_KEY, ''}
+    POSTHOG_HOST: ${env:POSTHOG_HOST, ''}
     VIDEO_S3_BUCKET_NAME: ${self:service}-video-uploads
     IMAGE_S3_BUCKET_NAME: ${self:service}-image-uploads
     ATTACHMENT_S3_BUCKET_NAME: ${self:service}-attachment-uploads
