@@ -235,6 +235,24 @@ func CreateContent(ctx context.Context, brandID string, fields map[string]interf
 	return ref.ID, nil
 }
 
+// UpsertContentAt writes a content document at a caller-chosen id, creating it
+// if absent and merging into it if present.
+//
+// CreateContent generates an id, which is right for anything a user makes. A
+// fixture needs the opposite: a stable id it can look up and rewrite across
+// runs, so repeated seeding does not pile up near-identical documents. Merge
+// semantics mean re-seeding refreshes the fields it names and leaves anything
+// a test wrote afterwards alone.
+func UpsertContentAt(ctx context.Context, brandID, contentID string, fields map[string]interface{}) error {
+	now := time.Now().UnixMilli()
+	if _, ok := fields["createdAt"]; !ok {
+		fields["createdAt"] = now
+	}
+	fields["updatedAt"] = now
+	_, err := contentsCollection(brandID).Doc(contentID).Set(ctx, fields, firestore.MergeAll)
+	return err
+}
+
 // UpdateContent applies a partial update to a content document, always bumping
 // updatedAt. Callers build the []firestore.Update; the Firestore call lives here.
 func UpdateContent(ctx context.Context, brandID, contentID string, updates []firestore.Update) error {
