@@ -9,6 +9,7 @@ import (
 
 	"firebase.google.com/go/v4/auth"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/pkg/analytics"
 	"github.com/idivarts/backend-sls/pkg/firebase/fauth"
 	"github.com/idivarts/backend-sls/pkg/myemail"
 
@@ -32,7 +33,12 @@ type CheckEmailRequest struct {
 }
 
 // Signup creates a new Firebase Auth account with email and password,
-// then sends a custom verification email via SendGrid.
+// then sends a custom verification email (delivery is Amazon SES v2 — see
+// pkg/myemail; the comment here used to say SendGrid).
+//
+// Emits E3 of the email signup funnel. E1/E2 are reported by the app, which
+// cannot see this step: a 2xx below means "account created AND mail
+// dispatched", so the app has no way to report the send on its own.
 func Signup(c *gin.Context) {
 	var req SignupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -71,9 +77,20 @@ func Signup(c *gin.Context) {
 	}
 	err = myemail.SendCustomHTMLEmail(req.Email, templates.EmailVerification, templates.SubjectEmailVerification, data)
 	if err != nil {
+		// The account exists but the mail did not go out, which is the one
+		// failure mode the app cannot see: it only learns the request failed,
+		// not that a user is now stranded with an unverifiable account.
+		analytics.CaptureAsync(userRecord.UID, "signup_verification_email_failed", map[string]interface{}{
+			"reason": err.Error(),
+		})
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error sending verification email"})
 		return
 	}
+
+	// E3 of the email funnel. Keyed on the Firebase uid so it stitches to the
+	// app's own identify() for the same user — the email itself is deliberately
+	// not sent as a property.
+	analytics.CaptureAsync(userRecord.UID, "signup_verification_email_sent", nil)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Account created successfully. Please check your email to verify your account."})
 }
@@ -101,6 +118,16 @@ func EmailRedirection(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "message": "Error verifying account"})
 		return
 	}
+
+	// E4 of the email funnel, and the step only the backend can see: the link
+	// is consumed HERE, before any redirect, so a client-side version of this
+	// event would miss everyone who opens the mail in a webview or on a device
+	// where the app intercepts the link.
+	//
+	// Captured synchronously rather than async: a redirect ends the handler
+	// immediately, and a goroutine racing a frozen Lambda would lose the event
+	// that closes the funnel. One short POST is worth the certainty here.
+	analytics.Capture(c.Request.Context(), uid, "signup_email_verified", nil)
 
 	// Redirect to Trendly Brands login page with email pre-filled
 	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s%s?email=%s", constants.GetBrandsFronted(), os.Getenv("BRAND_LOGIN_URL"), url.QueryEscape(uRecord.Email)))
