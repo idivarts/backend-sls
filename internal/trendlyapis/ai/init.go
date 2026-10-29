@@ -31,6 +31,7 @@ func RegisterRoutes(engine *gin.Engine) {
 	// Scores a script against the virality rubric: five dimensions, one judge
 	// call each, rolled up in code. See virality_score.go.
 	g.POST("/content/score", HTTPScore)
+	g.POST("/content/hooks", HTTPHooks)
 
 	g.GET("/models", ListModels)
 

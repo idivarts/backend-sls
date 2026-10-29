@@ -29,10 +29,19 @@ const (
 	// temperature scores a rubric more reproducibly than a reasoning model
 	// does, and run-to-run stability is the thing the score lives or dies on.
 	TaskScore TaskType = "score"
+	// TaskHooks writes five candidate opening hooks and ranks them against the
+	// Hook dimension of the same rubric. Separate from TaskScript because the
+	// two want opposite things from a model: a script wants one coherent piece,
+	// a ladder wants five genuinely different angles, so this one runs hot where
+	// TaskScript does not. It is also the cheapest useful call in the product —
+	// five fifteen-word lines — which argues for a different allowed list than
+	// a full script generation.
+	TaskHooks TaskType = "hooks"
 )
 
 // AllTaskTypes is the canonical list of tasks, used when seeding/validating config.
 var AllTaskTypes = []TaskType{
 	TaskChat, TaskQuickEdit, TaskCaption, TaskHashtag, TaskStrategy,
 	TaskScript, TaskMultimodal, TaskReasoning, TaskImage, TaskDesign, TaskScore,
+	TaskHooks,
 }
