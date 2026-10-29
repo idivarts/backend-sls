@@ -437,6 +437,11 @@ func firstChoiceText(resp *openrouter.ChatResponse) string {
 func ScoreScript(ctx context.Context, script, format string, platforms []trendlymodels.Platform,
 	model string) (*ViralityScore, *openrouter.Usage, error) {
 
+	// The judge reads the same text the checks do. A script typed in the app's
+	// rich-text editor arrives as HTML, and handing the model raw markup both
+	// wastes tokens and asks it to judge the markup's structure instead of the
+	// script's.
+	script = plainScript(script)
 	clean := strings.TrimSpace(script)
 	if clean == "" {
 		return nil, nil, fmt.Errorf("nothing to score")
