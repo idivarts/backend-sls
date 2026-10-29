@@ -153,6 +153,37 @@ jobs:
             -t "$IMAGE_URI" --push .
         env:
           IMAGE_URI: ${{ steps.render_image.outputs.uri }}
+      # A secret that resolves empty does NOT fail the deploy — serverless
+      # substitutes '' and the stack ships with a blank env var. The feature
+      # then dies per-request, at runtime, with an error only the caller sees:
+      # "ELEVENLABS_API_KEY is not set". That is a green deploy and a dead
+      # feature, which is the worst shape a failure can take.
+      #
+      # These two are guarded because each is a pure runtime API key whose
+      # absence silently disables a whole surface rather than breaking
+      # something visible. Secrets that are legitimately absent in a stage do
+      # not belong here.
+      #
+      # It matters more now that these are moving to ENVIRONMENT-scoped
+      # secrets: `secrets.X` falls back to the repository-level value when an
+      # environment has none, so a typo in an environment secret name fails
+      # silently today and would be caught here.
+      - name: Check the runtime secrets resolved
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          missing=""
+          for name in ELEVENLABS_API_KEY OPENROUTER_API_KEY; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Empty secret(s) for the ${{ env.STAGE }} environment:$missing"
+            echo "Set them on the '${{ env.STAGE }}' GitHub Environment, or at the repository level."
+            exit 1
+          fi
+          echo "Runtime secrets present for ${{ env.STAGE }}."
+
       - name: Add Service JSON and Deploy
         env:
           # Schema-less WS API Gateway host, picked per-stage from org-level action variables
@@ -207,6 +238,15 @@ jobs:
           # AI Studio — ElevenLabs (music + voiceover) and Canva Connect bridge.
           # ELEVENLABS_API_KEY + CANVA_CLIENT_SECRET are secrets; CANVA_CLIENT_ID +
           # CANVA_REDIRECT_URI are non-secret vars.
+          #
+          # ELEVENLABS_API_KEY is ENVIRONMENT-scoped, like the Branch keys below:
+          # the `environment:` binding at the top picks the dev account on dev
+          # and the production one on master, with no per-stage ternary here.
+          # Until an environment secret exists this falls back to the
+          # repository-level value, which is how one account came to serve both
+          # stages — dev testing drawing down production's quota, on a plan with
+          # no overage headroom, so an exhausted allowance takes production's
+          # audio out.
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           CANVA_CLIENT_ID: ${{ vars.CANVA_CLIENT_ID }}
           CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
