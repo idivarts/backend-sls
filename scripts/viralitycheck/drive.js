@@ -81,6 +81,31 @@ const CHECKS = [
     },
 ];
 
+/**
+ * Remove the model's production notes and its closing message to the user.
+ *
+ * Mirrors stripCommentary in script_validate.go, and exists for the same
+ * reason: on the first dev run these checks flagged a LinkedIn script for
+ * "comment YES" when the phrase appeared only in the model's own note about
+ * having AVOIDED engagement bait. A harness that reports false failures
+ * teaches you to ignore it.
+ *
+ * A horizontal rule is deliberately not a tail marker — this model puts `---`
+ * between every section.
+ */
+const TAIL_MARKER = /^[ \t]*(\*{0,2}(a few |two |some )?notes?\b[^\n]*:[ \t]*\*{0,2}|\*{0,2}(want|would you like|should i|shall i|do you want|let me know|i can also)\b[^\n]*)$/gim;
+
+function stripCommentary(script) {
+    let out = script;
+    const marks = [...out.matchAll(TAIL_MARKER)].map((m) => m.index);
+    const threshold = out.length / 3;
+    const cut = marks.find((i) => i > threshold);
+    if (cut !== undefined) out = out.slice(0, cut);
+    out = out.replace(/^[ \t]*\*[^*\s][^\n]*\*[ \t]*$/gm, "");
+    out = out.replace(/^[ \t]*\([^\n]*\)[ \t]*$/gm, "");
+    return out;
+}
+
 /** Pull the named markdown section out of a script. */
 function section(script, heading) {
     const re = new RegExp(`##\\s*${heading}[^\\n]*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, "i");
@@ -98,7 +123,8 @@ function scopeText(script, scope) {
     return script;
 }
 
-function runChecks(script) {
+function runChecks(rawScript) {
+    const script = stripCommentary(rawScript);
     return CHECKS.map((c) => {
         const text = scopeText(script, c.scope);
         const found = c.pattern.test(text);
