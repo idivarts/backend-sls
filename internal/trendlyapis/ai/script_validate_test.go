@@ -273,3 +273,97 @@ func TestEmptyCTASectionIsFatal(t *testing.T) {
 		t.Errorf("an empty CTA section should be a fatal D7, got %v", problemIDs(got))
 	}
 }
+
+// Regression fixtures taken verbatim from real dev output. Every one of these
+// was a FALSE POSITIVE the handcrafted fixtures above could not surface: the
+// model wrote a good script and then talked to the user about it, and the
+// checks read the conversation as if it were the script.
+
+// The model correctly avoided engagement bait, then explained that it had —
+// and got flagged for the phrase it was declining to use.
+const scriptWithBaitInItsOwnExplanation = `Here is a draft.
+
+---
+
+## Hook (first 3 seconds)
+**On-screen text + VO:** "Our second cafe cost 40% more than the first. The rent wasn't the reason."
+
+## Body
+**Scene 1 — the assumption (0:03-0:12)**
+*Cue: you to camera, or B-roll of the new site mid-fit-out.*
+VO: "We budgeted the second location like the first."
+
+**Scene 2 — the turn (0:12-0:28)**
+VO: "What blew the budget was people, not the lease."
+
+---
+
+## CTA
+VO: "Curious what blindsided you on an expansion — the cost nobody warns you about?"
+
+*Cue: end on you back in the finished space. Put any resource link in the first comment, not the post body.*
+
+---
+
+**Caption first line (second hook):** "The lease was the easy part."
+
+Two notes:
+- Kept it to **~55 seconds** — right for reaching beyond your followers on LinkedIn.
+- The ask is an **opinion prompt**, not engagement bait — it invites a real reply, which drives the dwell/comment signal LinkedIn rewards without tripping its suppression of "comment YES" prompts.
+`
+
+func TestValidateScriptIgnoresBaitInsideCommentary(t *testing.T) {
+	got := ValidateScript(scriptWithBaitInItsOwnExplanation, "video")
+	if hasProblem(got, "D8") {
+		t.Error("D8 fired on the phrase 'comment YES' inside the model's note about AVOIDING bait")
+	}
+	if hasProblem(got, "D7") {
+		t.Errorf("D7 counted asks from the commentary rather than the CTA, got %v", problemIDs(got))
+	}
+}
+
+// "Pin this" is a real ask on X. Leaving it out of the ask vocabulary made a
+// perfectly good CTA look like no CTA at all.
+func TestValidateScriptRecognisesPinAsAnAsk(t *testing.T) {
+	s := strings.Replace(goodScript,
+		`**VO:** "Send this to the one person who thinks they hate cold brew."`,
+		`**VO:** "Pin this the next time someone says a cafe coffee is a rip-off."`, 1)
+	for _, p := range ValidateScript(s, "reel") {
+		if p.ID == "D7" {
+			t.Errorf("'pin this' is an ask: %s", p.Message)
+		}
+	}
+}
+
+// Production notes and the trailing chat message are not speech. Counting them
+// turned a ~20 second reel into "about 80 seconds" and fired a length warning
+// on a script that was the right length.
+func TestValidateScriptLengthIgnoresCommentary(t *testing.T) {
+	padded := goodScript + "\n\n*Note: every line above is burned in, so the script works with sound off, and the first caption line should lead with the number rather than a thread emoji.*\n\n---\n\nWant me to draft the full thread version so it stands alone without the video, or tighten this to 30 seconds first?\n"
+	if got := ValidateScript(padded, "reel"); hasProblem(got, "D13") {
+		t.Errorf("commentary inflated the spoken-word count into a length warning, got %v", problemIDs(got))
+	}
+}
+
+// Over-stripping would be as bad as under-stripping: a real script must
+// survive the cleaner intact.
+func TestStripCommentaryKeepsTheScript(t *testing.T) {
+	out := stripCommentary(goodScript)
+	for _, must := range []string{"## Hook", "## Body", "## CTA", "Eighteen hours", "Send this to"} {
+		if !strings.Contains(out, must) {
+			t.Errorf("stripCommentary removed %q from a clean script", must)
+		}
+	}
+	// Bold production labels are structure, not commentary.
+	if !strings.Contains(out, "**VO:**") {
+		t.Error("stripCommentary removed a bold VO label")
+	}
+}
+
+func TestStripCommentaryDoesNotEmptyAShortScript(t *testing.T) {
+	// A leading rule must not truncate everything after it.
+	s := "---\n" + goodScript
+	if out := stripCommentary(s); !strings.Contains(out, "## CTA") {
+		t.Error("a leading horizontal rule truncated the whole script")
+	}
+}

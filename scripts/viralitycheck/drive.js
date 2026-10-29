@@ -114,6 +114,7 @@ function generate(fixture, item) {
         const ws = new WebSocket(url);
         let out = "";
         let usage = null;
+        let problems = [];
         let failure = null;
 
         // The socket can go quiet if a lambda dies mid-stream; without this the
@@ -146,13 +147,13 @@ function generate(fixture, item) {
             let msg;
             try { msg = JSON.parse(raw.toString()); } catch { return; }
             if (msg.type === "token") out += msg.delta || "";
-            else if (msg.type === "done") { usage = msg.usage || null; clearTimeout(timer); ws.close(); }
+            else if (msg.type === "done") { usage = msg.usage || null; problems = msg.problems || []; clearTimeout(timer); ws.close(); }
             else if (msg.type === "error") { failure = msg.message || "error"; clearTimeout(timer); ws.close(); }
             else if (msg.type === "upgrade_required") { failure = `upgrade_required (${msg.reason || msg.task})`; clearTimeout(timer); ws.close(); }
         });
 
         ws.on("error", (e) => { failure = failure || String(e.message || e); });
-        ws.on("close", () => { clearTimeout(timer); resolve({ script: out, usage, failure }); });
+        ws.on("close", () => { clearTimeout(timer); resolve({ script: out, usage, problems, failure }); });
     });
 }
 
@@ -185,7 +186,7 @@ const CASES = [
 
     for (const item of cases) {
         process.stdout.write(`\n── ${item.platform} · ${item.contentId}\n`);
-        const { script, usage, failure } = await generate(fixture, item);
+        const { script, usage, problems, failure } = await generate(fixture, item);
 
         if (failure) {
             process.stdout.write(`   FAILED: ${failure}\n`);
@@ -203,9 +204,22 @@ const CASES = [
             const mark = c.pass ? "pass" : c.fatal ? "FAIL" : "warn";
             process.stdout.write(`   [${mark}] ${c.id}${c.evidence && !c.pass ? ` → "${c.evidence}"` : ""}\n`);
         }
+        // What the BACKEND validator said about the same script. The regex
+        // checks above are this script's own opinion; these come from the
+        // deployed lambda, so a disagreement between them is the interesting
+        // signal — usually a false positive the handcrafted unit-test fixtures
+        // could never have surfaced.
+        if (problems.length === 0) {
+            process.stdout.write(`   [pass] backend validator: no problems\n`);
+        } else {
+            for (const p of problems) {
+                process.stdout.write(`   [${p.severity === "warn" ? "warn" : "FAIL"}] backend ${p.id}: ${p.message}\n`);
+            }
+        }
+
         process.stdout.write(`   ${script.split(/\s+/).length} words, ${(usage && (usage.total_tokens || usage.totalTokens)) || "?"} tokens\n`);
 
-        results.push({ ...item, checks, words: script.split(/\s+/).length, usage, fatalFails: fatalFails.length, softFails: softFails.length });
+        results.push({ ...item, checks, problems, words: script.split(/\s+/).length, usage, fatalFails: fatalFails.length, softFails: softFails.length });
     }
 
     fs.writeFileSync(path.join(OUT_DIR, "summary.json"), JSON.stringify({ ranAt: new Date().toISOString(), results }, null, 2));
