@@ -123,6 +123,12 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 	case toolGetDesignHTML:
 		r, err := runGetDesignHTML(ctx, brandID, contextID, arguments)
 		return r, false, err
+	case toolGetScript:
+		r, err := runGetScript(ctx, brandID, contextID)
+		return r, false, err
+	case toolUpdateScript:
+		r, err := runUpdateScript(ctx, brandID, contextID, arguments)
+		return r, false, err
 	case toolGenerateMusic:
 		orgID, _ := orgIDForBrand(brandID)
 		r, err := runGenerateMusic(ctx, brandID, contextID, orgID, arguments)

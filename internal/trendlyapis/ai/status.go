@@ -98,6 +98,8 @@ var curatedToolLabels = map[string]string{
 	// Studio (design / media)
 	"generate_design":       "Designing your visual…",
 	"apply_design_edits":    "Editing your design…",
+	"get_script":            "Reading your script…",
+	"update_script":         "Updating your script…",
 	"render_design_preview": "Reviewing the design…",
 	"generate_image":        "Generating an image…",
 	"generate_music":        "Composing music…",
