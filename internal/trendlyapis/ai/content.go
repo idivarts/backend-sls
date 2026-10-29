@@ -864,6 +864,8 @@ func handleContentGenWS(req WSRequest) {
 		handleScriptGenWS(req)
 	case "image":
 		handleImageGenWS(req)
+	case "design_score":
+		handleDesignScoreWS(req)
 	default:
 		wsErrorTo(req.ConnectionID, "unknown content task: "+req.Task)
 	}
