@@ -53,21 +53,51 @@ const sceneScript = `## Hook (first 3 seconds)
 **VO:** "Send this to someone who gave up on cold brew."
 `
 
+// The hook and the CTA ARE scenes — that is how a design is built: a hook
+// slide, some body slides, a closing slide. Matching only "Scene N" blocks
+// left both out and shifted every line one scene early, so scene 1 was judged
+// against scene 2's words and the last slides came back empty. Running the
+// checker on a real script is what surfaced it.
+func TestScriptSceneLinesCoversHookBodyAndCTA(t *testing.T) {
+	scenes := scriptSceneLines(sceneScript)
+	if len(scenes) != 4 {
+		t.Fatalf("want hook + 2 body scenes + CTA = 4, got %d: %#v", len(scenes), scenes)
+	}
+	want := []string{
+		"Eighteen hours",    // hook
+		"Hot water is fast", // body scene 1
+		"Cold water works",  // body scene 2
+		"Send this",         // CTA
+	}
+	for i, w := range want {
+		if !strings.Contains(scenes[i], w) {
+			t.Errorf("scene %d should carry %q, got %q", i+1, w, scenes[i])
+		}
+	}
+}
+
 func TestScriptSceneLinesTakesOnlyWhatIsSpoken(t *testing.T) {
 	scenes := scriptSceneLines(sceneScript)
-	if len(scenes) != 2 {
-		t.Fatalf("want 2 scenes, got %d: %#v", len(scenes), scenes)
-	}
+	joined := strings.Join(scenes, " | ")
 	// Visual direction and on-screen text are not narrated, and counting them
 	// would make every scene look wildly over budget.
-	if strings.Contains(scenes[0], "Cut to grounds") || strings.Contains(scenes[0], "Why not just") {
-		t.Errorf("scene 1 picked up production lines: %q", scenes[0])
+	for _, unwanted := range []string{"Cut to grounds", "Why not just", "18 hours for one cup"} {
+		if strings.Contains(joined, unwanted) {
+			t.Errorf("a production line was counted as speech: %q in %q", unwanted, joined)
+		}
 	}
-	if !strings.Contains(scenes[0], "Hot water is fast") {
-		t.Errorf("scene 1 lost its spoken line: %q", scenes[0])
+}
+
+// A body written as prose, with no "Scene N" headings, is still one scene
+// rather than nothing.
+func TestScriptSceneLinesHandlesABodyWithoutSceneHeadings(t *testing.T) {
+	script := "## Hook\n**VO:** \"Open.\"\n\n## Body\n**VO:** \"The middle, all of it.\"\n\n## CTA\n**VO:** \"Do the thing.\"\n"
+	scenes := scriptSceneLines(script)
+	if len(scenes) != 3 {
+		t.Fatalf("want 3, got %d: %#v", len(scenes), scenes)
 	}
-	if !strings.Contains(scenes[1], "Cold water works slower") {
-		t.Errorf("scene 2 lost its spoken line: %q", scenes[1])
+	if !strings.Contains(scenes[1], "The middle") {
+		t.Errorf("the body lost its line: %q", scenes[1])
 	}
 }
 
