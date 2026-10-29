@@ -193,12 +193,18 @@ type Fix struct {
 
 // ViralityScore is the whole result.
 type ViralityScore struct {
-	Overall       int              `json:"overall"`
-	Band          string           `json:"band"`
-	Cap           *ScoreCap        `json:"cap,omitempty"`
+	Overall int    `json:"overall"`
+	Band    string `json:"band"`
+	// No omitempty on Cap or Problems, deliberately. The persisted document is
+	// written with firestore.MergeAll, which MERGES map keys rather than
+	// replacing the map — so a key a later score omits keeps the PREVIOUS
+	// score's value. A piece that was capped once and then fixed would go on
+	// showing "Held at 70" forever. Writing them as null / [] makes every
+	// re-score overwrite every key.
+	Cap           *ScoreCap        `json:"cap"`
 	Dimensions    []DimensionScore `json:"dimensions"`
 	Fixes         []Fix            `json:"fixes"`
-	Problems      []ScriptProblem  `json:"problems,omitempty"`
+	Problems      []ScriptProblem  `json:"problems"`
 	RubricVersion string           `json:"rubricVersion"`
 	JudgeModel    string           `json:"judgeModel"`
 	ScoredAt      int64            `json:"scoredAt"`

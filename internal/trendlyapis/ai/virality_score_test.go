@@ -378,3 +378,28 @@ func TestFirestoreMapMatchesTheAPIShape(t *testing.T) {
 		t.Errorf("prefilled did not survive: %#v", c0)
 	}
 }
+
+// Every key must be present on every write, even when empty.
+//
+// The document is persisted with firestore.MergeAll, which merges map keys
+// rather than replacing the map. A key a later score omits therefore keeps the
+// PREVIOUS score's value — so a piece that was capped once and then fixed would
+// go on reporting "Held at 70" after the cap was gone, and stale problems would
+// outlive the script that caused them.
+func TestFirestoreMapAlwaysWritesEveryKey(t *testing.T) {
+	// The emptiest legitimate score: nothing capped, nothing flagged.
+	s := &ViralityScore{Overall: 95, Band: "Exceptional", ScoredAt: 1}
+
+	doc, err := s.FirestoreMap()
+	if err != nil {
+		t.Fatalf("FirestoreMap: %v", err)
+	}
+	for _, k := range []string{"cap", "problems", "dimensions", "fixes"} {
+		if _, ok := doc[k]; !ok {
+			t.Errorf("key %q is absent — a MergeAll write would leave the previous score's value in place", k)
+		}
+	}
+	if doc["cap"] != nil {
+		t.Errorf("cap should be an explicit null, got %#v", doc["cap"])
+	}
+}
