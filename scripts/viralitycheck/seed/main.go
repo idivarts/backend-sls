@@ -23,6 +23,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -51,7 +53,13 @@ const (
 // Fixture is what the driver reads. The token is short-lived (one hour) and
 // the file lands outside the repo, but treat it as a credential regardless.
 type Fixture struct {
-	IDToken    string   `json:"idToken"`
+	IDToken string `json:"idToken"`
+	// Email + password for signing in to the dev brand app in a browser, to
+	// check a UI the websocket driver cannot see. Regenerated every run, so a
+	// leaked one stops working at the next seed — the same reasoning as the
+	// one-hour token above.
+	Email      string   `json:"email"`
+	Password   string   `json:"password"`
 	UID        string   `json:"uid"`
 	BrandID    string   `json:"brandId"`
 	OrgID      string   `json:"orgId"`
@@ -110,8 +118,15 @@ func main() {
 		log.Fatalf("id token: %v", err)
 	}
 
+	password, err := resetPassword(ctx, uid)
+	if err != nil {
+		log.Fatalf("password: %v", err)
+	}
+
 	fx := Fixture{
 		IDToken:    idToken,
+		Email:      fixtureEmail,
+		Password:   password,
 		UID:        uid,
 		BrandID:    fixtureBrandID,
 		OrgID:      orgID,
@@ -149,6 +164,25 @@ func ensureAuthUser(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return created.UID, nil
+}
+
+// resetPassword gives the fixture user a fresh random password so the dev brand
+// app can be driven in a browser — the Phase 2 panel is a UI, and no websocket
+// driver can tell me whether it reads correctly in both themes.
+//
+// A new password every run rather than a stored one: there is then nothing to
+// keep secret for longer than the next seed, and nothing to rotate by hand.
+func resetPassword(ctx context.Context, uid string) (string, error) {
+	buf := make([]byte, 18)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	// Firebase requires six characters; base64url of 18 bytes gives 24.
+	pw := base64.RawURLEncoding.EncodeToString(buf)
+	if _, err := fauth.Client.UpdateUser(ctx, uid, (&auth.UserToUpdate{}).Password(pw)); err != nil {
+		return "", err
+	}
+	return pw, nil
 }
 
 func ensureManager(uid string) error {
