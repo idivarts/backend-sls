@@ -19,6 +19,19 @@ on:
 # be abandoned: cancelling one mid-update leaves the stack in
 # UPDATE_ROLLBACK_IN_PROGRESS, and the newer commit would then deploy on top of
 # a half-applied older one. Queue them instead.
+#
+# ⚠️ Do NOT re-run a successful deploy to pick up a changed secret or variable.
+# Re-running the same commit produces an identical Lambda package, so
+# AWS::Lambda::Version fails with
+#
+#   "A version for this Lambda function exists ( N ). Modify the function to
+#    create a new version." (AlreadyExists)
+#
+# and CloudFormation rolls the whole stack back — including the env change you
+# were trying to apply. It is safe (the rollback is clean) but it does nothing
+# and it reads like a broken pipeline. A changed secret needs a deploy of NEW
+# code; push a commit, or wait for the next merge. Re-running a FAILED deploy
+# is fine, because nothing was published the first time.
 concurrency:
   group: deploy-trendly-${{ github.ref }}
   cancel-in-progress: false
