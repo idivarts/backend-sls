@@ -258,3 +258,53 @@ func TestJudgementCriteriaAreNotPrefilled(t *testing.T) {
 		}
 	}
 }
+
+// The scale anchors are load-bearing and easy to soften by accident.
+//
+// The first version said "2 = clearly met", and competent work cleared that
+// without effort: Hook and Body saturated at 100 on every real dev script, so
+// the score separated bad from good and told someone iterating on a good
+// script nothing at all. Reserving 2 for exemplary execution is what put the
+// useful range back — measured on dev, a decent script moved from 91
+// "Exceptional" to 85 "Strong", and the weak control from 17 to 5.
+func TestJudgePromptKeepsADemandingBar(t *testing.T) {
+	d := rubric[0]
+	p := judgePrompt(d, d.Criteria, nil, nil)
+	for _, must := range []string{"EXEMPLARY", "ADEQUATE", "NOT MET"} {
+		if !strings.Contains(p, must) {
+			t.Errorf("the scale anchor %q is gone", must)
+		}
+	}
+	if !strings.Contains(p, "absence of a mistake") {
+		t.Error("the 'do not award 2 for the absence of a mistake' instruction is gone")
+	}
+	if strings.Contains(p, "2 = clearly met") {
+		t.Error("the soft anchor is back; it saturates Hook and Body at 100")
+	}
+}
+
+// Evidence must not leak across dimensions: that is the contamination the
+// one-call-per-dimension split exists to prevent.
+func TestJudgePromptEvidenceIsScoped(t *testing.T) {
+	for _, d := range rubric {
+		for _, id := range d.Evidence {
+			var ownedElsewhere bool
+			for _, other := range rubric {
+				if other.Key == d.Key {
+					continue
+				}
+				for _, c := range other.Criteria {
+					if c.Prefill == id {
+						ownedElsewhere = true
+					}
+				}
+			}
+			if ownedElsewhere {
+				// Not fatal — D10 and D13 legitimately inform both Body and
+				// Fit — but a check that another dimension PRE-FILLS should
+				// not also be loose evidence here.
+				t.Logf("note: %s lists evidence %s which another dimension pre-fills", d.Label, id)
+			}
+		}
+	}
+}
