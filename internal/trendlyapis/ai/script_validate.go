@@ -381,7 +381,10 @@ func ValidateScript(rawScript, format string) []ScriptProblem {
 		problems = append(problems, ScriptProblem{ID: id, Severity: sev, Message: msg})
 	}
 
-	script := stripCommentary(rawScript)
+	// The script is rich text in the app, so it may arrive as HTML. Render it
+	// to the markdown dialect every check below reads before anything looks at
+	// it; plainScript leaves plain markdown untouched. See script_plain.go.
+	script := stripCommentary(plainScript(rawScript))
 	trimmed := strings.TrimSpace(script)
 	if trimmed == "" {
 		add("D1", severityFatal, "The script is empty. Write it with the sections asked for: a hook, a body of scenes, and one call to action.")
