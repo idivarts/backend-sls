@@ -20,18 +20,31 @@ on:
 # UPDATE_ROLLBACK_IN_PROGRESS, and the newer commit would then deploy on top of
 # a half-applied older one. Queue them instead.
 #
-# ⚠️ Do NOT re-run a successful deploy to pick up a changed secret or variable.
-# Re-running the same commit produces an identical Lambda package, so
-# AWS::Lambda::Version fails with
+# ⚠️ A rolled-back deploy leaves orphaned Lambda versions, and they block EVERY
+# later deploy until they are cleared. Seen for real applying the ElevenLabs
+# key split.
+#
+# A deploy publishes a new AWS::Lambda::Version for each container-image
+# function. If it then fails, CloudFormation drops those version resources from
+# the stack but Lambda KEEPS the published versions. The next deploy tries to
+# create the same logical resource and Lambda refuses:
 #
 #   "A version for this Lambda function exists ( N ). Modify the function to
 #    create a new version." (AlreadyExists)
 #
-# and CloudFormation rolls the whole stack back — including the env change you
-# were trying to apply. It is safe (the rollback is clean) but it does nothing
-# and it reads like a broken pipeline. A changed secret needs a deploy of NEW
-# code; push a commit, or wait for the next merge. Re-running a FAILED deploy
-# is fine, because nothing was published the first time.
+# which rolls back again and publishes yet another orphan — so deleting them
+# one at a time never catches up. Clear ALL numbered versions of the affected
+# functions in one pass, then deploy once:
+#
+#   aws lambda list-versions-by-function --function-name trendly-be-<stage>-render_image
+#   aws lambda delete-function --function-name trendly-be-<stage>-render_image:<N>
+#
+# Safe because nothing references them: pkg/designpreview invokes by name with
+# no Qualifier, so traffic goes to $LATEST, and these functions carry no
+# aliases. Check both before deleting anything in prod.
+#
+# Separately: do not re-run a SUCCEEDED deploy to pick up a changed secret. It
+# is what starts the above. A changed secret needs a deploy of new code.
 concurrency:
   group: deploy-trendly-${{ github.ref }}
   cancel-in-progress: false
