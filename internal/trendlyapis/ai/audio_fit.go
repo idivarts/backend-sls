@@ -90,27 +90,68 @@ func sceneDurations(doc string) []int {
 	return out
 }
 
-// scriptSceneLines splits the script's spoken words by scene.
+// spokenIn returns what is actually said in a block of script.
 //
-// Only what is actually said counts. A scene's block carries visual direction,
-// on-screen text and bracketed notes, and narrating those would be both wrong
-// and a wildly pessimistic estimate — so this reuses the same spoken/production
-// classification the script checks use.
-func scriptSceneLines(script string) []string {
-	plain := stripCommentary(plainScript(script))
-	lines := normaliseScript(plain)
-
-	var scenes []string
-	var cur strings.Builder
-	started := false
-
-	flush := func() {
-		if started {
-			scenes = append(scenes, strings.TrimSpace(cur.String()))
-			cur.Reset()
+// Only speech counts. A block carries visual direction, on-screen text and
+// bracketed notes, and narrating those would be both wrong and a wildly
+// pessimistic estimate — so this reuses the same spoken/production
+// classification the script checks use. A production label beats the quotes:
+// on-screen text is written in quotes exactly like a VO line.
+func spokenIn(block string) string {
+	var sb strings.Builder
+	for _, l := range normaliseScript(block) {
+		if l.Spoken || (l.Quoted && !l.Note) {
+			if sb.Len() > 0 {
+				sb.WriteString(" ")
+			}
+			sb.WriteString(l.Body)
 		}
 	}
+	return strings.TrimSpace(sb.String())
+}
 
+// scriptSceneLines splits the script's spoken words into the sequence of
+// scenes a design is actually built from.
+//
+// That sequence is Hook, then each body scene, then the CTA — because that is
+// how the designs are built: a hook slide, some body slides, a closing slide.
+// An earlier version only matched blocks headed "Scene N", which left the Hook
+// and the CTA out entirely and shifted every line one scene early. Running the
+// checker on a real script is what surfaced it: scene 1 was being judged
+// against scene 2's line, and the last two scenes came back empty.
+func scriptSceneLines(script string) []string {
+	plain := stripCommentary(plainScript(script))
+	sections := scriptBodySections(plain)
+	if len(sections) == 0 {
+		return nil
+	}
+
+	var scenes []string
+	for i, sec := range sections {
+		// The middle section is the body, which itself holds several scenes.
+		// The first and last are the hook and the CTA, one scene each.
+		if i == 0 || i == len(sections)-1 {
+			scenes = append(scenes, spokenIn(sec))
+			continue
+		}
+		scenes = append(scenes, bodyScenes(sec)...)
+	}
+	return scenes
+}
+
+// bodyScenes splits the body into its "Scene N" blocks. A body with no scene
+// headings is one scene — a two-scene reel written as prose is still a reel.
+func bodyScenes(body string) []string {
+	lines := normaliseScript(body)
+	var out []string
+	var cur []string
+	started := false
+	flush := func() {
+		if started {
+			out = append(out, spokenIn(strings.Join(cur, "\n")))
+			cur = nil
+		}
+	}
 	for _, l := range lines {
 		raw := strings.TrimSpace(l.Label + " " + l.Body)
 		if reSceneHeading.MatchString(raw) {
@@ -121,19 +162,17 @@ func scriptSceneLines(script string) []string {
 		if !started {
 			continue
 		}
-		// Spoken lines, plus bare quoted narration that carries no label. A
-		// production label wins over the quotes: on-screen text is written in
-		// quotes too and counting it would make every scene look wildly over
-		// budget, when in fact nobody reads it aloud.
-		if l.Spoken || (l.Quoted && !l.Note) {
-			if cur.Len() > 0 {
-				cur.WriteString(" ")
-			}
-			cur.WriteString(l.Body)
+		if l.Label != "" {
+			cur = append(cur, l.Label+": "+l.Body)
+		} else {
+			cur = append(cur, l.Body)
 		}
 	}
 	flush()
-	return scenes
+	if len(out) == 0 {
+		return []string{spokenIn(body)}
+	}
+	return out
 }
 
 func wordsIn(s string) int { return len(strings.Fields(s)) }
