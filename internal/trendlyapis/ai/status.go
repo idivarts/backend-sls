@@ -100,6 +100,7 @@ var curatedToolLabels = map[string]string{
 	"apply_design_edits":    "Editing your design…",
 	"get_script":            "Reading your script…",
 	"update_script":         "Updating your script…",
+	"check_audio_fit":       "Checking the voiceover against the scenes…",
 	"render_design_preview": "Reviewing the design…",
 	"generate_image":        "Generating an image…",
 	"generate_music":        "Composing music…",

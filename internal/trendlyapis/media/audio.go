@@ -38,6 +38,32 @@ type musicReq struct {
 	Prompt       string `json:"prompt" binding:"required"`
 	LengthMs     int    `json:"lengthMs"`
 	Instrumental bool   `json:"instrumental"`
+	// Title is a short name for the clip. The caller knows what it asked for;
+	// deriving one from the prompt here would just reproduce the truncation
+	// the picker already suffered from.
+	Title string `json:"title"`
+}
+
+// ElevenLabs Music accepts 3s-10min. A caller asking for the length of its
+// video can legitimately be outside that on both ends, and the cost scales
+// with duration, so this clamps rather than letting a bad request through.
+const (
+	minMusicMs     = 3000
+	maxMusicMs     = 600000
+	defaultMusicMs = 20000
+)
+
+func ClampMusicMs(ms int) int {
+	if ms <= 0 {
+		return defaultMusicMs
+	}
+	if ms < minMusicMs {
+		return minMusicMs
+	}
+	if ms > maxMusicMs {
+		return maxMusicMs
+	}
+	return ms
 }
 
 type voiceoverReq struct {
@@ -62,9 +88,10 @@ func GenerateMusic(c *gin.Context) {
 		return
 	}
 
+	lengthMs := ClampMusicMs(req.LengthMs)
 	audio, err := elevenlabs.GenerateMusic(elevenlabs.MusicRequest{
 		Prompt:            req.Prompt,
-		LengthMs:          req.LengthMs,
+		LengthMs:          lengthMs,
 		ForceInstrumental: req.Instrumental,
 	})
 	if err != nil {
@@ -83,14 +110,15 @@ func GenerateMusic(c *gin.Context) {
 		Kind:       "music",
 		Provider:   "elevenlabs",
 		Prompt:     req.Prompt,
+		Title:      strings.TrimSpace(req.Title),
 		URL:        url,
-		DurationMs: int64(req.LengthMs),
+		DurationMs: int64(lengthMs),
 		Status:     "ready",
 	})
 
-	trendlymodels.MeterUSD(orgID, MusicCostUSD(req.LengthMs))
+	trendlymodels.MeterUSD(orgID, MusicCostUSD(lengthMs))
 
-	c.JSON(http.StatusOK, gin.H{"id": id, "url": url, "kind": "music", "durationMs": req.LengthMs})
+	c.JSON(http.StatusOK, gin.H{"id": id, "url": url, "kind": "music", "durationMs": lengthMs, "title": strings.TrimSpace(req.Title)})
 }
 
 // GenerateVoiceover proxies ElevenLabs TTS, stores the bytes, records the doc
