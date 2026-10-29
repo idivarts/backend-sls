@@ -144,6 +144,10 @@ func defaultRegistry() Registry {
 			// is scored on reproducibility, and five dimension calls per run means
 			// a reasoning model would dominate the cost of the whole feature.
 			TaskScore: {Allowed: []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4"}},
+			// Hook laddering generates AND judges, so unlike TaskScore it needs a
+			// model with some range — a hook is a piece of writing, not a verdict.
+			// Still cheapest-capable first: the whole call is five short lines.
+			TaskHooks: {Allowed: []string{"anthropic/claude-sonnet-4.6", "google/gemini-3.5-flash", "openai/gpt-5.4"}},
 		},
 	}
 }

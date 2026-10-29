@@ -653,3 +653,38 @@ func repairInstruction(problems []ScriptProblem) string {
 	return "The script you just wrote has these problems:\n" + strings.Join(lines, "\n") +
 		"\n\nRewrite it, fixing exactly these and changing nothing else. Return the full script in the same format, with no preamble."
 }
+
+// hookProblems runs the checks that mean something about an OPENING, on a hook
+// in isolation.
+//
+// Only a subset applies. D1 would fire on every candidate — a hook has no body
+// and no CTA by definition — and a check that always fires carries no
+// information. What survives is the two failures that are about the opening
+// itself, plus a length bound, which exists because the generator is asked for
+// under twenty words and a model that ignores the instruction should not be
+// silently rewarded for it.
+func hookProblems(hook string) []ScriptProblem {
+	var problems []ScriptProblem
+	add := func(id string, sev scriptSeverity, msg string) {
+		problems = append(problems, ScriptProblem{ID: id, Severity: sev, Message: msg})
+	}
+
+	text := strings.TrimSpace(plainScript(hook))
+	if text == "" {
+		add("D1", severityFatal, "The hook is empty.")
+		return problems
+	}
+
+	if reThroatClearing.MatchString(text) {
+		add("D2", severityCap, "The hook opens with throat-clearing. Open on the subject or the claim itself.")
+	}
+	if m := reEngagementBait.FindString(text); m != "" {
+		add("D8", severityCap, fmt.Sprintf("The hook uses engagement bait (%q), which costs reach rather than earning it.", m))
+	}
+	// Two to three seconds of speech is roughly eight words; twenty is the
+	// outer edge of what fits before the decision to scroll has been made.
+	if words := len(strings.Fields(text)); words > 20 {
+		add("D14", severityWarn, fmt.Sprintf("The hook runs %d words — longer than the moment it has to land in. Cut it to the claim.", words))
+	}
+	return problems
+}
