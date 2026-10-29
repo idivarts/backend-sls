@@ -117,7 +117,7 @@ var (
 	// Imperative asks, for counting calls to action. "pin" and "reply" are
 	// here because they are real asks on X and LinkedIn, and leaving them out
 	// made a perfectly good "pin this" CTA look like no CTA at all.
-	reAsk = regexp.MustCompile(`(?i)\b(send (this|it)|save (this|it)|share (this|it)|pin (this|it|a)|reply with|drop (a|your)|comment\b|follow\b|subscribe\b|tap (the )?link|click (the )?link|sign up|book (a|your)|try (it|this)|download)\b`)
+	reAsk = regexp.MustCompile(`(?i)\b(send\s+(\w+\s+)?(this|it|that)|save (this|it)|share (this|it)|pin (this|it|a)|reply with|drop (a|your)|comment\b|follow\b|subscribe\b|tap (the )?link|click (the )?link|sign up|book (a|your)|try (it|this)|download)\b`)
 
 	// Markdown decoration to strip before counting words.
 	reMarkdownNoise = regexp.MustCompile(`[*_#>` + "`" + `]+`)
@@ -324,9 +324,22 @@ func ValidateScript(rawScript, format string) []ScriptProblem {
 		add("D7", severityFatal, "The CTA section is empty. Write exactly ONE ask, and pick the one this platform rewards.")
 	} else if n := countAsks(cta); n > 1 {
 		add("D7", severityCap, fmt.Sprintf("The call to action contains %d separate asks. Keep exactly one — two asks is zero asks.", n))
-	} else if n == 0 {
-		add("D7", severityWarn, "The CTA section does not contain a recognisable ask. State one concrete action for the viewer to take.")
 	}
+	// There is deliberately no "the CTA contains no recognisable ask" check.
+	//
+	// It was here, and both times it fired on dev it was wrong: once on
+	// "curious what blindsided you on an expansion?" (an opinion prompt, and
+	// the ask LinkedIn's own playbook asks for) and once on "send them this
+	// before they make another pot" (a vocabulary gap). Natural language has
+	// endless ways to ask for something, and every round of broadening the
+	// pattern bought one more false positive.
+	//
+	// The structural cases are still caught above and still fatal: no CTA
+	// section, and an empty one. Whether a paragraph of prose amounts to an
+	// ask is a judgement, and judgement is what the Phase 2 scorer is for —
+	// a regex that guesses at it only teaches people to distrust the score.
+	// The ask vocabulary stays, because a missing verb makes the multi-ask
+	// count UNDER-report, which is the safe direction.
 
 	// D8 — bait costs reach rather than earning it.
 	if m := reEngagementBait.FindString(script); m != "" {
