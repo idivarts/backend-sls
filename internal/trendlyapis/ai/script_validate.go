@@ -180,6 +180,7 @@ type normalisedLine struct {
 	Body   string // everything after the label, unquoted and unemphasised
 	Spoken bool   // the label says a presenter says this
 	Note   bool   // the label says this is a production note
+	Quoted bool   // the line is a quoted utterance, label or not
 }
 
 // normaliseScript strips list bullets and emphasis from every line and splits
@@ -219,6 +220,10 @@ func normaliseScript(script string) []normalisedLine {
 				n.Spoken = spoken
 				n.Note = note && !spoken
 			}
+		}
+		if t := strings.TrimSpace(n.Body); len(t) > 1 &&
+			strings.ContainsAny(t[:1], `"“`) && strings.ContainsAny(t[len(t)-1:], `"”`) {
+			n.Quoted = true
 		}
 		n.Body = strings.Trim(n.Body, `"“”`)
 		out = append(out, n)
@@ -410,12 +415,12 @@ func ValidateScript(rawScript, format string) []ScriptProblem {
 	// count UNDER-report, which is the safe direction.
 
 	// D8 — bait costs reach rather than earning it.
-	if m := reEngagementBait.FindString(script); m != "" {
+	if m := reEngagementBait.FindString(scriptContentText(script)); m != "" {
 		add("D8", severityCap, fmt.Sprintf("The script uses engagement bait (%q). Meta demotes it and LinkedIn suppresses it, so it costs reach. Replace it with a genuine ask.", m))
 	}
 
 	// Not fatal, not a cap: wrong rather than forbidden.
-	if reFollowForMore.MatchString(cta) {
+	if reFollowForMore.MatchString(scriptContentText(cta)) {
 		add("D7b", severityWarn, "The ask is 'follow for more', which is almost never the action a feed surface rewards. Prefer a send or a save.")
 	}
 
@@ -472,6 +477,7 @@ func countAsks(cta string) int {
 	// Distinct asks, not ask MENTIONS. A script that puts the same ask in the
 	// on-screen text and again in the voiceover -- which is correct craft, not
 	// a second ask -- was being counted twice and reported as competing CTAs.
+	cta = scriptContentText(cta)
 	distinct := map[string]bool{}
 	for _, m := range reAsk.FindAllString(cta, -1) {
 		distinct[strings.ToLower(strings.Join(strings.Fields(m), " "))] = true
@@ -481,6 +487,32 @@ func countAsks(cta string) int {
 		n++
 	}
 	return n
+}
+
+// scriptContentText is the part of a block that is actually the piece: lines
+// that carry a production label, and bare quoted utterances.
+//
+// Everything else is the model talking to the user. Cutting that by hunting
+// for opening phrases ("Two notes:", "Want me to…") was the same losing game
+// as matching markdown dialects — it caught "Two notes:" and missed "One
+// note:", and caught a line starting "Want me to…" but not one where the same
+// question followed a sentence of prose. The normalisation already knows which
+// lines are script, so the content checks read those and nothing else.
+//
+// Under-reading is the safe direction here: the remaining checks fire on
+// something being PRESENT (bait, a second ask), so a line wrongly skipped
+// costs a missed warning, while a line wrongly included invents a problem in
+// good work.
+func scriptContentText(block string) string {
+	var sb strings.Builder
+	for _, l := range normaliseScript(block) {
+		if l.Label == "" && !l.Quoted {
+			continue
+		}
+		sb.WriteString(l.Body)
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // hasSoundOffCues reports whether anything in the script is meant to be read
