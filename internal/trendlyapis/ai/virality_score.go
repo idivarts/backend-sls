@@ -269,13 +269,26 @@ func judgePrompt(d dimension, toJudge []criterion, platforms []trendlymodels.Pla
 		}
 		sb.WriteString("\n")
 	}
-	sb.WriteString("Score EACH criterion below as exactly 0, 1 or 2:\n")
-	sb.WriteString("  2 = clearly met\n  1 = partly met\n  0 = not met\n\n")
+	// The anchors are deliberately demanding. An earlier version read
+	// "2 = clearly met", and competent work cleared that easily: Hook and
+	// Body saturated at 100 on every real script, so the score separated bad
+	// from good and told someone iterating on a good script nothing at all.
+	// Reserving 2 for exemplary execution is what puts the useful range back.
+	sb.WriteString("Score EACH criterion below as exactly 0, 1 or 2, against a demanding bar:\n")
+	sb.WriteString("  2 = EXEMPLARY. Among the best executions of this criterion you could expect. " +
+		"Not merely correct — distinctly good.\n")
+	sb.WriteString("  1 = ADEQUATE. The criterion is met, but unremarkably. This is the normal score " +
+		"for competent work, and most criteria on a decent script should land here.\n")
+	sb.WriteString("  0 = NOT MET, or not addressed at all.\n\n")
+	sb.WriteString("Do not award 2 for the absence of a mistake. A hook that merely avoids being bad " +
+		"is a 1.\n\n")
 	for _, c := range toJudge {
 		sb.WriteString("- " + c.ID + ": " + c.Text + "\n")
 	}
 	sb.WriteString("\nJudge only what is in the script. Do not reward intent, effort or topic interest. " +
 		"A criterion the script simply does not address scores 0, not 1.\n\n")
+	sb.WriteString("Keep each note UNDER 12 WORDS. Long notes are the one thing that breaks this " +
+		"call: the reply is capped, and a verbose note truncates the array mid-object.\n\n")
 	sb.WriteString("Reply with ONLY a JSON array, one object per criterion, no prose and no code fence:\n")
 	sb.WriteString(`[{"id":"` + toJudge[0].ID + `","score":0,"note":"at most 12 words, naming what is missing"}]`)
 	return sb.String()
@@ -334,7 +347,12 @@ func scoreDimension(ctx context.Context, d dimension, script, model string,
 			// run-to-run stability target (±4 overall across 5 runs) is not
 			// reachable at a conversational temperature.
 			Temperature: 0.1,
-			MaxTokens:   900,
+			// Sized from a measured run, not guessed: six criteria with a
+			// short note each came to ~900 completion tokens, which is
+			// exactly where the first version was capped. The reply was
+			// truncated mid-array and every dimension failed to parse, which
+			// presented as the useless "no JSON array in judge reply".
+			MaxTokens: 2000,
 			Messages: []openrouter.Message{
 				{Role: "system", Content: judgePrompt(d, toJudge, platforms, evidence)},
 				{Role: "user", Content: script},
@@ -344,9 +362,17 @@ func scoreDimension(ctx context.Context, d dimension, script, model string,
 			return out, nil, err
 		}
 		usage = resp.Usage
+		// Truncation has to be named. Without this the parse simply fails and
+		// reports "no JSON array", which is true and tells you nothing about
+		// why -- it cost a deploy cycle to find out the first time.
+		if len(resp.Choices) > 0 && resp.Choices[0].FinishReason == "length" {
+			return out, usage, fmt.Errorf("%s: judge reply hit the token cap before closing its JSON "+
+				"(raise MaxTokens or shorten the notes)", d.Label)
+		}
 		verdicts, err := parseVerdicts(firstChoiceText(resp))
 		if err != nil {
-			return out, usage, fmt.Errorf("%s: %w", d.Label, err)
+			return out, usage, fmt.Errorf("%s: %w (reply began %q)", d.Label, err,
+				truncate(strings.TrimSpace(firstChoiceText(resp)), 120))
 		}
 		seen := map[string]bool{}
 		for _, v := range verdicts {
