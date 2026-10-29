@@ -110,6 +110,7 @@ func handleMessageWS(req WSRequest) {
 		if design := currentDesignBrief(conv.BrandID, conv.ContextID); design != "" {
 			systemPrompt = systemPrompt + "\n\n" + design
 		}
+		systemPrompt = systemPrompt + "\n\n" + scriptEditBrief
 	}
 
 	msgs := make([]openrouter.Message, 0, len(history)+2)
@@ -490,6 +491,10 @@ func toolsForModule(module string) []openrouter.Tool {
 	if moduleHasStudio(module) {
 		tools = append(tools, designServerTools()...)
 		tools = append(tools, audioServerTools()...)
+		// The script lives on the same surface as the design and had no way to
+		// be edited from the chat, so asking for a tighter hook produced a good
+		// revision in the conversation and nothing in the editor.
+		tools = append(tools, scriptServerTools()...)
 	}
 	// On-demand read-only fetch tools (content, analytics, inbox, strategy,
 	// account, assets, billing) let the AI ground its output in the brand's real
