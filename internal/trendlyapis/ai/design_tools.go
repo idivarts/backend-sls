@@ -89,6 +89,24 @@ func designServerTools() []openrouter.Tool {
 				"- Set transform-origin deliberately on anything that scales or rotates.\n"+
 				"- Stagger siblings by 60-80ms rather than entering everything at once, and use real "+
 				"easing (a cubic-bezier with a little overshoot) rather than the default `ease`.\n"+
+				"PHOTOGRAPHY: flat gradients and type are what make a design look generated. "+
+				"Where a photograph would carry the piece — a background behind a headline, a "+
+				"product shot, a human face — do NOT draw it in CSS and do NOT invent a URL. "+
+				"Write a placeholder and the server fills it in before the user ever sees the "+
+				"document:\n"+
+				"- `<img data-stock=\"<description>\" data-el=\"bg\">` — real photography, searched "+
+				"from a stock library. Use this for anything that should look like a real "+
+				"photograph of a real place, object or person.\n"+
+				"- `<img data-gen=\"<description>\" data-el=\"hero\">` — a generated image. Use this "+
+				"only when the shot has to be specific in a way stock cannot be (a particular "+
+				"product, an imagined scene).\n"+
+				"Describe the SHOT, not the mood: subject, framing, light, and any space the "+
+				"layout needs left empty (\"wide shot of an empty café at dawn, lots of flat wall "+
+				"on the left for a headline\"). Give every placeholder a data-el, size it with CSS "+
+				"as you would any image (object-fit:cover and an explicit width/height), and put "+
+				"a scrim behind text that sits over it so the type still reads. Prefer ONE strong "+
+				"photograph per scene over several small ones. A placeholder that cannot be "+
+				"filled renders as nothing, so never make one load-bearing for the layout.\n"+
 				"Return the full HTML in `html`.",
 			openrouter.ObjectSchema(map[string]any{
 				"html":       openrouter.StringProp("The complete self-contained HTML document (a data-carousel with `slides` data-slide sections)."),
@@ -231,15 +249,57 @@ func runGenerateDesign(ctx context.Context, brandID, contentID, arguments string
 	if problems := validateDesignHTML(html, docType, a.Slides); len(problems) > 0 {
 		return designProblemsResult(problems), nil
 	}
-	revID, err := persistDesign(brandID, contentID, wrapHTML(html), w, h, slides, duration, docType, "generate", "")
+	// Resolve every data-gen / data-stock placeholder before the document
+	// becomes a revision, so the design the user sees already has its
+	// photography in it. Runs AFTER validation — there is no point spending
+	// money on images for a document that will not render.
+	filled, imagery := fillDesignImagery(ctx, brandID, aspectForSize(w, h), wrapHTML(html))
+
+	revID, err := persistDesign(brandID, contentID, filled, w, h, slides, duration, docType, "generate", "")
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), err
 	}
-	return jsonResult(map[string]any{
+	out := map[string]any{
 		"ok":         true,
 		"revisionId": revID,
 		"note":       "design created and shown to the user; describe it briefly and invite them to edit text or pin comments.",
-	}), nil
+	}
+	if imagery.touched() {
+		out["imagery"] = map[string]any{
+			"generated": imagery.Generated,
+			"stock":     imagery.Stock,
+			"failed":    imagery.Failed,
+			"credits":   imagery.Credits,
+		}
+		if imagery.Failed > 0 {
+			// Say so plainly. An <img> with no src is an invisible gap, and the
+			// model is the only thing that can tell the user a photo is missing
+			// or offer to try a different description.
+			out["note"] = "design created. " + fmt.Sprint(imagery.Failed) +
+				" image placeholder(s) could not be filled and are empty — tell the user which, " +
+				"and offer to try a different description or a different source."
+		}
+	}
+	return jsonResult(out), nil
+}
+
+// aspectForSize names the closest ratio for a pixel size, so stock search and
+// image generation are asked for the shape the slide actually is.
+func aspectForSize(w, h int) string {
+	if w <= 0 || h <= 0 {
+		return "1:1"
+	}
+	r := float64(w) / float64(h)
+	switch {
+	case r < 0.65:
+		return "9:16"
+	case r < 0.95:
+		return "4:5"
+	case r < 1.2:
+		return "1:1"
+	default:
+		return "16:9"
+	}
 }
 
 // designEdit is one surgical replacement: swap an exact snippet for another.

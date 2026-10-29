@@ -274,6 +274,13 @@ jobs:
           # no overage headroom, so an exhausted allowance takes production's
           # audio out.
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          # Stock photography for AI-authored designs. Deliberately NOT in the
+          # "Check the runtime secrets resolved" guard above: that guard is for
+          # keys whose absence silently kills a surface. This one degrades
+          # honestly — with no key, stock placeholders are skipped, the design
+          # still lands, and the tool result tells the model to say so. Adding
+          # it there would fail every deploy until the key is provisioned.
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           CANVA_CLIENT_ID: ${{ vars.CANVA_CLIENT_ID }}
           CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
           CANVA_REDIRECT_URI: ${{ vars.CANVA_REDIRECT_URI }}
