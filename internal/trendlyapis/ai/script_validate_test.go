@@ -2,6 +2,8 @@ package ai
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -92,17 +94,18 @@ func TestValidateScriptThroatClearing(t *testing.T) {
 	}
 }
 
-func TestValidateScriptRamblingOpening(t *testing.T) {
-	rambling := strings.Replace(goodScript,
+// D3 was removed: see the comment in ValidateScript. This locks the decision
+// in, so a future change cannot quietly reintroduce a word-count proxy for
+// "the subject arrives late" and start flagging good hooks again.
+func TestNoRamblingOpeningCheck(t *testing.T) {
+	// A real hook from dev that the six-second version wrongly flagged.
+	good := strings.Replace(goodScript,
 		`**VO:** "Eighteen hours for one glass of cold brew. Here's why we don't rush it."`,
-		`**VO:** "So I was thinking the other day about how most people never really stop to consider what actually happens to coffee when you leave it sitting in cold water for a very long time."`, 1)
-	if got := ValidateScript(rambling, "reel"); !hasProblem(got, "D3") {
-		t.Errorf("a rambling opening should trip D3, got %v", problemIDs(got))
-	}
-
-	// A brisk opening must not be punished for being a full sentence.
-	if got := ValidateScript(goodScript, "reel"); hasProblem(got, "D3") {
-		t.Error("an eight-word claim is not a rambling opening")
+		`**Spoken:** "Our second location cost 40% more to open than our first — and it had nothing to do with rent."`, 1)
+	for _, p := range ValidateScript(good, "reel") {
+		if p.ID == "D3" {
+			t.Errorf("D3 is gone; judging a brisk opening belongs to the Phase 2 scorer: %s", p.Message)
+		}
 	}
 }
 
@@ -365,5 +368,69 @@ func TestStripCommentaryDoesNotEmptyAShortScript(t *testing.T) {
 	s := "---\n" + goodScript
 	if out := stripCommentary(s); !strings.Contains(out, "## CTA") {
 		t.Error("a leading horizontal rule truncated the whole script")
+	}
+}
+
+// Real scripts the model produced on dev, kept as testdata.
+//
+// Every one was read and judged good by hand, so ANY problem reported against
+// them is a false positive. They are here because handcrafted fixtures missed
+// four rounds of bugs in a row: a real generation is wrapped in commentary and
+// written in whichever of about fourteen markdown dialects the model felt like
+// that minute, and a clean invented script has neither.
+func TestValidateScriptAgainstRealDevScripts(t *testing.T) {
+	files, err := filepath.Glob("testdata/devscripts/*.md")
+	if err != nil || len(files) == 0 {
+		t.Fatal("no dev script corpus found")
+	}
+	for _, f := range files {
+		t.Run(filepath.Base(f), func(t *testing.T) {
+			b, err := os.ReadFile(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			format := "video"
+			if strings.Contains(f, "reel") || strings.Contains(f, "short") {
+				format = "reel"
+			}
+			for _, p := range ValidateScript(string(b), format) {
+				t.Errorf("false positive [%s] %s: %s", p.Severity, p.ID, p.Message)
+			}
+		})
+	}
+}
+
+// The dialects seen on dev, each of which broke at least one check before
+// normalisation. If the model invents another, add it here.
+func TestNormaliseScriptHandlesEveryDialect(t *testing.T) {
+	cases := []struct {
+		line, wantBody       string
+		wantSpoken, wantNote bool
+	}{
+		{`**VO:** "Said aloud."`, "Said aloud.", true, false},
+		{`*VO:* "Said aloud."`, "Said aloud.", true, false},
+		{`- *VO:* "Said aloud."`, "Said aloud.", true, false},
+		{`**Spoken:** "Said aloud."`, "Said aloud.", true, false},
+		{`**Line (on-screen + VO):** "Said aloud."`, "Said aloud.", true, false},
+		{`**On-screen text:** "Read, not heard."`, "Read, not heard.", false, true},
+		{`*On-screen:* "Read, not heard."`, "Read, not heard.", false, true},
+		{`- *On-screen:* "Read, not heard."`, "Read, not heard.", false, true},
+		{`**Visual:** A wide shot.`, "A wide shot.", false, true},
+		{`(a bare stage direction)`, "(a bare stage direction)", false, true},
+		{`Just a plain sentence.`, "Just a plain sentence.", false, false},
+	}
+	for _, c := range cases {
+		got := normaliseScript(c.line)
+		if len(got) != 1 {
+			t.Errorf("%q produced %d lines", c.line, len(got))
+			continue
+		}
+		if got[0].Body != c.wantBody {
+			t.Errorf("%q body = %q, want %q", c.line, got[0].Body, c.wantBody)
+		}
+		if got[0].Spoken != c.wantSpoken || got[0].Note != c.wantNote {
+			t.Errorf("%q spoken=%v note=%v, want spoken=%v note=%v",
+				c.line, got[0].Spoken, got[0].Note, c.wantSpoken, c.wantNote)
+		}
 	}
 }

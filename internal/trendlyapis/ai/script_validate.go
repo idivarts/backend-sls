@@ -78,10 +78,6 @@ func (p ScriptProblem) MarshalJSON() ([]byte, error) {
 // law, which is why everything downstream of it is a warning.
 const wordsPerSecond = 2.5
 
-// maxOpeningSeconds is how long the hook's first spoken sentence may run
-// before it counts as rambling. Generous on purpose: see D3.
-const maxOpeningSeconds = 6.0
-
 // Target duration per content format, in seconds, used for the length check.
 // A format with no entry is simply not length-checked rather than guessed at.
 var formatTargetSeconds = map[string]struct{ min, max float64 }{
@@ -112,7 +108,8 @@ var (
 	reSceneMarker = regexp.MustCompile(`(?im)^\s*\*{0,2}(scene|beat)\s*\d`)
 
 	// Cues that the piece carries meaning with the sound off.
-	reOnScreenText = regexp.MustCompile(`(?i)(on-?screen text|caption|subtitle|text overlay|burned[- ]in)`)
+	// Labels that mean "the viewer can read this with the sound off".
+	reSoundOffWord = regexp.MustCompile(`(?i)\b(on-?screen|caption|subtitle|overlay|burned[- ]in|text)\b`)
 
 	// Imperative asks, for counting calls to action. "pin" and "reply" are
 	// here because they are real asks on X and LinkedIn, and leaving them out
@@ -138,41 +135,106 @@ func scriptSection(script, headingPattern string) string {
 }
 
 // spokenWords counts the words a presenter would actually say, which is what
-// decides a script's duration. Markdown, stage directions in brackets and
-// on-screen-text labels are production notes, not speech, and counting them
-// would make every script look twice as long as it is.
+// decides a script's duration.
+//
+// Camera directions, on-screen text and the model's own commentary are not
+// speech. Counting them made a twenty-second reel read as "about 80 seconds"
+// and fired a length warning on a script that was the right length.
 func spokenWords(script string) int {
-	s := regexp.MustCompile(`(?s)\(.*?\)|\[.*?\]`).ReplaceAllString(script, " ")
-	s = regexp.MustCompile(`(?im)^\s*\*{0,2}(on-?screen text|visual|cue|b-?roll|title suggestion)\b[^\n]*`).ReplaceAllString(s, " ")
-	s = reMarkdownNoise.ReplaceAllString(s, " ")
-	fields := strings.Fields(s)
-	return len(fields)
+	n := 0
+	for _, l := range normaliseScript(script) {
+		if l.Note {
+			continue
+		}
+		n += len(strings.Fields(l.Body))
+	}
+	return n
 }
 
-var reProductionLabel = regexp.MustCompile(`(?i)^\s*(vo|voice ?over|v/o|narration|on-?screen text|text|visual|audio|cue)\s*:\s*`)
-
-// openingLines returns the first n content lines of a block with their
-// production labels stripped, so a check sees the words rather than the cue
-// that introduces them.
+// The model does not write one markdown dialect, it writes about fourteen.
+// Across a handful of generations the same cue appeared as `**VO:**`, `*VO:*`,
+// `- *VO:*`, `**Line (on-screen + VO):**`, `**On-screen text:**`, `*On-screen:*`
+// and `- *On-screen:*`. Matching dialects one at a time is how the first three
+// rounds of this validator were spent: each round fixed the shapes in the last
+// run and the next generation produced new ones.
 //
-// A hook does not begin with one sentence; it begins with a stack of them —
-// an on-screen text line, a visual note, a voiceover line — in whatever order
-// the model chose. Looking at only the literal first sentence meant a greeting
-// in the VO went unnoticed whenever an on-screen-text line happened to come
-// first, which is most of the time.
+// So nothing below matches a dialect. Every line is normalised ONCE —
+// list bullet stripped, emphasis stripped, label identified by what it says
+// rather than how it is decorated — and the checks read the normalised form.
+var (
+	reListBullet = regexp.MustCompile(`^\s*([-*+]|\d+[.)])\s+`)
+	reEmphasis   = regexp.MustCompile(`\*{1,3}|_{2,}`)
+	// A label is any short leading phrase before a colon. The words inside it
+	// decide what kind it is; the brackets, slashes and extra words that the
+	// model sprinkles in ("Line (on-screen + VO)") do not have to be enumerated.
+	reLeadingLabel = regexp.MustCompile(`^\s*([A-Za-z][A-Za-z /+&()-]{0,40}?)\s*:\s*`)
+	// Words that mean "a presenter says this out loud".
+	reSpokenWord = regexp.MustCompile(`(?i)\b(vo|v/o|voice ?over|narration|narrator|spoken|speech|says|line|script|dialogue|host|talent)\b`)
+	// Words that mean "this is a production note, not speech".
+	reProductionWord = regexp.MustCompile(`(?i)\b(visual|on-?screen|caption|subtitle|text|overlay|cue|b-?roll|sfx|sound|music|title|shot|graphic)\b`)
+)
+
+// normalisedLine is one line of a script with its decoration removed.
+type normalisedLine struct {
+	Label  string // the leading label, lowercased, "" when the line has none
+	Body   string // everything after the label, unquoted and unemphasised
+	Spoken bool   // the label says a presenter says this
+	Note   bool   // the label says this is a production note
+}
+
+// normaliseScript strips list bullets and emphasis from every line and splits
+// off any leading label, so the checks can ask "is this spoken?" instead of
+// trying to recognise every way the model might have written "VO:".
+//
+// A line can be both spoken and a note — "Line (on-screen + VO)" is a real
+// example — in which case spoken wins, because the words after it are said
+// aloud whatever else is happening on the frame.
+func normaliseScript(script string) []normalisedLine {
+	var out []normalisedLine
+	for _, raw := range strings.Split(script, "\n") {
+		line := reListBullet.ReplaceAllString(raw, "")
+		line = reEmphasis.ReplaceAllString(line, "")
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		n := normalisedLine{Body: line}
+		// A line that is entirely parenthesised is a stage direction, whatever
+		// it does or does not call itself.
+		if strings.HasPrefix(line, "(") && strings.HasSuffix(line, ")") {
+			n.Note = true
+			out = append(out, n)
+			continue
+		}
+		if m := reLeadingLabel.FindStringSubmatch(line); m != nil {
+			label := strings.ToLower(strings.TrimSpace(m[1]))
+			spoken := reSpokenWord.MatchString(label)
+			note := reProductionWord.MatchString(label)
+			// Only treat it as a label when it actually names something we
+			// recognise. Otherwise "Monday: the day it broke" would lose its
+			// first two words.
+			if spoken || note {
+				n.Label = label
+				n.Body = strings.TrimSpace(line[len(m[0]):])
+				n.Spoken = spoken
+				n.Note = note && !spoken
+			}
+		}
+		n.Body = strings.Trim(n.Body, `"“”`)
+		out = append(out, n)
+	}
+	return out
+}
+
+// openingLines returns the first n lines of a block that a viewer actually
+// perceives — spoken words and on-screen text, not camera directions.
 func openingLines(block string, n int) []string {
 	var out []string
-	for _, raw := range strings.Split(block, "\n") {
-		line := strings.TrimSpace(reMarkdownNoise.ReplaceAllString(raw, ""))
-		if line == "" {
+	for _, l := range normaliseScript(block) {
+		if l.Body == "" {
 			continue
 		}
-		line = strings.TrimSpace(reProductionLabel.ReplaceAllString(line, ""))
-		line = strings.Trim(line, `"“”`)
-		if line == "" {
-			continue
-		}
-		out = append(out, line)
+		out = append(out, l.Body)
 		if len(out) == n {
 			break
 		}
@@ -180,19 +242,25 @@ func openingLines(block string, n int) []string {
 	return out
 }
 
-// spokenOpening returns the first line a presenter actually says: the first
-// voiceover line if the hook marks one, otherwise its first line. This is what
-// the time-to-subject check measures, since on-screen text is read instantly
-// and speech is not.
+// spokenOpening returns the first line a presenter actually says.
+//
+// This is what the rambling-opening check measures, and getting it wrong is
+// not harmless: before normalisation it fell back to the first line of the
+// hook, which is usually a camera direction, and measured a shot description
+// as if someone were reading it aloud.
 func spokenOpening(hook string) string {
-	for _, raw := range strings.Split(hook, "\n") {
-		stripped := strings.TrimSpace(reMarkdownNoise.ReplaceAllString(raw, ""))
-		if regexp.MustCompile(`(?i)^\s*(vo|voice ?over|v/o|narration)\s*:`).MatchString(stripped) {
-			return strings.Trim(strings.TrimSpace(reProductionLabel.ReplaceAllString(stripped, "")), `"“”`)
+	lines := normaliseScript(hook)
+	for _, l := range lines {
+		if l.Spoken && l.Body != "" {
+			return l.Body
 		}
 	}
-	if lines := openingLines(hook, 1); len(lines) > 0 {
-		return lines[0]
+	// No line is explicitly marked as speech: fall back to the first line that
+	// is at least not a production note.
+	for _, l := range lines {
+		if !l.Note && l.Body != "" {
+			return l.Body
+		}
 	}
 	return ""
 }
@@ -222,7 +290,11 @@ var (
 	// this model uses `---` as a separator between every section, so treating
 	// it as the boundary cut scripts in half — or, because only the first
 	// match was considered, cut nothing at all.
-	reCommentaryTail = regexp.MustCompile(`(?im)^\s*(\*{0,2}(a few |two |some )?notes?\b[^\n]*:\s*\*{0,2}|\*{0,2}(want|would you like|should i|shall i|do you want|let me know|i can also)\b[^\n]*)$`)
+	// Two shapes. A note heading ("Two notes:", "*Note on the ask:*") need NOT
+	// end its line -- the model often continues straight into the prose -- so
+	// that branch is not anchored to the line end. A closing question to the
+	// user is anchored, because mid-line "want" is an ordinary word.
+	reCommentaryTail = regexp.MustCompile(`(?im)^\s*\*{0,2}((a few |two |some )?notes?\b[^:\n]{0,60}:|(want|would you like|should i|shall i|do you want|let me know|i can also)\b[^\n]*$)`)
 )
 
 // stripCommentary removes the model's conversational wrapper and its
@@ -298,22 +370,18 @@ func ValidateScript(rawScript, format string) []ScriptProblem {
 		}
 	}
 
-	// D3 — a rambling opening.
+	// There is deliberately no "the opening rambles" check.
 	//
-	// What we would like to measure is "how long before the subject arrives",
-	// and that is not reliably computable: a good hook can put the subject in
-	// word two or word nine. What IS computable is whether the opening
-	// sentence is so long that the subject cannot possibly have landed in
-	// time. The threshold is therefore deliberately generous — it catches "so
-	// I was thinking the other day about how most people never really
-	// consider…" and leaves a brisk eight-word claim alone. Measured on the
-	// spoken line, because on-screen text is read at a glance and speech is
-	// not.
-	if spoken := spokenOpening(hook); spoken != "" {
-		if secs := float64(len(strings.Fields(firstSentence(spoken)))) / wordsPerSecond; secs > maxOpeningSeconds {
-			add("D3", severityCap, fmt.Sprintf("The hook's spoken opening runs about %.0f seconds before its first sentence ends. Cut it down and put the subject in the first few words.", secs))
-		}
-	}
+	// What matters is how long before the SUBJECT arrives, and that is not
+	// computable: a good hook can put it in word two or word nine. Sentence
+	// length was the available proxy and it is a bad one. At three seconds it
+	// flagged a brisk eight-word claim; raised to six it flagged "Our second
+	// location cost 40% more to open than our first — and it had nothing to do
+	// with rent", which lands its number in word four and is exactly the hook
+	// the craft contract asks for.
+	//
+	// Judging whether an opening is brisk is a judgement, so it belongs to the
+	// Phase 2 scorer's H2 criterion rather than to a word count here.
 
 	// D7 — exactly one ask. Two asks is zero asks.
 	if !reCTAHeading.MatchString(script) {
@@ -366,7 +434,7 @@ func ValidateScript(rawScript, format string) []ScriptProblem {
 	}
 
 	// D10 — most feed viewing is sound-off.
-	if !reOnScreenText.MatchString(script) {
+	if !hasSoundOffCues(script) {
 		add("D10", severityWarn, "The script gives no on-screen text or caption cues. Most feed viewing is muted, so the idea has to survive without audio.")
 	}
 
@@ -401,11 +469,29 @@ var reViewerQuestion = regexp.MustCompile(`(?i)\byou(r|'ve|'re)?\b[^?]*\?`)
 // A question counts as one ask however many sentences it spans, so a single
 // prompt phrased across two lines is not read as two competing asks.
 func countAsks(cta string) int {
-	n := len(reAsk.FindAllString(cta, -1))
+	// Distinct asks, not ask MENTIONS. A script that puts the same ask in the
+	// on-screen text and again in the voiceover -- which is correct craft, not
+	// a second ask -- was being counted twice and reported as competing CTAs.
+	distinct := map[string]bool{}
+	for _, m := range reAsk.FindAllString(cta, -1) {
+		distinct[strings.ToLower(strings.Join(strings.Fields(m), " "))] = true
+	}
+	n := len(distinct)
 	if reViewerQuestion.MatchString(cta) {
 		n++
 	}
 	return n
+}
+
+// hasSoundOffCues reports whether anything in the script is meant to be read
+// rather than heard.
+func hasSoundOffCues(script string) bool {
+	for _, l := range normaliseScript(script) {
+		if l.Label != "" && reSoundOffWord.MatchString(l.Label) {
+			return true
+		}
+	}
+	return false
 }
 
 // closesItsLoop reports whether the hook's distinctive words recur later in
