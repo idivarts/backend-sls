@@ -78,12 +78,19 @@ func (p ScriptProblem) MarshalJSON() ([]byte, error) {
 // law, which is why everything downstream of it is a warning.
 const wordsPerSecond = 2.5
 
-// Target duration per content format, in seconds, used for the length check.
-// A format with no entry is simply not length-checked rather than guessed at.
-var formatTargetSeconds = map[string]struct{ min, max float64 }{
-	"reel":  {15, 60},
-	"story": {5, 15},
-	"video": {30, 180},
+// The longest a script of each format should run, in seconds. A format with
+// no entry is not length-checked rather than guessed at.
+//
+// Only the upper bound is checked. A script being SHORTER than some band is
+// not a defect, and the band is really per-platform rather than per-format:
+// sixteen seconds is right for a post on X and short for a YouTube video, and
+// both arrive here as "video". Warning that a tight X script has "room for
+// another beat" is advice dressed up as a problem, which is the one thing
+// this validator must not produce.
+var formatMaxSeconds = map[string]float64{
+	"reel":  60,
+	"story": 15,
+	"video": 180,
 }
 
 var (
@@ -134,21 +141,48 @@ func scriptSection(script, headingPattern string) string {
 	return strings.TrimSpace(m[1])
 }
 
-// spokenWords counts the words a presenter would actually say, which is what
-// decides a script's duration.
+// reStructuralLine matches a line that organises the script rather than being
+// part of it: a markdown heading, a horizontal rule, or a scene header.
+var reStructuralLine = regexp.MustCompile(`(?i)^(#{1,6}\s|-{3,}\s*$|(scene|beat)\s*\d)`)
+
+// spokenWords counts the words a presenter actually says.
 //
-// Camera directions, on-screen text and the model's own commentary are not
-// speech. Counting them made a twenty-second reel read as "about 80 seconds"
-// and fired a length warning on a script that was the right length.
+// Neither obvious rule works on real output, and both were tried:
+//
+//   - "everything not marked as a production note" swept in the markdown
+//     headings, the scene headers and the model's own "Here's a draft…"
+//     preamble, turning a 33-second reel into "about 80 seconds".
+//   - "only lines explicitly marked VO or Spoken" missed the scripts that
+//     write their narration as bare prose under a scene header — a perfectly
+//     normal style — and called a 40-second LinkedIn video 8 seconds long.
+//
+// What actually separates narration from commentary is not how a line is
+// labelled but WHERE IT SITS: narration is inside the Hook, Body and CTA
+// sections, and the model's remarks are before the first heading or after the
+// last. So the count reads those three sections and skips notes and the lines
+// that merely organise them.
 func spokenWords(script string) int {
 	n := 0
-	for _, l := range normaliseScript(script) {
-		if l.Note {
-			continue
+	for _, sec := range scriptBodySections(script) {
+		for _, l := range normaliseScript(sec) {
+			if l.Note || reStructuralLine.MatchString(l.Body) {
+				continue
+			}
+			n += len(strings.Fields(l.Body))
 		}
-		n += len(strings.Fields(l.Body))
 	}
 	return n
+}
+
+// scriptBodySections returns the parts of a script that are the piece itself.
+func scriptBodySections(script string) []string {
+	var out []string
+	for _, pat := range []string{`hook`, `(?:body|scenes?)`, `(?:cta|call[ -]to[ -]action)`} {
+		if sec := scriptSection(script, pat); sec != "" {
+			out = append(out, sec)
+		}
+	}
+	return out
 }
 
 // The model does not write one markdown dialect, it writes about fourteen.
@@ -444,13 +478,9 @@ func ValidateScript(rawScript, format string) []ScriptProblem {
 	}
 
 	// D4/D13 — length against the format's band.
-	if band, ok := formatTargetSeconds[strings.ToLower(strings.TrimSpace(format))]; ok {
-		secs := float64(spokenWords(script)) / wordsPerSecond
-		switch {
-		case secs > band.max*1.2:
-			add("D13", severityWarn, fmt.Sprintf("At about %.0f seconds of speech this is well past the %.0f-%.0f second band for a %s. Cut it back.", secs, band.min, band.max, format))
-		case secs < band.min*0.8:
-			add("D13", severityWarn, fmt.Sprintf("At about %.0f seconds of speech this is short for a %s (%.0f-%.0f seconds). There is room for another beat.", secs, format, band.min, band.max))
+	if maxSecs, ok := formatMaxSeconds[strings.ToLower(strings.TrimSpace(format))]; ok && len(scriptBodySections(script)) > 0 {
+		if secs := float64(spokenWords(script)) / wordsPerSecond; secs > maxSecs*1.2 {
+			add("D13", severityWarn, fmt.Sprintf("At about %.0f seconds of speech this runs well past the %.0f seconds a %s should. Cut it back.", secs, maxSecs, format))
 		}
 	}
 
