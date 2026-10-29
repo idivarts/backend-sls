@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/idivarts/backend-sls/pkg/mediagen"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
-	"github.com/idivarts/backend-sls/pkg/pexels"
 	"golang.org/x/net/html"
 )
 
@@ -157,27 +157,28 @@ func collectPlaceholders(root *html.Node) []placeholder {
 // CDN makes every past design hostage to that host. Same rule as generated
 // images.
 func resolveStock(ctx context.Context, brandID, query, aspect string) (src, alt, credit string) {
-	photos, err := pexels.Search(ctx, query, orientationForAspect(aspect), 1)
+	res, err := mediagen.Submit(ctx, "pexels", mediagen.Spec{
+		Kind:        mediagen.KindStock,
+		Prompt:      query,
+		AspectRatio: aspect,
+		Count:       1,
+	})
 	if err != nil {
-		if err != pexels.ErrNotConfigured {
-			log.Printf("design imagery: stock search %q: %v", query, err)
-		}
+		log.Printf("design imagery: stock search %q: %v", query, err)
 		return "", "", ""
 	}
-	if len(photos) == 0 {
+	if res.Status == mediagen.StatusFailed || len(res.Assets) == 0 {
+		// Includes "not configured", which is an ops gap and not worth a log
+		// line on every placeholder of every design.
 		return "", "", ""
 	}
-	p := photos[0]
-	hosted, uerr := uploadFromURL(p.URL, brandID)
+	p := res.Assets[0]
+	hosted, uerr := hostAsset(p.URL, brandID)
 	if uerr != nil {
 		log.Printf("design imagery: stock copy %q: %v", query, uerr)
 		return "", "", ""
 	}
-	credit = strings.TrimSpace(p.Photographer)
-	if credit != "" {
-		credit = "Photo by " + credit + " on Pexels"
-	}
-	return hosted, p.Alt, credit
+	return hosted, "", p.Attribution
 }
 
 // resolveGenerated produces an image from the model and hosts it.
@@ -189,44 +190,26 @@ func resolveGenerated(ctx context.Context, brandID, prompt, aspect string) strin
 		// reported by the surfaces that can actually prompt an upgrade.
 		return ""
 	}
-	resp, usage, err := openrouter.GenerateImage(ctx, openrouter.ImageRequest{
-		Model:  model,
-		Prompt: designSystemImageryGuidance(loadDesignSystem(brandID), prompt),
-		Size:   aspectToSize(aspect),
-		N:      1,
+	res, err := mediagen.Submit(ctx, "openrouter", mediagen.Spec{
+		Kind:        mediagen.KindImage,
+		ModelID:     model,
+		Prompt:      designSystemImageryGuidance(loadDesignSystem(brandID), prompt),
+		AspectRatio: aspect,
+		Count:       1,
 	})
-	if err != nil {
-		log.Printf("design imagery: generate %q: %v", prompt, err)
+	if err != nil || res.Status == mediagen.StatusFailed {
+		log.Printf("design imagery: generate %q: %v %s", prompt, err, res.Error)
 		return ""
 	}
-	if usage != nil {
+	if res.Usage != nil {
 		if orgID, ok := orgIDForBrand(brandID); ok {
-			meterAIUsage(orgID, &openrouter.Usage{Cost: usage.Cost})
+			meterAIUsage(orgID, &openrouter.Usage{Cost: res.Usage.CostUSD})
 		}
 	}
-	for _, d := range resp.Data {
-		if d.URL != "" {
-			if s3url, uerr := uploadFromURL(d.URL, brandID); uerr == nil {
-				return s3url
-			}
+	for _, a := range res.Assets {
+		if s3url, uerr := hostAsset(a.URL, brandID); uerr == nil && s3url != "" {
+			return s3url
 		}
-		if d.B64JSON != "" {
-			if s3url, uerr := uploadBase64Image(d.B64JSON, brandID); uerr == nil {
-				return s3url
-			}
-		}
-	}
-	return ""
-}
-
-func orientationForAspect(aspect string) string {
-	switch aspect {
-	case "9:16", "4:5":
-		return pexels.OrientationPortrait
-	case "16:9":
-		return pexels.OrientationLandscape
-	case "1:1":
-		return pexels.OrientationSquare
 	}
 	return ""
 }
