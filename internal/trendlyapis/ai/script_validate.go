@@ -508,9 +508,19 @@ func countAsks(cta string) int {
 	// on-screen text and again in the voiceover -- which is correct craft, not
 	// a second ask -- was being counted twice and reported as competing CTAs.
 	cta = scriptContentText(cta)
+	// Key on the VERB, not the phrase. The same ask written for two surfaces
+	// comes out slightly differently in each -- "Send this to whoever bought
+	// the cheap grinder" on screen, "Send them this before their next bag" in
+	// the voiceover -- and keying on the matched text counted those as two
+	// competing asks. The verb is what makes an ask distinct: "save" and
+	// "send" are two things to do, "send this" and "send them this" are one.
 	distinct := map[string]bool{}
 	for _, m := range reAsk.FindAllString(cta, -1) {
-		distinct[strings.ToLower(strings.Join(strings.Fields(m), " "))] = true
+		fields := strings.Fields(strings.ToLower(m))
+		if len(fields) == 0 {
+			continue
+		}
+		distinct[fields[0]] = true
 	}
 	n := len(distinct)
 	if reViewerQuestion.MatchString(cta) {
