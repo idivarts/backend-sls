@@ -114,8 +114,10 @@ var (
 	// Cues that the piece carries meaning with the sound off.
 	reOnScreenText = regexp.MustCompile(`(?i)(on-?screen text|caption|subtitle|text overlay|burned[- ]in)`)
 
-	// Imperative asks, for counting calls to action.
-	reAsk = regexp.MustCompile(`(?i)\b(send (this|it)|save (this|it)|share (this|it)|comment\b|follow\b|subscribe\b|tap (the )?link|click (the )?link|sign up|book (a|your)|try (it|this)|download)\b`)
+	// Imperative asks, for counting calls to action. "pin" and "reply" are
+	// here because they are real asks on X and LinkedIn, and leaving them out
+	// made a perfectly good "pin this" CTA look like no CTA at all.
+	reAsk = regexp.MustCompile(`(?i)\b(send (this|it)|save (this|it)|share (this|it)|pin (this|it|a)|reply with|drop (a|your)|comment\b|follow\b|subscribe\b|tap (the )?link|click (the )?link|sign up|book (a|your)|try (it|this)|download)\b`)
 
 	// Markdown decoration to strip before counting words.
 	reMarkdownNoise = regexp.MustCompile(`[*_#>` + "`" + `]+`)
@@ -204,17 +206,71 @@ func firstSentence(s string) string {
 	return s
 }
 
+var (
+	// A line that is entirely italic, or entirely parenthesised, is the
+	// model talking to the user about the script rather than writing it:
+	// "*Cue: you to camera.*", "*(Structure: hook / payoff / one ask.)*".
+	// Bold labels like "**VO:**" are untouched — the pattern requires a
+	// single leading asterisk followed by a non-asterisk.
+	reItalicOnlyLine = regexp.MustCompile(`(?m)^\s*\*[^*\s][^\n]*\*\s*$`)
+	reParenOnlyLine  = regexp.MustCompile(`(?m)^\s*\([^\n]*\)\s*$`)
+
+	// Where the script stops and the chat message resumes. Everything from
+	// here on is the model addressing the user.
+	//
+	// A horizontal rule is deliberately NOT a marker. It reads like one, but
+	// this model uses `---` as a separator between every section, so treating
+	// it as the boundary cut scripts in half — or, because only the first
+	// match was considered, cut nothing at all.
+	reCommentaryTail = regexp.MustCompile(`(?im)^\s*(\*{0,2}(a few |two |some )?notes?\b[^\n]*:\s*\*{0,2}|\*{0,2}(want|would you like|should i|shall i|do you want|let me know|i can also)\b[^\n]*)$`)
+)
+
+// stripCommentary removes the model's conversational wrapper and its
+// production notes, leaving the words that are actually the script.
+//
+// This is not cosmetic. Without it the checks read the model's own prose
+// ABOUT the script as if it were the script, and the failure is perfectly
+// backwards: a model that correctly avoided engagement bait and then
+// explained that it had avoided it — "the ask is an opinion prompt, not
+// engagement bait … without tripping its suppression of 'comment YES'
+// prompts" — was flagged for using the very phrase it was declining to use.
+// The same wrapper inflated the ask count and the spoken-word count.
+//
+// Found by running against real dev output. The unit fixtures were clean
+// handcrafted scripts and could never have surfaced it, which is the whole
+// argument for verifying on dev rather than trusting a green test run.
+func stripCommentary(script string) string {
+	// Cut the conversational tail at the EARLIEST marker that still sits in
+	// the last third of the document. Taking the first match outright would
+	// let a stray early match disarm the cut; requiring the last would miss a
+	// notes block followed by a closing question. Scanning only the tail
+	// region gives both.
+	if locs := reCommentaryTail.FindAllStringIndex(script, -1); locs != nil {
+		threshold := len(script) / 3
+		for _, loc := range locs {
+			if loc[0] > threshold {
+				script = script[:loc[0]]
+				break
+			}
+		}
+	}
+	script = reItalicOnlyLine.ReplaceAllString(script, "")
+	script = reParenOnlyLine.ReplaceAllString(script, "")
+	return script
+}
+
 // ValidateScript runs every deterministic check over a generated script and
 // returns the problems, most severe first.
 //
 // `format` is the content format ("reel", "video", …) and may be empty, in
 // which case the length checks are skipped rather than guessed at.
-func ValidateScript(script, format string) []ScriptProblem {
+func ValidateScript(rawScript, format string) []ScriptProblem {
 	var problems []ScriptProblem
 	add := func(id string, sev scriptSeverity, msg string) {
 		problems = append(problems, ScriptProblem{ID: id, Severity: sev, Message: msg})
 	}
 
+	script := stripCommentary(rawScript)
 	trimmed := strings.TrimSpace(script)
 	if trimmed == "" {
 		add("D1", severityFatal, "The script is empty. Write it with the sections asked for: a hook, a body of scenes, and one call to action.")
@@ -266,9 +322,9 @@ func ValidateScript(script, format string) []ScriptProblem {
 		// A heading with nothing under it is as useless as no heading, and
 		// easier to miss because the section looks present.
 		add("D7", severityFatal, "The CTA section is empty. Write exactly ONE ask, and pick the one this platform rewards.")
-	} else if n := len(reAsk.FindAllString(cta, -1)); n > 1 {
+	} else if n := countAsks(cta); n > 1 {
 		add("D7", severityCap, fmt.Sprintf("The call to action contains %d separate asks. Keep exactly one — two asks is zero asks.", n))
-	} else if n == 0 && cta != "" {
+	} else if n == 0 {
 		add("D7", severityWarn, "The CTA section does not contain a recognisable ask. State one concrete action for the viewer to take.")
 	}
 
@@ -314,6 +370,29 @@ func ValidateScript(script, format string) []ScriptProblem {
 
 	sortProblemsBySeverity(problems)
 	return problems
+}
+
+// reViewerQuestion is a question put to the viewer: second person, ending in
+// a question mark.
+var reViewerQuestion = regexp.MustCompile(`(?i)\byou(r|'ve|'re)?\b[^?]*\?`)
+
+// countAsks counts the calls to action in a CTA section.
+//
+// An imperative is the obvious form, but it is not the only one. An opinion
+// prompt — "curious what blindsided you on an expansion?" — is a genuine ask,
+// and on LinkedIn it is the RIGHT ask, the one the platform playbook tells the
+// model to prefer over a reaction prompt. Counting only imperatives therefore
+// reported "no recognisable ask" on exactly the CTAs the craft contract asks
+// for, which would have taught anyone reading the score to ignore it.
+//
+// A question counts as one ask however many sentences it spans, so a single
+// prompt phrased across two lines is not read as two competing asks.
+func countAsks(cta string) int {
+	n := len(reAsk.FindAllString(cta, -1))
+	if reViewerQuestion.MatchString(cta) {
+		n++
+	}
+	return n
 }
 
 // closesItsLoop reports whether the hook's distinctive words recur later in
