@@ -329,7 +329,7 @@ func handleMessageWS(req WSRequest) {
 				var derr error
 				if sc.Function.Name == toolGenerateImage {
 					var urls []string
-					result, urls, derr = runChatImageTool(ctx, conv.BrandID, orgID, req.ConnectionID, conv.ID, req.Model, sc.Function.Arguments)
+					result, urls, derr = runChatImageTool(ctx, conv.BrandID, orgID, conv.ContextID, req.ConnectionID, conv.ID, req.Model, sc.Function.Arguments)
 					genImages = append(genImages, urls...)
 				} else if sc.Function.Name == toolRenderDesignPreview {
 					// The frames are collected here and appended as a user turn
