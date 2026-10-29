@@ -140,6 +140,10 @@ func defaultRegistry() Registry {
 			// gemini-3.5-flash — the same model it had before, but one that can at
 			// least see its own render.
 			TaskDesign: {Allowed: []string{"anthropic/claude-opus-4.8", "openai/gpt-5.5", "google/gemini-3-pro-preview", "openai/gpt-5.4", "google/gemini-3.5-flash"}},
+			// Cheapest-capable first, and deliberately NOT reasoning-grade: a judge
+			// is scored on reproducibility, and five dimension calls per run means
+			// a reasoning model would dominate the cost of the whole feature.
+			TaskScore: {Allowed: []string{"google/gemini-3.5-flash", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4"}},
 		},
 	}
 }
