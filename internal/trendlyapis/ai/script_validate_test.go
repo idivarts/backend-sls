@@ -379,25 +379,63 @@ func TestStripCommentaryDoesNotEmptyAShortScript(t *testing.T) {
 // written in whichever of about fourteen markdown dialects the model felt like
 // that minute, and a clean invented script has neither.
 func TestValidateScriptAgainstRealDevScripts(t *testing.T) {
-	files, err := filepath.Glob("testdata/devscripts/*.md")
-	if err != nil || len(files) == 0 {
-		t.Fatal("no dev script corpus found")
+	clean, _ := filepath.Glob("testdata/devscripts/clean/*.md")
+	if len(clean) == 0 {
+		t.Fatal("no clean corpus found")
 	}
-	for _, f := range files {
-		t.Run(filepath.Base(f), func(t *testing.T) {
-			b, err := os.ReadFile(f)
-			if err != nil {
-				t.Fatal(err)
-			}
-			format := "video"
-			if strings.Contains(f, "reel") || strings.Contains(f, "short") {
-				format = "reel"
-			}
-			for _, p := range ValidateScript(string(b), format) {
+	for _, f := range clean {
+		t.Run("clean/"+filepath.Base(f), func(t *testing.T) {
+			for _, p := range ValidateScript(readScript(t, f), formatFor(f)) {
 				t.Errorf("false positive [%s] %s: %s", p.Severity, p.ID, p.Message)
 			}
 		})
 	}
+
+	// The other direction matters just as much. Four rounds of this validator
+	// were spent removing false positives, and a validator that has stopped
+	// reporting anything at all would have passed every one of those rounds.
+	flagged, _ := filepath.Glob("testdata/devscripts/flagged/*.md")
+	if len(flagged) == 0 {
+		t.Fatal("no flagged corpus found: without one, a validator that reports nothing looks perfect")
+	}
+	for _, f := range flagged {
+		t.Run("flagged/"+filepath.Base(f), func(t *testing.T) {
+			if len(ValidateScript(readScript(t, f), formatFor(f))) == 0 {
+				t.Error("this script really does have a problem and the validator missed it")
+			}
+		})
+	}
+}
+
+// A real generation that asks for a save AND a send — two different actions,
+// which is two asks however confidently the model's own note claims one.
+func TestValidateScriptCatchesTheRealTwoAskScript(t *testing.T) {
+	f := "testdata/devscripts/flagged/two-asks-save-and-send-reel.md"
+	var found bool
+	for _, p := range ValidateScript(readScript(t, f), "reel") {
+		if p.ID == "D7" && strings.Contains(p.Message, "2 separate asks") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("want D7 reporting two asks")
+	}
+}
+
+func readScript(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func formatFor(path string) string {
+	if strings.Contains(path, "reel") || strings.Contains(path, "short") {
+		return "reel"
+	}
+	return "video"
 }
 
 // The dialects seen on dev, each of which broke at least one check before
