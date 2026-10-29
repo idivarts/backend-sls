@@ -308,3 +308,73 @@ func TestJudgePromptEvidenceIsScoped(t *testing.T) {
 		}
 	}
 }
+
+// The stored document must be the API shape, key for key. Firestore marshals by
+// `firestore:` tag and falls back to the Go field name, never the json tag, so
+// persisting the struct directly wrote Band / Overall / ScoredAt and every
+// reader saw undefined.
+func TestFirestoreMapMatchesTheAPIShape(t *testing.T) {
+	s := &ViralityScore{
+		Overall:       84,
+		Band:          "Strong",
+		Cap:           &ScoreCap{At: 70, Reason: "a check fired"},
+		RubricVersion: rubricVersion,
+		JudgeModel:    "google/gemini-3.5-flash",
+		ScoredAt:      1_793_000_000_000,
+		Dimensions: []DimensionScore{{
+			Key: "hook", Label: "Hook", Weight: 30, Score: 100,
+			Criteria: []CriterionScore{{ID: "H1", Score: 2}, {ID: "H4", Score: 0, Note: "n", Prefills: true}},
+		}},
+		Fixes:    []Fix{{Criterion: "S2", Dimension: "Share", Message: "m"}},
+		Problems: []ScriptProblem{{ID: "D2", Severity: severityCap, Message: "msg"}},
+	}
+
+	doc, err := s.FirestoreMap()
+	if err != nil {
+		t.Fatalf("FirestoreMap: %v", err)
+	}
+
+	for _, k := range []string{"overall", "band", "cap", "dimensions", "fixes", "problems", "rubricVersion", "judgeModel", "scoredAt"} {
+		if _, ok := doc[k]; !ok {
+			t.Errorf("missing %q — the panel reads this key", k)
+		}
+	}
+	// A capitalised key means the struct leaked through rather than its JSON.
+	for k := range doc {
+		if k != "" && k[0] >= 'A' && k[0] <= 'Z' {
+			t.Errorf("key %q is a Go field name, not the json tag", k)
+		}
+	}
+	if doc["scoredAt"] == nil {
+		t.Error("scoredAt must be present: an undefined timestamp crashes the panel")
+	}
+
+	// The severity has to survive as its name. Firestore tags could not do
+	// this — MarshalJSON is the only thing that renders the enum.
+	probs, ok := doc["problems"].([]interface{})
+	if !ok || len(probs) != 1 {
+		t.Fatalf("problems did not round-trip: %#v", doc["problems"])
+	}
+	p, _ := probs[0].(map[string]interface{})
+	if p["severity"] != "cap" {
+		t.Errorf("severity = %#v, want \"cap\"", p["severity"])
+	}
+
+	// Nested shapes matter just as much: the panel maps over dimensions and
+	// reads each criterion.
+	dims, _ := doc["dimensions"].([]interface{})
+	if len(dims) != 1 {
+		t.Fatalf("dimensions did not round-trip: %#v", doc["dimensions"])
+	}
+	d, _ := dims[0].(map[string]interface{})
+	for _, k := range []string{"key", "label", "weight", "score", "criteria"} {
+		if _, ok := d[k]; !ok {
+			t.Errorf("dimension missing %q", k)
+		}
+	}
+	crits, _ := d["criteria"].([]interface{})
+	c0, _ := crits[1].(map[string]interface{})
+	if c0["prefilled"] != true {
+		t.Errorf("prefilled did not survive: %#v", c0)
+	}
+}
