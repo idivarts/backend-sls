@@ -28,6 +28,10 @@ func RegisterRoutes(engine *gin.Engine) {
 	g.POST("/content/caption", HTTPCaption)
 	g.POST("/content/hashtags", HTTPHashtags)
 
+	// Scores a script against the virality rubric: five dimensions, one judge
+	// call each, rolled up in code. See virality_score.go.
+	g.POST("/content/score", HTTPScore)
+
 	g.GET("/models", ListModels)
 
 	// Strategy → calendar conversion lives under its own prefix (documented
