@@ -43,7 +43,7 @@ func audioServerTools() []openrouter.Tool {
 				"bed at render time.",
 			openrouter.ObjectSchema(map[string]any{
 				"text":     openrouter.StringProp("The words to speak (script/caption). Ignored when sceneTexts is given."),
-				"voiceId":  openrouter.StringProp("The ElevenLabs voice id (from the voice picker)."),
+				"voiceId":  openrouter.StringProp("Optional ElevenLabs voice id. Leave it out to reuse the voice this content was last recorded in, or the brand's default — do NOT stop and ask the user for an id they have no way to look up."),
 				"language": openrouter.StringProp("Optional ISO 639-1 language code."),
 				"sceneTexts": map[string]any{
 					"type": "array",
@@ -55,7 +55,7 @@ func audioServerTools() []openrouter.Tool {
 						"you where.",
 					"items": map[string]any{"type": "string"},
 				},
-			}, []string{"voiceId"}),
+			}, []string{}),
 		),
 	}
 }
@@ -115,8 +115,16 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 	if err := json.Unmarshal([]byte(arguments), &a); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "could not parse arguments"}), nil
 	}
-	if a.VoiceID == "" {
-		return jsonResult(map[string]any{"ok": false, "error": "voiceId is required"}), nil
+	// A voice id is not something the user can look up, and the model has no
+	// catalogue — so asking for one stalls the whole flow on a value nobody in
+	// the conversation possesses. Fall back to the voice this content was last
+	// recorded in, then to the first in the catalogue.
+	voiceID := strings.TrimSpace(a.VoiceID)
+	if voiceID == "" {
+		voiceID = defaultVoiceFor(brandID, contentID)
+	}
+	if voiceID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "no voices are available from the provider right now"}), nil
 	}
 	// Per-scene lines are joined into ONE take. Generating a clip per scene
 	// would give exact boundaries too, but resets the prosody and leaves a
@@ -142,14 +150,14 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 	if len(sceneTexts) > 0 {
 		var timings []elevenlabs.CharTiming
 		audio, timings, err = elevenlabs.GenerateVoiceoverTimed(elevenlabs.TTSRequest{
-			VoiceID: a.VoiceID, Text: text, Language: a.Language,
+			VoiceID: voiceID, Text: text, Language: a.Language,
 		})
 		if err == nil {
 			boundaries, exact = sceneBoundariesFrom(sceneTexts, sceneJoiner, timings)
 		}
 	} else {
 		audio, err = elevenlabs.GenerateVoiceover(elevenlabs.TTSRequest{
-			VoiceID: a.VoiceID, Text: text, Language: a.Language,
+			VoiceID: voiceID, Text: text, Language: a.Language,
 		})
 	}
 	if err != nil {
@@ -161,7 +169,7 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 	}
 	id, _ := trendlymodels.CreateGeneratedAudio(&trendlymodels.GeneratedAudio{
 		BrandID: brandID, Kind: "voiceover", Provider: "elevenlabs", Prompt: text,
-		VoiceID: a.VoiceID, Language: a.Language, URL: url, Status: "ready",
+		VoiceID: voiceID, Language: a.Language, URL: url, Status: "ready",
 	})
 	if contentID != "" {
 		attachVoiceover(brandID, contentID, id, url, boundaries, exact)
@@ -217,4 +225,27 @@ func loadContentAudio(brandID, contentID string) *trendlymodels.ContentAudio {
 		return c.Audio
 	}
 	return &trendlymodels.ContentAudio{}
+}
+
+// defaultVoiceFor picks a voice without asking.
+//
+// The one this content was last recorded in comes first: a brand that has
+// chosen a voice should not drift to another one because a regeneration did
+// not name it. Otherwise the catalogue's first entry, which is a real voice
+// rather than a failure.
+func defaultVoiceFor(brandID, contentID string) string {
+	if contentID != "" {
+		if ct, err := trendlymodels.GetContent(brandID, contentID); err == nil &&
+			ct != nil && ct.Audio != nil && ct.Audio.VoiceoverID != "" {
+			if prev, err := trendlymodels.GetGeneratedAudio(brandID, ct.Audio.VoiceoverID); err == nil &&
+				prev != nil && prev.VoiceID != "" {
+				return prev.VoiceID
+			}
+		}
+	}
+	voices, err := elevenlabs.ListVoices()
+	if err != nil || len(voices) == 0 {
+		return ""
+	}
+	return voices[0].VoiceID
 }
