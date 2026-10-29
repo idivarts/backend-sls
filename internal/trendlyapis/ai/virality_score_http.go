@@ -97,8 +97,12 @@ func HTTPScore(c *gin.Context) {
 	// wasteful but correct, and is not worth failing the request the user is
 	// waiting on.
 	if req.ContextID != "" {
-		if err := trendlymodels.UpdateContentFields(req.BrandID, req.ContextID,
-			map[string]any{"viralityScore": score}); err != nil {
+		// Through FirestoreMap, not the struct: Firestore ignores `json:` tags
+		// and would store the Go field names. See the note on that method.
+		if doc, err := score.FirestoreMap(); err != nil {
+			log.Printf("ai score encode brand=%s content=%s: %v", req.BrandID, req.ContextID, err)
+		} else if err := trendlymodels.UpdateContentFields(req.BrandID, req.ContextID,
+			map[string]any{"viralityScore": doc}); err != nil {
 			log.Printf("ai score persist brand=%s content=%s: %v", req.BrandID, req.ContextID, err)
 		}
 	}

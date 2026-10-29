@@ -580,3 +580,29 @@ func topFixes(s *ViralityScore) []Fix {
 	}
 	return out
 }
+
+// FirestoreMap renders the score as the document to persist.
+//
+// Firestore marshals a struct by its `firestore:` tags and falls back to the
+// Go FIELD NAME — it does not look at `json:`. ViralityScore carried only json
+// tags, so the stored document came out as Band / Overall / ScoredAt while
+// every reader expects band / overall / scoredAt. The panel then read undefined
+// for all of it, and an undefined timestamp took the whole content screen down
+// with "RangeError: Invalid time value".
+//
+// A JSON round-trip rather than a second set of tags, for two reasons. It makes
+// the json tags the single source of truth, so the stored shape and the API
+// shape cannot drift apart again; and it honours ScriptProblem.MarshalJSON,
+// which turns the severity enum into its name — something a `firestore:` tag on
+// an int field cannot do at all.
+func (s *ViralityScore) FirestoreMap() (map[string]interface{}, error) {
+	blob, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]interface{}
+	if err := json.Unmarshal(blob, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
