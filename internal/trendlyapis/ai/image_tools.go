@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
+	"log"
 	"strings"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -67,7 +70,7 @@ type generateImageArgs struct {
 // gating is enforced here (STANDING RULE — backend gate), and an upgrade_required
 // frame is pushed to the client so the UI can react in-context; the tool result
 // also tells the model so it can explain to the user.
-func runChatImageTool(ctx context.Context, brandID, orgID, connID, convID, requestedModel, arguments string) (string, []string, error) {
+func runChatImageTool(ctx context.Context, brandID, orgID, contentID, connID, convID, requestedModel, arguments string) (string, []string, error) {
 	var a generateImageArgs
 	if arguments != "" {
 		if err := json.Unmarshal([]byte(arguments), &a); err != nil {
@@ -152,6 +155,15 @@ func runChatImageTool(ctx context.Context, brandID, orgID, connID, convID, reque
 		return jsonResult(map[string]any{"ok": false, "error": "image upload failed"}), nil, nil
 	}
 
+	// A generated image belongs on the canvas, not in a chat bubble.
+	//
+	// Loose attachments are indistinguishable from an upload in the data, so an
+	// image saved that way is publishable but can never be iterated on — you
+	// cannot put a headline over it, animate it, or reuse it as a frame. Wrapping
+	// it in a design document puts it in the design lane, where every one of
+	// those is an ordinary edit.
+	placed := placeImagesOnCanvas(brandID, contentID, urls)
+
 	// Push the images to the client immediately so the assistant bubble can show
 	// them before the committed Firestore doc syncs.
 	wsSend(connID, map[string]any{
@@ -160,9 +172,80 @@ func runChatImageTool(ctx context.Context, brandID, orgID, connID, convID, reque
 		"images":         urls,
 	})
 
+	note := fmt.Sprintf("%d image(s) generated and shown to the user; reference them naturally in your reply.", len(urls))
+	if placed {
+		note += " They are now on the content's canvas as a design, so the user can caption or restyle them — " +
+			"call " + toolGetDesignHTML + " before any edit."
+	}
 	return jsonResult(map[string]any{
 		"ok":     true,
 		"images": urls,
-		"note":   fmt.Sprintf("%d image(s) generated and shown to the user; reference them naturally in your reply.", len(urls)),
+		"placed": placed,
+		"note":   note,
 	}), urls, nil
+}
+
+// placeImagesOnCanvas wraps freshly generated images in a design document so
+// they land in the design lane. Reports whether it did.
+//
+// It deliberately does NOT touch a content that already has a design: once a
+// canvas exists, "generate an image" almost always means "make me something to
+// USE in this design", and silently replacing the user's laid-out work with a
+// bare photo would destroy it. In that case the images stay in the chat, where
+// the model can place them with apply_design_edits instead.
+func placeImagesOnCanvas(brandID, contentID string, urls []string) bool {
+	if contentID == "" || len(urls) == 0 {
+		return false
+	}
+	content, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil || content == nil {
+		return false
+	}
+	if content.DesignRef != nil && content.DesignRef.RevisionID != "" {
+		return false
+	}
+	format := content.ContentFormat
+	// A live or text post has no media area at all, so a design document on one
+	// would be invisible in the app and would still claim the design lane.
+	if format == trendlymodels.ContentFormatLive || format == trendlymodels.ContentFormatText {
+		return false
+	}
+	// Only a carousel has more than one slide. Writing N slides onto a single
+	// post would publish the first and silently lose the rest.
+	slides := len(urls)
+	if format != trendlymodels.ContentFormatCarousel {
+		slides = 1
+		urls = urls[:1]
+	}
+	w, h := sizeForFormatPx(string(format))
+	if _, err := persistDesign(
+		brandID, contentID, imageDesignHTML(urls, w, h),
+		w, h, slides, 0, "image", "generate", "",
+	); err != nil {
+		log.Printf("ai image-gen canvas placement: %v", err)
+		return false
+	}
+	return true
+}
+
+// imageDesignHTML builds a minimal design document whose only content is the
+// generated photography, one slide per image.
+//
+// The image is a real <img> rather than a CSS background: the render worker
+// captures each [data-slide] as an element, and a background-image on a sized
+// slide and an <img> with object-fit:cover produce the same pixels — but only
+// the <img> carries a data-el the model can address later ("swap the hero
+// photo") without rewriting the stylesheet.
+func imageDesignHTML(urls []string, w, h int) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, `<div data-carousel style="width:%dpx">`, w)
+	for i, u := range urls {
+		fmt.Fprintf(&b,
+			`<section data-slide style="position:relative;width:%dpx;height:%dpx;overflow:hidden;background:#000">`+
+				`<img data-el="photo-%d" src="%s" alt="" style="position:absolute;inset:0;width:100%%;height:100%%;object-fit:cover">`+
+				`</section>`,
+			w, h, i+1, html.EscapeString(u))
+	}
+	b.WriteString(`</div>`)
+	return wrapHTML(b.String())
 }
