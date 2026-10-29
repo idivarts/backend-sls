@@ -326,15 +326,34 @@ func handleScriptGenWS(req WSRequest) {
 			wsSend(req.ConnectionID, map[string]any{"type": "token", "delta": delta})
 		},
 		OnDone: func(u *openrouter.Usage) {
-			if p.ContextID != "" {
-				if s := strings.TrimSpace(scriptBuf.String()); s != "" {
-					if err := trendlymodels.UpdateContentFields(p.BrandID, p.ContextID, map[string]any{"script": s}); err != nil {
-						log.Printf("ai script persist: %v", err)
-					}
+			s := strings.TrimSpace(scriptBuf.String())
+			if p.ContextID != "" && s != "" {
+				if err := trendlymodels.UpdateContentFields(p.BrandID, p.ContextID, map[string]any{"script": s}); err != nil {
+					log.Printf("ai script persist: %v", err)
 				}
 			}
 			meterAIUsage(orgID, u)
-			wsSend(req.ConnectionID, map[string]any{"type": "done", "usage": u})
+
+			// Deterministic checks on what was just written. These cost no
+			// tokens and no model call, so they run on every generation.
+			//
+			// They are REPORTED, not enforced, and that is a deliberate
+			// decision rather than a half-finished one. The obvious design —
+			// repair a failing script and persist the repaired version — would
+			// diverge from what the user is looking at: the editor holds the
+			// streamed text as local state and is not subscribed to the
+			// content doc, so Firestore would quietly hold a different script
+			// from the one on screen until a reload. The repair turn lands
+			// with the Phase 2 panel, which can show a replacement and let the
+			// user accept it. Until then the honest move is to surface the
+			// problems and leave the text alone.
+			done := map[string]any{"type": "done", "usage": u}
+			if problems := ValidateScript(s, p.Format); len(problems) > 0 {
+				done["problems"] = problems
+				log.Printf("ai script validate brand=%s content=%s: %d problem(s), fatal=%v",
+					p.BrandID, p.ContextID, len(problems), HasFatal(problems))
+			}
+			wsSend(req.ConnectionID, done)
 		},
 		OnError: func(e error) {
 			wsErrorTo(req.ConnectionID, e.Error())
