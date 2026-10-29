@@ -287,10 +287,15 @@ func judgePrompt(d dimension, toJudge []criterion, platforms []trendlymodels.Pla
 	}
 	sb.WriteString("\nJudge only what is in the script. Do not reward intent, effort or topic interest. " +
 		"A criterion the script simply does not address scores 0, not 1.\n\n")
-	sb.WriteString("Keep each note UNDER 12 WORDS. Long notes are the one thing that breaks this " +
-		"call: the reply is capped, and a verbose note truncates the array mid-object.\n\n")
+	// Notes are only ever shown as FIXES, and a fix is only generated for a
+	// criterion that scored below 2. A note on a passing criterion is written,
+	// paid for, and then thrown away -- and writing them is what pushed the
+	// reply past its token cap and failed whole dimensions.
+	sb.WriteString("Write a note ONLY when the score is 0 or 1, and keep it under 12 words, naming " +
+		"what is missing. For a score of 2 leave the note empty. Notes on passing criteria are " +
+		"discarded, and writing them can truncate this reply and fail the whole dimension.\n\n")
 	sb.WriteString("Reply with ONLY a JSON array, one object per criterion, no prose and no code fence:\n")
-	sb.WriteString(`[{"id":"` + toJudge[0].ID + `","score":0,"note":"at most 12 words, naming what is missing"}]`)
+	sb.WriteString(`[{"id":"` + toJudge[0].ID + `","score":0,"note":"under 12 words"},{"id":"X","score":2,"note":""}]`)
 	return sb.String()
 }
 
@@ -343,16 +348,18 @@ func scoreDimension(ctx context.Context, d dimension, script, model string,
 	if len(toJudge) > 0 {
 		resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
 			Model: model,
-			// Low temperature: a judge is scored on reproducibility, and the
-			// run-to-run stability target (±4 overall across 5 runs) is not
-			// reachable at a conversational temperature.
-			Temperature: 0.1,
-			// Sized from a measured run, not guessed: six criteria with a
-			// short note each came to ~900 completion tokens, which is
-			// exactly where the first version was capped. The reply was
-			// truncated mid-array and every dimension failed to parse, which
-			// presented as the useless "no JSON array in judge reply".
-			MaxTokens: 2000,
+			// Zero, not merely low. There is no value in sampling diversity
+			// when scoring a rubric: the only thing a judge is measured on is
+			// giving the same answer to the same input. At 0.1 the spread
+			// over six runs was 7 points against a target of 8 -- inside it,
+			// but with nothing to spare.
+			Temperature: 0,
+			// Scaled to the work rather than fixed. A flat cap was wrong
+			// twice: 900 truncated every dimension, and 2000 still failed the
+			// six-criterion Body dimension intermittently on dev. Headroom is
+			// cheap here -- max_tokens is a ceiling, not a reservation, and
+			// the note rule above means a clean script spends far less.
+			MaxTokens: 600 + 400*len(toJudge),
 			Messages: []openrouter.Message{
 				{Role: "system", Content: judgePrompt(d, toJudge, platforms, evidence)},
 				{Role: "user", Content: script},
