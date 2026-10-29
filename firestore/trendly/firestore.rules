@@ -99,6 +99,23 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Generative-media capability registry ──────────────────────────────
+    // mediaModels/{modelId}. What each image/video/stock model can do: start
+    // and end frames, duration bounds, aspect ratios, estimated cost, minimum
+    // plan. Read by the app so the composer can offer only the controls a
+    // chosen model actually supports — an end-frame slot on a model without
+    // keyframes is a control that takes the user's money and ignores them.
+    //
+    // Writes are server-only, and that is the point rather than an aside: the
+    // `enabled` field is a REVIEW GATE. The catalog sync inserts newly
+    // published models with enabled=false and never flips it, so a model
+    // nobody has looked at cannot start spending money. A client able to write
+    // here could enable one.
+    match /mediaModels/{modelId} {
+      allow read:  if isAuthenticated();
+      allow write: if false;
+    }
+
     match /collaborations-invites/{collabUserId} {
       allow read, write: if isAuthenticated() && isAdmin();
     }

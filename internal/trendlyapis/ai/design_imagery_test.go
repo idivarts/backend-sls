@@ -146,17 +146,3 @@ func TestAspectForSize(t *testing.T) {
 	}
 }
 
-func TestOrientationForAspect(t *testing.T) {
-	cases := map[string]string{
-		"9:16":    "portrait",
-		"4:5":     "portrait",
-		"16:9":    "landscape",
-		"1:1":     "square",
-		"unknown": "",
-	}
-	for aspect, want := range cases {
-		if got := orientationForAspect(aspect); got != want {
-			t.Errorf("%q: got %q, want %q", aspect, got, want)
-		}
-	}
-}

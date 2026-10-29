@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/mediagen"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -120,35 +121,36 @@ func runChatImageTool(ctx context.Context, brandID, orgID, contentID, connID, co
 		"state":          "generating",
 	})
 
-	size := aspectToSize(a.AspectRatio)
-	resp, usage, err := openrouter.GenerateImage(ctx, openrouter.ImageRequest{
-		Model:       model,
+	// Through the mediagen seam rather than straight at the provider. Plan
+	// gating and model choice above are unchanged — what moves is only WHERE
+	// the call goes, so the seam is proven by an existing, exercised path
+	// before anything new depends on it.
+	refs := make([]mediagen.AssetRef, 0, len(a.InputImages))
+	for _, u := range cleanStrings(a.InputImages) {
+		refs = append(refs, mediagen.AssetRef{URL: u})
+	}
+	res, err := mediagen.Submit(ctx, "openrouter", mediagen.Spec{
+		Kind:        mediagen.KindImage,
+		ModelID:     model,
 		Prompt:      prompt,
-		Size:        size,
-		N:           1,
-		InputImages: cleanStrings(a.InputImages),
+		AspectRatio: a.AspectRatio,
+		ImageRefs:   refs,
+		Count:       1,
 	})
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "image generation failed: " + err.Error()}), nil, err
 	}
-	if usage != nil {
-		meterAIUsage(orgID, &openrouter.Usage{Cost: usage.Cost})
+	if res.Status == mediagen.StatusFailed {
+		return jsonResult(map[string]any{"ok": false, "error": "image generation failed: " + res.Error}), nil, nil
+	}
+	if res.Usage != nil {
+		meterAIUsage(orgID, &openrouter.Usage{Cost: res.Usage.CostUSD})
 	}
 
 	var urls []string
-	for _, d := range resp.Data {
-		url := ""
-		if d.URL != "" {
-			if s3url, uerr := uploadFromURL(d.URL, brandID); uerr == nil {
-				url = s3url
-			}
-		} else if d.B64JSON != "" {
-			if s3url, uerr := uploadBase64Image(d.B64JSON, brandID); uerr == nil {
-				url = s3url
-			}
-		}
-		if url != "" {
-			urls = append(urls, url)
+	for _, asset := range res.Assets {
+		if s3url, uerr := hostAsset(asset.URL, brandID); uerr == nil && s3url != "" {
+			urls = append(urls, s3url)
 		}
 	}
 	if len(urls) == 0 {
@@ -248,4 +250,25 @@ func imageDesignHTML(urls []string, w, h int) string {
 	}
 	b.WriteString(`</div>`)
 	return wrapHTML(b.String())
+}
+
+// hostAsset copies a provider's asset to our own storage and returns OUR url.
+//
+// Every driver's output goes through here, and that is deliberate: a provider
+// URL is typically signed and expires within the hour, so a design that still
+// points at one cannot be re-rendered next week. Hosting is also the one
+// decision that must be identical for every provider, which is why the drivers
+// return "where the bytes are right now" and nothing more.
+//
+// It takes both a plain URL and a data: URI, because providers differ on which
+// they hand back and callers should not have to care.
+func hostAsset(src, brandID string) (string, error) {
+	const dataPNG = "data:image/png;base64,"
+	if strings.HasPrefix(src, dataPNG) {
+		return uploadBase64Image(strings.TrimPrefix(src, dataPNG), brandID)
+	}
+	if src == "" {
+		return "", nil
+	}
+	return uploadFromURL(src, brandID)
 }
