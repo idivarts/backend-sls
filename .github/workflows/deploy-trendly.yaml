@@ -6,6 +6,23 @@ on:
       - master
       - dev
 
+# One deploy per branch at a time. Two pushes merged minutes apart raced the
+# same CloudFormation stack and the second died on
+#
+#   Error: ChangeSet [trendly-be-dev-change-set] does not exist
+#
+# — the first deploy had already consumed the change set of that fixed name.
+# Nothing was wrong with the code, and the failure looks like a build failure
+# until you read the log, which is the expensive part.
+#
+# cancel-in-progress stays FALSE deliberately. A deploy is not a check that can
+# be abandoned: cancelling one mid-update leaves the stack in
+# UPDATE_ROLLBACK_IN_PROGRESS, and the newer commit would then deploy on top of
+# a half-applied older one. Queue them instead.
+concurrency:
+  group: deploy-trendly-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Trendly Deploy
