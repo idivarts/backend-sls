@@ -169,6 +169,12 @@ func sceneBudgetBrief(durations []int) string {
 	}
 	sb.WriteString(fmt.Sprintf("Total: %.1fs ≈ %d words.\n\n",
 		float64(total)/1000, int(float64(total)/1000*spokenWordsPerSecond)))
+	sb.WriteString("HOW TO MAKE A VOICEOVER FOR THIS VIDEO: call generate_voiceover with " +
+		"sceneTexts — one entry per scene, in order — then call " + toolAlignScenes + ". " +
+		"That records where each line actually lands in the audio and retimes the scenes to " +
+		"match, which is the only thing that keeps the voice and the picture together; a " +
+		"budget alone cannot, because the speaking pace varies between takes. Then " +
+		toolCheckAudioFit + " to confirm.\n\n")
 	sb.WriteString("Write each scene's spoken line to its own budget, not the total. A line " +
 		"that overruns its scene leaves the voice describing something that is no longer on " +
 		"screen, and the whole voiceover overrunning means it is cut off mid-word — neither " +

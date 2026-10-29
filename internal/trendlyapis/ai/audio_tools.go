@@ -35,16 +35,27 @@ func audioServerTools() []openrouter.Tool {
 			}, []string{"prompt"}),
 		),
 		audioFitTool(),
+		alignScenesTool(),
 		openrouter.NewFunctionTool(
 			toolGenerateVoiceover,
 			"Generate an AI voiceover for this video content from the given text (usually the "+
 				"script or caption), using a chosen voice. The voiceover is muxed over the music "+
 				"bed at render time.",
 			openrouter.ObjectSchema(map[string]any{
-				"text":     openrouter.StringProp("The words to speak (script/caption)."),
+				"text":     openrouter.StringProp("The words to speak (script/caption). Ignored when sceneTexts is given."),
 				"voiceId":  openrouter.StringProp("The ElevenLabs voice id (from the voice picker)."),
 				"language": openrouter.StringProp("Optional ISO 639-1 language code."),
-			}, []string{"text", "voiceId"}),
+				"sceneTexts": map[string]any{
+					"type": "array",
+					"description": "STRONGLY PREFERRED for a video: the spoken line for each scene, " +
+						"in order, one entry per scene. Read as ONE take, so it still sounds like a " +
+						"person — but the timings of each line are captured, which is what lets " +
+						"align_scenes_to_voiceover retime the scenes to the voice afterwards. " +
+						"Without this the voice and the picture drift apart and nothing can tell " +
+						"you where.",
+					"items": map[string]any{"type": "string"},
+				},
+			}, []string{"voiceId"}),
 		),
 	}
 }
@@ -104,15 +115,43 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 	if err := json.Unmarshal([]byte(arguments), &a); err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "could not parse arguments"}), nil
 	}
-	if strings.TrimSpace(a.Text) == "" || a.VoiceID == "" {
-		return jsonResult(map[string]any{"ok": false, "error": "text and voiceId are required"}), nil
+	if a.VoiceID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "voiceId is required"}), nil
+	}
+	// Per-scene lines are joined into ONE take. Generating a clip per scene
+	// would give exact boundaries too, but resets the prosody and leaves a
+	// seam at every cut; one read straight through sounds like a person.
+	sceneTexts := parseSceneTexts(arguments)
+	text := strings.TrimSpace(a.Text)
+	if len(sceneTexts) > 0 {
+		text = strings.Join(sceneTexts, sceneJoiner)
+	}
+	if text == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "give either text or sceneTexts"}), nil
 	}
 	if aiTokensExhausted(orgID) {
 		return jsonResult(map[string]any{"ok": false, "error": "out of AI tokens; tell the user to upgrade or add a top-up"}), nil
 	}
-	audio, err := elevenlabs.GenerateVoiceover(elevenlabs.TTSRequest{
-		VoiceID: a.VoiceID, Text: a.Text, Language: a.Language,
-	})
+
+	var (
+		audio      *elevenlabs.Audio
+		err        error
+		boundaries []trendlymodels.SceneBoundary
+		exact      bool
+	)
+	if len(sceneTexts) > 0 {
+		var timings []elevenlabs.CharTiming
+		audio, timings, err = elevenlabs.GenerateVoiceoverTimed(elevenlabs.TTSRequest{
+			VoiceID: a.VoiceID, Text: text, Language: a.Language,
+		})
+		if err == nil {
+			boundaries, exact = sceneBoundariesFrom(sceneTexts, sceneJoiner, timings)
+		}
+	} else {
+		audio, err = elevenlabs.GenerateVoiceover(elevenlabs.TTSRequest{
+			VoiceID: a.VoiceID, Text: text, Language: a.Language,
+		})
+	}
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "voiceover generation failed: " + err.Error()}), nil
 	}
@@ -121,15 +160,24 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 		return jsonResult(map[string]any{"ok": false, "error": "could not store audio"}), nil
 	}
 	id, _ := trendlymodels.CreateGeneratedAudio(&trendlymodels.GeneratedAudio{
-		BrandID: brandID, Kind: "voiceover", Provider: "elevenlabs", Prompt: a.Text,
+		BrandID: brandID, Kind: "voiceover", Provider: "elevenlabs", Prompt: text,
 		VoiceID: a.VoiceID, Language: a.Language, URL: url, Status: "ready",
 	})
 	if contentID != "" {
-		attachVoiceover(brandID, contentID, id, url)
+		attachVoiceover(brandID, contentID, id, url, boundaries, exact)
 	}
-	meterAIUsage(orgID, &openrouter.Usage{Cost: media.TTSCostUSD(a.Text)})
+	meterAIUsage(orgID, &openrouter.Usage{Cost: media.TTSCostUSD(text)})
+
+	note := "voiceover generated and attached; it will be muxed over the music at render."
+	if len(boundaries) > 0 {
+		note = "Voiceover generated with per-scene timings. Call " + toolAlignScenes +
+			" now so each scene lasts exactly as long as its own line."
+	} else {
+		note += " No per-scene timings were captured, so the voice and the picture may drift — " +
+			"pass sceneTexts next time."
+	}
 	return jsonResult(map[string]any{"ok": true, "audioId": id, "url": url,
-		"note": "voiceover generated and attached; it will be muxed over the music at render."}), nil
+		"sceneTimings": len(boundaries), "exact": exact, "note": note}), nil
 }
 
 // attachMusic / attachVoiceover merge the generated track into content.Audio,
@@ -147,10 +195,20 @@ func attachMusic(brandID, contentID, id, url, title string) {
 	_ = trendlymodels.UpdateContentFields(brandID, contentID, map[string]interface{}{"audio": audio})
 }
 
-func attachVoiceover(brandID, contentID, id, url string) {
+func attachVoiceover(brandID, contentID, id, url string, bounds []trendlymodels.SceneBoundary, exact bool) {
 	audio := loadContentAudio(brandID, contentID)
 	audio.VoiceoverID = id
 	audio.VoiceoverURL = url
+	// Stale boundaries are worse than none: they would retime the scenes to a
+	// voiceover that no longer exists. Replaced wholesale, cleared when the
+	// new take has none.
+	audio.SceneBoundaries = bounds
+	audio.SceneTimingsExact = exact
+	if len(bounds) > 0 {
+		audio.VoiceoverMs = int64(bounds[len(bounds)-1].EndMs)
+	} else {
+		audio.VoiceoverMs = 0
+	}
 	_ = trendlymodels.UpdateContentFields(brandID, contentID, map[string]interface{}{"audio": audio})
 }
 

@@ -3,6 +3,8 @@ package ai
 import (
 	"strings"
 	"testing"
+
+	"github.com/idivarts/backend-sls/pkg/elevenlabs"
 )
 
 const videoDesign = `<!doctype html><html><body>
@@ -96,5 +98,92 @@ func TestSceneBudgetBriefStatesAWordCountPerScene(t *testing.T) {
 func TestSceneBudgetBriefIsEmptyWithoutScenes(t *testing.T) {
 	if b := sceneBudgetBrief(nil); b != "" {
 		t.Errorf("want empty, got %q", b)
+	}
+}
+
+// ── Retiming ────────────────────────────────────────────────────────────────
+
+func timingsFor(text string, msPerChar int) []elevenlabs.CharTiming {
+	out := make([]elevenlabs.CharTiming, 0, len([]rune(text)))
+	for i, r := range []rune(text) {
+		out = append(out, elevenlabs.CharTiming{
+			Char: string(r), StartMs: i * msPerChar, EndMs: (i + 1) * msPerChar,
+		})
+	}
+	return out
+}
+
+func TestSceneBoundariesAreExactWhenTheCountsAgree(t *testing.T) {
+	scenes := []string{"One two", "Three four five", "Six"}
+	full := strings.Join(scenes, sceneJoiner)
+	bounds, exact := sceneBoundariesFrom(scenes, sceneJoiner, timingsFor(full, 10))
+	if !exact {
+		t.Fatal("character counts match, so the mapping should be exact")
+	}
+	if len(bounds) != 3 {
+		t.Fatalf("want 3 boundaries, got %d", len(bounds))
+	}
+	if bounds[0].StartMs != 0 {
+		t.Errorf("scene 1 should start at 0, got %d", bounds[0].StartMs)
+	}
+	// Each boundary must start no earlier than the previous one ends.
+	for i := 1; i < len(bounds); i++ {
+		if bounds[i].StartMs < bounds[i-1].EndMs {
+			t.Errorf("scene %d starts (%d) before scene %d ends (%d)",
+				i+1, bounds[i].StartMs, i, bounds[i-1].EndMs)
+		}
+	}
+	if bounds[2].EndMs <= bounds[2].StartMs {
+		t.Error("the last scene has no duration")
+	}
+}
+
+// The provider normalises numbers and abbreviations before speaking them, so
+// the counts can disagree. Scaling is still useful; claiming it is exact is not.
+func TestSceneBoundariesFallBackToScalingAndSaySo(t *testing.T) {
+	scenes := []string{"18 hours", "for one cup"}
+	full := strings.Join(scenes, sceneJoiner)
+	short := timingsFor(full, 10)[:len([]rune(full))-6] // as if it spoke fewer characters
+	bounds, exact := sceneBoundariesFrom(scenes, sceneJoiner, short)
+	if exact {
+		t.Error("counts disagree, so this must not be reported as exact")
+	}
+	if len(bounds) != 2 {
+		t.Fatalf("want 2 boundaries, got %d", len(bounds))
+	}
+}
+
+func TestSceneBoundariesHandlesNothing(t *testing.T) {
+	if b, _ := sceneBoundariesFrom(nil, sceneJoiner, nil); b != nil {
+		t.Error("no scenes should give no boundaries")
+	}
+	if b, _ := sceneBoundariesFrom([]string{"a"}, sceneJoiner, nil); b != nil {
+		t.Error("no timings should give no boundaries")
+	}
+}
+
+func TestRetimeScenesRewritesInOrder(t *testing.T) {
+	got, changed := retimeScenes(videoDesign, []int{4000, 4500, 2000})
+	// Scene 1 is rewritten; scene 2 already reads 4500 so it must not count as
+	// a change; scene 3 carries no data-duration attribute, so there is
+	// nothing to rewrite — runAlignScenes refuses that case separately rather
+	// than inventing an attribute here.
+	if changed != 1 {
+		t.Errorf("want 1 change, got %d", changed)
+	}
+	if !strings.Contains(got, `data-duration="4000"`) {
+		t.Error("scene 1 was not retimed")
+	}
+	if !strings.Contains(got, `data-duration="4500"`) {
+		t.Error("scene 2 should still read 4500")
+	}
+}
+
+func TestRetimeScenesLeavesEverythingElseAlone(t *testing.T) {
+	got, _ := retimeScenes(videoDesign, []int{4000, 4500, 2000})
+	for _, want := range []string{"<h1>One</h1>", "<h1>Two</h1>", "data-carousel", "<!doctype html>"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the rewrite lost %q", want)
+		}
 	}
 }

@@ -133,6 +133,9 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 		orgID, _ := orgIDForBrand(brandID)
 		r, err := runGenerateMusic(ctx, brandID, contextID, orgID, arguments)
 		return r, false, err
+	case toolAlignScenes:
+		r, err := runAlignScenes(ctx, brandID, contextID)
+		return r, false, err
 	case toolCheckAudioFit:
 		r, err := runCheckAudioFit(ctx, brandID, contextID)
 		return r, false, err
