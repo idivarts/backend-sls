@@ -43,7 +43,19 @@ async function download(url: string, name: string): Promise<string> {
     return path;
 }
 
-export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage> {
+/**
+ * Seconds of fade on the music bed, in and out.
+ *
+ * Applied always rather than behind a switch. `musicFade` existed as a toggle
+ * in the UI and was implemented NOWHERE — not here, not in the browser preview
+ * — so it was a control that lied. A bed that starts at full level and stops
+ * dead on the last frame sounds unfinished every time, and nobody has ever
+ * wanted the other option, so this is a default rather than a decision.
+ */
+const FADE_IN_S = 0.4;
+const FADE_OUT_S = 0.6;
+
+export async function buildAudioStage(audio?: ContentAudio, totalMs?: number): Promise<AudioStage> {
     const empty: AudioStage = { inputArgs: [], filter: null, outputArgs: ["-an"], tempFiles: [] };
     if (!audio || (!audio.musicUrl && !audio.voiceoverUrl)) return empty;
 
@@ -78,9 +90,18 @@ export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage>
         throw err;
     }
 
+    // The bed is looped and infinite, so an out-fade has to be anchored to the
+    // video's length rather than the clip's. Without a known length we fade in
+    // only: guessing where the end is would cut the music early.
+    const totalS = totalMs && totalMs > 0 ? totalMs / 1000 : 0;
+    const musicFade =
+        totalS > FADE_IN_S + FADE_OUT_S
+            ? `,afade=t=in:st=0:d=${FADE_IN_S},afade=t=out:st=${(totalS - FADE_OUT_S).toFixed(3)}:d=${FADE_OUT_S}`
+            : `,afade=t=in:st=0:d=${FADE_IN_S}`;
+
     const parts: string[] = [];
     if (labels.music !== undefined && labels.voice !== undefined) {
-        parts.push(`[${labels.music}:a]volume=${musicVol}[m]`);
+        parts.push(`[${labels.music}:a]volume=${musicVol}${musicFade}[m]`);
         // apad is load-bearing, not cosmetic. sidechaincompress reads its two
         // inputs in lockstep, and the music is infinite (-stream_loop -1) while
         // a voiceover is not. When the voice hit EOF the compressor stopped
@@ -98,7 +119,7 @@ export async function buildAudioStage(audio?: ContentAudio): Promise<AudioStage>
             parts.push(`[m][v]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
         }
     } else if (labels.music !== undefined) {
-        parts.push(`[${labels.music}:a]volume=${musicVol}[aout]`);
+        parts.push(`[${labels.music}:a]volume=${musicVol}${musicFade}[aout]`);
     } else if (labels.voice !== undefined) {
         // Padded for the same reason as above, and because -shortest used to
         // truncate the whole video to the voiceover when it was the only track.

@@ -29,10 +29,12 @@ func audioServerTools() []openrouter.Tool {
 				"for beds under a voiceover. The music is baked into the video at render time.",
 			openrouter.ObjectSchema(map[string]any{
 				"prompt":       openrouter.StringProp("Describe the music: mood, genre, tempo, instruments."),
+				"title":        openrouter.StringProp("A short name for this track, 2-4 words (e.g. \"Warm lofi bed\"). It is what the user picks from later, so make it distinguishable from their other tracks — not a restatement of the prompt."),
 				"lengthMs":     openrouter.NumberProp("Length in milliseconds (3000–600000). Match the video length."),
 				"instrumental": openrouter.EnumProp("Force instrumental (recommended under a voiceover).", []string{"true", "false"}),
 			}, []string{"prompt"}),
 		),
+		audioFitTool(),
 		openrouter.NewFunctionTool(
 			toolGenerateVoiceover,
 			"Generate an AI voiceover for this video content from the given text (usually the "+
@@ -49,6 +51,7 @@ func audioServerTools() []openrouter.Tool {
 
 type musicToolArgs struct {
 	Prompt       string `json:"prompt"`
+	Title        string `json:"title"`
 	LengthMs     int    `json:"lengthMs"`
 	Instrumental string `json:"instrumental"`
 }
@@ -64,9 +67,10 @@ func runGenerateMusic(ctx context.Context, brandID, contentID, orgID, arguments 
 	if aiTokensExhausted(orgID) {
 		return jsonResult(map[string]any{"ok": false, "error": "out of AI tokens; tell the user to upgrade or add a top-up"}), nil
 	}
+	lengthMs := media.ClampMusicMs(a.LengthMs)
 	audio, err := elevenlabs.GenerateMusic(elevenlabs.MusicRequest{
 		Prompt:            a.Prompt,
-		LengthMs:          a.LengthMs,
+		LengthMs:          lengthMs,
 		ForceInstrumental: a.Instrumental == "true",
 	})
 	if err != nil {
@@ -78,12 +82,13 @@ func runGenerateMusic(ctx context.Context, brandID, contentID, orgID, arguments 
 	}
 	id, _ := trendlymodels.CreateGeneratedAudio(&trendlymodels.GeneratedAudio{
 		BrandID: brandID, Kind: "music", Provider: "elevenlabs", Prompt: a.Prompt,
-		URL: url, DurationMs: int64(a.LengthMs), Status: "ready",
+		Title: strings.TrimSpace(a.Title),
+		URL:   url, DurationMs: int64(lengthMs), Status: "ready",
 	})
 	if contentID != "" {
-		attachMusic(brandID, contentID, id, url)
+		attachMusic(brandID, contentID, id, url, strings.TrimSpace(a.Title))
 	}
-	meterAIUsage(orgID, &openrouter.Usage{Cost: media.MusicCostUSD(a.LengthMs)})
+	meterAIUsage(orgID, &openrouter.Usage{Cost: media.MusicCostUSD(lengthMs)})
 	return jsonResult(map[string]any{"ok": true, "audioId": id, "url": url,
 		"note": "music generated and attached; it will be baked into the video on render."}), nil
 }
@@ -129,10 +134,15 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 
 // attachMusic / attachVoiceover merge the generated track into content.Audio,
 // preserving the other track.
-func attachMusic(brandID, contentID, id, url string) {
+func attachMusic(brandID, contentID, id, url, title string) {
 	audio := loadContentAudio(brandID, contentID)
 	audio.MusicID = id
 	audio.MusicURL = url
+	// The lane shows this. Without it the UI had nothing to print but a
+	// truncated prompt, and every track read the same.
+	if title != "" {
+		audio.MusicTitle = title
+	}
 	audio.DuckMusic = true
 	_ = trendlymodels.UpdateContentFields(brandID, contentID, map[string]interface{}{"audio": audio})
 }

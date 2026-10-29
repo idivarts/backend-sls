@@ -326,6 +326,19 @@ func currentDesignBrief(brandID, contentID string) string {
 		return ""
 	}
 	dr := ct.DesignRef
+
+	// For a video, the scene timings go in the prompt too. Everything about
+	// keeping the voice and the picture together is cheaper to get right while
+	// the line is being written than to correct after it has been spoken.
+	budget := ""
+	if dr.DocType == "video" {
+		if rev, rerr := trendlymodels.GetDesignRevision(brandID, contentID, dr.RevisionID); rerr == nil && rev != nil {
+			if b := sceneBudgetBrief(sceneDurations(rev.HTML)); b != "" {
+				budget = "\n\n" + b
+			}
+		}
+	}
+
 	return fmt.Sprintf(
 		"CURRENT DESIGN: this content already has an AI-generated HTML design "+
 			"(revisionId %q, docType %s, %d slide(s), %dx%d). The design HTML is NOT included "+
@@ -336,7 +349,7 @@ func currentDesignBrief(brandID, contentID string) string {
 			"re-typed document. Preserve the data-carousel/data-slide structure and every "+
 			"data-el id. Then call render_design_preview and look at what you changed.",
 		dr.RevisionID, dr.DocType, dr.SlideCount, dr.Width, dr.Height,
-	)
+	) + budget
 }
 
 // contentBriefText renders a content doc into the compact brief the AI prompts

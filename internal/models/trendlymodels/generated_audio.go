@@ -22,10 +22,14 @@ type GeneratedAudio struct {
 	Kind     string `json:"kind" firestore:"kind"`               // music|voiceover
 	Provider string `json:"provider" firestore:"provider"`       // elevenlabs
 	Prompt   string `json:"prompt,omitempty" firestore:"prompt"` // music prompt / voiceover text
-	VoiceID  string `json:"voiceId,omitempty" firestore:"voiceId,omitempty"`
-	Language string `json:"language,omitempty" firestore:"language,omitempty"`
-	URL      string `json:"url" firestore:"url"`
-	DurationMs int64 `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
+	// Title is a short human name for the clip, for the picker. Without it the
+	// UI fell back to the first 40 characters of the prompt, which made six
+	// tracks that all begin "Calm, warm…" indistinguishable from each other.
+	Title      string `json:"title,omitempty" firestore:"title,omitempty"`
+	VoiceID    string `json:"voiceId,omitempty" firestore:"voiceId,omitempty"`
+	Language   string `json:"language,omitempty" firestore:"language,omitempty"`
+	URL        string `json:"url" firestore:"url"`
+	DurationMs int64  `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
 	// Status: "ready" (URL populated) | "failed".
 	Status    string `json:"status" firestore:"status"`
 	Error     string `json:"error,omitempty" firestore:"error,omitempty"`

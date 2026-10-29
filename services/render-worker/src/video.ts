@@ -53,7 +53,9 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
     const fps = config.fps;
     const frames = Math.max(1, Math.round((totalMs / 1000) * fps));
 
-    const audioStage = await buildAudioStage(audio);
+    // The bed's out-fade is anchored to the video's length, not the clip's:
+    // the music is looped and has no end of its own.
+    const audioStage = await buildAudioStage(audio, totalMs);
     const outPath = join(tmpdir(), `render_${Date.now()}.mp4`);
 
     // H.264 needs even dimensions; the scale filter fixes an odd design size
