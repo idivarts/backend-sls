@@ -1,15 +1,42 @@
 package mediajobs
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/mediagen"
 )
+
+func containsInt(xs []int, want int) bool {
+	for _, x := range xs {
+		if x == want {
+			return true
+		}
+	}
+	return false
+}
+
+// joinInts renders a duration set the way the message reads it: "4, 6 or 8".
+func joinInts(xs []int) string {
+	out := make([]string, 0, len(xs))
+	for _, x := range xs {
+		out = append(out, strconv.Itoa(x))
+	}
+	switch len(out) {
+	case 0:
+		return ""
+	case 1:
+		return out[0]
+	}
+	return strings.Join(out[:len(out)-1], ", ") + " or " + out[len(out)-1]
+}
 
 type generateClipRequest struct {
 	CompositionID string `json:"compositionId" binding:"required"`
@@ -73,6 +100,17 @@ func GenerateClip(c *gin.Context) {
 		return
 	}
 	if secs := req.DurationSecs; secs > 0 {
+		// An exact set beats the bounds where a model has one. Veo takes 4, 6 or
+		// 8 and refuses 5 — the provider's 422 is the same money and a worse
+		// message, so the refusal happens here.
+		if len(model.DurationsS) > 0 && !containsInt(model.DurationsS, secs) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "unsupported_capability",
+				"message": fmt.Sprintf("This model makes clips of %s seconds. Pick one of those.",
+					joinInts(model.DurationsS)),
+			})
+			return
+		}
 		if model.MinDurationS > 0 && secs < model.MinDurationS {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "unsupported_capability",

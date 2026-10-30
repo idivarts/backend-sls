@@ -43,8 +43,16 @@ type MediaModel struct {
 	SourceVideo bool `json:"sourceVideo,omitempty" firestore:"sourceVideo"`
 	NativeAudio bool `json:"nativeAudio,omitempty" firestore:"nativeAudio"`
 
-	MinDurationS int      `json:"minDurationS,omitempty" firestore:"minDurationS"`
-	MaxDurationS int      `json:"maxDurationS,omitempty" firestore:"maxDurationS"`
+	MinDurationS int `json:"minDurationS,omitempty" firestore:"minDurationS"`
+	MaxDurationS int `json:"maxDurationS,omitempty" firestore:"maxDurationS"`
+	// DurationsS is the EXACT set of lengths a model accepts, when it accepts a
+	// set rather than a range.
+	//
+	// Veo takes 4, 6 or 8 seconds and refuses 5 with a 422 — a bound of 4-8
+	// cannot express that, so a composer offering "5s" from the range offered a
+	// value the provider would always reject. Empty means the min/max range is
+	// the truth, which is the ordinary case.
+	DurationsS   []int    `json:"durationsS,omitempty" firestore:"durationsS"`
 	Resolutions  []string `json:"resolutions,omitempty" firestore:"resolutions"`
 	AspectRatios []string `json:"aspectRatios,omitempty" firestore:"aspectRatios"`
 
