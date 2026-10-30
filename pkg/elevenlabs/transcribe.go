@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strings"
 )
 
 // ── Speech to text (Scribe) ─────────────────────────────────────────────────
@@ -19,6 +20,10 @@ import (
 // the bytes never pass through this process. A 200MB upload would otherwise be
 // downloaded and re-uploaded for no reason.
 
+// transcribeModel is the FALLBACK, not the setting. The model id comes from the
+// media registry where one is enabled — a provider's catalog changes without
+// us, and footage ingest should not need a deploy to follow it — and this is
+// what it degrades to when the registry is empty or unreachable.
 const transcribeModel = "scribe_v2"
 
 // Word is one token and when it was said.
@@ -49,7 +54,7 @@ type Transcript struct {
 // multipart/form-data even though no file is attached: the endpoint takes form
 // fields, and sending JSON gets a validation error that reads like the url is
 // wrong rather than the encoding.
-func TranscribeURL(sourceURL string) (*Transcript, error) {
+func TranscribeURL(sourceURL, modelID string) (*Transcript, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("ELEVENLABS_API_KEY is not set")
 	}
@@ -57,10 +62,15 @@ func TranscribeURL(sourceURL string) (*Transcript, error) {
 		return nil, fmt.Errorf("elevenlabs: a source url is required")
 	}
 
+	model := strings.TrimSpace(modelID)
+	if model == "" {
+		model = transcribeModel
+	}
+
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
 	for k, v := range map[string]string{
-		"model_id":   transcribeModel,
+		"model_id":   model,
 		"source_url": sourceURL,
 		// Word granularity is the entire reason this call exists. Character
 		// timings would be finer and are not useful here; `none` would make

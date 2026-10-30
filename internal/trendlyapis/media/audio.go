@@ -95,6 +95,7 @@ func GenerateMusic(c *gin.Context) {
 		Prompt:            req.Prompt,
 		LengthMs:          lengthMs,
 		ForceInstrumental: req.Instrumental,
+		ModelID:           trendlymodels.EnabledModelID(c.Request.Context(), "music"),
 	})
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "audio generation failed", "detail": err.Error()})
@@ -138,7 +139,10 @@ func GenerateVoiceover(c *gin.Context) {
 		return
 	}
 
-	model := elevenlabs.TTSMultiV2
+	// "flash" is a caller's explicit request for the fast model and wins over
+	// everything; otherwise the registry's enabled voice model, and failing
+	// that the client's own default.
+	model := trendlymodels.EnabledModelID(c.Request.Context(), "voice")
 	if req.Model == "flash" {
 		model = elevenlabs.TTSFlashV2_5
 	}
