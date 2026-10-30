@@ -42,6 +42,26 @@ export const config = {
     x264Preset: process.env.RENDER_X264_PRESET || "veryfast",
     x264Crf: num("RENDER_X264_CRF", 20),
 
+    /**
+     * x264 thread count, PINNED rather than left to auto-detect.
+     *
+     * This is what makes a render reproducible, and it was measured: two
+     * renders of the same revision on identical code came back 344,433 and
+     * 348,160 bytes. Same frame count, byte-identical audio track, and the
+     * video differing from sample 0 with no identical prefix — the signature of
+     * the same pixels encoded differently, not of different pixels. x264 reads
+     * its default thread count from the number of processors ONLINE, which
+     * inside a container is the host's core count and not the task's vCPU
+     * limit, so two Spot placements on different instance types produce two
+     * equally valid but different bitstreams.
+     *
+     * 4 matches the Fargate task's vCPUs, so nothing gets slower; pinning it is
+     * only about getting the same answer twice. Deterministic output is not a
+     * nicety here — it is what lets a change to the render pipeline be verified
+     * by comparing bytes rather than by eye.
+     */
+    x264Threads: num("RENDER_X264_THREADS", 4),
+
     /** How long one <img> may hold up a capture before we shoot anyway. */
     imageTimeoutMs: num("RENDER_IMAGE_TIMEOUT_MS", 10000),
 

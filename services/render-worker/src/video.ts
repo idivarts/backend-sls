@@ -6,6 +6,13 @@
  * deterministic (every animation paused and its currentTime set), so the same
  * revision always produces the same video.
  *
+ * That last claim used to be false, and it was the seek it was wrong about —
+ * the ENCODER was the non-deterministic half. Two renders of one revision came
+ * back 344,433 and 348,160 bytes: identical frame count, byte-identical audio,
+ * and video differing from the very first sample, which is what the same pixels
+ * encoded differently looks like. x264's thread count is pinned now; see
+ * config.x264Threads.
+ *
  * Everything the browser version needed to survive html2canvas is GONE, not
  * ported: static-frame reuse, the encoder backpressure loop, MessageChannel
  * yielding, H.264 level probing, even-dimension rounding. A screenshot is tens
@@ -74,6 +81,11 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
         "-c:v", "libx264",
         "-preset", config.x264Preset,
         "-crf", String(config.x264Crf),
+        // Pinned, not auto. x264's default thread count comes from the host's
+        // online processors, which in a container is not the task's vCPU limit —
+        // so the same pixels encoded on two different Spot instance types came
+        // out as two different files. See config.x264Threads.
+        "-threads", String(config.x264Threads),
         "-pix_fmt", "yuv420p",
         // An explicit duration, not -shortest. Every audio chain here is now
         // endless by construction (looping music, apadded voice), so -shortest
