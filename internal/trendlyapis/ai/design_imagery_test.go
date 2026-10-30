@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/idivarts/backend-sls/pkg/mediagen"
 	"golang.org/x/net/html"
 )
 
@@ -146,3 +147,208 @@ func TestAspectForSize(t *testing.T) {
 	}
 }
 
+// ── The visible credit ──────────────────────────────────────────────────────
+//
+// A data-credit attribute satisfied nobody: nothing in the product ever painted
+// it, so in practice the credit did not exist. Unsplash's §9 and Guideline 3
+// require it to be DISPLAYED where the photo is, which makes this a rendering
+// concern rather than a metadata one.
+
+func firstImg(t *testing.T, root *html.Node) *html.Node {
+	t.Helper()
+	var found *html.Node
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if found != nil {
+			return
+		}
+		if n.Type == html.ElementNode && n.Data == "img" {
+			found = n
+			return
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(root)
+	if found == nil {
+		t.Fatal("no img in document")
+	}
+	return found
+}
+
+func render(t *testing.T, root *html.Node) string {
+	t.Helper()
+	var b strings.Builder
+	if err := html.Render(&b, root); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	return b.String()
+}
+
+func TestPlaceCreditLandsInsideTheSlideAndLinksThePhotographer(t *testing.T) {
+	doc := parseDoc(t, `<html><body><section data-slide="0" style="position:relative">
+		<img data-el="bg" src="https://images.unsplash.com/regular">
+	</section></body></html>`)
+	placeCredit(firstImg(t, doc), "Photo by Ada on Unsplash",
+		"https://unsplash.com/@ada?utm_source=trendly&utm_medium=referral")
+
+	out := render(t, doc)
+	if !strings.Contains(out, `data-el="stock-credit-0"`) {
+		t.Fatalf("no credit element:\n%s", out)
+	}
+	if !strings.Contains(out, "Photo by Ada on Unsplash") {
+		t.Errorf("credit text missing:\n%s", out)
+	}
+	// The referral tag is a term of use, not a nicety.
+	if !strings.Contains(out, "utm_source=trendly") || !strings.Contains(out, "utm_medium=referral") {
+		t.Errorf("the credit link is not referral-tagged:\n%s", out)
+	}
+	// It has to sit in the slide, or it will not travel into the render.
+	slideIdx := strings.Index(out, `data-slide="0"`)
+	creditIdx := strings.Index(out, `data-el="stock-credit-0"`)
+	if slideIdx < 0 || creditIdx < slideIdx {
+		t.Errorf("credit is not inside the slide:\n%s", out)
+	}
+}
+
+func TestPlaceCreditCombinesTwoPhotosOnOneSlide(t *testing.T) {
+	doc := parseDoc(t, `<html><body><section data-slide="0" style="position:relative">
+		<img data-el="bg"><img data-el="inset">
+	</section></body></html>`)
+	img := firstImg(t, doc)
+	placeCredit(img, "Photo by Ada on Unsplash", "https://unsplash.com/@ada")
+	placeCredit(img, "Photo by Bo on Unsplash", "https://unsplash.com/@bo")
+
+	out := render(t, doc)
+	// One line naming both, not two captions stacked in a corner.
+	if n := strings.Count(out, `data-el="stock-credit-0"`); n != 1 {
+		t.Errorf("want one credit element, got %d:\n%s", n, out)
+	}
+	for _, want := range []string{"Ada", "Bo", " · "} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestPlaceCreditFallsBackToTheBodyWithNoSlide(t *testing.T) {
+	doc := parseDoc(t, `<html><body><img data-el="bg"></body></html>`)
+	placeCredit(firstImg(t, doc), "Photo by Ada on Unsplash", "")
+	out := render(t, doc)
+	if !strings.Contains(out, `data-el="stock-credit"`) {
+		t.Errorf("a design with no slides should still be credited:\n%s", out)
+	}
+	// No link to make, so no empty anchor either.
+	if strings.Contains(out, "<a") {
+		t.Errorf("an unknown photographer should not produce a link:\n%s", out)
+	}
+}
+
+// ── Hotlink vs re-host ──────────────────────────────────────────────────────
+
+type fakeStock struct {
+	asset    mediagen.Asset
+	reported *int
+}
+
+func (fakeStock) Name() string                  { return "fake-stock" }
+func (fakeStock) Supports(k mediagen.Kind) bool { return k == mediagen.KindStock }
+func (f fakeStock) Submit(context.Context, mediagen.Spec) (mediagen.Result, error) {
+	return mediagen.Result{Status: mediagen.StatusSucceeded, Assets: []mediagen.Asset{f.asset}}, nil
+}
+func (fakeStock) Get(context.Context, string) (mediagen.Result, error) {
+	return mediagen.Result{}, mediagen.ErrNotAsynchronous
+}
+func (f fakeStock) ReportUsed(context.Context, mediagen.Asset) error {
+	*f.reported++
+	return nil
+}
+
+func TestResolveStockHotlinksAndReportsThePlacementOnce(t *testing.T) {
+	reported := 0
+	mediagen.Register(fakeStock{
+		asset: mediagen.Asset{
+			URL:         "https://images.unsplash.com/regular",
+			Alt:         "a cat",
+			Hotlink:     true,
+			Attribution: "Photo by Ada on Unsplash",
+			CreatorURL:  "https://unsplash.com/@ada?utm_source=trendly&utm_medium=referral",
+			TrackingRef: "https://api.unsplash.com/photos/abc/download",
+		},
+		reported: &reported,
+	})
+	t.Setenv("STOCK_PROVIDER", "fake-stock")
+
+	src, alt, credit, creditURL := resolveStock(context.Background(), "brand-1", "a cat", "1:1")
+
+	// Hotlinked: the URL is used as-is. Copying it would be a material breach
+	// of the API terms, and any rewrite here is the symptom.
+	if src != "https://images.unsplash.com/regular" {
+		t.Errorf("a hotlinked photo must keep its own url, got %q", src)
+	}
+	if alt != "a cat" || credit != "Photo by Ada on Unsplash" {
+		t.Errorf("alt/credit did not travel: %q / %q", alt, credit)
+	}
+	if !strings.Contains(creditURL, "utm_source=trendly") {
+		t.Errorf("credit link lost its referral tag: %q", creditURL)
+	}
+	// Placing a photo is one use, however many results the search returned.
+	if reported != 1 {
+		t.Errorf("the placement should report exactly once, got %d", reported)
+	}
+}
+
+func TestResolveStockSurvivesAProviderWithNothingToGive(t *testing.T) {
+	mediagen.Register(emptyStock{})
+	t.Setenv("STOCK_PROVIDER", "empty-stock")
+	// A missing key or no match leaves the placeholder alone rather than
+	// failing the design — an <img> with no src is a visible gap the user can
+	// ask about, which beats a layout quietly changed.
+	src, _, credit, _ := resolveStock(context.Background(), "brand-1", "a cat", "1:1")
+	if src != "" || credit != "" {
+		t.Errorf("want empty results, got %q / %q", src, credit)
+	}
+}
+
+type emptyStock struct{}
+
+func (emptyStock) Name() string                  { return "empty-stock" }
+func (emptyStock) Supports(k mediagen.Kind) bool { return k == mediagen.KindStock }
+func (emptyStock) Submit(context.Context, mediagen.Spec) (mediagen.Result, error) {
+	return mediagen.Result{Status: mediagen.StatusFailed, Error: "stock photography is not configured"}, nil
+}
+func (emptyStock) Get(context.Context, string) (mediagen.Result, error) {
+	return mediagen.Result{}, mediagen.ErrNotAsynchronous
+}
+
+func TestCreditIDsAreUniquePerSlide(t *testing.T) {
+	// A data-el is how the editor selects an element and how a comment anchors
+	// to one. Two slides sharing an id would make both uneditable and pin every
+	// comment to whichever matched first.
+	doc := parseDoc(t, `<html><body>
+		<section data-slide="0" style="position:relative"><img data-el="a"></section>
+		<section data-slide="1" style="position:relative"><img data-el="b"></section>
+	</body></html>`)
+	var imgs []*html.Node
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "img" {
+			imgs = append(imgs, n)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+
+	placeCredit(imgs[0], "Photo by Ada on Unsplash", "")
+	placeCredit(imgs[1], "Photo by Bo on Unsplash", "")
+
+	out := render(t, doc)
+	for _, want := range []string{`data-el="stock-credit-0"`, `data-el="stock-credit-1"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %s:\n%s", want, out)
+		}
+	}
+}

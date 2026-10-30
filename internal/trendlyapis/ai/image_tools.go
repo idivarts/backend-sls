@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"log"
@@ -125,8 +126,18 @@ func runChatImageTool(ctx context.Context, brandID, orgID, contentID, connID, co
 	// gating and model choice above are unchanged — what moves is only WHERE
 	// the call goes, so the seam is proven by an existing, exercised path
 	// before anything new depends on it.
-	refs := make([]mediagen.AssetRef, 0, len(a.InputImages))
-	for _, u := range cleanStrings(a.InputImages) {
+	inputs := cleanStrings(a.InputImages)
+	// Some stock licences forbid their photos being used as model input. The
+	// seam refuses them anyway, but refusing HERE is what lets the model tell
+	// the user what to do instead rather than reporting a generation failure.
+	if bad, why := mediagen.RestrictedRefs(inputs); bad {
+		return jsonResult(map[string]any{
+			"ok":    false,
+			"error": why + " Tell the user this, and offer to generate the image from the prompt alone instead.",
+		}), nil, nil
+	}
+	refs := make([]mediagen.AssetRef, 0, len(inputs))
+	for _, u := range inputs {
 		refs = append(refs, mediagen.AssetRef{URL: u})
 	}
 	res, err := mediagen.Submit(ctx, "openrouter", mediagen.Spec{
@@ -138,6 +149,14 @@ func runChatImageTool(ctx context.Context, brandID, orgID, contentID, connID, co
 		Count:       1,
 	})
 	if err != nil {
+		// A licence refusal is not a failure to report as one: it has a cause
+		// the user can act on, and no error should be surfaced to support.
+		if errors.Is(err, mediagen.ErrRestrictedRef) {
+			return jsonResult(map[string]any{
+				"ok":    false,
+				"error": err.Error() + "; tell the user and offer to generate from the prompt alone",
+			}), nil, nil
+		}
 		return jsonResult(map[string]any{"ok": false, "error": "image generation failed: " + err.Error()}), nil, err
 	}
 	if res.Status == mediagen.StatusFailed {
