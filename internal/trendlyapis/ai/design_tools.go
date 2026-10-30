@@ -257,7 +257,7 @@ func runGenerateDesign(ctx context.Context, brandID, contentID, arguments string
 	// becomes a revision, so the design the user sees already has its
 	// photography in it. Runs AFTER validation — there is no point spending
 	// money on images for a document that will not render.
-	filled, imagery := fillDesignImagery(ctx, brandID, aspectForSize(w, h), wrapHTML(html))
+	filled, imagery := fillDesignImagery(ctx, brandID, contentID, aspectForSize(w, h), wrapHTML(html))
 
 	revID, err := persistDesign(brandID, contentID, filled, w, h, slides, duration, docType, "generate", "")
 	if err != nil {

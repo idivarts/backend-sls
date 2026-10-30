@@ -40,7 +40,7 @@
  * sequence fed into it are what "identical" means: changing either changes
  * every video the product has ever made.
  */
-import { readFile, unlink } from "node:fs/promises";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Page } from "playwright";
@@ -224,4 +224,52 @@ export async function renderDesignSegment(input: DesignSegmentInput): Promise<vo
         progressStepPct: config.progressStepPct,
         label: input.label ?? "segment",
     });
+}
+
+/**
+ * Render an overlay design to a numbered sequence of transparent PNGs.
+ *
+ * A PNG sequence rather than a video with an alpha channel, deliberately. The
+ * alpha-capable codecs each come with a catch — VP9 with yuva420p is slow,
+ * ProRes 4444 is enormous, and whether either is compiled into the container's
+ * FFmpeg is one more thing that can differ between here and production. PNG is
+ * lossless, carries alpha by definition, and image2 is always available. An
+ * overlay is a caption or a logo lasting a few seconds, so the frames cost
+ * megabytes on a Fargate task with 20GB of scratch, not gigabytes.
+ *
+ * ⚠️ Never run this on the image Lambda: /tmp there is 512 MB.
+ */
+export interface OverlayFramesInput {
+    page: Page;
+    rect: Rect;
+    offsetMs: number;
+    frames: number;
+    fps: number;
+    /** Existing directory the numbered frames are written into. */
+    dir: string;
+    onProgress?: (fraction: number) => void;
+    label?: string;
+}
+
+export async function renderOverlayFrames(input: OverlayFramesInput): Promise<void> {
+    const { page, rect, offsetMs, fps, dir, onProgress } = input;
+    const frames = Math.max(1, input.frames);
+    const label = input.label ?? "overlay";
+
+    let lastReported = -1;
+    for (let i = 0; i < frames; i++) {
+        await page.evaluate(seekAt, { ms: offsetMs + (i * 1000) / fps });
+        // omitBackground is what keeps the alpha; the page's own backgrounds
+        // were cleared in loadDesign, because this flag alone only drops the
+        // browser's base canvas.
+        const png = await page.screenshot({ type: "png", clip: rect, omitBackground: true });
+        await writeFile(join(dir, String(i).padStart(6, "0") + ".png"), png);
+
+        const pct = Math.floor(((i + 1) / frames) * 100);
+        if (pct - lastReported >= config.progressStepPct) {
+            lastReported = pct;
+            console.log(`[${label}] frame ${i + 1}/${frames} (${pct}%)`);
+            onProgress?.((i + 1) / frames);
+        }
+    }
 }

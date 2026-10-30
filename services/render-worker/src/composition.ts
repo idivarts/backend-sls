@@ -29,13 +29,15 @@
  * not identical, and byte-identical output on every pre-existing video design
  * is this phase's acceptance test.
  */
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Browser } from "playwright";
 import {
     measureComposition,
+    measureOverlays,
     type CompositionMeasurement,
+    type MeasuredOverlay,
     singleDesignPassthrough,
     validateComposition,
     type Clip,
@@ -46,7 +48,7 @@ import { buildAudioStage } from "./audio";
 import { config } from "./config";
 import { runFfmpeg } from "./encode";
 import { loadDesign } from "./page";
-import { renderDesignSegment, renderVideo, type VideoOutput } from "./video";
+import { renderDesignSegment, renderOverlayFrames, renderVideo, type VideoOutput } from "./video";
 import type { ContentAudio } from "./types";
 
 export interface CompositionInput {
@@ -86,6 +88,15 @@ interface ClipPlan {
     overlapFrames: number;
     /** Its start on the composition timeline, in frames. */
     startFrames: number;
+}
+
+/** An overlay staged as a transparent frame sequence. */
+interface StagedOverlay {
+    measured: MeasuredOverlay;
+    /** FFmpeg args declaring this overlay's input. */
+    inputArgs: string[];
+    startSeconds: string;
+    endSeconds: string;
 }
 
 /** A clip reduced to what the final FFmpeg pass needs from it. */
@@ -184,6 +195,7 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
     const totalMs = Math.round((totalFrames / fps) * 1000);
 
     const tempFiles: string[] = [];
+    const tempDirs: string[] = [];
     const outPath = join(tmpdir(), `composition_${Date.now()}.mp4`);
     const posterPath = join(tmpdir(), `composition_${Date.now()}_poster.png`);
     tempFiles.push(outPath, posterPath);
@@ -237,20 +249,46 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
             segments.push({ measured, plan, inputArgs: local.inputArgs, filter: local.filter });
         }
 
+        // Overlays last, over whatever the picture turned out to be.
+        const overlays: StagedOverlay[] = [];
+        for (const measured of measureOverlays(composition)) {
+            const dir = join(tmpdir(), `overlay_${measured.index}_${Date.now()}`);
+            await mkdir(dir, { recursive: true });
+            tempDirs.push(dir);
+            const frames = Math.max(1, Math.round((measured.durationMs / 1000) * fps));
+            await renderOverlayClip({ input, measured, frames, fps, dir });
+            overlays.push({
+                measured,
+                // -itsoffset shifts this input's timestamps, so the frames land
+                // where the overlay was placed rather than at zero.
+                inputArgs: [
+                    "-itsoffset", (measured.startMs / 1000).toFixed(3),
+                    "-framerate", String(fps),
+                    "-start_number", "0",
+                    "-i", join(dir, "%06d.png"),
+                ],
+                startSeconds: (measured.startMs / 1000).toFixed(3),
+                endSeconds: ((measured.startMs + measured.durationMs) / 1000).toFixed(3),
+            });
+        }
+
         onProgress?.(0.9);
 
-        // Audio inputs come after every video input, so the stage has to be told
-        // where it starts — the default of 1 is only right for a single pipe.
-        const audioStage = await buildAudioStage(audio, totalMs, segments.length);
+        // Audio inputs come after EVERY video input — the clips and now the
+        // overlays. The default of 1 is only right for a single pipe, and an
+        // index that is off by the overlay count filters the wrong stream and
+        // ships a clip's own audio as the soundtrack.
+        const audioStage = await buildAudioStage(audio, totalMs, segments.length + overlays.length);
         tempFiles.push(...audioStage.tempFiles);
 
-        const videoFilter = buildVideoGraph(segments, width, height, fps);
+        const videoFilter = buildVideoGraph(segments, width, height, fps, overlays);
         const filter = audioStage.filter ? `${videoFilter};${audioStage.filter}` : videoFilter;
 
         const args = [
             "-hide_banner",
             "-loglevel", "error",
             ...segments.flatMap((s) => s.inputArgs),
+            ...overlays.flatMap((o) => o.inputArgs),
             ...audioStage.inputArgs,
             "-filter_complex", filter,
             "-map", "[outv]",
@@ -285,7 +323,12 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
         ]);
         return { mp4, poster };
     } finally {
-        await Promise.all(tempFiles.map((p) => unlink(p).catch(() => undefined)));
+        await Promise.all([
+            ...tempFiles.map((p) => unlink(p).catch(() => undefined)),
+            // Frame sequences are the one thing here big enough to matter if it
+            // leaks: a few hundred megabytes per overlay.
+            ...tempDirs.map((d) => rm(d, { recursive: true, force: true }).catch(() => undefined)),
+        ]);
     }
 }
 
@@ -324,6 +367,56 @@ async function renderDesignClip(args: {
             outPath,
             onProgress,
             label: `clip ${measured.index}`,
+        });
+    } finally {
+        await loaded.close();
+    }
+}
+
+/**
+ * Render one overlay clip's transparent frames.
+ *
+ * Loaded with `transparent` so the design's own backgrounds are cleared and the
+ * capture keeps its alpha; everything else about it is an ordinary design,
+ * which is the point — an overlay inherits the brand's fonts, the palette and
+ * the editor without the renderer learning anything new.
+ */
+async function renderOverlayClip(args: {
+    input: CompositionInput;
+    measured: MeasuredOverlay;
+    frames: number;
+    fps: number;
+    dir: string;
+}): Promise<void> {
+    const { input, measured, frames, fps, dir } = args;
+    const source = measured.clip.source;
+    if (source.kind !== "design") throw new Error("An overlay has to be a design.");
+
+    const revision = await input.loadRevision(source.revisionId);
+    const loaded = await loadDesign(
+        input.browser,
+        revision.html,
+        revision.width,
+        revision.height,
+        undefined,
+        true
+    );
+    try {
+        // A scene index addresses the DESIGN's own timeline, so the offset
+        // comes from its measurement, not the composition's.
+        let offsetMs = 0;
+        const offsets = loaded.measurement.offsets;
+        if (source.sceneIndex !== undefined && source.sceneIndex !== null) {
+            offsetMs = offsets[Math.min(Math.max(source.sceneIndex, 0), offsets.length - 1)];
+        }
+        await renderOverlayFrames({
+            page: loaded.page,
+            rect: loaded.rects[0],
+            offsetMs,
+            frames,
+            fps,
+            dir,
+            label: `overlay ${measured.index}`,
         });
     } finally {
         await loaded.close();
@@ -455,7 +548,13 @@ function kenBurns(
  * is simply the measured start of the clip arriving, with no running total to
  * get wrong.
  */
-function buildVideoGraph(segments: Segment[], width: number, height: number, fps: number): string {
+function buildVideoGraph(
+    segments: Segment[],
+    width: number,
+    height: number,
+    fps: number,
+    overlays: StagedOverlay[] = []
+): string {
     const toSeconds = (frames: number) => (frames / fps).toFixed(3);
     const parts: string[] = [];
     segments.forEach((segment, i) => {
@@ -481,9 +580,35 @@ function buildVideoGraph(segments: Segment[], width: number, height: number, fps
         acc = next;
     }
 
-    // An explicit copy so the last label is always [outv], whether there was one
-    // clip or ten — the -map argument should not have to know which.
-    parts.push(`[${acc}]null[outv]`);
+    // Overlays go on last, over whatever the picture turned out to be.
+    //
+    // `enable` bounds the overlay to its window and `eof_action=pass` keeps the
+    // picture running once the overlay's frames are exhausted — without it the
+    // output would END when the shortest overlay did, which is a video silently
+    // truncated to the length of its caption.
+    overlays.forEach((o, i) => {
+        const input = segments.length + i;
+        const label = `ov${i}`;
+        // Fit inside the frame and pad with TRANSPARENT black, not opaque: a
+        // pad colour without an alpha of 0 turns the overlay into a rectangle
+        // that hides the picture behind it.
+        parts.push(
+            `[${input}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,` +
+                `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,` +
+                `format=rgba,fps=${fps},setsar=1,settb=AVTB[${label}]`
+        );
+        const next = `ovr${i}`;
+        parts.push(
+            `[${acc}][${label}]overlay=0:0:eof_action=pass:format=auto:` +
+                `enable='between(t,${o.startSeconds},${o.endSeconds})'[${next}]`
+        );
+        acc = next;
+    });
+
+    // Back to a chroma format the encoder takes. The overlay chain works in
+    // rgba, and handing that to libx264 yuv420p is a conversion better stated
+    // than left to FFmpeg's choice.
+    parts.push(`[${acc}]format=yuv420p[outv]`);
     return parts.join(";");
 }
 

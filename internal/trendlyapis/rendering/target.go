@@ -63,6 +63,11 @@ func ResolveRenderTarget(brandID, contentID string, ct *trendlymodels.Content) (
 			// recomputed on read, never from the cached ref — the ref is
 			// client-writable and this number is what gets charged.
 			clips, total := trendlymodels.MeasureComposition(&rev.Composition)
+			// Overlays are billed as clips too. Each one is its own Chromium
+			// pass and its own compositing step in the graph, so a timeline
+			// with four captions costs more than the same timeline without
+			// them — and quoting it as if it did not would be a quiet loss.
+			billable := len(clips) + len(trendlymodels.OverlayClips(&rev.Composition))
 			// Checked HERE rather than in the worker alone, so a timeline with a
 			// clip that cannot render is refused before the wallet is debited
 			// for an attempt that was never going to produce anything.
@@ -76,7 +81,7 @@ func ResolveRenderTarget(brandID, contentID string, ct *trendlymodels.Content) (
 				ChargedTokens: rev.RenderChargedTokens,
 				Problem:       why,
 				Tokens: trendlymodels.CompositionRenderTokenCost(
-					total, len(clips), trendlymodels.CompositionDecodedMs(&rev.Composition)),
+					total, billable, trendlymodels.CompositionDecodedMs(&rev.Composition)),
 			}, nil
 		}
 		// A compositionRef pointing at a revision that is gone falls through to

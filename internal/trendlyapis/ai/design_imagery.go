@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/mediagen"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 	"golang.org/x/net/html"
@@ -54,7 +55,7 @@ func (r imageryResult) touched() bool { return r.Generated+r.Stock+r.Failed > 0 
 // It never fails the caller: an image that cannot be resolved leaves its
 // placeholder in place and is counted in Failed. A design with a missing photo
 // is worth far more than no design.
-func fillDesignImagery(ctx context.Context, brandID, aspect string, doc string) (string, imageryResult) {
+func fillDesignImagery(ctx context.Context, brandID, contentID, aspect string, doc string) (string, imageryResult) {
 	var res imageryResult
 	if !strings.Contains(doc, attrGen) && !strings.Contains(doc, attrStock) {
 		return doc, res
@@ -89,9 +90,9 @@ func fillDesignImagery(ctx context.Context, brandID, aspect string, doc string) 
 			defer wg.Done()
 			f := filled{node: t.node, stock: t.stock}
 			if t.stock {
-				f.src, f.alt, f.credit, f.creditURL = resolveStock(ctx, brandID, t.prompt, aspect)
+				f.src, f.alt, f.credit, f.creditURL = resolveStock(ctx, brandID, contentID, t.prompt, aspect)
 			} else {
-				f.src = resolveGenerated(ctx, brandID, t.prompt, aspect)
+				f.src = resolveGenerated(ctx, brandID, contentID, t.prompt, aspect)
 			}
 			out[i] = f
 		}(i, t)
@@ -176,7 +177,7 @@ func collectPlaceholders(root *html.Node) []placeholder {
 // One consolation: a hotlinked photo carries its provenance in its own URL,
 // which is what makes the "stock may not feed a model" gate enforceable at all.
 // A copy in our bucket would be indistinguishable from a user's upload.
-func resolveStock(ctx context.Context, brandID, query, aspect string) (src, alt, credit, creditURL string) {
+func resolveStock(ctx context.Context, brandID, contentID, query, aspect string) (src, alt, credit, creditURL string) {
 	provider := mediagen.StockProvider()
 	res, err := mediagen.Submit(ctx, provider, mediagen.Spec{
 		Kind:        mediagen.KindStock,
@@ -217,11 +218,41 @@ func resolveStock(ctx context.Context, brandID, query, aspect string) (src, alt,
 		log.Printf("design imagery: stock usage report %q: %v", query, rerr)
 	}
 
+	recordLibraryAsset(ctx, brandID, &trendlymodels.Asset{
+		Kind:            trendlymodels.AssetKindImage,
+		Source:          trendlymodels.AssetSourceStock,
+		URL:             src,
+		MimeType:        p.MimeType,
+		Alt:             p.Alt,
+		Title:           query,
+		Provider:        provider,
+		Attribution:     p.Attribution,
+		CreditURL:       p.CreatorURL,
+		Hotlink:         p.Hotlink,
+		NoAIInput:       p.NoAIInput,
+		OriginContentID: contentID,
+	})
+
 	return src, p.Alt, p.Attribution, p.CreatorURL
 }
 
+// recordLibraryAsset files an asset in the brand's library, best effort.
+//
+// Never allowed to fail the thing that produced it: the photo is already in the
+// design and the image is already paid for, so losing a library row is a far
+// smaller harm than losing either. Deduplicated by URL inside RecordAsset,
+// because one design resolving the same photo twice should not show it twice.
+func recordLibraryAsset(ctx context.Context, brandID string, a *trendlymodels.Asset) {
+	if a == nil || a.URL == "" {
+		return
+	}
+	if _, _, err := trendlymodels.RecordAsset(ctx, brandID, a); err != nil {
+		log.Printf("asset library: could not record %s asset: %v", a.Source, err)
+	}
+}
+
 // resolveGenerated produces an image from the model and hosts it.
-func resolveGenerated(ctx context.Context, brandID, prompt, aspect string) string {
+func resolveGenerated(ctx context.Context, brandID, contentID, prompt, aspect string) string {
 	model, locked := pickModel(ctx, brandID, openrouter.TaskImage, "")
 	if locked {
 		// The plan does not include image generation. Silently leaving the
@@ -247,6 +278,15 @@ func resolveGenerated(ctx context.Context, brandID, prompt, aspect string) strin
 	}
 	for _, a := range res.Assets {
 		if s3url, uerr := hostAsset(a.URL, brandID); uerr == nil && s3url != "" {
+			recordLibraryAsset(ctx, brandID, &trendlymodels.Asset{
+				Kind:            trendlymodels.AssetKindImage,
+				Source:          trendlymodels.AssetSourceGenerated,
+				URL:             s3url,
+				MimeType:        a.MimeType,
+				Title:           prompt,
+				Provider:        "openrouter",
+				OriginContentID: contentID,
+			})
 			return s3url
 		}
 	}

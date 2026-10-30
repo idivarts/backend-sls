@@ -342,6 +342,22 @@ service cloud.firestore {
         }
       }
 
+      // ── The brand's media library ────────────────────────────────────────
+      // brands/{brandId}/assets/{assetId}. Brand-scoped on purpose: an asset
+      // uploaded while editing one post is meant to be reachable from another.
+      //
+      // Read by any brand member. NOT client-writable: an asset carries
+      // provenance — a credit that must travel with it, a licence that forbids
+      // re-hosting, a flag saying it may not be fed to a model — and a client
+      // able to write those could strip a photographer's credit or mark
+      // someone else's licensed photo as freely usable. Uploads are recorded
+      // through POST /api/v2/brands/:brandId/assets, which stamps provenance
+      // itself rather than accepting it.
+      match /assets/{assetId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
+      }
+
       // ── Generated audio (ElevenLabs music / voiceovers) ──────────────────
       // brands/{brandId}/generatedAudio/{audioId}. Written ONLY by the backend
       // (Admin SDK) after a metered generation; brand members read to preview.

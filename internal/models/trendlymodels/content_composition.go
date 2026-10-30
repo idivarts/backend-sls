@@ -3,6 +3,7 @@ package trendlymodels
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -268,8 +269,39 @@ func compositionVideoClips(c *Composition) []CompositionClip {
 	return nil
 }
 
+// OverlayClips returns the clips on every overlay track, in start order.
+//
+// Their StartMs is AUTHORED and absolute, unlike the video track's, because a
+// gap between captions is the ordinary case while a gap in the picture can only
+// render as black. Mirrors measureOverlays in composition-runtime.ts.
+func OverlayClips(c *Composition) []CompositionClip {
+	if c == nil {
+		return nil
+	}
+	var out []CompositionClip
+	for _, t := range c.Tracks {
+		if t.Kind != CompositionTrackOverlay {
+			continue
+		}
+		for _, clip := range t.Clips {
+			if clip.DurationMs <= 0 {
+				clip.DurationMs = DefaultClipMs
+			}
+			if clip.StartMs < 0 {
+				clip.StartMs = 0
+			}
+			out = append(out, clip)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].StartMs < out[j].StartMs })
+	return out
+}
+
 // StampDerived recomputes the cached offsets and total in place, so what is
 // stored can never contradict what will be rendered — or what was billed.
+//
+// Only the VIDEO track. An overlay's StartMs is authored, and restamping it
+// would move every caption to the start of the timeline.
 func (c *Composition) StampDerived() {
 	measured, total := MeasureComposition(c)
 	c.DurationMs = total
@@ -323,8 +355,27 @@ func ValidateComposition(c *Composition) []CompositionProblem {
 		case CompositionTrackVideo:
 			videoTracks++
 		case CompositionTrackOverlay:
-			if len(t.Clips) > 0 {
-				add("tracks.overlay", "Overlay tracks aren't supported yet.", true)
+			for i, clip := range t.Clips {
+				at := fmt.Sprintf("tracks.overlay.clips[%d]", i)
+				if clip.DurationMs <= 0 {
+					add(at+".durationMs", "An overlay needs a duration.", true)
+				}
+				if clip.StartMs < 0 {
+					add(at+".startMs", "An overlay can't start before the video does.", true)
+				}
+				// An overlay IS a transparent design. That is what makes it
+				// nearly free — it inherits the brand's fonts, the palette and
+				// the editor, and the renderer needs nothing new.
+				if clip.Source.Kind != ClipSourceDesign {
+					add(at+".source", "An overlay has to be a design — captions, a logo or an end card.", true)
+					continue
+				}
+				if clip.Source.RevisionID == "" {
+					add(at+".source.revisionId", "An overlay needs a design revision.", true)
+				}
+				if !clip.Source.Transparent {
+					add(at+".source.transparent", "An overlay design has to be captured transparently.", true)
+				}
 			}
 		case CompositionTrackAudio:
 			if len(t.Clips) > 0 {
@@ -372,7 +423,8 @@ func ValidateComposition(c *Composition) []CompositionProblem {
 				add(at+".source.sceneIndex", "A scene index can't be negative.", true)
 			}
 			if s.Transparent {
-				add(at+".source.transparent", "Transparent design clips aren't supported yet.", true)
+				add(at+".source.transparent",
+					"A transparent design belongs on an overlay track, not the video track.", true)
 			}
 		case ClipSourceFootage:
 			if s.URL == "" {
