@@ -31,6 +31,11 @@ provider:
     # AI Studio — ElevenLabs (music + voiceover) and Canva Connect deep-edit
     # bridge. See docs/elevenlabs-setup.md and docs/canva-setup.md.
     ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY, ''}
+    # Off unless the workspace actually has a flows webhook configured in the
+    # ElevenLabs dashboard. Asking for a callback a workspace cannot make
+    # refuses the whole generation, so this stays off until the endpoint exists;
+    # the polling sweep resolves every job either way.
+    ELEVENLABS_WEBHOOKS: ${env:ELEVENLABS_WEBHOOKS, ''}
     # Stock photography for AI-authored designs. Empty means stock placeholders
     # are skipped and the design still lands, just without photography.
     PEXELS_API_KEY: ${env:PEXELS_API_KEY, ''}
