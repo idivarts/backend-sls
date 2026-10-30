@@ -55,7 +55,7 @@ import (
 	_ "github.com/idivarts/backend-sls/pkg/firebase"
 )
 
-func videoRow(id, name string, usdPerSecond float64, keyframes bool) trendlymodels.MediaModel {
+func videoRow(id, name string, usdPerSecond float64, keyframes, nativeAudio bool) trendlymodels.MediaModel {
 	m := trendlymodels.MediaModel{
 		ID:          id,
 		Provider:    "elevenlabs",
@@ -64,7 +64,7 @@ func videoRow(id, name string, usdPerSecond float64, keyframes bool) trendlymode
 		StartFrame:  keyframes,
 		EndFrame:    keyframes,
 		ImageRefs:   true,
-		NativeAudio: true,
+		NativeAudio: nativeAudio,
 		// Veo refuses 5 seconds with a 422 — it takes a SET, which min/max
 		// cannot express, so both are carried and the set wins.
 		MinDurationS:    4,
@@ -81,13 +81,18 @@ func videoRow(id, name string, usdPerSecond float64, keyframes bool) trendlymode
 
 func catalog() []trendlymodels.MediaModel {
 	return []trendlymodels.MediaModel{
-		videoRow("veo-3.1-fast-generate-001", "Veo 3.1 Fast", 0.15, true),
-		videoRow("veo-3.1-generate-001", "Veo 3.1", 0.40, true),
-		videoRow("bytedance-seedance-v2", "Seedance v2", 0.40, false),
-		videoRow("bytedance-seedance-v2-fast", "Seedance v2 Fast", 0.15, false),
-		videoRow("bytedance-seedance-v2-mini", "Seedance v2 Mini", 0.08, false),
-		videoRow("bytedance-seedance-v2.5", "Seedance v2.5", 0.40, false),
-		videoRow("creatify-aurora", "Creatify Aurora", 0.20, false),
+		// `nativeAudio` is not a guess: POST each model_id with a
+		// generate_audio the API cannot parse and the 422 says whether the
+		// field exists for it — "bool_parsing" means it does, "extra_forbidden"
+		// means it does not. Costs nothing, where assuming costs a generation.
+		// Checked 2026-10-30: Veo and every Seedance take it, Aurora does not.
+		videoRow("veo-3.1-fast-generate-001", "Veo 3.1 Fast", 0.15, true, true),
+		videoRow("veo-3.1-generate-001", "Veo 3.1", 0.40, true, true),
+		videoRow("bytedance-seedance-v2", "Seedance v2", 0.40, false, true),
+		videoRow("bytedance-seedance-v2-fast", "Seedance v2 Fast", 0.15, false, true),
+		videoRow("bytedance-seedance-v2-mini", "Seedance v2 Mini", 0.08, false, true),
+		videoRow("bytedance-seedance-v2.5", "Seedance v2.5", 0.40, false, true),
+		videoRow("creatify-aurora", "Creatify Aurora", 0.20, false, false),
 
 		{
 			ID: "music_v2", Provider: "elevenlabs",
