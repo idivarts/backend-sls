@@ -491,6 +491,10 @@ func toolsForModule(module string) []openrouter.Tool {
 	if moduleHasStudio(module) {
 		tools = append(tools, designServerTools()...)
 		tools = append(tools, audioServerTools()...)
+		// The timeline. `get_footage` could already say which part of a take
+		// was the good part and then do nothing about it; these two let the
+		// model place it.
+		tools = append(tools, timelineServerTools()...)
 		// The script lives on the same surface as the design and had no way to
 		// be edited from the chat, so asking for a tighter hook produced a good
 		// revision in the conversation and nothing in the editor.
