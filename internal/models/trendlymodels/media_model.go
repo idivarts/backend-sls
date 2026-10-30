@@ -123,6 +123,26 @@ func ListEnabledMediaModels(ctx context.Context, kind string) ([]MediaModel, err
 	return out, nil
 }
 
+// EnabledModelID returns the id of the model to use for a kind, or "" when the
+// registry has nothing enabled for it.
+//
+// The empty string is a real answer and every caller treats it as one: the
+// ElevenLabs client falls back to its compiled-in default, so an unseeded or
+// unreachable registry degrades to the behaviour we had before it existed
+// rather than failing a generation. The registry is authoritative when it has
+// something to say and silent otherwise.
+//
+// Reads through the cache, because this runs on the hot path of every music,
+// voiceover and transcription call.
+func EnabledModelID(ctx context.Context, kind string) string {
+	for _, m := range CachedMediaModels(ctx) {
+		if m.Enabled && m.Kind == kind {
+			return m.ID
+		}
+	}
+	return ""
+}
+
 // GetMediaModel reads one row by id.
 func GetMediaModel(ctx context.Context, id string) (*MediaModel, error) {
 	doc, err := mediaModels().Doc(id).Get(ctx)

@@ -83,6 +83,10 @@ func runGenerateMusic(ctx context.Context, brandID, contentID, orgID, arguments 
 		Prompt:            a.Prompt,
 		LengthMs:          lengthMs,
 		ForceInstrumental: a.Instrumental == "true",
+		// From the registry where one is enabled; empty falls back to the
+		// client's compiled-in default, so an unseeded registry behaves as
+		// before rather than failing.
+		ModelID: trendlymodels.EnabledModelID(ctx, "music"),
 	})
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "music generation failed: " + err.Error()}), nil
@@ -151,6 +155,7 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 		var timings []elevenlabs.CharTiming
 		audio, timings, err = elevenlabs.GenerateVoiceoverTimed(elevenlabs.TTSRequest{
 			VoiceID: voiceID, Text: text, Language: a.Language,
+			ModelID: trendlymodels.EnabledModelID(ctx, "voice"),
 		})
 		if err == nil {
 			boundaries, exact = sceneBoundariesFrom(sceneTexts, sceneJoiner, timings)
@@ -158,6 +163,7 @@ func runGenerateVoiceover(ctx context.Context, brandID, contentID, orgID, argume
 	} else {
 		audio, err = elevenlabs.GenerateVoiceover(elevenlabs.TTSRequest{
 			VoiceID: voiceID, Text: text, Language: a.Language,
+			ModelID: trendlymodels.EnabledModelID(ctx, "voice"),
 		})
 	}
 	if err != nil {

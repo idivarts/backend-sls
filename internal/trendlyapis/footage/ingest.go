@@ -58,7 +58,7 @@ func Finish(ctx context.Context, brandID string, asset *trendlymodels.Asset) err
 	}
 	out := *asset.Ingest
 
-	if words, text, err := transcribe(asset.URL); err != nil {
+	if words, text, err := transcribe(ctx, asset.URL); err != nil {
 		log.Printf("footage: transcript for %s: %v", asset.ID, err)
 	} else {
 		out.Words, out.Text = words, text
@@ -82,8 +82,12 @@ func Finish(ctx context.Context, brandID string, asset *trendlymodels.Asset) err
 }
 
 // transcribe turns the footage into words with timings.
-func transcribe(url string) ([]trendlymodels.TranscriptWord, string, error) {
-	t, err := elevenlabs.TranscribeURL(url)
+//
+// The model comes from the registry, which is empty-string-safe: the client
+// falls back to its compiled-in default, so an unseeded registry transcribes
+// exactly as it did before the registry existed.
+func transcribe(ctx context.Context, url string) ([]trendlymodels.TranscriptWord, string, error) {
+	t, err := elevenlabs.TranscribeURL(url, trendlymodels.EnabledModelID(ctx, "stt"))
 	if err != nil {
 		return nil, "", err
 	}
