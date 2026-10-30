@@ -10,14 +10,15 @@ export interface RenderJob {
     revisionId: string;
     /**
      * "image" renders one PNG per slide; "video" renders a single MP4 from one
-     * design; "composition" renders an authored timeline.
+     * design; "composition" renders an authored timeline; "ingest" looks at an
+     * uploaded video and records what is in it.
      *
      * "video" is not the pre-composition path kept alive beside a new one — it
      * goes through the composition renderer too, as a one-clip composition
      * derived from the design in memory. The timeline is the only primitive;
      * this field only says where the job reads from and writes back to.
      */
-    docType: "image" | "video" | "composition";
+    docType: "image" | "video" | "composition" | "ingest";
     /**
      * Re-render a revision that already has a renderUrl. Off by default so a
      * duplicate queue delivery is a no-op rather than a second charge.
@@ -25,6 +26,12 @@ export interface RenderJob {
     force?: boolean;
     /** Opaque id (Batch job / Lambda request) recorded for support. */
     jobId?: string;
+    /**
+     * For an ingest job: the video to look at. `revisionId` carries the asset
+     * id in that case — one field for "the document this job is about", so the
+     * status writers do not need a second shape.
+     */
+    sourceUrl?: string;
 }
 
 /** What the worker found in Firestore and is about to render. */
@@ -50,6 +57,18 @@ export interface RenderTarget {
     contentId: string;
     revisionId: string;
     kind: "design" | "composition";
+}
+
+/**
+ * An ingest job: look at one uploaded video and record what is in it.
+ *
+ * Carries the asset rather than a revision, because ingest describes a piece
+ * of FOOTAGE in the brand's library, not a design belonging to one post.
+ */
+export interface IngestJob {
+    brandId: string;
+    assetId: string;
+    url: string;
 }
 
 /** Soundtrack to mux into a video render. */

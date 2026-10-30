@@ -63,6 +63,7 @@ var registry = []Registered{
 
 	// Assets & media
 	mediaLibrary(),
+	footageLibrary(),
 	generatedAssets(),
 
 	// Ops & scheduling intelligence

@@ -17,10 +17,10 @@ type generateClipRequest struct {
 	ModelID       string `json:"modelId" binding:"required"`
 	Prompt        string `json:"prompt" binding:"required"`
 
-	AspectRatio  string `json:"aspectRatio"`
-	DurationSecs int    `json:"durationSecs"`
-	Resolution   string `json:"resolution"`
-	GenerateAudio bool  `json:"generateAudio"`
+	AspectRatio   string `json:"aspectRatio"`
+	DurationSecs  int    `json:"durationSecs"`
+	Resolution    string `json:"resolution"`
+	GenerateAudio bool   `json:"generateAudio"`
 
 	StartFrameURL string `json:"startFrameUrl"`
 	EndFrameURL   string `json:"endFrameUrl"`

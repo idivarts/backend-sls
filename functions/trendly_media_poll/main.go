@@ -17,14 +17,27 @@ import (
 	"log"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/footage"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/mediajobs"
 	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
+
+// ingestBatch bounds one sweep. Each finished ingest is a transcription and a
+// multimodal call, so this is deliberately smaller than the job poll's limit.
+const ingestBatch = 10
 
 func handler(ctx context.Context) error {
 	if err := mediajobs.PollPending(ctx); err != nil {
 		log.Printf("media poll: %v", err)
 		mysentry.Capture(err, map[string]string{"lambda": "media_poll"})
+	}
+	// Footage ingest rides the same cron rather than getting its own. The
+	// worker has already measured the video and written its frames; what is
+	// left is a transcript and a shot list, and nobody is watching a progress
+	// bar for either — the footage was usable the moment it uploaded.
+	if err := footage.FinishPending(ctx, ingestBatch); err != nil {
+		log.Printf("footage ingest: %v", err)
+		mysentry.Capture(err, map[string]string{"lambda": "media_poll", "op": "ingest"})
 	}
 	return nil
 }

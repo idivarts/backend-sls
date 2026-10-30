@@ -49,3 +49,18 @@ func meterAIUsage(orgID string, usage *openrouter.Usage) {
 		log.Printf("ai meter: deduct tokens for org %s: %v", orgID, err)
 	}
 }
+
+// MeterBrandUsage bills an AI call to whichever org owns the brand.
+//
+// Exported for callers outside this package that make a model call of their
+// own — the footage vision pass, for one. Every such call has to be metered:
+// describing a dozen frames is a real multimodal request, not a free side
+// effect of uploading a video.
+func MeterBrandUsage(brandID string, usage *openrouter.Usage) {
+	if usage == nil {
+		return
+	}
+	if orgID, ok := orgIDForBrand(brandID); ok {
+		meterAIUsage(orgID, usage)
+	}
+}

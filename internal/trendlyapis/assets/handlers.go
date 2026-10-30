@@ -8,12 +8,14 @@
 package assets
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
 )
 
 // ListAssets returns the brand's library.
@@ -129,6 +131,17 @@ func RecordAsset(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not record the asset"})
 		return
 	}
+	// A new video gets looked at. Only on creation: re-recording the same URL
+	// must not queue a second ingest of a file we have already read.
+	if created && req.Kind == trendlymodels.AssetKindVideo {
+		if err := rendering.SubmitIngest(brandID, id, req.URL); err != nil {
+			// Not fatal. The footage is usable without ingest — it can be
+			// trimmed and placed by hand — so a failed dispatch costs the
+			// smart features, not the upload.
+			log.Printf("assets: could not start ingest for %s: %v", id, err)
+		}
+	}
+
 	// 200 rather than 201 when it was already there: re-recording the same URL
 	// is what a retried upload does, and it is not an error.
 	c.JSON(http.StatusOK, gin.H{"id": id, "created": created})
