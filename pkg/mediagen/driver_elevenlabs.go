@@ -182,12 +182,54 @@ func inlineFrame(ctx context.Context, ref *AssetRef) (*elevenlabs.ImageRef, erro
 	if err != nil {
 		return nil, err
 	}
-	mime := resp.Header.Get("content-type")
-	if i := strings.Index(mime, ";"); i > 0 {
-		mime = strings.TrimSpace(mime[:i])
+
+	mime, ok := frameMimeType(data, resp.Header.Get("content-type"))
+	if !ok {
+		// Refused here rather than sent and rejected: the API answers an
+		// unknown mime type with a 422 naming a field path, which reaches the
+		// user as "couldn't start this clip" and reaches nobody as a reason.
+		return nil, fmt.Errorf(
+			"mediagen: that frame isn't an image the model accepts (JPEG, PNG, WebP, HEIC or HEIF)")
 	}
-	out := elevenlabs.InlineImage(data, orDefault(mime, "image/png"))
+	out := elevenlabs.InlineImage(data, mime)
 	return &out, nil
+}
+
+// frameMimeType decides what a frame's bytes ARE, not what the server said.
+//
+// The header is checked second, and only as a tie-break, because it is the part
+// that was wrong: a file uploaded to S3 without an explicit content type comes
+// back as `binary/octet-stream`, and forwarding that got every pinned start
+// frame refused with a 422 on `start_frame.inline_base64.mime_type`. The bytes
+// cannot be wrong in the same way — a PNG begins with a PNG header whatever the
+// bucket claims.
+func frameMimeType(data []byte, header string) (string, bool) {
+	allowed := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/webp": true,
+		"image/heic": true,
+		"image/heif": true,
+	}
+
+	sniffed := http.DetectContentType(data)
+	if i := strings.Index(sniffed, ";"); i > 0 {
+		sniffed = strings.TrimSpace(sniffed[:i])
+	}
+	if allowed[sniffed] {
+		return sniffed, true
+	}
+
+	// DetectContentType knows nothing about HEIC/HEIF and reports WebP only on
+	// newer Go, so a header the API would have accepted is still worth taking.
+	h := strings.ToLower(strings.TrimSpace(header))
+	if i := strings.Index(h, ";"); i > 0 {
+		h = strings.TrimSpace(h[:i])
+	}
+	if allowed[h] {
+		return h, true
+	}
+	return "", false
 }
 
 func orDefault(v, def string) string {
