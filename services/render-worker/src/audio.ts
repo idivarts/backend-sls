@@ -55,7 +55,19 @@ async function download(url: string, name: string): Promise<string> {
 const FADE_IN_S = 0.4;
 const FADE_OUT_S = 0.6;
 
-export async function buildAudioStage(audio?: ContentAudio, totalMs?: number): Promise<AudioStage> {
+/**
+ * `firstInputIndex` is where this stage's inputs land in the FFmpeg argument
+ * list. It defaults to 1 because the design renderer has exactly one input
+ * before it — the frame pipe. A composition has one input PER CLIP, so it
+ * passes the real count; getting this wrong does not fail loudly, it silently
+ * filters the wrong stream and ships a video with a clip's own audio where the
+ * soundtrack should be.
+ */
+export async function buildAudioStage(
+    audio?: ContentAudio,
+    totalMs?: number,
+    firstInputIndex = 1
+): Promise<AudioStage> {
     const empty: AudioStage = { inputArgs: [], filter: null, outputArgs: ["-an"], tempFiles: [] };
     if (!audio || (!audio.musicUrl && !audio.voiceoverUrl)) return empty;
 
@@ -66,7 +78,7 @@ export async function buildAudioStage(audio?: ContentAudio, totalMs?: number): P
     const inputArgs: string[] = [];
     const tempFiles: string[] = [];
     const labels: { music?: number; voice?: number } = {};
-    let index = 1; // 0 is the frame pipe
+    let index = firstInputIndex;
 
     try {
         if (audio.musicUrl) {

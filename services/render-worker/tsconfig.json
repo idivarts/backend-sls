@@ -14,5 +14,10 @@
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts", "../../shared-libs/design/**/*.ts"]
+  "include": ["src/**/*.ts", "../../shared-libs/design/**/*.ts"],
+  // shared-libs' own tests run under its jest config, with its own types. They
+  // are inside the include glob, so without this the worker's typecheck fails
+  // on `describe` not existing — a shared-libs test file breaking the worker's
+  // build is a confusing way to learn that.
+  "exclude": ["../../shared-libs/**/__tests__/**"]
 }

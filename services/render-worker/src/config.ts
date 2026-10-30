@@ -62,6 +62,17 @@ export const config = {
      */
     x264Threads: num("RENDER_X264_THREADS", 4),
 
+    /**
+     * CRF for a composition's per-clip intermediates, which are encoded again
+     * into the final file. Visually lossless on purpose: the intermediate must
+     * not be where the quality goes, or a design inside a timeline would look
+     * worse than the same design rendered on its own.
+     *
+     * A single-clip composition never writes one — it takes the parity path and
+     * encodes exactly once, at x264Crf.
+     */
+    intermediateCrf: num("RENDER_INTERMEDIATE_CRF", 12),
+
     /** How long one <img> may hold up a capture before we shoot anyway. */
     imageTimeoutMs: num("RENDER_IMAGE_TIMEOUT_MS", 10000),
 

@@ -12,7 +12,8 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, Firestore } from "firebase-admin/firestore";
 import { config } from "./config";
-import type { ContentAudio, DesignRevision } from "./types";
+import type { Composition } from "../../../shared-libs/design/composition-runtime";
+import type { ContentAudio, DesignRevision, RenderTarget } from "./types";
 
 export const RenderStatus = {
     Queued: "queued",
@@ -41,6 +42,20 @@ function firestore(): Firestore {
 const revisionRef = (brandId: string, contentId: string, revisionId: string) =>
     firestore().doc(`brands/${brandId}/contents/${contentId}/designs/${revisionId}`);
 
+const compositionRef = (brandId: string, contentId: string, revisionId: string) =>
+    firestore().doc(`brands/${brandId}/contents/${contentId}/compositions/${revisionId}`);
+
+/**
+ * The document a job reports into. A design revision and a composition
+ * revision carry the same render fields — deliberately, so the app's existing
+ * watcher follows either without knowing the difference — so every status
+ * writer takes a target rather than a path.
+ */
+const targetRef = (t: RenderTarget) =>
+    t.kind === "composition"
+        ? compositionRef(t.brandId, t.contentId, t.revisionId)
+        : revisionRef(t.brandId, t.contentId, t.revisionId);
+
 const contentRef = (brandId: string, contentId: string) =>
     firestore().doc(`brands/${brandId}/contents/${contentId}`);
 
@@ -58,8 +73,32 @@ export async function getRevision(
         height: Number(d.height ?? 1350),
         slideCount: Math.max(Number(d.slideCount ?? 1), 1),
         docType: d.docType === "video" ? "video" : "image",
+        durationMs: Number(d.durationMs ?? 0),
         renderUrl: d.renderUrl ? String(d.renderUrl) : undefined,
         renderStatus: d.renderStatus ? String(d.renderStatus) : undefined,
+    };
+}
+
+/**
+ * Read one composition revision.
+ *
+ * The stored startMs/durationMs are NOT trusted: measureComposition derives
+ * every offset from the clip sequence, so a stale or hand-edited cache cannot
+ * change what gets rendered. They exist for layout, not for the renderer.
+ */
+export async function getComposition(
+    brandId: string,
+    contentId: string,
+    revisionId: string
+): Promise<{ composition: Composition; renderUrl?: string } | null> {
+    const snap = await compositionRef(brandId, contentId, revisionId).get();
+    if (!snap.exists) return null;
+    const d = snap.data() as Record<string, unknown>;
+    const composition = d.composition as Composition | undefined;
+    if (!composition) return null;
+    return {
+        composition,
+        renderUrl: d.renderUrl ? String(d.renderUrl) : undefined,
     };
 }
 
@@ -75,13 +114,8 @@ export async function getContentAudio(
     return audio;
 }
 
-export async function markStarted(
-    brandId: string,
-    contentId: string,
-    revisionId: string,
-    jobId?: string
-): Promise<void> {
-    await revisionRef(brandId, contentId, revisionId).set(
+export async function markStarted(target: RenderTarget, jobId?: string): Promise<void> {
+    await targetRef(target).set(
         {
             renderStatus: RenderStatus.Rendering,
             renderStartedAt: Date.now(),
@@ -92,14 +126,9 @@ export async function markStarted(
 }
 
 /** Called roughly every 5% of frames — one field, so the write stays cheap. */
-export async function setProgress(
-    brandId: string,
-    contentId: string,
-    revisionId: string,
-    progress: number
-): Promise<void> {
+export async function setProgress(target: RenderTarget, progress: number): Promise<void> {
     const clamped = Math.min(Math.max(progress, 0), 1);
-    await revisionRef(brandId, contentId, revisionId).set(
+    await targetRef(target).set(
         { renderProgress: clamped },
         { merge: true }
     );
@@ -109,13 +138,8 @@ export async function setProgress(
  * `reason` is shown to the user verbatim, so it must read as a sentence. The
  * stack trace belongs in the logs, not in the app.
  */
-export async function markFailed(
-    brandId: string,
-    contentId: string,
-    revisionId: string,
-    reason: string
-): Promise<void> {
-    await revisionRef(brandId, contentId, revisionId).set(
+export async function markFailed(target: RenderTarget, reason: string): Promise<void> {
+    await targetRef(target).set(
         {
             renderStatus: RenderStatus.Failed,
             renderError: reason,
@@ -135,9 +159,7 @@ export async function markFailed(
  * rather than attachments that claim to match a design they don't.
  */
 export async function setResult(
-    brandId: string,
-    contentId: string,
-    revisionId: string,
+    target: RenderTarget,
     urls: string[],
     docType: "image" | "video",
     posterUrl: string | undefined,
@@ -145,8 +167,9 @@ export async function setResult(
     /** Per-slide thumbnail urls, index-aligned with `urls`. May be sparse. */
     thumbUrls: (string | undefined)[] = []
 ): Promise<void> {
+    const { brandId, contentId } = target;
     const cover = urls[0];
-    await revisionRef(brandId, contentId, revisionId).set(
+    await targetRef(target).set(
         {
             renderStatus: RenderStatus.Done,
             renderUrl: cover,
@@ -170,9 +193,15 @@ export async function setResult(
                   ...(thumbUrls[i] ? { thumbUrl: thumbUrls[i] } : {}),
               }));
 
+    // The cached cover goes on whichever ref the content is actually pointed at.
+    // Writing designRef for a composition render would leave the two pointers
+    // disagreeing about what the current media is, and share previews read the
+    // cache rather than the attachment.
     await contentRef(brandId, contentId).set(
         {
-            designRef: { renderUrl: cover },
+            ...(target.kind === "composition"
+                ? { compositionRef: { renderUrl: cover } }
+                : { designRef: { renderUrl: cover } }),
             attachments,
             updatedAt: Date.now(),
         },

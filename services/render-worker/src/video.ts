@@ -17,8 +17,15 @@
  * ported: static-frame reuse, the encoder backpressure loop, MessageChannel
  * yielding, H.264 level probing, even-dimension rounding. A screenshot is tens
  * of milliseconds and FFmpeg applies its own backpressure through the pipe.
+ *
+ * ⚠️ This is the PARITY path. Every pre-existing video design now reaches the
+ * renderer as a one-clip composition, and a one-clip composition delegates
+ * straight back here rather than taking the general timeline path — a concat or
+ * an intermediate re-encode would be a second lossy generation, so the output
+ * would be equivalent but not identical. The argument list below and the frame
+ * sequence fed into it are what "identical" means: changing either changes
+ * every video the product has ever made.
  */
-import { spawn, type ChildProcess } from "node:child_process";
 import { readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -26,6 +33,7 @@ import type { Page } from "playwright";
 import { seekAt } from "../../../shared-libs/design/design-runtime";
 import { buildAudioStage } from "./audio";
 import { config } from "./config";
+import { encodeFrames } from "./encode";
 import type { ContentAudio } from "./types";
 
 export interface Rect {
@@ -98,13 +106,10 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
     ];
 
     // Everything this job wrote to disk: the encode target plus whatever the
-    // audio stage downloaded. Cleared in the outer finally so a design that
-    // throws mid-encode leaves nothing behind — on Batch the task exits anyway,
-    // but a warm Lambda keeps its 512 MB /tmp between invocations.
+    // audio stage downloaded. Cleared in the finally so a design that throws
+    // mid-encode leaves nothing behind — on Batch the task exits anyway, but a
+    // warm Lambda keeps its 512 MB /tmp between invocations.
     const tempFiles = [outPath, ...audioStage.tempFiles];
-
-    // Hoisted so the outer finally can reach it, whatever went wrong.
-    let ffmpeg: ChildProcess | null = null;
 
     try {
         console.log(
@@ -112,82 +117,92 @@ export async function renderVideo(input: VideoInput): Promise<VideoOutput> {
                 `${totalMs}ms, audio=${audioStage.filter ? "yes" : "no"}`
         );
 
-        const ff = spawn("ffmpeg", args, { stdio: ["pipe", "ignore", "pipe"] });
-        ffmpeg = ff;
-        let ffErr = "";
-        ff.stderr.on("data", (d) => {
-            ffErr += String(d);
-        });
-        // Once FFmpeg is gone its stdin emits EPIPE, and a stream 'error' with
-        // no listener takes the whole process down with it. The write loop below
-        // detects the exit properly, via ffGone.
-        ff.stdin.on("error", () => undefined);
-
-        const done = new Promise<void>((resolve, reject) => {
-            ff.on("error", reject);
-            ff.on("close", (code) =>
-                code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${ffErr.trim()}`))
-            );
-        });
-
-        // A dead FFmpeg never drains its pipe again, so awaiting "drain" alone
-        // blocks the frame loop FOREVER — no error, no exit, just a render
-        // frozen at whatever percentage it had reached. This turns that into the
-        // real failure, with FFmpeg's own stderr attached.
-        const ffGone = done.then(
-            () => Promise.reject(new Error(`ffmpeg exited before all ${frames} frames were written`)),
-            (err) => Promise.reject(err)
-        );
-        // The race below is its only consumer; without this an unraced rejection
-        // would surface as an unhandled rejection instead of the real error.
-        ffGone.catch(() => undefined);
-
         let poster: Buffer | null = null;
-        let lastReported = -1;
-
-        try {
-            for (let i = 0; i < frames; i++) {
-                const t = (i * 1000) / fps;
-                // seekAt, not sceneAt + seekScene: a scene boundary may now be an
-                // OVERLAP rather than a cut, and placing one scene at a time
-                // cannot express two of them composited. seekAt owns the whole
-                // timeline, so a frame inside a transition is as exact as any other.
-                await page.evaluate(seekAt, { ms: t });
-
-                const frame = await page.screenshot({ type: "png", clip: rect });
+        await encodeFrames({
+            args,
+            frames,
+            // seekAt, not sceneAt + seekScene: a scene boundary may now be an
+            // OVERLAP rather than a cut, and placing one scene at a time cannot
+            // express two of them composited. seekAt owns the whole timeline, so
+            // a frame inside a transition is as exact as any other.
+            produce: async (i) => {
+                await page.evaluate(seekAt, { ms: (i * 1000) / fps });
+                return page.screenshot({ type: "png", clip: rect });
+            },
+            onFrame: (i, frame) => {
                 if (i === 0) poster = frame;
+            },
+            onProgress,
+            progressStepPct: config.progressStepPct,
+            label: "render",
+        });
 
-                // Respect the pipe's backpressure: if FFmpeg hasn't drained, wait
-                // rather than buffering the whole video in memory — but never
-                // wait on a process that has already gone away.
-                if (!ff.stdin.write(frame)) {
-                    await Promise.race([
-                        new Promise<void>((resolve) => ff.stdin.once("drain", () => resolve())),
-                        ffGone,
-                    ]);
-                }
-
-                const pct = Math.floor(((i + 1) / frames) * 100);
-                if (pct - lastReported >= config.progressStepPct) {
-                    lastReported = pct;
-                    // Logged as well as written to Firestore: when a render
-                    // stalls, this is the only record of where it got to.
-                    console.log(`[render] frame ${i + 1}/${frames} (${pct}%)`);
-                    onProgress?.((i + 1) / frames);
-                }
-            }
-        } finally {
-            ff.stdin.end();
-        }
-
-        await done;
         const mp4 = await readFile(outPath);
         return { mp4, poster: poster ?? Buffer.alloc(0) };
     } finally {
-        // A job that failed part-way can leave FFmpeg alive holding the pipe.
-        // On Batch the task exits anyway, but a warm Lambda would accumulate one
-        // orphaned encoder per failed render.
-        if (ffmpeg && ffmpeg.exitCode === null && !ffmpeg.killed) ffmpeg.kill("SIGKILL");
         await Promise.all(tempFiles.map((p) => unlink(p).catch(() => undefined)));
     }
+}
+
+/**
+ * Render one design's frames to a silent intermediate file, for a composition
+ * that has more than one clip.
+ *
+ * Separate from renderVideo rather than a flag on it, because the two differ in
+ * every decision that matters: no audio (the soundtrack is muxed once, over the
+ * whole timeline), a near-lossless CRF (these frames get encoded a second time,
+ * so the intermediate must not be where the quality goes), a window into the
+ * design's timeline rather than all of it, and no poster.
+ *
+ * Keeping renderVideo free of those branches is also what keeps the parity path
+ * provably unchanged.
+ */
+export interface DesignSegmentInput {
+    page: Page;
+    rect: Rect;
+    /** Where in the design's own timeline this segment starts. */
+    offsetMs: number;
+    /** How long the segment is. */
+    durationMs: number;
+    fps: number;
+    outPath: string;
+    onProgress?: (fraction: number) => void;
+    label?: string;
+}
+
+export async function renderDesignSegment(input: DesignSegmentInput): Promise<void> {
+    const { page, rect, offsetMs, durationMs, fps, outPath, onProgress } = input;
+    const frames = Math.max(1, Math.round((durationMs / 1000) * fps));
+
+    const args = [
+        "-hide_banner",
+        "-loglevel", "error",
+        "-f", "image2pipe",
+        "-framerate", String(fps),
+        "-i", "-",
+        "-an",
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-c:v", "libx264",
+        "-preset", config.x264Preset,
+        // Visually lossless, deliberately far below the final CRF. This file is
+        // an input to another encode, and a mid-quality intermediate is how a
+        // timeline ends up looking worse than the same design rendered alone.
+        "-crf", String(config.intermediateCrf),
+        "-threads", String(config.x264Threads),
+        "-pix_fmt", "yuv420p",
+        "-t", (frames / fps).toFixed(3),
+        "-y", outPath,
+    ];
+
+    await encodeFrames({
+        args,
+        frames,
+        produce: async (i) => {
+            await page.evaluate(seekAt, { ms: offsetMs + (i * 1000) / fps });
+            return page.screenshot({ type: "png", clip: rect });
+        },
+        onProgress,
+        progressStepPct: config.progressStepPct,
+        label: input.label ?? "segment",
+    });
 }

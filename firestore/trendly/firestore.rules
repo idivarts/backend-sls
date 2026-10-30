@@ -318,6 +318,28 @@ service cloud.firestore {
                                    || contentShared(brandId, contentId);
           allow create, update: if isAuthenticated() && canManageContent(brandId);
         }
+
+        // ── Composition (timeline) revisions ─────────────────────────────────
+        // brands/{brandId}/contents/{contentId}/compositions/{revisionId}. Each
+        // holds one immutable timeline: a sequence of clips, of which a whole
+        // HTML design may be one. Client-writable like designs, because the
+        // timeline editor composes them directly.
+        //
+        // The render fields are NOT writable here, unlike on a design. A design
+        // revision's renderUrl can come from the app, which used to capture its
+        // own export; a composition is only ever rendered on our own
+        // infrastructure, after the wallet has been charged, so a client that
+        // could write renderStatus/renderUrl could mark a render done that
+        // never ran — and the publish pipeline reads exactly that field.
+        match /compositions/{revisionId} {
+          allow read:   if (isAuthenticated() && isBrandMember(brandId))
+                           || contentShared(brandId, contentId);
+          allow create: if isAuthenticated() && canManageContent(brandId)
+                           && !request.resource.data.keys().hasAny(compositionRenderFields());
+          allow update: if isAuthenticated() && canManageContent(brandId)
+                           && !request.resource.data.diff(resource.data).affectedKeys()
+                               .hasAny(compositionRenderFields());
+        }
       }
 
       // ── Generated audio (ElevenLabs music / voiceovers) ──────────────────
@@ -451,6 +473,14 @@ service cloud.firestore {
     }
 
     // ── Helper functions ────────────────────────────────────────────────────
+
+    // Fields on a composition revision that only the render worker may write.
+    // Listed once so the create and update rules cannot drift apart.
+    function compositionRenderFields() {
+      return ['renderUrl', 'posterUrl', 'renderStatus', 'renderProgress',
+              'renderError', 'renderJobId', 'renderStartedAt', 'renderedAt',
+              'renderScale', 'renderChargedTokens'];
+    }
 
     function isAuthenticated() {
       return request.auth != null;

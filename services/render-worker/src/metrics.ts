@@ -44,7 +44,7 @@ function emit(metrics: Record<string, number>, dimensions: Dimensions, extra: Re
 }
 
 export function renderSucceeded(opts: {
-    docType: "image" | "video";
+    docType: "image" | "video" | "composition";
     durationMs: number;
     outputs: number;
     bytes: number;
@@ -63,7 +63,7 @@ export function renderSucceeded(opts: {
 }
 
 export function renderFailed(opts: {
-    docType: "image" | "video";
+    docType: "image" | "video" | "composition";
     durationMs: number;
     revisionId: string;
     reason: string;

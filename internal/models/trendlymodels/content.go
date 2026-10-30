@@ -163,6 +163,14 @@ type Content struct {
 	Source string `json:"source,omitempty" firestore:"source,omitempty"`
 	// DesignRef points at the CURRENT HTML design revision + its captured render.
 	DesignRef *ContentDesignRef `json:"designRef,omitempty" firestore:"designRef,omitempty"`
+	// CompositionRef points at the CURRENT composition (timeline) revision.
+	//
+	// Present only once something has AUTHORED a timeline. A video content with
+	// a design and no composition still renders through the composition path —
+	// the worker derives a single-clip composition from the design in memory —
+	// so the absence of this field means "nobody has edited the timeline", not
+	// "this content predates timelines".
+	CompositionRef *ContentCompositionRef `json:"compositionRef,omitempty" firestore:"compositionRef,omitempty"`
 	// Audio holds the generated music/voiceover attached to a video content.
 	Audio *ContentAudio `json:"audio,omitempty" firestore:"audio,omitempty"`
 	// Canva deep-edit bridge references (Module 3).
