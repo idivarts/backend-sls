@@ -24,7 +24,10 @@ package trendlymodels
 //
 //	On top of the modelled cost sits a 2x markup, covering retries, failed
 //	renders we don't charge for, Spot falling back to on-demand, and the fact
-//	that a modelled number is always an optimistic one.
+//	that a modelled number is always an optimistic one. That markup is COVER,
+//	not profit: the margin is a separate multiplier applied in TokensForCost
+//	(BillingMarginX), so a render sells at 2.6x modelled cost. The two are kept
+//	apart so either can be re-tuned without arguing about the other.
 //
 // What is NOT charged:
 //   - a retry after a failure — the user already paid for the attempt we lost
@@ -60,12 +63,12 @@ const (
 
 // RenderTokenCost returns the wallet tokens one render job should deduct.
 //
-// Worked examples at today's constants:
+// Worked examples at today's constants, margin included:
 //
-//	single post  (1 slide)      ~  221 tokens
-//	carousel     (6 slides)     ~1,326 tokens
-//	reel         (15 seconds)   ~2,000 tokens
-//	reel         (30 seconds)   ~3,429 tokens
+//	single post  (1 slide)      ~  288 tokens
+//	carousel     (6 slides)     ~1,724 tokens
+//	reel         (15 seconds)   ~2,600 tokens
+//	reel         (30 seconds)   ~4,458 tokens
 //
 // For scale: one AI design generation is typically 20k-80k tokens, so a render
 // lands around 2-5% of the generation that produced it — a real cost, correctly
