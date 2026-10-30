@@ -387,3 +387,31 @@ func DeleteOrgMember(orgID, managerID string) error {
 	return err
 }
 
+// planRank orders the tiers so "at least this plan" is answerable.
+//
+// A map rather than a field on OrgPlanLimits: the limits describe what a tier
+// GIVES, and ordering is a separate question that only gating asks. Legacy
+// India keys map onto the tier they were migrated to, so an org mid-backfill
+// is never locked out of something it had paid for.
+var planRank = map[string]int{
+	"free": 0, "pro": 1, "team": 2, "agency": 3,
+	"starter": 1, "growth": 2, "enterprise": 3,
+}
+
+// OrgMeetsPlan reports whether an org is on `minPlan` or better.
+//
+// An unknown minPlan is treated as NO requirement rather than an impossible
+// one. A capability gated behind a tier nobody can name is a capability nobody
+// can use, and that failure is silent — whereas letting it through is visible
+// and correctable.
+func OrgMeetsPlan(orgID, minPlan string) bool {
+	need, ok := planRank[minPlan]
+	if !ok || need == 0 {
+		return true
+	}
+	var org Organization
+	if err := org.Get(orgID); err != nil || org.PlanKey == nil {
+		return false
+	}
+	return planRank[*org.PlanKey] >= need
+}

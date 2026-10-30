@@ -490,6 +490,17 @@ service cloud.firestore {
 
     // ── Helper functions ────────────────────────────────────────────────────
 
+    // ── Generative media jobs ────────────────────────────────────────────
+    // mediaJobs/{jobId}, top-level and keyed by the PROVIDER's generation id.
+    // Written only by the backend: the document records what the wallet was
+    // charged and whether that charge has been refunded, so a client able to
+    // write one could refund itself indefinitely. The app watches the
+    // composition's clip rather than this.
+    match /mediaJobs/{jobId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // Fields on a composition revision that only the render worker may write.
     // Listed once so the create and update rules cannot drift apart.
     function compositionRenderFields() {

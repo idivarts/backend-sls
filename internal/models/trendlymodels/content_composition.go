@@ -713,6 +713,39 @@ func SetCompositionRenderResult(brandID, contentID, revisionID, renderURL, poste
 	return updateCompositionRevisionFields(brandID, contentID, revisionID, fields)
 }
 
+// SetCompositionClipURL fills in a generated clip's url once its job lands.
+//
+// Writes the whole composition back rather than a field path, because a clip
+// sits inside an array and Firestore cannot address an array element — and
+// rewriting only the track would lose a concurrent edit to the other one.
+//
+// Returns false when the clip is no longer there: by the time a generation
+// finishes, minutes later, the user may well have deleted it, and that is an
+// ordinary outcome rather than an error.
+func SetCompositionClipURL(brandID, contentID, revisionID, clipID, url string) (bool, error) {
+	rev, err := GetCompositionRevision(brandID, contentID, revisionID)
+	if err != nil || rev == nil {
+		return false, err
+	}
+	found := false
+	for ti := range rev.Composition.Tracks {
+		for ci := range rev.Composition.Tracks[ti].Clips {
+			clip := &rev.Composition.Tracks[ti].Clips[ci]
+			if clip.ID != clipID || clip.Source.Kind != ClipSourceGenVideo {
+				continue
+			}
+			clip.Source.URL = url
+			found = true
+		}
+	}
+	if !found {
+		return false, nil
+	}
+	rev.Composition.StampDerived()
+	return true, updateCompositionRevisionFields(brandID, contentID, revisionID,
+		map[string]interface{}{"composition": rev.Composition})
+}
+
 // MarkCompositionRenderCharged records what the wallet was debited, so a retry
 // after a failure is not charged twice.
 func MarkCompositionRenderCharged(brandID, contentID, revisionID string, tokens int64) error {
