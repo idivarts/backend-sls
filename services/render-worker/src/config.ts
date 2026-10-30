@@ -56,9 +56,15 @@ export const config = {
      * equally valid but different bitstreams.
      *
      * 4 matches the Fargate task's vCPUs, so nothing gets slower; pinning it is
-     * only about getting the same answer twice. Deterministic output is not a
-     * nicety here — it is what lets a change to the render pipeline be verified
-     * by comparing bytes rather than by eye.
+     * only about getting the same answer twice.
+     *
+     * ⚠️ It does not get the whole way there. With this pinned, two renders of
+     * one revision agree byte-for-byte on their first 11 frames and then
+     * diverge by as little as a single byte per frame: the ENCODE is now
+     * reproducible, but Chromium does not rasterize animated layers
+     * bit-identically between runs. See the measurements in video.ts. Worth
+     * keeping regardless — it removes one of the two causes, and it is the only
+     * one that was ours.
      */
     x264Threads: num("RENDER_X264_THREADS", 4),
 

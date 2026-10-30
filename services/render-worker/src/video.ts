@@ -6,12 +6,26 @@
  * deterministic (every animation paused and its currentTime set), so the same
  * revision always produces the same video.
  *
- * That last claim used to be false, and it was the seek it was wrong about —
- * the ENCODER was the non-deterministic half. Two renders of one revision came
- * back 344,433 and 348,160 bytes: identical frame count, byte-identical audio,
- * and video differing from the very first sample, which is what the same pixels
- * encoded differently looks like. x264's thread count is pinned now; see
- * config.x264Threads.
+ * ⚠️ That last claim is still NOT true end to end, and it is worth knowing
+ * exactly how far it goes. Measured on dev, three renders of one revision:
+ *
+ *   frame count, audio track bytes, duration   IDENTICAL, every time
+ *   video bytes                                248,210 / 246,580 / 248,296
+ *   first 11 frames                            byte-identical, every time
+ *   frames 11 onward                           31 to 148 of 180 differ, by
+ *                                              as little as a single byte
+ *
+ * Pinning x264's threads (config.x264Threads) fixed the ENCODE: before it, the
+ * files diverged from sample 0, and after it the first 11 frames match
+ * byte-for-byte. What remains is upstream of the encoder — Chromium does not
+ * rasterize animated layers bit-identically between runs, and no amount of
+ * pinning on our side changes that.
+ *
+ * So the seek IS deterministic in the sense that matters (same timeline, same
+ * animation clocks, same frame count), and the output is reproducible to within
+ * a fraction of a percent, but it is not bit-reproducible. Anything that wants
+ * to verify a change to this pipeline by comparing output has to compare the
+ * exact invariants above and hold the rest to an envelope.
  *
  * Everything the browser version needed to survive html2canvas is GONE, not
  * ported: static-frame reuse, the encoder backpressure loop, MessageChannel
