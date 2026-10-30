@@ -143,3 +143,21 @@ func TestParseWebhookRoutesByProviderName(t *testing.T) {
 		t.Errorf("want ErrNoProvider, got %v", err)
 	}
 }
+
+func TestPlanRefusalIsNotAKeyProblem(t *testing.T) {
+	// Measured against the real workspace: a key that works for music and
+	// voice returns 402 on the video API, because it needs a Pro plan. The
+	// message has to say that, or it sends someone to rotate credentials that
+	// were never wrong.
+	d := elevenlabsDriver{}
+	res := resultFromGeneration(&elevenlabs.VideoGeneration{
+		ID: "g", Status: elevenlabs.VideoFailed, FailureReason: "charging_failed",
+	})
+	if res.Status != StatusFailed {
+		t.Fatalf("got %+v", res)
+	}
+	if strings.Contains(strings.ToLower(res.Error), "key") {
+		t.Errorf("a billing failure must not read as a credential problem: %q", res.Error)
+	}
+	_ = d
+}
