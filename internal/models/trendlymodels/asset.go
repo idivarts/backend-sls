@@ -280,12 +280,15 @@ func ListBrandAssets(ctx context.Context, brandID, source string, limit int) ([]
 //
 // Everything it produces is marked Derived, has no id, and carries no
 // provenance — because an attachment never had any.
+//
+// ⚠️ It reads ListRecentContent, NOT the posting-time range the old scan used.
+// A Firestore range filter skips documents missing the field, so filtering on
+// postingTimeStamp cannot see an unscheduled draft — and a draft is exactly
+// where an upload sits before anyone has put it on the calendar. Measured on
+// dev: one brand had 0 of 10 contents with a posting time and 10 of 10 with an
+// updatedAt. The old scan returned nothing at all there.
 func deriveAssetsFromAttachments(ctx context.Context, brandID string, limit int) ([]Asset, error) {
-	now := time.Now().UTC()
-	start := now.AddDate(-1, 0, 0).UnixMilli()
-	end := now.AddDate(0, 3, 0).UnixMilli()
-
-	items, err := ListContentInRange(ctx, brandID, start, end, true)
+	items, err := ListRecentContent(ctx, brandID, limit)
 	if err != nil {
 		return nil, err
 	}

@@ -282,6 +282,41 @@ func UpdateContentFields(brandID, contentID string, fields map[string]interface{
 // ListContentInRange returns a brand's content whose postingTimeStamp falls in
 // [start, end), ordered ascending. When includeArchived is false, archived
 // (soft-deleted) items are skipped. Each item carries its document ID.
+// ListRecentContent returns a brand's most recently touched content.
+//
+// Ordered by updatedAt rather than filtered by postingTimeStamp, and that is
+// the whole point of it existing beside ListContentInRange. A Firestore range
+// filter SKIPS documents missing the field entirely, so a posting-time range
+// cannot see an unscheduled draft at all — and on a real dev brand that was 0
+// of 10 contents, while updatedAt covered 10 of 10 and 109 of 109 on another.
+// Anything that wants "what has this brand got", rather than "what is on the
+// calendar between these dates", has to come through here.
+func ListRecentContent(ctx context.Context, brandID string, limit int) ([]Content, error) {
+	if limit <= 0 {
+		limit = 60
+	}
+	iter := contentsCollection(brandID).
+		OrderBy("updatedAt", firestore.Desc).
+		Limit(limit).
+		Documents(ctx)
+	defer iter.Stop()
+
+	out := []Content{}
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			break
+		}
+		var ct Content
+		if err := doc.DataTo(&ct); err != nil {
+			continue
+		}
+		ct.ID = doc.Ref.ID
+		out = append(out, ct)
+	}
+	return out, nil
+}
+
 func ListContentInRange(ctx context.Context, brandID string, start, end int64, includeArchived bool) ([]Content, error) {
 	iter := contentsCollection(brandID).
 		Where("postingTimeStamp", ">=", start).
