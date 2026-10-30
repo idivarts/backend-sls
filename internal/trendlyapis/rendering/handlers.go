@@ -95,6 +95,14 @@ func StartRender(c *gin.Context) {
 		}
 	}
 	if target == nil {
+		// Distinguished so the message is true: a content with no media at all
+		// is a different problem from one whose pointer has gone stale, and
+		// "this content has no design" sent for the latter sends someone
+		// looking in the wrong place.
+		if content.DesignRef != nil || content.CompositionRef != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "revision not found"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no_design", "message": "This content has no design to render."})
 		return
 	}
