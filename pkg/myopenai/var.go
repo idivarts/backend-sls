@@ -29,11 +29,13 @@ var Client oai.Client
 func init() {
 	envValue := os.Getenv("OPENAI_API_KEY")
 
-	// Check if the environment variable is set
+	// Presence only. This runs at package init in every lambda that imports
+	// the OpenAI client, so printing the value put a live API key in plaintext
+	// into CloudWatch on every cold start, on dev and on production alike.
 	if envValue == "" {
-		log.Println("Environment variable is not set")
+		log.Println("myopenai: OPENAI_API_KEY is not set")
 	} else {
-		log.Println("Environment variable value:", envValue)
+		log.Printf("myopenai: OPENAI_API_KEY set (%d chars)", len(envValue))
 		apiKey = envValue
 	}
 

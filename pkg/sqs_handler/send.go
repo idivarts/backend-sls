@@ -24,12 +24,11 @@ func SendToMessageQueue(message string, delayInSeconds int64) error {
 	// Get environment variable value by key
 	envValue := os.Getenv("SEND_MESSAGE_QUEUE_ARN")
 
-	// Check if the environment variable is set
+	// A queue ARN is not a secret, but "Environment variable value: ..." next
+	// to the same line that printed an API key is the pattern worth retiring,
+	// not just the one instance of it.
 	if envValue == "" {
-		fmt.Println("Environment variable is not set")
-		return fmt.Errorf("Error")
-	} else {
-		fmt.Println("Environment variable value:", envValue)
+		return fmt.Errorf("sqs: SEND_MESSAGE_QUEUE_ARN is not set")
 	}
 
 	return SendToQueue(envValue, message, delayInSeconds)
