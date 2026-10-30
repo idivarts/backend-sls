@@ -35,6 +35,7 @@ import { tmpdir } from "node:os";
 import type { Browser } from "playwright";
 import {
     measureComposition,
+    type CompositionMeasurement,
     singleDesignPassthrough,
     validateComposition,
     type Clip,
@@ -61,13 +62,68 @@ export interface CompositionInput {
     onProgress?: (fraction: number) => void;
 }
 
+/**
+ * One clip's place on the timeline, measured in FRAMES rather than milliseconds.
+ *
+ * This exists because of an exact equality that xfade depends on. Chained,
+ * xfade needs its first input to run exactly up to `offset + duration`, and
+ * that holds in millisecond arithmetic — but a clip is ENCODED as a whole
+ * number of frames, so a duration that is not a multiple of the frame interval
+ * comes out up to half a frame away from what the timeline declared. Feed the
+ * graph millisecond offsets and the drift lands exactly on the boundary
+ * condition, where a clip one frame short leaves the cross-fade with nothing to
+ * fade from.
+ *
+ * So the renderer plans in frames, converts to seconds only at the edges, and
+ * declared length and encoded length cannot disagree. The shared runtime stays
+ * fps-agnostic, which is right for layout: frames only exist here.
+ */
+interface ClipPlan {
+    index: number;
+    /** Frames this clip contributes. */
+    frames: number;
+    /** Frames it overlaps the previous clip. 0 for a cut and for the first clip. */
+    overlapFrames: number;
+    /** Its start on the composition timeline, in frames. */
+    startFrames: number;
+}
+
 /** A clip reduced to what the final FFmpeg pass needs from it. */
 interface Segment {
     measured: MeasuredClip;
+    plan: ClipPlan;
     /** FFmpeg args that declare this clip's input, in track order. */
     inputArgs: string[];
     /** Filter chain applied to this input before it is composited. */
     filter: string;
+}
+
+/**
+ * Snap the measurement onto the frame grid, preserving the runtime's invariant
+ * that offsets strictly increase.
+ */
+function planClips(measurement: CompositionMeasurement): { plans: ClipPlan[]; totalFrames: number } {
+    const fps = measurement.fps;
+    const toFrames = (ms: number) => Math.round((ms / 1000) * fps);
+
+    const plans: ClipPlan[] = [];
+    let cursor = 0;
+    for (const clip of measurement.clips) {
+        const frames = Math.max(1, toFrames(clip.durationMs));
+        let overlapFrames = clip.index === 0 ? 0 : toFrames(clip.transition.ms);
+        if (overlapFrames > 0) {
+            // Re-clamp in frame space. The runtime already clamped in ms, but
+            // rounding both sides independently could put the overlap back over
+            // half of the shorter clip, and the whole point of that clamp is
+            // that offsets keep increasing.
+            const half = Math.floor(Math.min(plans[clip.index - 1].frames, frames) / 2);
+            if (overlapFrames > half) overlapFrames = half;
+        }
+        const startFrames = clip.index === 0 ? 0 : cursor - overlapFrames;
+        plans.push({ index: clip.index, frames, overlapFrames, startFrames });
+        cursor = startFrames + frames;
+    }
+    return { plans, totalFrames: cursor };
 }
 
 export async function renderComposition(input: CompositionInput): Promise<VideoOutput> {
@@ -121,7 +177,11 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
     const { composition, audio, onProgress } = input;
     const measurement = measureComposition(composition);
     const { width, height, fps } = measurement;
-    const totalMs = measurement.totalMs;
+    const { plans, totalFrames } = planClips(measurement);
+    // The frame-aligned total, not the measurement's. This is the length that
+    // will actually be encoded, so it is the length the soundtrack's out-fade
+    // and the encode's -t must both be anchored to.
+    const totalMs = Math.round((totalFrames / fps) * 1000);
 
     const tempFiles: string[] = [];
     const outPath = join(tmpdir(), `composition_${Date.now()}.mp4`);
@@ -142,12 +202,14 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
 
         for (const measured of measurement.clips) {
             const source = measured.clip.source;
+            const plan = plans[measured.index];
             if (source.kind === "design") {
                 const path = join(tmpdir(), `segment_${measured.index}_${Date.now()}.mp4`);
                 tempFiles.push(path);
                 await renderDesignClip({
                     input,
                     measured,
+                    plan,
                     fps,
                     outPath: path,
                     onProgress: (f) => {
@@ -160,17 +222,19 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
                     },
                 });
                 designsDone++;
-                // No filter of its own: the segment was already encoded at the
-                // composition's size and rate, and buildVideoGraph normalizes
-                // every input once. Doing it here as well would put a second
-                // fps/format/setsar pass on the chain for no effect.
-                segments.push({ measured, inputArgs: ["-i", path], filter: "" });
+                // No filter of its own. The segment is encoded at the DESIGN's
+                // own slide size — which may not be the composition's, and a
+                // design in the wrong aspect ratio should be letterboxed, not
+                // reframed — so buildVideoGraph's single normalization pass is
+                // what fits it to the frame. Adding one here would just be a
+                // second fps/format/setsar pass for no effect.
+                segments.push({ measured, plan, inputArgs: ["-i", path], filter: "" });
                 continue;
             }
 
-            const local = await stage(source, measured, fps, width, height);
+            const local = await stage(source, measured, plan, fps, width, height);
             tempFiles.push(...local.tempFiles);
-            segments.push({ measured, inputArgs: local.inputArgs, filter: local.filter });
+            segments.push({ measured, plan, inputArgs: local.inputArgs, filter: local.filter });
         }
 
         onProgress?.(0.9);
@@ -200,7 +264,7 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
             // by construction, so -shortest would have nothing finite to stop
             // on but the video, and in the voiceover-only case it truncated the
             // video to the voiceover.
-            "-t", (totalMs / 1000).toFixed(3),
+            "-t", (totalFrames / fps).toFixed(3),
             "-movflags", "+faststart",
             "-y", outPath,
         ];
@@ -229,11 +293,12 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
 async function renderDesignClip(args: {
     input: CompositionInput;
     measured: MeasuredClip;
+    plan: ClipPlan;
     fps: number;
     outPath: string;
     onProgress?: (fraction: number) => void;
 }): Promise<void> {
-    const { input, measured, fps, outPath, onProgress } = args;
+    const { input, measured, plan, fps, outPath, onProgress } = args;
     const source = measured.clip.source;
     if (source.kind !== "design") throw new Error("renderDesignClip called with a non-design clip");
 
@@ -254,7 +319,7 @@ async function renderDesignClip(args: {
             page: loaded.page,
             rect: loaded.rects[0],
             offsetMs,
-            durationMs: measured.durationMs,
+            frames: plan.frames,
             fps,
             outPath,
             onProgress,
@@ -283,11 +348,14 @@ interface StagedInput {
 async function stage(
     source: Clip["source"],
     measured: MeasuredClip,
+    plan: ClipPlan,
     fps: number,
     width: number,
     height: number
 ): Promise<StagedInput> {
-    const seconds = (measured.durationMs / 1000).toFixed(3);
+    // Frames, not the declared ms: an input that ends a frame before the graph
+    // expects it to is what breaks a cross-fade on the join after it.
+    const seconds = (plan.frames / fps).toFixed(3);
 
     if (source.kind === "image") {
         const path = await download(source.url, `image_${measured.index}`);
@@ -296,7 +364,7 @@ async function stage(
             // -loop with an explicit framerate and duration: one still becomes
             // exactly the frames this slot needs.
             inputArgs: ["-loop", "1", "-framerate", String(fps), "-t", seconds, "-i", path],
-            filter: kenBurns(source.kenBurns, measured.durationMs, fps, width, height),
+            filter: kenBurns(source.kenBurns, plan.frames, width, height),
         };
     }
 
@@ -308,7 +376,7 @@ async function stage(
         const inMs = source.kind === "footage" ? source.inMs ?? 0 : 0;
         // At 2x, filling a 3-second slot needs 6 seconds of source. Reading only
         // the slot's worth would run the clip out and freeze on its last frame.
-        const readSeconds = ((measured.durationMs * speed) / 1000).toFixed(3);
+        const readSeconds = ((plan.frames / fps) * speed).toFixed(3);
 
         // Only the source-specific part; buildVideoGraph normalizes size, rate
         // and timebase for every input in one place.
@@ -362,18 +430,18 @@ function normalize(width: number, height: number, fps: number): string {
  */
 function kenBurns(
     mode: string | undefined,
-    durationMs: number,
-    fps: number,
+    frames: number,
     width: number,
     height: number
 ): string {
     if (!mode || mode === "none") return "";
-    const frames = Math.max(1, Math.round((durationMs / 1000) * fps));
     const z = mode === "out" ? `1.15-0.15*on/${frames}` : `1+0.15*on/${frames}`;
     return [
         `scale=${width}:${height}:force_original_aspect_ratio=increase`,
         `crop=${width}:${height}`,
-        `zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${width}x${height}:fps=${fps}`,
+        // No fps= here: buildVideoGraph pins the rate for every input, and a
+        // zoompan that set its own would be a second, conflicting opinion.
+        `zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${width}x${height}`,
     ].join(",");
 }
 
@@ -388,6 +456,7 @@ function kenBurns(
  * get wrong.
  */
 function buildVideoGraph(segments: Segment[], width: number, height: number, fps: number): string {
+    const toSeconds = (frames: number) => (frames / fps).toFixed(3);
     const parts: string[] = [];
     segments.forEach((segment, i) => {
         // An empty filter chain would be "[0:v][v0]" — a null filter is needed
@@ -399,10 +468,10 @@ function buildVideoGraph(segments: Segment[], width: number, height: number, fps
     let acc = "v0";
     for (let i = 1; i < segments.length; i++) {
         const next = `x${i}`;
-        const overlap = segments[i].measured.transition.ms;
+        const overlap = segments[i].plan.overlapFrames;
         if (overlap > 0) {
-            const offset = (segments[i].measured.startMs / 1000).toFixed(3);
-            const duration = (overlap / 1000).toFixed(3);
+            const offset = toSeconds(segments[i].plan.startFrames);
+            const duration = toSeconds(overlap);
             parts.push(
                 `[${acc}][v${i}]xfade=transition=fade:duration=${duration}:offset=${offset}[${next}]`
             );
@@ -429,5 +498,5 @@ async function download(url: string, name: string): Promise<string> {
 }
 
 /** Exported for tests — the graph is the part worth asserting on. */
-export const __test = { buildVideoGraph, normalize, kenBurns };
-export type { Segment };
+export const __test = { buildVideoGraph, normalize, kenBurns, planClips };
+export type { ClipPlan, Segment };

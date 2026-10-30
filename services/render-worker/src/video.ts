@@ -162,8 +162,13 @@ export interface DesignSegmentInput {
     rect: Rect;
     /** Where in the design's own timeline this segment starts. */
     offsetMs: number;
-    /** How long the segment is. */
-    durationMs: number;
+    /**
+     * How many frames to render. A frame COUNT rather than a duration, because
+     * the composition's graph plans in frames: a segment that rounded its own
+     * length independently could come out a frame away from the slot the
+     * timeline reserved for it, and that is exactly where a cross-fade breaks.
+     */
+    frames: number;
     fps: number;
     outPath: string;
     onProgress?: (fraction: number) => void;
@@ -171,8 +176,8 @@ export interface DesignSegmentInput {
 }
 
 export async function renderDesignSegment(input: DesignSegmentInput): Promise<void> {
-    const { page, rect, offsetMs, durationMs, fps, outPath, onProgress } = input;
-    const frames = Math.max(1, Math.round((durationMs / 1000) * fps));
+    const { page, rect, offsetMs, fps, outPath, onProgress } = input;
+    const frames = Math.max(1, input.frames);
 
     const args = [
         "-hide_banner",
