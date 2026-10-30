@@ -55,44 +55,108 @@ import (
 	_ "github.com/idivarts/backend-sls/pkg/firebase"
 )
 
-func videoRow(id, name string, usdPerSecond float64, keyframes, nativeAudio bool) trendlymodels.MediaModel {
-	m := trendlymodels.MediaModel{
-		ID:          id,
-		Provider:    "elevenlabs",
-		DisplayName: name,
-		Kind:        "video",
-		StartFrame:  keyframes,
-		EndFrame:    keyframes,
-		ImageRefs:   true,
-		NativeAudio: nativeAudio,
-		// Veo refuses 5 seconds with a 422 — it takes a SET, which min/max
-		// cannot express, so both are carried and the set wins.
-		MinDurationS:    4,
-		MaxDurationS:    8,
-		DurationsS:      []int{4, 6, 8},
-		Resolutions:     []string{"720p", "1080p"},
-		AspectRatios:    []string{"16:9", "9:16"},
-		EstUSDPerSecond: usdPerSecond,
+// videoRow builds a video model row. Everything that differs between models
+// is a field rather than a default, because the differences are what the row
+// exists to record — and every value below was read off the API, not guessed.
+//
+// How to read them off it: POST the model_id with deliberately invalid values
+// and the 422 enumerates what it will take.
+//
+//	duration_secs: 0      -> "Input should be greater than or equal to 4"
+//	duration_secs: 999    -> "Input should be less than or equal to 15"
+//	resolution: "BAD"     -> "Input should be '480p' or '720p'"
+//	aspect_ratio: "BAD"   -> the full list
+//	generate_audio: "x"   -> "bool_parsing" if it takes it, "extra_forbidden" if not
+//	end_frame: "BAD"      -> "should be a valid dictionary" if it takes one
+//
+// The request is rejected at validation, so a full capability sweep costs
+// nothing — where one wrong field costs a generation to discover.
+type videoSpec struct {
+	id, name               string
+	usdPerSecond           float64
+	keyframes, nativeAudio bool
+	minS, maxS             int
+	// durations is the EXACT set, for a model that takes a set rather than a
+	// range. Veo refuses 5s with a 422; Seedance takes anything from 4 to its
+	// cap, so it leaves this empty and the bounds are the truth.
+	durations            []int
+	resolutions, aspects []string
+}
+
+func videoRow(v videoSpec) trendlymodels.MediaModel {
+	return trendlymodels.MediaModel{
+		ID:              v.id,
+		Provider:        "elevenlabs",
+		DisplayName:     v.name,
+		Kind:            "video",
+		StartFrame:      v.keyframes,
+		EndFrame:        v.keyframes,
+		ImageRefs:       true,
+		NativeAudio:     v.nativeAudio,
+		MinDurationS:    v.minS,
+		MaxDurationS:    v.maxS,
+		DurationsS:      v.durations,
+		Resolutions:     v.resolutions,
+		AspectRatios:    v.aspects,
+		EstUSDPerSecond: v.usdPerSecond,
 		MinPlan:         "pro",
 		Enabled:         false,
 	}
-	return m
 }
+
+// What every Seedance variant takes, which is a wider set than we send.
+var seedanceAspects = []string{"21:9", "16:9", "4:3", "1:1", "3:4", "9:16"}
 
 func catalog() []trendlymodels.MediaModel {
 	return []trendlymodels.MediaModel{
-		// `nativeAudio` is not a guess: POST each model_id with a
-		// generate_audio the API cannot parse and the 422 says whether the
-		// field exists for it — "bool_parsing" means it does, "extra_forbidden"
-		// means it does not. Costs nothing, where assuming costs a generation.
-		// Checked 2026-10-30: Veo and every Seedance take it, Aurora does not.
-		videoRow("veo-3.1-fast-generate-001", "Veo 3.1 Fast", 0.15, true, true),
-		videoRow("veo-3.1-generate-001", "Veo 3.1", 0.40, true, true),
-		videoRow("bytedance-seedance-v2", "Seedance v2", 0.40, false, true),
-		videoRow("bytedance-seedance-v2-fast", "Seedance v2 Fast", 0.15, false, true),
-		videoRow("bytedance-seedance-v2-mini", "Seedance v2 Mini", 0.08, false, true),
-		videoRow("bytedance-seedance-v2.5", "Seedance v2.5", 0.40, false, true),
-		videoRow("creatify-aurora", "Creatify Aurora", 0.20, false, false),
+		// Veo takes a SET of lengths — 5s is a 422 — and tops out at 1080p.
+		videoRow(videoSpec{
+			id: "veo-3.1-fast-generate-001", name: "Veo 3.1 Fast", usdPerSecond: 0.15,
+			keyframes: true, nativeAudio: true,
+			minS: 4, maxS: 8, durations: []int{4, 6, 8},
+			resolutions: []string{"720p", "1080p"}, aspects: []string{"16:9", "9:16"},
+		}),
+		videoRow(videoSpec{
+			id: "veo-3.1-generate-001", name: "Veo 3.1", usdPerSecond: 0.40,
+			keyframes: true, nativeAudio: true,
+			minS: 4, maxS: 8, durations: []int{4, 6, 8},
+			resolutions: []string{"720p", "1080p"}, aspects: []string{"16:9", "9:16"},
+		}),
+
+		// Seedance takes a RANGE, goes further than Veo, and does take start
+		// and end frames — all three of which the first pass of this file got
+		// wrong, by copying Veo's shape instead of asking.
+		videoRow(videoSpec{
+			id: "bytedance-seedance-v2", name: "Seedance v2", usdPerSecond: 0.40,
+			keyframes: true, nativeAudio: true, minS: 4, maxS: 15,
+			resolutions: []string{"480p", "720p", "1080p", "4k"}, aspects: seedanceAspects,
+		}),
+		videoRow(videoSpec{
+			id: "bytedance-seedance-v2-fast", name: "Seedance v2 Fast", usdPerSecond: 0.15,
+			keyframes: true, nativeAudio: true, minS: 4, maxS: 15,
+			// 1080p is a 422 on the fast and mini variants. The row said
+			// 720p/1080p, so every 1080p request would have been refused.
+			resolutions: []string{"480p", "720p"}, aspects: seedanceAspects,
+		}),
+		videoRow(videoSpec{
+			id: "bytedance-seedance-v2-mini", name: "Seedance v2 Mini", usdPerSecond: 0.08,
+			keyframes: true, nativeAudio: true, minS: 4, maxS: 15,
+			resolutions: []string{"480p", "720p"}, aspects: seedanceAspects,
+		}),
+		videoRow(videoSpec{
+			id: "bytedance-seedance-v2.5", name: "Seedance v2.5", usdPerSecond: 0.40,
+			keyframes: true, nativeAudio: true, minS: 4, maxS: 30,
+			resolutions: []string{"480p", "720p", "1080p"}, aspects: seedanceAspects,
+		}),
+
+		// ⛔ creatify-aurora is NOT here, and should not be added back.
+		//
+		// It is not a text-to-video model at all. Its API requires `image` and
+		// `audio` and FORBIDS `prompt`, `duration_secs` and `aspect_ratio` —
+		// it animates a still from a soundtrack, which is a different product
+		// wearing the same endpoint. Nothing in mediagen.Spec can drive it, so
+		// a row for it is an invitation to enable a model that 422s on every
+		// request. Supporting it means a driver, not a row.
 
 		{
 			ID: "music_v2", Provider: "elevenlabs",
