@@ -17,22 +17,24 @@ import (
 	"github.com/idivarts/backend-sls/pkg/mys3"
 )
 
-// ── Provisional cost model (Phase-1) ─────────────────────────────────────────
-// ElevenLabs bills credits; these USD estimates map generation cost onto the
-// org token wallet (TokensForCost). They are deliberately margin-safe and will
-// be re-tuned once real per-request credit costs are observed. See
-// docs/elevenlabs-setup.md.
-func MusicCostUSD(lengthMs int) float64 {
-	secs := float64(lengthMs) / 1000
-	if secs <= 0 {
-		secs = 30
-	}
-	return 0.02 + 0.002*secs
-}
+// ── What a generation costs ─────────────────────────────────────────────────
+//
+// These were invented numbers — "$0.02 + $0.002 a second" for music, "$0.00018
+// a character" for speech — and the music one was WRONG in the direction that
+// matters: measured against the live API, a second of music costs 15 credits
+// ($0.0033), so the old formula under-charged every track over ~20 seconds and
+// sold a 60-second bed at roughly 80% of what it cost us.
+//
+// They now come from pkg/elevenlabs, which prices in the credits ElevenLabs
+// actually bills and converts once. Kept as wrappers here because the AI tools
+// and the HTTP handlers both call them by these names.
+func MusicCostUSD(lengthMs int) float64 { return elevenlabs.MusicCostUSD(lengthMs) }
 
-func TTSCostUSD(text string) float64 {
-	return float64(len([]rune(text))) * 0.00018
-}
+func TTSCostUSD(text string) float64 { return elevenlabs.TTSCostUSD(text) }
+
+// STTCostUSD prices a transcription. New: footage ingest transcribes every
+// uploaded video and nothing was charging for it.
+func STTCostUSD(durationMs int) float64 { return elevenlabs.STTCostUSD(durationMs) }
 
 type musicReq struct {
 	Prompt       string `json:"prompt" binding:"required"`

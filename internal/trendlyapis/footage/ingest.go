@@ -21,6 +21,7 @@ import (
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/ai"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/media"
 	"github.com/idivarts/backend-sls/pkg/elevenlabs"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
@@ -61,6 +62,12 @@ func Finish(ctx context.Context, brandID string, asset *trendlymodels.Asset) err
 		log.Printf("footage: transcript for %s: %v", asset.ID, err)
 	} else {
 		out.Words, out.Text = words, text
+		// Metered. Transcription is a paid provider call and this one was free
+		// to the user and billed to us: a brand uploading an hour of footage
+		// ran an hour of speech-to-text against our account and spent nothing.
+		// Charged on SUCCESS only — a refused transcription costs the provider
+		// nothing and should cost the user nothing.
+		meterTranscription(ctx, brandID, &out)
 	}
 
 	if shots, err := describeShots(ctx, brandID, &out); err != nil {
@@ -94,6 +101,24 @@ func transcribe(url string) ([]trendlymodels.TranscriptWord, string, error) {
 		})
 	}
 	return words, t.Text, nil
+}
+
+// meterTranscription bills the speech-to-text for one video.
+//
+// Priced on the audio's measured length, which ingest already knows from
+// ffprobe. Falls back to the provider's own view of the duration where the
+// probe came back empty; a transcript with neither is not billed, because
+// guessing a length to charge for is worse than missing one.
+func meterTranscription(ctx context.Context, brandID string, ingest *trendlymodels.AssetIngest) {
+	ms := ingest.DurationMs
+	if ms <= 0 {
+		return
+	}
+	orgID, ok := trendlymodels.OrgIDForBrand(brandID)
+	if !ok {
+		return
+	}
+	trendlymodels.MeterUSD(orgID, media.STTCostUSD(ms))
 }
 
 // shotListSchema is what the vision pass must return.

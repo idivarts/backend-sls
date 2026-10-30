@@ -11,9 +11,10 @@ import (
 // OrgTokenWallet is the single shared AI-token wallet for an organization — all
 // brands in the org draw from one balance. Tokens are "model-weighted": one
 // wallet token == one token of usage on the baseline/default model (Gemini 3.5
-// Flash). AI actions deduct the real OpenRouter cost converted via TokensForCost,
-// so the wallet drains in proportion to actual spend regardless of which model
-// (or how much context) was used. See the Credit ticket §5b.
+// Flash). AI actions deduct the real provider cost converted via TokensForCost
+// — at a margin, see BillingMarginX — so the wallet drains in proportion to
+// actual spend regardless of which model (or how much context) was used, and
+// draining it leaves us ahead rather than square. See the Credit ticket §5b.
 type OrgTokenWallet struct {
 	Balance          int64 `json:"balance" firestore:"balance"`                   // monthly allotment remaining this period
 	MonthlyAllotment int64 `json:"monthlyAllotment" firestore:"monthlyAllotment"` // refilled on the 1st of the month
@@ -27,13 +28,39 @@ type OrgTokenWallet struct {
 // If the free/default model changes, re-check ONLY this constant (Credit §5b).
 const WalletTokenValueUSD = 0.00000525
 
-// TokensForCost converts a real OpenRouter USD cost into model-weighted wallet
-// tokens. Rounds UP fractional tokens (margin-safe) and never returns negative.
+// BillingMarginX is the margin on every provider cost, and the reason it lives
+// here rather than at each call site.
+//
+// Before this, "charge the real cost" was taken literally: an OpenRouter call
+// deducted exactly what it cost, so draining a wallet left us at precisely
+// break-even — and below it, once the costs nobody bills for are counted
+// (failed calls, retries, the OpenRouter platform fee on top of the model
+// price, the Firestore and Lambda work around every request). Only the render
+// and generated-video paths carried a markup, because those happened to be
+// written later.
+//
+// 1.30 charges 130% of measured cost, which is a 23% margin on what the wallet
+// is worth — inside the 20-25% target. It is applied HERE, in the one function
+// every paid path already converts through, so a new provider cannot be wired
+// up at cost by forgetting a multiplier.
+//
+// ⚠️ It stacks with renderCostMarkupX (2x), deliberately: that one covers
+// retries and failures we swallow, which is a different thing from profit. A
+// render therefore sells at 2.6x modelled cost. Over-charging is the intended
+// direction of error.
+const BillingMarginX = 1.30
+
+// TokensForCost converts a real provider USD cost into model-weighted wallet
+// tokens, with the margin applied.
+//
+// Rounds UP fractional tokens, which matters more than it looks: the smallest
+// AI calls in the product cost a fraction of a cent, and truncating them would
+// bill a long tail of real spend as zero.
 func TokensForCost(costUSD float64) int64 {
 	if costUSD <= 0 {
 		return 0
 	}
-	t := int64(math.Ceil(costUSD / WalletTokenValueUSD))
+	t := int64(math.Ceil((costUSD * BillingMarginX) / WalletTokenValueUSD))
 	if t < 0 {
 		return 0
 	}

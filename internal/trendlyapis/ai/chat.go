@@ -218,7 +218,19 @@ func handleMessageWS(req WSRequest) {
 	}
 
 	var fullText strings.Builder // cumulative across steps — matches what the client accumulates
-	var finalUsage *openrouter.Usage
+	// Usage ACCUMULATED across every step of the tool loop, not just the last.
+	//
+	// This used to be a single `finalUsage` that each step overwrote, so a turn
+	// that wrote a design, rendered a preview, inspected it and replied — four
+	// model calls, up to maxToolSteps of them — was billed for ONE: the closing
+	// reply, which is reliably the cheapest of the lot. The expensive steps,
+	// the ones carrying the whole design document in context, were free.
+	//
+	// `lastUsage` is kept beside it because the WS payload reports the final
+	// step's token counts to the client, which is a different question from
+	// what the turn cost.
+	var turnUsage openrouter.Usage
+	var lastUsage *openrouter.Usage
 	var pendingControl *trendlymodels.AIControl
 	// Images produced by generate_image tool calls this turn — attached to the
 	// committed assistant message so the chat bubble renders them from Firestore.
@@ -264,7 +276,15 @@ func handleMessageWS(req WSRequest) {
 			OnToolCall: func(call openrouter.ToolCall) {
 				toolCalls = append(toolCalls, call)
 			},
-			OnDone:  func(u *openrouter.Usage) { finalUsage = u },
+			OnDone: func(u *openrouter.Usage) {
+				lastUsage = u
+				if u != nil {
+					turnUsage.Cost += u.Cost
+					turnUsage.PromptTokens += u.PromptTokens
+					turnUsage.CompletionTokens += u.CompletionTokens
+					turnUsage.TotalTokens += u.TotalTokens
+				}
+			},
 			OnError: func(e error) { streamErr = e },
 		})
 		if err != nil {
@@ -411,11 +431,11 @@ func handleMessageWS(req WSRequest) {
 		break
 	}
 
-	tokens := 0
-	if finalUsage != nil {
-		tokens = finalUsage.TotalTokens
-	}
-	meterAIUsage(orgID, finalUsage)
+	tokens := turnUsage.TotalTokens
+	// Billed on the WHOLE turn. A cancelled turn still bills what it spent:
+	// the model calls that ran were paid for either way, and only the reply
+	// was thrown away.
+	meterAIUsage(orgID, &turnUsage)
 	// On a cancel we still persist whatever streamed so it isn't lost — unless
 	// nothing came through yet (interrupted during "Thinking…"), in which case
 	// there's no assistant bubble to write.
@@ -461,7 +481,7 @@ func handleMessageWS(req WSRequest) {
 		"messageId":      assistantMsgID,
 		"clientMsgId":    req.ClientMsgID,
 		"images":         genImages,
-		"usage":          finalUsage,
+		"usage":          lastUsage,
 		"stopped":        cancelled,
 	})
 }
