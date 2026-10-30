@@ -22,15 +22,25 @@ import (
 // Fetching the generation again mints a fresh URL, which is the recovery path
 // when a copy fails rather than a reason to skip copying.
 
-// Video model ids. Veo is the default because ByteDance's models are disabled
-// by default for API requests and need explicit approval per workspace — a
-// model nobody has approved would fail every call with a configuration error
-// that looks like a bug.
+// Video model ids, as the API itself enumerates them.
+//
+// Veo is the default because ByteDance's models are disabled by default for API
+// requests and need explicit approval per workspace — a model nobody has
+// approved would fail every call with a configuration error that looks like a
+// bug.
+//
+// The authoritative list is free to re-read: POST a model_id the API does not
+// know and the 422 names every valid tag. That is how these were last checked
+// (2026-10-30), and it is the cheapest way to check them again — a wrong id
+// costs nothing, while guessing at a right one can cost a generation.
 const (
-	VideoVeo31      = "veo-3.1-generate-001"
-	VideoVeo31Fast  = "veo-3.1-fast-generate-001"
-	VideoSeedance2  = "bytedance-seedance-v2"
-	VideoSeedance25 = "bytedance-seedance-v2.5"
+	VideoVeo31          = "veo-3.1-generate-001"
+	VideoVeo31Fast      = "veo-3.1-fast-generate-001"
+	VideoSeedance2      = "bytedance-seedance-v2"
+	VideoSeedance2Fast  = "bytedance-seedance-v2-fast"
+	VideoSeedance2Mini  = "bytedance-seedance-v2-mini"
+	VideoSeedance25     = "bytedance-seedance-v2.5"
+	VideoCreatifyAurora = "creatify-aurora"
 )
 
 // Generation statuses. `pending` and `generating` are both "still running";
@@ -76,7 +86,11 @@ type VideoRequest struct {
 	ModelID string `json:"model_id"`
 	Prompt  string `json:"prompt,omitempty"`
 
-	AspectRatio  string `json:"aspect_ratio,omitempty"`
+	AspectRatio string `json:"aspect_ratio,omitempty"`
+	// ⚠️ `duration_secs`, NOT `duration_seconds`. The request body is a union
+	// discriminated on model_id and each arm FORBIDS unknown fields, so the
+	// plural spelling — the obvious "correction" — makes every call 422 with
+	// "Extra inputs are not permitted". Verified against the live API.
 	DurationSecs int    `json:"duration_secs,omitempty"`
 	Resolution   string `json:"resolution,omitempty"`
 	// GenerateAudio defaults to TRUE at the API, so it is a pointer here:
