@@ -106,6 +106,45 @@ func DeductTokens(orgID string, tokens int64) (int64, error) {
 	return remaining, err
 }
 
+// RefundTokens gives tokens back after work that was charged for and did not
+// happen — a generation the provider failed, which it does not charge us for
+// either.
+//
+// Returns them to the MONTHLY balance rather than the top-up balance, even
+// when the deduction came partly out of top-up. That is deliberate and in the
+// user's favour: monthly tokens expire at the reset and top-up tokens do not,
+// so crediting the wrong one would be the version that quietly takes value
+// away. The amounts are a single generation's cost, so the drift is bounded.
+//
+// Callers must guard against refunding twice — see MarkMediaJobRefunded. A
+// webhook and a poll can both decide the same job failed.
+func RefundTokens(orgID string, tokens int64) (int64, error) {
+	if tokens <= 0 || orgID == "" {
+		return 0, nil
+	}
+	ctx := context.Background()
+	ref := firestoredb.Client.Collection(orgCollection).Doc(orgID)
+	var remaining int64
+	err := firestoredb.Client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if err != nil {
+			return err
+		}
+		var o Organization
+		if err := snap.DataTo(&o); err != nil {
+			return err
+		}
+		w := o.TokenWallet
+		if w == nil {
+			w = &OrgTokenWallet{}
+		}
+		w.Balance += tokens
+		remaining = w.Balance + w.TopupBalance
+		return tx.Update(ref, []firestore.Update{{Path: "tokenWallet", Value: w}})
+	})
+	return remaining, err
+}
+
 // RefillWallet resets the monthly Balance to `allotment` and sets the next reset
 // timestamp, stamping MonthlyAllotment. TopupBalance is preserved (top-ups do
 // not reset monthly). Called by the 1st-of-month billing cron and on a plan

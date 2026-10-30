@@ -7,6 +7,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/assets"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/mediajobs"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/sharing"
@@ -94,6 +95,10 @@ func handleManagerAPIs() {
 	managerApisV1.GET("/brands/:brandId/assets", assets.ListAssets)
 	managerApisV1.POST("/brands/:brandId/assets", assets.RecordAsset)
 	managerApisV1.DELETE("/brands/:brandId/assets/:assetId", assets.DeleteAsset)
+
+	// Generated video. Returns 202 with a job id — a clip takes minutes, so
+	// the strip shows it queued and a webhook or the polling cron resolves it.
+	managerApisV1.POST("/brands/:brandId/contents/:contentId/clips/generate", mediajobs.GenerateClip)
 
 	// ── Public sharing (Branch deep links for a share token) ──────────────────
 	// The token + `enabled` toggle are owned by the app (it writes shareLinks/

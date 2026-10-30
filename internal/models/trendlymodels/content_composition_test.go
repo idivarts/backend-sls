@@ -421,3 +421,62 @@ func TestOverlayClipsKeepTheirAuthoredStart(t *testing.T) {
 		t.Errorf("a composition with no overlay track has no overlays, got %+v", got)
 	}
 }
+
+func TestGenerativeVideoTokenCostUsesTheRegistryNotAConstant(t *testing.T) {
+	// The provider's per-second price is theirs and churns, so it lives on the
+	// registry row. A constant here would need a deploy per price change.
+	model := &MediaModel{EstUSDPerSecond: 0.01, MinDurationS: 4, MaxDurationS: 8}
+
+	eight := GenerativeVideoTokenCost(model, 8)
+	four := GenerativeVideoTokenCost(model, 4)
+	if eight <= four {
+		t.Errorf("8s (%d) should cost more than 4s (%d)", eight, four)
+	}
+
+	// A request naming no length is quoted at the model's floor, never free.
+	if GenerativeVideoTokenCost(model, 0) != four {
+		t.Errorf("an unspecified length should be quoted at the minimum")
+	}
+
+	// A row nobody has costed must not silently generate for nothing — this is
+	// the most expensive thing the product does.
+	uncosted := GenerativeVideoTokenCost(&MediaModel{MinDurationS: 4}, 8)
+	if uncosted <= 0 {
+		t.Errorf("an uncosted model must still charge something, got %d", uncosted)
+	}
+	viaCall := GenerativeVideoTokenCost(&MediaModel{EstUSDPerCall: 0.5}, 8)
+	if viaCall <= 0 {
+		t.Error("a per-call price should be used when there is no per-second one")
+	}
+
+	if GenerativeVideoTokenCost(nil, 8) != 0 {
+		t.Error("no model is no charge")
+	}
+}
+
+func TestOrgMeetsPlanOrdersTiersAndToleratesTheUnknown(t *testing.T) {
+	// A capability gated behind a tier nobody can name is one nobody can use,
+	// and that failure is silent — so an unknown requirement is NO requirement.
+	if !OrgMeetsPlan("whatever", "nonexistent-tier") {
+		t.Error("an unknown minPlan must not lock anyone out")
+	}
+	if !OrgMeetsPlan("whatever", "free") {
+		t.Error("the free floor is no requirement at all")
+	}
+	if !OrgMeetsPlan("whatever", "") {
+		t.Error("an empty minPlan is no requirement")
+	}
+
+	// The legacy India keys have to rank alongside the tier they migrated to,
+	// or an org mid-backfill loses something it paid for.
+	for legacy, equivalent := range map[string]string{
+		"starter": "pro", "growth": "team", "enterprise": "agency",
+	} {
+		if planRank[legacy] != planRank[equivalent] {
+			t.Errorf("%s should rank with %s", legacy, equivalent)
+		}
+	}
+	if planRank["agency"] <= planRank["pro"] {
+		t.Error("tiers are out of order")
+	}
+}

@@ -156,3 +156,45 @@ func CompositionDecodedMs(c *Composition) int {
 	}
 	return total
 }
+
+// GenerativeVideoTokenCost prices one generated clip.
+//
+// Unlike a render, this is mostly NOT our cost — the provider bills per second
+// of output and the number is theirs, so it comes from the model's registry row
+// rather than a constant here. That is the whole reason EstUSDPerSecond exists
+// on MediaModel: a catalog that churns weekly cannot have its prices compiled
+// in.
+//
+// The same 2x markup applies, covering retries, the generations we refund, and
+// a provider estimate always being optimistic.
+//
+// ⚠️ PROVISIONAL, like every other Phase-1 billing number — and more so here,
+// because the per-second figures are estimates until a month of real
+// generations exists to measure.
+func GenerativeVideoTokenCost(model *MediaModel, durationSecs int) int64 {
+	if model == nil {
+		return 0
+	}
+	secs := float64(durationSecs)
+	if secs <= 0 {
+		// A request that named no length gets the model's own floor rather
+		// than being quoted free.
+		if model.MinDurationS > 0 {
+			secs = float64(model.MinDurationS)
+		} else {
+			secs = 1
+		}
+	}
+	usd := model.EstUSDPerSecond * secs
+	if usd <= 0 {
+		// A row with no price is a row nobody has costed. Charging nothing
+		// would be a silent giveaway on the most expensive thing the product
+		// does, so it falls back to the per-call figure and, failing that, to
+		// the video render's own per-second cost.
+		usd = model.EstUSDPerCall
+	}
+	if usd <= 0 {
+		usd = renderVideoPerSecondUSD * secs
+	}
+	return TokensForCost(usd * renderCostMarkupX)
+}

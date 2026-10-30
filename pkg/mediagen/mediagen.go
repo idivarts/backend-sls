@@ -82,6 +82,11 @@ type Spec struct {
 	Resolution   string
 	AspectRatio  string
 	// GenerateAudio asks a model that can produce sound to do so.
+	//
+	// A plain bool, not a pointer, and the zero value means NO AUDIO. The
+	// providers default it to on, which is the wrong default here: a generated
+	// clip that arrives with sound nobody asked for fights the composition's
+	// own soundtrack in the mix, and the person hears two.
 	GenerateAudio bool
 	// Count is how many variations to produce. Drivers clamp to what they allow.
 	Count int
@@ -163,6 +168,17 @@ type Provider interface {
 // it. Optional: a provider that does not implement it is simply never asked.
 type UsageReporter interface {
 	ReportUsed(ctx context.Context, a Asset) error
+}
+
+// WebhookParser is implemented by a provider that can call us back when an
+// asynchronous job finishes, instead of being polled.
+//
+// Optional, and a provider that implements it must still work under polling: a
+// webhook that is misconfigured, blocked or simply never fires would otherwise
+// strand every job forever, and the first anyone would know is a clip that sat
+// as "queued" for a day.
+type WebhookParser interface {
+	ParseWebhook(body []byte) (Result, error)
 }
 
 // RefGuard is implemented by a provider whose assets may not be fed to a model.
@@ -312,6 +328,23 @@ func RestrictedRefs(urls []string) (bool, string) {
 		}
 	}
 	return false, ""
+}
+
+// ParseWebhook decodes a provider's callback into a Result.
+//
+// The provider is named by the route rather than discovered from the body:
+// deciding which parser to run by sniffing a payload means an attacker picks
+// the parser, and these callbacks arrive from the open internet.
+func ParseWebhook(provider string, body []byte) (Result, error) {
+	p, ok := ByName(provider)
+	if !ok {
+		return Result{}, fmt.Errorf("%w: %q", ErrNoProvider, provider)
+	}
+	w, ok := p.(WebhookParser)
+	if !ok {
+		return Result{}, fmt.Errorf("%w: %q sends no callbacks", ErrUnsupported, provider)
+	}
+	return w.ParseWebhook(body)
 }
 
 // ReportUsed tells a provider that an asset was actually used, where its terms

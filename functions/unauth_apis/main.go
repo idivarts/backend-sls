@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/idivarts/backend-sls/internal/trendlyapis/mediajobs"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/social_connect"
 	trendlyunauth "github.com/idivarts/backend-sls/internal/trendlyapis/unauth_apis"
 	apihandler "github.com/idivarts/backend-sls/pkg/api_handler"
@@ -21,6 +22,15 @@ func main() {
 	instaApi.GET("/auth/:redirect_type", trendlyunauth.InstagramAuthRedirect)
 	instaApi.GET("/deauth", trendlyunauth.InstagramDeAuth)
 	instaApi.GET("/delete", trendlyunauth.InstagramDelete)
+
+	// Generative-media callbacks. Unauthenticated because the provider calls
+	// us, and the provider is taken from the ROUTE rather than the body — a
+	// parser chosen by sniffing a payload is a parser chosen by whoever sent
+	// it. The handler only ever resolves a job it already has a record of, and
+	// the polling sweep is what actually guarantees resolution, so a spoofed
+	// callback can at worst re-resolve a job that was already terminal.
+	mediaApi := apihandler.GinEngine.Group("/media")
+	mediaApi.POST("/webhook/:provider", mediajobs.Webhook)
 
 	firebaseApi := apihandler.GinEngine.Group("/firebase")
 	firebaseApi.GET("/brands/members/add", trendlyunauth.ValidateFirebaseCallback)

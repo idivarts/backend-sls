@@ -281,6 +281,18 @@ functions:
     events:
       - schedule:
           rate: cron(*/15 * * * ? *)  # every 15 minutes
+  media_poll:
+    handler: functions/trendly_media_poll/main.go
+    package:
+      include:
+        - 'service-account.json'
+        - 'key-secrets.json'
+    timeout: 300
+    memorySize: 512
+    description: "Collects generated clips the provider never called back about"
+    events:
+      - schedule:
+          rate: cron(*/2 * * * ? *)  # every 2 minutes
   social_token_refresh:
     handler: functions/trendly_social_refresh/main.go
     package:
