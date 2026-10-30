@@ -38,16 +38,16 @@ const maxRenderWaits = 10
 // Returns (false, nil) for everything that is ready to publish now — including
 // content with no design at all, which is the common case.
 func ensureRendered(brandID, contentID string, ct *trendlymodels.Content, attempt int) (bool, error) {
-	if ct.DesignRef == nil || ct.DesignRef.RevisionID == "" {
+	// ResolveRenderTarget, not DesignRef directly: a content with a timeline
+	// publishes the timeline, and a gate that checked the design instead would
+	// wave through a single scene of a multi-clip reel as "already rendered".
+	target, err := rendering.ResolveRenderTarget(brandID, contentID, ct)
+	if err != nil || target == nil {
+		// Can't tell, or nothing to render — publish what we have rather than
+		// blocking on a read.
 		return false, nil
 	}
-
-	rev, err := trendlymodels.GetDesignRevision(brandID, contentID, ct.DesignRef.RevisionID)
-	if err != nil || rev == nil {
-		// Can't tell — publish what we have rather than blocking on a read.
-		return false, nil
-	}
-	if rev.RenderURL != "" {
+	if target.RenderURL != "" {
 		return false, nil
 	}
 
@@ -55,20 +55,25 @@ func ensureRendered(brandID, contentID string, ct *trendlymodels.Content, attemp
 		return false, fmt.Errorf("the design for this post could not be rendered in time")
 	}
 
-	switch rev.RenderStatus {
-	case trendlymodels.DesignRenderQueued, trendlymodels.DesignRenderRendering:
-		// Already in flight — just come back.
+	if target.InFlight() {
+		// Already running — just come back.
 		return true, nil
 	}
 
+	// A timeline that cannot be rendered will never become publishable however
+	// long the gate waits, so it fails now with the reason rather than burning
+	// ten deferrals to arrive at a generic timeout.
+	if target.Problem != "" {
+		return false, fmt.Errorf("%s", target.Problem)
+	}
+
 	// Not rendered and nothing running: start it. Charged, but never gated —
-	// see rendering.Submit.
-	tokens := trendlymodels.RenderTokenCost(rev.DocType, rev.SlideCount, rev.DurationMs)
-	alreadyPaid := rev.RenderChargedTokens > 0
-	if err := rendering.Submit(brandID, contentID, rev.ID, rev.DocType, false, alreadyPaid, tokens); err != nil {
+	// see rendering.SubmitTarget.
+	alreadyPaid := target.ChargedTokens > 0
+	if err := rendering.SubmitTarget(brandID, contentID, target, false, alreadyPaid); err != nil {
 		return false, fmt.Errorf("could not render the design for this post: %w", err)
 	}
-	log.Printf("publishing: deferred content %s pending render of revision %s", contentID, rev.ID)
+	log.Printf("publishing: deferred content %s pending render of revision %s", contentID, target.RevisionID)
 	return true, nil
 }
 

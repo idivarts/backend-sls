@@ -32,6 +32,11 @@ import (
 )
 
 // RenderJob is the worker's input. Keep in sync with the worker's types.ts.
+//
+// RevisionID identifies both the revision to render and the document the worker
+// reports into; DocType says which subcollection that is ("composition" means
+// compositions/, anything else means designs/). One id rather than two, because
+// no job ever needs both.
 type RenderJob struct {
 	BrandID    string `json:"brandId"`
 	ContentID  string `json:"contentId"`
@@ -69,29 +74,54 @@ func StartRender(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "content not found"})
 		return
 	}
-	if content.DesignRef == nil {
+
+	// An explicit revisionId names a DESIGN revision and bypasses the
+	// composition precedence on purpose: it is how an older design revision is
+	// re-rendered, and a caller that asked for one revision must not silently
+	// get another.
+	var target *RenderTarget
+	if req.RevisionID != "" {
+		revision, revErr := trendlymodels.GetDesignRevision(brandID, contentID, req.RevisionID)
+		if revErr != nil || revision == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "revision not found"})
+			return
+		}
+		target = DesignRenderTarget(revision)
+	} else {
+		target, err = ResolveRenderTarget(brandID, contentID, content)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "revision not found"})
+			return
+		}
+	}
+	if target == nil {
+		// Distinguished so the message is true: a content with no media at all
+		// is a different problem from one whose pointer has gone stale, and
+		// "this content has no design" sent for the latter sends someone
+		// looking in the wrong place.
+		if content.DesignRef != nil || content.CompositionRef != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "revision not found"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no_design", "message": "This content has no design to render."})
 		return
 	}
 
-	revisionID := req.RevisionID
-	if revisionID == "" {
-		revisionID = content.DesignRef.RevisionID
-	}
-	revision, err := trendlymodels.GetDesignRevision(brandID, contentID, revisionID)
-	if err != nil || revision == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "revision not found"})
-		return
-	}
-
 	// Already rendered and nobody asked for a new one: say so and charge nothing.
-	if revision.RenderURL != "" && !req.Force {
-		c.JSON(http.StatusOK, gin.H{"status": trendlymodels.DesignRenderDone, "renderUrl": revision.RenderURL})
+	if target.RenderURL != "" && !req.Force {
+		c.JSON(http.StatusOK, gin.H{"status": trendlymodels.DesignRenderDone, "renderUrl": target.RenderURL})
 		return
 	}
 
-	tokens := trendlymodels.RenderTokenCost(revision.DocType, revision.SlideCount, revision.DurationMs)
-	alreadyPaid := revision.RenderChargedTokens > 0 && !req.Force
+	// A timeline with a clip that cannot render is refused BEFORE the charge.
+	// The worker would reject it too, but by then the wallet has paid for an
+	// attempt that was never going to produce anything.
+	if target.Problem != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "not_renderable", "message": target.Problem})
+		return
+	}
+
+	alreadyPaid := target.ChargedTokens > 0 && !req.Force
 
 	// A user-initiated render is GATED on the wallet: refusing here is honest,
 	// and the app can say what it would have cost.
@@ -100,19 +130,19 @@ func StartRender(c *gin.Context) {
 			"error":   "upgrade_required",
 			"reason":  "tokens_exhausted",
 			"feature": "design_render",
-			"cost":    tokens,
+			"cost":    target.Tokens,
 		})
 		return
 	}
 
-	if err := Submit(brandID, contentID, revisionID, revision.DocType, req.Force, alreadyPaid, tokens); err != nil {
+	if err := SubmitTarget(brandID, contentID, target, req.Force, alreadyPaid); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error(), "message": "Could not start the render"})
 		return
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"status":      trendlymodels.DesignRenderQueued,
-		"tokensSpent": map[string]any{"charged": !alreadyPaid, "tokens": tokens},
+		"tokensSpent": map[string]any{"charged": !alreadyPaid, "tokens": target.Tokens},
 	})
 }
 
@@ -124,32 +154,32 @@ func StartRender(c *gin.Context) {
 // Render is refused when they are out of tokens; a scheduled post is not, since
 // failing a publish the user set up days ago over a token balance would be a
 // worse outcome than letting the wallet go slightly negative.
-func Submit(brandID, contentID, revisionID, docType string, force, alreadyPaid bool, tokens int64) error {
+func SubmitTarget(brandID, contentID string, target *RenderTarget, force, alreadyPaid bool) error {
 	if !alreadyPaid {
 		if orgID := orgIDForBrand(brandID); orgID != "" {
-			if _, err := trendlymodels.DeductTokens(orgID, tokens); err != nil {
-				log.Printf("render meter: deduct %d tokens for org %s: %v", tokens, orgID, err)
-			} else if err := trendlymodels.MarkDesignRenderCharged(brandID, contentID, revisionID, tokens); err != nil {
-				log.Printf("render meter: mark charged %s: %v", revisionID, err)
+			if _, err := trendlymodels.DeductTokens(orgID, target.Tokens); err != nil {
+				log.Printf("render meter: deduct %d tokens for org %s: %v", target.Tokens, orgID, err)
+			} else if err := target.markCharged(brandID, contentID, target.Tokens); err != nil {
+				log.Printf("render meter: mark charged %s: %v", target.RevisionID, err)
 			}
 		}
 	}
 
 	// Stamp "queued" BEFORE dispatching, so the app shows the job the instant
 	// this returns rather than sitting on a stale state until a worker starts.
-	if err := trendlymodels.MarkDesignRenderQueued(brandID, contentID, revisionID, ""); err != nil {
-		log.Printf("render: mark queued %s: %v", revisionID, err)
+	if err := target.markQueued(brandID, contentID, ""); err != nil {
+		log.Printf("render: mark queued %s: %v", target.RevisionID, err)
 	}
 
 	err := dispatch(RenderJob{
 		BrandID:    brandID,
 		ContentID:  contentID,
-		RevisionID: revisionID,
-		DocType:    docType,
+		RevisionID: target.RevisionID,
+		DocType:    target.DocType,
 		Force:      force,
 	})
 	if err != nil {
-		_ = trendlymodels.MarkDesignRenderFailed(brandID, contentID, revisionID,
+		_ = target.markFailed(brandID, contentID,
 			"We couldn't start the render. Please try again.")
 	}
 	return err
@@ -161,7 +191,9 @@ func dispatch(job RenderJob) error {
 	if err != nil {
 		return err
 	}
-	if job.DocType == "video" {
+	// A composition is a video encode with more steps, so it takes the video
+	// lane: Fargate, not the image Lambda, whose ceiling an encode would hit.
+	if job.DocType == "video" || job.DocType == "composition" {
 		return submitBatchJob(job, string(body))
 	}
 	queueURL := os.Getenv("IMAGE_RENDER_QUEUE_URL")

@@ -47,40 +47,61 @@ const stuckQueuedAfter = 30 * time.Minute
 // systemic, and the next run picks up the rest.
 const sweepLimit = 500
 
-// sweep closes out one status. The message is the only thing the user will see,
-// so it names what actually happened rather than a generic failure.
-func sweep(ctx context.Context, status string, after time.Duration, message string) {
+// revisionKind is one of the two subcollections a render reports into. They
+// carry identical render fields but are separate collection groups, so a single
+// query cannot see both — hence a sweep per kind rather than one that forgets
+// the newer one exists.
+type revisionKind struct {
+	name string
+	list func(ctx context.Context, status string, cutoffMs int64, limit int) ([]trendlymodels.StuckRender, error)
+	fail func(brandID, contentID, revisionID, reason string) error
+}
+
+var revisionKinds = []revisionKind{
+	{"designs", trendlymodels.ListStuckRenders, trendlymodels.MarkDesignRenderFailed},
+	{"compositions", trendlymodels.ListStuckCompositionRenders, trendlymodels.MarkCompositionRenderFailed},
+}
+
+// sweep closes out one status in one subcollection. The message is the only
+// thing the user will see, so it names what actually happened rather than a
+// generic failure.
+func sweep(ctx context.Context, kind revisionKind, status string, after time.Duration, message string) {
 	cutoff := time.Now().Add(-after).UnixMilli()
 
-	stuck, err := trendlymodels.ListStuckRenders(ctx, status, cutoff, sweepLimit)
+	stuck, err := kind.list(ctx, status, cutoff, sweepLimit)
 	if err != nil {
-		log.Printf("render reconcile: %s query failed: %v", status, err)
-		mysentry.Capture(err, map[string]string{"lambda": "render_reconcile", "op": "query", "status": status})
+		log.Printf("render reconcile: %s %s query failed: %v", kind.name, status, err)
+		mysentry.Capture(err, map[string]string{
+			"lambda": "render_reconcile", "op": "query", "status": status, "kind": kind.name,
+		})
 		// Partial results are still worth acting on.
 	}
 	if len(stuck) == 0 {
 		return
 	}
 
-	log.Printf("render reconcile: %d render(s) stuck in %q for over %s", len(stuck), status, after)
+	log.Printf("render reconcile: %d %s render(s) stuck in %q for over %s",
+		len(stuck), kind.name, status, after)
 	failed := 0
 	for _, s := range stuck {
-		markErr := trendlymodels.MarkDesignRenderFailed(s.BrandID, s.ContentID, s.RevisionID, message)
+		markErr := kind.fail(s.BrandID, s.ContentID, s.RevisionID, message)
 		if markErr != nil {
-			log.Printf("render reconcile: could not fail %s/%s/%s: %v",
-				s.BrandID, s.ContentID, s.RevisionID, markErr)
+			log.Printf("render reconcile: could not fail %s %s/%s/%s: %v",
+				kind.name, s.BrandID, s.ContentID, s.RevisionID, markErr)
 			continue
 		}
 		failed++
 	}
-	log.Printf("render reconcile: closed %d/%d stuck in %q", failed, len(stuck), status)
+	log.Printf("render reconcile: closed %d/%d %s stuck in %q", failed, len(stuck), kind.name, status)
 }
 
 func handler(ctx context.Context) error {
-	sweep(ctx, trendlymodels.DesignRenderRendering, stuckRenderingAfter,
-		"This render stopped unexpectedly. Please try again.")
-	sweep(ctx, trendlymodels.DesignRenderQueued, stuckQueuedAfter,
-		"This render never started. Please try again.")
+	for _, kind := range revisionKinds {
+		sweep(ctx, kind, trendlymodels.DesignRenderRendering, stuckRenderingAfter,
+			"This render stopped unexpectedly. Please try again.")
+		sweep(ctx, kind, trendlymodels.DesignRenderQueued, stuckQueuedAfter,
+			"This render never started. Please try again.")
+	}
 	return nil
 }
 
