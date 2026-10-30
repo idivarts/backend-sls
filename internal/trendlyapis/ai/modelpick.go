@@ -100,3 +100,13 @@ func pickModel(ctx context.Context, brandID string, task openrouter.TaskType, re
 	openrouter.EnsureRegistry(ctx)
 	return openrouter.Resolve(task, brandPlan(brandID), requested)
 }
+
+// PickModelFor is pickModel for callers outside this package.
+//
+// Exported deliberately narrow: no requested-model override, because a caller
+// outside the chat has no user asking for a particular model — it wants
+// whatever this brand's plan allows for the task. Keeping the override
+// unexported is what stops "pick a model" turning into "pick any model".
+func PickModelFor(ctx context.Context, brandID string, task openrouter.TaskType) (model string, locked bool) {
+	return pickModel(ctx, brandID, task, "")
+}

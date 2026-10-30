@@ -74,10 +74,19 @@ type Asset struct {
 	// by the generation path to refuse it as a reference.
 	NoAIInput bool `json:"noAiInput,omitempty" firestore:"noAiInput,omitempty"`
 
-	// ── Footage (Phase 9 fills these; declared so the shape is settled) ──
-	TrimInMs   int    `json:"trimInMs,omitempty" firestore:"trimInMs,omitempty"`
-	TrimOutMs  int    `json:"trimOutMs,omitempty" firestore:"trimOutMs,omitempty"`
-	Transcript string `json:"transcript,omitempty" firestore:"transcript,omitempty"`
+	// ── Footage ──
+	// A default in and out point, so a clip placed from the library starts
+	// where the usable part of the take does.
+	TrimInMs  int `json:"trimInMs,omitempty" firestore:"trimInMs,omitempty"`
+	TrimOutMs int `json:"trimOutMs,omitempty" firestore:"trimOutMs,omitempty"`
+
+	// Ingest is what was learned about this footage when it arrived: its real
+	// dimensions and length, what is said in it and when, and what is on
+	// screen and when. None of this fits on an attachment, which is the whole
+	// reason this collection exists.
+	//
+	// Nil until ingest runs, and ingest only runs for video.
+	Ingest *AssetIngest `json:"ingest,omitempty" firestore:"ingest,omitempty"`
 
 	// OriginContentID records where it first appeared, so the library can say
 	// "from <post>" without the asset belonging to that post.
@@ -317,6 +326,162 @@ func deriveAssetsFromAttachments(ctx context.Context, brandID string, limit int)
 				Derived:         true,
 			})
 		}
+	}
+	return out, nil
+}
+
+// ── What ingest learns about a piece of footage ─────────────────────────────
+
+// AssetIngest is the result of looking at an uploaded video properly: its real
+// shape, a frame to show it by, what is said in it, and what is in it.
+//
+// The point of all of it is PLACEMENT. "Put the bit where she picks up the cup
+// at the front" is only answerable if something recorded that there is a cup
+// and when. Without this an uploaded video is a rectangle of unknown content
+// that a person has to scrub through themselves.
+type AssetIngest struct {
+	// Status: pending | done | failed. A video is usable before ingest
+	// finishes — it can be trimmed and placed by hand — so this gates the
+	// smart features, not the footage.
+	Status string `json:"status" firestore:"status"`
+	Error  string `json:"error,omitempty" firestore:"error,omitempty"`
+
+	// ── From ffprobe ──
+	DurationMs int     `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
+	Width      int     `json:"width,omitempty" firestore:"width,omitempty"`
+	Height     int     `json:"height,omitempty" firestore:"height,omitempty"`
+	FPS        float64 `json:"fps,omitempty" firestore:"fps,omitempty"`
+	HasAudio   bool    `json:"hasAudio,omitempty" firestore:"hasAudio,omitempty"`
+
+	// SampleFrameURLs are evenly spaced stills, in order, used for the vision
+	// pass that produces the shot list. Kept rather than discarded: they are
+	// what a later, better model would re-read, and re-extracting them means
+	// downloading the whole video again.
+	SampleFrameURLs []string `json:"sampleFrameUrls,omitempty" firestore:"sampleFrameUrls,omitempty"`
+
+	// Words is the transcript with per-word timings — the thing that makes
+	// "cut the dead air" and "start on the line about pricing" answerable.
+	Words []TranscriptWord `json:"words,omitempty" firestore:"words,omitempty"`
+	// Text is the same transcript as prose, for reading and for prompts.
+	Text string `json:"text,omitempty" firestore:"text,omitempty"`
+
+	// Shots describe what is on screen over time.
+	Shots []Shot `json:"shots,omitempty" firestore:"shots,omitempty"`
+
+	IngestedAt int64 `json:"ingestedAt,omitempty" firestore:"ingestedAt,omitempty"`
+}
+
+// Ingest statuses.
+const (
+	IngestPending = "pending"
+	IngestDone    = "done"
+	IngestFailed  = "failed"
+)
+
+// TranscriptWord is one word and when it was said.
+type TranscriptWord struct {
+	Text string `json:"text" firestore:"text"`
+	// StartMs/EndMs are milliseconds into the footage. Stored as integers
+	// rather than the provider's float seconds, because every other time in
+	// this product is integer milliseconds and two units is how a trim ends up
+	// a thousand times too long.
+	StartMs int `json:"startMs" firestore:"startMs"`
+	EndMs   int `json:"endMs" firestore:"endMs"`
+	// Kind is word | spacing | audio_event. Spacing is kept so a span that is
+	// deleted takes its surrounding silence with it.
+	Kind string `json:"kind,omitempty" firestore:"kind,omitempty"`
+}
+
+// Shot is a stretch of footage described in words.
+type Shot struct {
+	StartMs int `json:"startMs" firestore:"startMs"`
+	EndMs   int `json:"endMs" firestore:"endMs"`
+	// Description is what a person would say is happening — the thing the AI
+	// matches a request against when choosing which part to place.
+	Description string `json:"description" firestore:"description"`
+}
+
+// SetAssetIngest writes an ingest result onto an asset.
+func SetAssetIngest(ctx context.Context, brandID, assetID string, ingest *AssetIngest) error {
+	if ingest.IngestedAt == 0 {
+		ingest.IngestedAt = time.Now().UnixMilli()
+	}
+	_, err := assetsCollection(brandID).Doc(assetID).Set(ctx, map[string]interface{}{
+		"ingest":    ingest,
+		"updatedAt": time.Now().UnixMilli(),
+	}, firestore.MergeAll)
+	return err
+}
+
+// ListFootageAssets returns the brand's ingested video, newest first.
+//
+// Filtered in memory on the ingest status rather than in the query: that would
+// need a composite index on a nested field for a collection of tens of rows,
+// and the library read is already bounded.
+func ListFootageAssets(ctx context.Context, brandID string, limit int) ([]Asset, error) {
+	all, err := ListStoredAssets(ctx, brandID, "", limit*2)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Asset, 0, len(all))
+	for _, a := range all {
+		if a.Kind != AssetKindVideo {
+			continue
+		}
+		out = append(out, a)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+
+// PendingIngest is an asset whose ingest the worker has handed over, plus the
+// brand it belongs to — which a collection-group query otherwise loses.
+type PendingIngest struct {
+	BrandID string
+	Asset   Asset
+}
+
+// ListPendingIngests finds footage the worker has measured but nobody has
+// transcribed or described yet.
+//
+// A collection-group query, because ingest finishes on a global cron and
+// assets are brand-scoped subcollections: a per-brand sweep would have to
+// enumerate every brand first. Needs the COLLECTION_GROUP single-field index
+// on `ingest.status`, which ships in firestore.indexes.json and, for the
+// Enterprise production database, as a gcloud migration.
+func ListPendingIngests(ctx context.Context, limit int) ([]PendingIngest, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	q := firestoredb.Client.CollectionGroup("assets").
+		Where("ingest.status", "==", IngestPending).
+		Limit(limit)
+
+	iter := q.Documents(ctx)
+	defer iter.Stop()
+
+	out := []PendingIngest{}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return out, err
+		}
+		var a Asset
+		if err := doc.DataTo(&a); err != nil {
+			continue
+		}
+		a.ID = doc.Ref.ID
+		// brands/{brandId}/assets/{assetId}
+		brandRef := doc.Ref.Parent.Parent
+		if brandRef == nil {
+			continue
+		}
+		out = append(out, PendingIngest{BrandID: brandRef.ID, Asset: a})
 	}
 	return out, nil
 }

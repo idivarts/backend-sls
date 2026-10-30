@@ -208,3 +208,69 @@ export async function setResult(
         { merge: true }
     );
 }
+
+const assetRef = (brandId: string, assetId: string) =>
+    firestore().doc(`brands/${brandId}/assets/${assetId}`);
+
+/**
+ * Record what ingest learned about a piece of footage.
+ *
+ * Status is `pending`, not `done`: this worker produces the measurements and
+ * the frames, but the transcript and the shot list are provider calls that
+ * belong with the other provider calls in the backend. The asset is only
+ * `done` once those have run too, so nothing downstream treats a half-ingested
+ * video as fully described.
+ *
+ * Field names mirror internal/models/trendlymodels/asset.go — change one,
+ * change both.
+ */
+export async function setIngest(
+    brandId: string,
+    assetId: string,
+    out: {
+        durationMs: number;
+        width: number;
+        height: number;
+        fps: number;
+        hasAudio: boolean;
+        posterUrl: string;
+        sampleFrameUrls: string[];
+    }
+): Promise<void> {
+    await assetRef(brandId, assetId).set(
+        {
+            posterUrl: out.posterUrl,
+            width: out.width,
+            height: out.height,
+            durationMs: out.durationMs,
+            ingest: {
+                status: "pending",
+                durationMs: out.durationMs,
+                width: out.width,
+                height: out.height,
+                fps: out.fps,
+                hasAudio: out.hasAudio,
+                sampleFrameUrls: out.sampleFrameUrls,
+            },
+            updatedAt: Date.now(),
+        },
+        { merge: true }
+    );
+}
+
+/**
+ * Record that ingest could not read this video.
+ *
+ * `reason` is shown to a person, so it has to read as a sentence. The footage
+ * itself is untouched and still usable by hand — this marks what we could not
+ * learn about it, not a lost upload.
+ */
+export async function failIngest(brandId: string, assetId: string, reason: string): Promise<void> {
+    await assetRef(brandId, assetId).set(
+        {
+            ingest: { status: "failed", error: reason },
+            updatedAt: Date.now(),
+        },
+        { merge: true }
+    );
+}

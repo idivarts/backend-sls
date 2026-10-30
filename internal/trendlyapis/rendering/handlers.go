@@ -43,6 +43,9 @@ type RenderJob struct {
 	RevisionID string `json:"revisionId"`
 	DocType    string `json:"docType"`
 	Force      bool   `json:"force,omitempty"`
+	// SourceURL carries the video for an ingest job, where RevisionID is the
+	// asset id rather than a revision.
+	SourceURL string `json:"sourceUrl,omitempty"`
 }
 
 type startRenderRequest struct {
@@ -193,7 +196,9 @@ func dispatch(job RenderJob) error {
 	}
 	// A composition is a video encode with more steps, so it takes the video
 	// lane: Fargate, not the image Lambda, whose ceiling an encode would hit.
-	if job.DocType == "video" || job.DocType == "composition" {
+	// Ingest joins the video lane: it downloads a whole file and writes a
+	// dozen frames to disk, which the image Lambda's 512MB /tmp cannot take.
+	if job.DocType == "video" || job.DocType == "composition" || job.DocType == "ingest" {
 		return submitBatchJob(job, string(body))
 	}
 	queueURL := os.Getenv("IMAGE_RENDER_QUEUE_URL")
@@ -265,3 +270,23 @@ func tokensExhausted(orgID string) bool {
 // rather than silently no-oping: a render that never happens must not look like
 // a render in progress.
 var errNoQueue = errors.New("render queue is not configured for this stage")
+
+// SubmitIngest asks the worker to look at an uploaded video.
+//
+// The video lane (Fargate), not the image Lambda: ingest downloads a whole
+// file, probes it and writes a dozen frames to disk, which is exactly the
+// shape the image Lambda's 512MB /tmp and short ceiling cannot take.
+//
+// Fire and forget, and deliberately not charged. Ingest is what makes an
+// upload useful rather than a feature someone opted into, and billing a user
+// for looking at their own file would be a strange place to meter. The vision
+// pass that follows IS metered, where a model is actually called.
+func SubmitIngest(brandID, assetID, url string) error {
+	return dispatch(RenderJob{
+		BrandID:    brandID,
+		ContentID:  "-",
+		RevisionID: assetID,
+		DocType:    "ingest",
+		SourceURL:  url,
+	})
+}

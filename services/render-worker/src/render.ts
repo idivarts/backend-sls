@@ -21,15 +21,18 @@
 import { closeBrowser, getBrowser } from "./browser";
 import { config } from "./config";
 import { renderComposition } from "./composition";
+import { ingestVideo } from "./ingest";
 import { captureSlides } from "./image";
 import { loadDesign } from "./page";
 import { upload } from "./s3";
 import {
+    failIngest,
     getComposition,
     getContentAudio,
     getRevision,
     markFailed,
     markStarted,
+    setIngest,
     setProgress,
     setResult,
 } from "./firestore";
@@ -122,6 +125,10 @@ async function runJobInner(job: RenderJob): Promise<void> {
     const startedAt = Date.now();
 
     try {
+        if (job.docType === "ingest") {
+            await runIngestJob(job);
+            return;
+        }
         if (job.docType === "composition") {
             await runCompositionJob(job, target, startedAt);
             return;
@@ -270,5 +277,33 @@ async function runDesignJob(job: RenderJob, target: RenderTarget, startedAt: num
         });
     } finally {
         await loaded.close();
+    }
+}
+
+/**
+ * Ingest one uploaded video: measure it, pull a poster, sample frames.
+ *
+ * Reports its own failure onto the asset rather than only throwing. Footage is
+ * usable without ingest — it can still be trimmed and placed by hand — so a
+ * failed ingest must degrade to "we could not read this one" rather than
+ * looking like a lost upload.
+ */
+async function runIngestJob(job: RenderJob): Promise<void> {
+    const assetId = job.revisionId;
+    const url = job.sourceUrl ?? "";
+    if (!assetId || !url) throw new Error("an ingest job needs an asset id and a url");
+
+    try {
+        const out = await ingestVideo(url, job.brandId);
+        await setIngest(job.brandId, assetId, out);
+        console.log(
+            `[ingest] ${assetId}: ${out.durationMs}ms ${out.width}x${out.height} ` +
+                `@${out.fps}fps audio=${out.hasAudio} frames=${out.sampleFrameUrls.length}`
+        );
+    } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error(`[ingest] ${assetId} failed:`, reason);
+        await failIngest(job.brandId, assetId, reason).catch(() => undefined);
+        throw err;
     }
 }
