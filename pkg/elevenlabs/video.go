@@ -187,13 +187,20 @@ func decodeGeneration(httpReq *http.Request, op string) (*VideoGeneration, error
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		// 401/403 here is nearly always the key lacking the Image & Video
-		// permission rather than being wrong, and video needs a Pro workspace
-		// — worth saying, because "unauthorized" sends people to the wrong
-		// place entirely.
-		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		// These three all read as "auth is broken" and none of them is, so each
+		// says what it actually means. Measured against a real workspace: a key
+		// that works perfectly well for music and voice returns 402 here,
+		// because generating through the Image & Video API needs a Pro plan or
+		// above — a billing upgrade, not a new key. Sending someone to rotate
+		// credentials over that wastes a morning.
+		switch resp.StatusCode {
+		case http.StatusPaymentRequired:
 			return nil, fmt.Errorf(
-				"elevenlabs: video %s refused (%d) — the key needs the Image & Video permission on a Pro workspace",
+				"elevenlabs: video %s refused (402) — the workspace needs a Pro plan or above for the Image & Video API",
+				op)
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return nil, fmt.Errorf(
+				"elevenlabs: video %s refused (%d) — the key needs the Image & Video permission",
 				op, resp.StatusCode)
 		}
 		return nil, fmt.Errorf("elevenlabs: video %s returned %d", op, resp.StatusCode)
