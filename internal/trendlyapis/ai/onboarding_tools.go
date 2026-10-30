@@ -120,6 +120,12 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 		// asked for it; answer rather than falling through to "unknown tool".
 		r, _, err := runRenderDesignPreview(ctx, brandID, contextID, arguments)
 		return r, false, err
+	case toolGetTimeline:
+		r, err := runGetTimeline(ctx, brandID, contextID)
+		return r, false, err
+	case toolCutFootage:
+		r, err := runCutFootage(ctx, brandID, contextID, arguments)
+		return r, false, err
 	case toolGetDesignHTML:
 		r, err := runGetDesignHTML(ctx, brandID, contextID, arguments)
 		return r, false, err
