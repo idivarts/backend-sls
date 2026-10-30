@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -122,11 +123,34 @@ type WebhookTarget struct {
 	IDs  []string `json:"ids,omitempty"`
 }
 
-// WebhookAll notifies every flows webhook configured on the workspace, which is
-// what we want: the endpoint is configured once in the ElevenLabs dashboard
-// rather than named per request, so a stage's own URL is a setting rather than
-// something every call has to carry correctly.
-func WebhookAll() *WebhookTarget { return &WebhookTarget{Type: "all"} }
+// WebhookAll notifies every flows webhook configured on the workspace: the
+// endpoint is configured once in the ElevenLabs dashboard rather than named per
+// request, so a stage's own URL is a setting rather than something every call
+// has to carry correctly.
+//
+// ⚠️ It returns nil unless ELEVENLABS_WEBHOOKS is on, and that is not caution —
+// asking for a callback the workspace cannot make REFUSES THE WHOLE
+// GENERATION. A workspace with `{"webhooks": []}` (the state ours was in, and
+// the state any new one starts in) rejects a request carrying this field, which
+// surfaces as a submit that fails with the request otherwise perfectly valid.
+//
+// Nothing is lost while it is off: the polling sweep resolves every job and is
+// the guarantee regardless — the webhook only makes the result arrive sooner.
+// Turn it on in the same change that configures the endpoint in the dashboard.
+func WebhookAll() *WebhookTarget {
+	if !webhooksEnabled() {
+		return nil
+	}
+	return &WebhookTarget{Type: "all"}
+}
+
+func webhooksEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ELEVENLABS_WEBHOOKS"))) {
+	case "1", "true", "on", "yes":
+		return true
+	}
+	return false
+}
 
 // VideoGeneration is the state of one generation.
 type VideoGeneration struct {
