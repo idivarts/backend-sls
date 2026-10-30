@@ -27,6 +27,20 @@ type elevenlabsDriver struct{}
 
 func init() { Register(elevenlabsDriver{}) }
 
+// audioFieldFor decides whether this request says anything about sound.
+//
+// Stated explicitly rather than left to the API's default, which is ON — but
+// only to a model that takes the field. One that does not rejects it outright
+// ("Extra inputs are not permitted"), so an explicit "no sound" would fail
+// every generation it serves rather than producing a silent clip.
+func audioFieldFor(s Spec) *bool {
+	if !s.NativeAudio {
+		return nil
+	}
+	v := s.GenerateAudio
+	return &v
+}
+
 func (elevenlabsDriver) Name() string { return "elevenlabs" }
 
 func (elevenlabsDriver) Supports(k Kind) bool { return k == KindVideo }
@@ -56,12 +70,9 @@ func (d elevenlabsDriver) Submit(ctx context.Context, s Spec) (Result, error) {
 		AspectRatio:  s.AspectRatio,
 		DurationSecs: s.DurationSecs,
 		Resolution:   s.Resolution,
-		// Asked for explicitly: the API defaults sound ON, and a clip that
-		// arrives with audio nobody asked for fights the composition's own
-		// soundtrack in the mix.
-		GenerateAudio: &s.GenerateAudio,
-		Webhook:       elevenlabs.WebhookAll(),
+		Webhook:      elevenlabs.WebhookAll(),
 	}
+	req.GenerateAudio = audioFieldFor(s)
 
 	var err error
 	if req.StartFrame, err = inlineFrame(ctx, s.StartFrame); err != nil {

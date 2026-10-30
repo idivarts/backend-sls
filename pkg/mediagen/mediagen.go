@@ -81,6 +81,17 @@ type Spec struct {
 	DurationSecs int
 	Resolution   string
 	AspectRatio  string
+	// NativeAudio says whether the model can produce sound at ALL, which is
+	// not the same question as whether this generation wants it.
+	//
+	// It has to be carried, because a model that cannot refuses the field
+	// rather than ignoring it: Creatify Aurora answers `generate_audio` with
+	// "Extra inputs are not permitted", so sending an explicit `false` — which
+	// is what asking for silence looks like on the wire — fails every
+	// generation it serves. Only a model that takes the field is told anything
+	// about sound.
+	NativeAudio bool
+
 	// GenerateAudio asks a model that can produce sound to do so.
 	//
 	// A plain bool, not a pointer, and the zero value means NO AUDIO. The

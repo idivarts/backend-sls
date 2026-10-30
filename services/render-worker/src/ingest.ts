@@ -84,6 +84,33 @@ export async function probe(path: string): Promise<ProbeResult> {
     };
 }
 
+/**
+ * Whether a file carries an audio track at all.
+ *
+ * Needed because naming `[i:a]` for an input that has none does not degrade —
+ * it fails the whole filter graph, taking the render with it. A design segment
+ * is muxed `-an`, a still has no sound by definition, and plenty of footage
+ * arrives mute, so the question has to be asked per file rather than assumed
+ * from the clip's kind.
+ *
+ * Answers `false` when ffprobe cannot say. Losing one clip's sound is a much
+ * better failure than losing the render.
+ */
+export async function hasAudioTrack(path: string): Promise<boolean> {
+    try {
+        const raw = await runProbe([
+            "-v", "error",
+            "-select_streams", "a",
+            "-show_entries", "stream=codec_type",
+            "-print_format", "json",
+            path,
+        ]);
+        return (JSON.parse(raw).streams ?? []).length > 0;
+    } catch {
+        return false;
+    }
+}
+
 /** ffprobe reports frame rates as a fraction, e.g. "30000/1001". */
 function parseRate(rate: unknown): number {
     if (typeof rate !== "string" || !rate.includes("/")) return 0;

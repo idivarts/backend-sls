@@ -44,7 +44,8 @@ import {
     type Composition,
     type MeasuredClip,
 } from "../../../shared-libs/design/composition-runtime";
-import { buildAudioStage } from "./audio";
+import { buildAudioStage, type ClipAudio } from "./audio";
+import { hasAudioTrack } from "./ingest";
 import { config } from "./config";
 import { runFfmpeg } from "./encode";
 import { loadDesign } from "./page";
@@ -107,6 +108,10 @@ interface Segment {
     inputArgs: string[];
     /** Filter chain applied to this input before it is composited. */
     filter: string;
+    /** Whether this input carries a sound track the mix can use. */
+    hasAudio?: boolean;
+    /** Playback speed applied to the picture, so the sound can match it. */
+    speed?: number;
 }
 
 /**
@@ -246,7 +251,14 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
 
             const local = await stage(source, measured, plan, fps, width, height);
             tempFiles.push(...local.tempFiles);
-            segments.push({ measured, plan, inputArgs: local.inputArgs, filter: local.filter });
+            segments.push({
+                measured,
+                plan,
+                inputArgs: local.inputArgs,
+                filter: local.filter,
+                hasAudio: local.hasAudio,
+                speed: local.speed,
+            });
         }
 
         // Overlays last, over whatever the picture turned out to be.
@@ -278,7 +290,31 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
         // overlays. The default of 1 is only right for a single pipe, and an
         // index that is off by the overlay count filters the wrong stream and
         // ships a clip's own audio as the soundtrack.
-        const audioStage = await buildAudioStage(audio, totalMs, segments.length + overlays.length);
+        // Each clip's own sound, placed where the frame-aligned plan put its
+        // picture. The input index is COUNTED rather than assumed to be the
+        // segment's position: every stage happens to declare exactly one `-i`
+        // today, and a graph that silently names the wrong input is the kind of
+        // bug that ships a clip's audio under a different clip.
+        const clipAudio: ClipAudio[] = [];
+        let inputIndex = 0;
+        for (const seg of segments) {
+            const declared = seg.inputArgs.filter((a) => a === "-i").length;
+            if (seg.hasAudio) {
+                clipAudio.push({
+                    inputIndex,
+                    startMs: Math.round((seg.plan.startFrames / fps) * 1000),
+                    speed: seg.speed,
+                });
+            }
+            inputIndex += declared;
+        }
+
+        const audioStage = await buildAudioStage(
+            audio,
+            totalMs,
+            segments.length + overlays.length,
+            clipAudio
+        );
         tempFiles.push(...audioStage.tempFiles);
 
         const videoFilter = buildVideoGraph(segments, width, height, fps, overlays);
@@ -427,6 +463,10 @@ interface StagedInput {
     inputArgs: string[];
     filter: string;
     tempFiles: string[];
+    /** Whether this input carries a sound track the mix can use. */
+    hasAudio?: boolean;
+    /** Playback speed applied to the picture, so the sound can match it. */
+    speed?: number;
 }
 
 /**
@@ -476,6 +516,10 @@ async function stage(
         const chain = speed !== 1 ? `setpts=PTS/${speed}` : "";
         return {
             tempFiles: [path],
+            // Asked of the file, not assumed from the kind: footage is often
+            // mute, and a generated clip only speaks when it was asked to.
+            hasAudio: await hasAudioTrack(path),
+            speed,
             // -ss before -i seeks by keyframe and is far cheaper than decoding
             // from the top; the trim is a user-facing in-point, not a
             // frame-exact edit, so keyframe accuracy is the right trade.

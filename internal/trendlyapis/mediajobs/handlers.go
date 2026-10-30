@@ -153,6 +153,7 @@ func GenerateClip(c *gin.Context) {
 		AspectRatio:   req.AspectRatio,
 		DurationSecs:  req.DurationSecs,
 		Resolution:    req.Resolution,
+		NativeAudio:   model.NativeAudio,
 		GenerateAudio: req.GenerateAudio,
 	}
 	if req.StartFrameURL != "" {

@@ -63,3 +63,31 @@ func TestFrameMimeTypeRefusesWhatTheModelWouldRefuse(t *testing.T) {
 		t.Fatal("unrecognised bytes with a useless header must be refused")
 	}
 }
+
+// Creatify Aurora answers `generate_audio` with "Extra inputs are not
+// permitted", so an explicit `false` — which is what asking for silence looks
+// like on the wire — would fail every generation it serves. A model that
+// cannot make sound must simply not be told about sound.
+func TestAudioIsOnlyMentionedToModelsThatTakeIt(t *testing.T) {
+	cases := []struct {
+		name   string
+		spec   Spec
+		wantIt bool
+	}{
+		{"a silent model is told nothing", Spec{NativeAudio: false, GenerateAudio: false}, false},
+		{"not even when sound was asked for", Spec{NativeAudio: false, GenerateAudio: true}, false},
+		{"a model that can is told yes", Spec{NativeAudio: true, GenerateAudio: true}, true},
+		{"and is told no just as explicitly", Spec{NativeAudio: true, GenerateAudio: false}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := audioFieldFor(c.spec)
+			if (got != nil) != c.wantIt {
+				t.Fatalf("generate_audio present = %v; want %v", got != nil, c.wantIt)
+			}
+			if got != nil && *got != c.spec.GenerateAudio {
+				t.Fatalf("generate_audio = %v; want %v", *got, c.spec.GenerateAudio)
+			}
+		})
+	}
+}
