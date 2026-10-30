@@ -29,3 +29,9 @@ key-secrets*.json
 new-leads.csv
 new-notion-leads.csv
 env.local.sh
+
+# Binaries built by `go build ./scripts/<name>` land here, named after the
+# package directory — a 49MB one reached a commit this way.
+/seed-media-models
+/backfill-org-brands
+/billing-cron
