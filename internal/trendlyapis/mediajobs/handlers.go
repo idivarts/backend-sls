@@ -126,6 +126,12 @@ func GenerateClip(c *gin.Context) {
 
 	res, err := mediagen.Submit(c.Request.Context(), model.Provider, spec)
 	if err != nil {
+		// Logged with the model and the provider's own words. The user gets a
+		// sentence they can act on, which is deliberately not the provider's
+		// error — but without this line a refused generation is a 502 with no
+		// trace anywhere, and the only way to learn why is to spend another
+		// one.
+		log.Printf("mediajobs: submit %s via %s failed: %v", req.ModelID, model.Provider, err)
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error":   "submit_failed",
 			"message": "Couldn't start this clip. Please try again.",
@@ -133,6 +139,8 @@ func GenerateClip(c *gin.Context) {
 		return
 	}
 	if res.JobID == "" {
+		log.Printf("mediajobs: submit %s via %s returned no job id: %s",
+			req.ModelID, model.Provider, res.Error)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "submit_failed", "message": res.Error})
 		return
 	}

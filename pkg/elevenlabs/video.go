@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 )
 
 // ── Video generation (the Flows Image & Video API) ──────────────────────────
@@ -200,7 +202,11 @@ func decodeGeneration(httpReq *http.Request, op string) (*VideoGeneration, error
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	// 201 counts: creating a generation is creating a resource, and an API that
+	// answers POST with 201 and GET with 200 is the ordinary case rather than a
+	// surprise. Treating it as a failure would reject a generation that had
+	// already been accepted — and charged for.
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		// These three all read as "auth is broken" and none of them is, so each
 		// says what it actually means. Measured against a real workspace: a key
 		// that works perfectly well for music and voice returns 402 here,
@@ -217,13 +223,29 @@ func decodeGeneration(httpReq *http.Request, op string) (*VideoGeneration, error
 				"elevenlabs: video %s refused (%d) — the key needs the Image & Video permission",
 				op, resp.StatusCode)
 		}
-		return nil, fmt.Errorf("elevenlabs: video %s returned %d", op, resp.StatusCode)
+		// Everything else carries the body, truncated. A 422 from this API
+		// names the exact field it refused and why — "Extra inputs are not
+		// permitted", "Field required", the valid model tags — and throwing
+		// that away leaves a caller with a status code and no way to learn
+		// what is wrong except by spending another generation.
+		return nil, fmt.Errorf("elevenlabs: video %s returned %d: %s",
+			op, resp.StatusCode, bodySnippet(resp.Body))
 	}
 	var out VideoGeneration
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err
 	}
 	return &out, nil
+}
+
+// bodySnippet reads an error body for a log line: enough to name the field
+// that was refused, short enough not to dump a page into CloudWatch.
+func bodySnippet(r io.Reader) string {
+	b, err := io.ReadAll(io.LimitReader(r, 2048))
+	if err != nil || len(b) == 0 {
+		return "(no body)"
+	}
+	return strings.TrimSpace(string(b))
 }
 
 // ParseVideoWebhook decodes a flows callback body.
