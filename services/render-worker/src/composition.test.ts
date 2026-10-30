@@ -105,7 +105,7 @@ describe("buildVideoGraph", () => {
     it("labels a single clip and ends on [outv]", () => {
         const graph = buildVideoGraph(segmentsFor(comp([{ ms: 4000 }])), W, H, FPS);
         assert.match(graph, /^\[0:v\]/);
-        assert.ok(graph.endsWith("[v0]null[outv]"), graph);
+        assert.ok(graph.endsWith("[v0]format=yuv420p[outv]"), graph);
         // Nothing to join, so no compositing filter should appear at all.
         assert.ok(!graph.includes("xfade"), graph);
         assert.ok(!graph.includes("concat"), graph);
@@ -149,7 +149,7 @@ describe("buildVideoGraph", () => {
         const graph = buildVideoGraph(segmentsFor(composition), W, H, FPS);
         assert.ok(graph.includes("offset=2.500[x1]"), graph);
         assert.ok(graph.includes("[x1][v2]xfade=transition=fade:duration=1.000:offset=4.500[x2]"), graph);
-        assert.ok(graph.endsWith("[x2]null[outv]"), graph);
+        assert.ok(graph.endsWith("[x2]format=yuv420p[outv]"), graph);
     });
 
     it("mixes cuts and fades in one chain", () => {
@@ -246,5 +246,63 @@ describe("planClips", () => {
         const { plans } = planFor([{ ms: 1001 }, { ms: 1001, fade: 500 }]);
         assert.ok(plans[1].overlapFrames <= Math.floor(plans[0].frames / 2), JSON.stringify(plans));
         assert.ok(plans[1].startFrames > 0);
+    });
+});
+
+describe("buildVideoGraph with overlays", () => {
+    const overlay = (startMs: number, durationMs: number, index = 0) => ({
+        measured: {
+            clip: { id: `o${index}`, durationMs, source: { kind: "design" as const, revisionId: "cap", transparent: true } },
+            index,
+            startMs,
+            durationMs,
+        },
+        inputArgs: ["-i", `ov${index}/%06d.png`],
+        startSeconds: (startMs / 1000).toFixed(3),
+        endSeconds: ((startMs + durationMs) / 1000).toFixed(3),
+    });
+
+    it("composites an overlay over the finished picture, in its own window", () => {
+        const segments = segmentsFor(comp([{ ms: 6000 }]));
+        const graph = buildVideoGraph(segments, W, H, FPS, [overlay(1000, 2000)]);
+        assert.ok(graph.includes("[v0][ov0]overlay=0:0:eof_action=pass"), graph);
+        assert.ok(graph.includes("enable='between(t,1.000,3.000)'"), graph);
+    });
+
+    // Without eof_action=pass the output ENDS when the shortest overlay does —
+    // a video silently truncated to the length of its caption.
+    it("keeps the picture running past the end of the overlay", () => {
+        const graph = buildVideoGraph(segmentsFor(comp([{ ms: 6000 }])), W, H, FPS, [overlay(0, 500)]);
+        assert.ok(graph.includes("eof_action=pass"), graph);
+    });
+
+    // An opaque pad turns the overlay into a rectangle that hides the picture.
+    it("pads the overlay with transparent black and keeps its alpha", () => {
+        const graph = buildVideoGraph(segmentsFor(comp([{ ms: 3000 }])), W, H, FPS, [overlay(0, 1000)]);
+        assert.ok(graph.includes("color=black@0"), graph);
+        assert.ok(graph.includes("format=rgba"), graph);
+    });
+
+    it("chains several overlays in order and still ends on [outv]", () => {
+        const graph = buildVideoGraph(segmentsFor(comp([{ ms: 9000 }])), W, H, FPS, [
+            overlay(0, 1000, 0),
+            overlay(4000, 1000, 1),
+        ]);
+        assert.ok(graph.includes("[v0][ov0]overlay"), graph);
+        assert.ok(graph.includes("[ovr0][ov1]overlay"), graph);
+        assert.ok(graph.endsWith("[ovr1]format=yuv420p[outv]"), graph);
+    });
+
+    it("numbers an overlay's input after every clip input", () => {
+        // Off-by-the-overlay-count here filters the wrong stream, and the
+        // audio stage's own index is computed from the same total.
+        const segments = segmentsFor(comp([{ ms: 1000 }, { ms: 1000 }, { ms: 1000 }]));
+        const graph = buildVideoGraph(segments, W, H, FPS, [overlay(0, 500, 0)]);
+        assert.ok(graph.includes("[3:v]scale="), graph);
+    });
+
+    it("converts back to a chroma format the encoder takes", () => {
+        const graph = buildVideoGraph(segmentsFor(comp([{ ms: 1000 }])), W, H, FPS, [overlay(0, 500)]);
+        assert.ok(graph.endsWith("format=yuv420p[outv]"), graph);
     });
 });

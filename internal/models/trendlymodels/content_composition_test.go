@@ -272,14 +272,40 @@ func TestValidateComposition(t *testing.T) {
 		t.Error("duplicate clip ids must be rejected — a UI keys on them")
 	}
 
-	// Honest refusals rather than a silently different render.
+	// Placed audio clips are still ahead of us; overlays are not.
 	notYet := fatalPaths(&Composition{Width: 1080, Height: 1920, FPS: 30, Tracks: []CompositionTrack{
 		{Kind: CompositionTrackVideo, Clips: []CompositionClip{{ID: "a", DurationMs: 1000, Source: designSource("r")}}},
-		{Kind: CompositionTrackOverlay, Clips: []CompositionClip{{ID: "o", DurationMs: 100, Source: designSource("r")}}},
 		{Kind: CompositionTrackAudio, Clips: []CompositionClip{{ID: "s", DurationMs: 100, Source: designSource("r")}}},
 	}})
-	if !notYet["tracks.overlay"] || !notYet["tracks.audio"] {
-		t.Errorf("overlay and placed audio must be refused plainly, got %+v", notYet)
+	if !notYet["tracks.audio"] {
+		t.Errorf("placed audio must still be refused plainly, got %+v", notYet)
+	}
+
+	// An overlay IS a transparent design — anything else is a different feature.
+	overlay := func(clip CompositionClip) map[string]bool {
+		return fatalPaths(&Composition{Width: 1080, Height: 1920, FPS: 30, Tracks: []CompositionTrack{
+			{Kind: CompositionTrackVideo, Clips: []CompositionClip{{ID: "a", DurationMs: 4000, Source: designSource("r")}}},
+			{Kind: CompositionTrackOverlay, Clips: []CompositionClip{clip}},
+		}})
+	}
+	good := overlay(CompositionClip{ID: "cap", StartMs: 500, DurationMs: 2000,
+		Source: CompositionClipSource{Kind: ClipSourceDesign, RevisionID: "cap", Transparent: true}})
+	if len(good) != 0 {
+		t.Errorf("a transparent design overlay should pass, got %+v", good)
+	}
+	if p := overlay(CompositionClip{ID: "c", DurationMs: 1000,
+		Source: CompositionClipSource{Kind: ClipSourceImage, URL: "u"}}); !p["tracks.overlay.clips[0].source"] {
+		t.Errorf("a non-design overlay must be refused, got %+v", p)
+	}
+	if p := overlay(CompositionClip{ID: "c", DurationMs: 1000,
+		Source: designSource("r")}); !p["tracks.overlay.clips[0].source.transparent"] {
+		t.Errorf("an opaque overlay must be refused, got %+v", p)
+	}
+
+	// And a transparent design on the VIDEO track points at the right track.
+	if p := fatalPaths(comp(CompositionClip{ID: "a", DurationMs: 1000,
+		Source: CompositionClipSource{Kind: ClipSourceDesign, RevisionID: "r", Transparent: true}})); !p["tracks.video.clips[0].source.transparent"] {
+		t.Errorf("a transparent design on the video track must be refused, got %+v", p)
 	}
 
 	bad := comp(CompositionClip{ID: "a", DurationMs: 1000, Source: designSource("r")})
@@ -358,5 +384,40 @@ func TestCompositionDecodedMsCountsSourceTimeNotTimelineTime(t *testing.T) {
 		if got := CompositionDecodedMs(comp(tc.clip)); got != tc.want {
 			t.Errorf("%s: got %dms, want %dms", tc.label, got, tc.want)
 		}
+	}
+}
+
+func TestOverlayClipsKeepTheirAuthoredStart(t *testing.T) {
+	transparent := func(id string) CompositionClipSource {
+		return CompositionClipSource{Kind: ClipSourceDesign, RevisionID: id, Transparent: true}
+	}
+	c := &Composition{Width: 1080, Height: 1920, FPS: 30, Tracks: []CompositionTrack{
+		{Kind: CompositionTrackVideo, Clips: []CompositionClip{{ID: "v", DurationMs: 10000, Source: designSource("v")}}},
+		{Kind: CompositionTrackOverlay, Clips: []CompositionClip{
+			{ID: "b", StartMs: 6000, DurationMs: 1500, Source: transparent("b")},
+			{ID: "a", StartMs: 1000, DurationMs: 2000, Source: transparent("a")},
+		}},
+	}}
+
+	// Sorted by start, not document order, so the graph composites them in the
+	// order they appear.
+	got := OverlayClips(c)
+	if len(got) != 2 || got[0].ID != "a" || got[1].ID != "b" {
+		t.Fatalf("got %+v", got)
+	}
+
+	// StampDerived restamps the VIDEO track only. Restamping overlays would
+	// move every caption to the start of the timeline.
+	c.StampDerived()
+	after := OverlayClips(c)
+	if after[0].StartMs != 1000 || after[1].StartMs != 6000 {
+		t.Errorf("overlay starts were restamped: %d, %d", after[0].StartMs, after[1].StartMs)
+	}
+
+	if OverlayClips(nil) != nil {
+		t.Error("a nil composition has no overlays")
+	}
+	if got := OverlayClips(comp(CompositionClip{ID: "a", DurationMs: 1, Source: designSource("r")})); got != nil {
+		t.Errorf("a composition with no overlay track has no overlays, got %+v", got)
 	}
 }

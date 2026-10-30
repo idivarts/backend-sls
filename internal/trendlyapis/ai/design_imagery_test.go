@@ -62,7 +62,7 @@ func TestCollectPlaceholdersPrefersStock(t *testing.T) {
 
 func TestFillDesignImageryLeavesDocumentAloneWithNoPlaceholders(t *testing.T) {
 	in := `<!doctype html><html><head></head><body><section data-slide><h1>Hi</h1></section></body></html>`
-	out, res := fillDesignImagery(context.Background(), "brand", "4:5", in)
+	out, res := fillDesignImagery(context.Background(), "brand", "content-1", "4:5", in)
 	if out != in {
 		t.Error("a document with no placeholders must be returned byte-identical")
 	}
@@ -76,7 +76,7 @@ func TestFillDesignImageryKeepsUnresolvedPlaceholders(t *testing.T) {
 	// resolves — and the placeholder must survive. Deleting it would silently
 	// change the layout the model designed, with nothing to point at.
 	in := `<!doctype html><html><body><img data-stock="a street at dusk" data-el="bg"></body></html>`
-	out, res := fillDesignImagery(context.Background(), "brand-does-not-exist", "4:5", in)
+	out, res := fillDesignImagery(context.Background(), "brand-does-not-exist", "content-1", "4:5", in)
 	if !strings.Contains(out, `data-stock="a street at dusk"`) {
 		t.Error("unresolved placeholder was dropped from the document")
 	}
@@ -280,7 +280,7 @@ func TestResolveStockHotlinksAndReportsThePlacementOnce(t *testing.T) {
 	})
 	t.Setenv("STOCK_PROVIDER", "fake-stock")
 
-	src, alt, credit, creditURL := resolveStock(context.Background(), "brand-1", "a cat", "1:1")
+	src, alt, credit, creditURL := resolveStock(context.Background(), "brand-1", "content-1", "a cat", "1:1")
 
 	// Hotlinked: the URL is used as-is. Copying it would be a material breach
 	// of the API terms, and any rewrite here is the symptom.
@@ -305,7 +305,7 @@ func TestResolveStockSurvivesAProviderWithNothingToGive(t *testing.T) {
 	// A missing key or no match leaves the placeholder alone rather than
 	// failing the design — an <img> with no src is a visible gap the user can
 	// ask about, which beats a layout quietly changed.
-	src, _, credit, _ := resolveStock(context.Background(), "brand-1", "a cat", "1:1")
+	src, _, credit, _ := resolveStock(context.Background(), "brand-1", "content-1", "a cat", "1:1")
 	if src != "" || credit != "" {
 		t.Errorf("want empty results, got %q / %q", src, credit)
 	}

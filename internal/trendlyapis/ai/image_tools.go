@@ -170,6 +170,18 @@ func runChatImageTool(ctx context.Context, brandID, orgID, contentID, connID, co
 	for _, asset := range res.Assets {
 		if s3url, uerr := hostAsset(asset.URL, brandID); uerr == nil && s3url != "" {
 			urls = append(urls, s3url)
+			// Into the brand's library as well as onto this post. An image
+			// generated while editing one content is reusable in another, and
+			// it is only reusable if something recorded it.
+			recordLibraryAsset(ctx, brandID, &trendlymodels.Asset{
+				Kind:            trendlymodels.AssetKindImage,
+				Source:          trendlymodels.AssetSourceGenerated,
+				URL:             s3url,
+				MimeType:        asset.MimeType,
+				Title:           prompt,
+				Provider:        "openrouter",
+				OriginContentID: contentID,
+			})
 		}
 	}
 	if len(urls) == 0 {

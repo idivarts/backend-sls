@@ -24,6 +24,8 @@ import { config } from "./config";
 
 export interface LoadedDesign {
     page: Page;
+    /** True when this design was loaded for transparent capture. */
+    transparent: boolean;
     close: () => Promise<void>;
     measurement: Awaited<ReturnType<typeof measure>>;
     rects: { x: number; y: number; width: number; height: number }[];
@@ -58,7 +60,12 @@ export async function loadDesign(
     // Overrides config.scale. The preview path renders small on purpose, so
     // Chromium paints once at the size we want instead of painting full size
     // and throwing most of the pixels away.
-    scale?: number
+    scale?: number,
+    // Capture with no page background, so the design composites over whatever
+    // is beneath it. An overlay — captions, a lower third, a logo bug — is just
+    // a design captured this way, which is what lets it inherit the brand's
+    // fonts, the palette and the editor for free.
+    transparent = false
 ): Promise<LoadedDesign> {
     const { url, server } = await serve(html);
 
@@ -74,6 +81,23 @@ export async function loadDesign(
 
     await page.goto(url, { waitUntil: "load", timeout: 60_000 });
 
+    // omitBackground alone is not enough. It drops the BROWSER's base canvas,
+    // but html/body keep whatever background the document gave them — and the
+    // design prompt has every scene paint one. Clearing them is what actually
+    // leaves the type and the logo on transparent pixels.
+    if (transparent) {
+        await page.evaluate(() => {
+            for (const el of [document.documentElement, document.body]) {
+                el.style.background = "transparent";
+                el.style.backgroundColor = "transparent";
+            }
+            document.querySelectorAll("[data-slide]").forEach((n) => {
+                (n as HTMLElement).style.background = "transparent";
+                (n as HTMLElement).style.backgroundColor = "transparent";
+            });
+        });
+    }
+
     // Strip editor chrome and the preview's display transform BEFORE measuring,
     // so the boxes we read are the design's real layout, not a scaled-down one.
     await page.evaluate(prepareForCapture);
@@ -84,6 +108,7 @@ export async function loadDesign(
 
     return {
         page,
+        transparent,
         measurement,
         rects,
         close: async () => {

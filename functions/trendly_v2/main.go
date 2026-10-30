@@ -5,6 +5,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/trendlyapis"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/admin"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/analytics"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/assets"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/inbox"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/publishing"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
@@ -87,6 +88,12 @@ func handleManagerAPIs() {
 	// Queues a render of the content's current design revision and returns 202;
 	// the app watches renderStatus on the revision it already subscribes to.
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/render", rendering.StartRender)
+
+	// The brand's media library. One endpoint for every surface that offers the
+	// user something to pick, so they cannot disagree about what exists.
+	managerApisV1.GET("/brands/:brandId/assets", assets.ListAssets)
+	managerApisV1.POST("/brands/:brandId/assets", assets.RecordAsset)
+	managerApisV1.DELETE("/brands/:brandId/assets/:assetId", assets.DeleteAsset)
 
 	// ── Public sharing (Branch deep links for a share token) ──────────────────
 	// The token + `enabled` toggle are owned by the app (it writes shareLinks/

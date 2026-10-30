@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
@@ -12,37 +11,43 @@ func mediaLibrary() Registered {
 	return Registered{
 		Tool: openrouter.NewFunctionTool(
 			"get_media_library",
-			"Aggregate reusable media attachments (images/videos) across the brand's content from roughly the last year, so you can reuse existing assets instead of generating new ones.",
+			"List the brand's reusable media library — uploads, stock photography and generated images — so you can reuse an existing asset instead of making a new one. Assets are brand-wide: one uploaded while editing any post is available to every post.",
 			openrouter.ObjectSchema(map[string]any{
+				"source": openrouter.EnumProp(
+					"Optional filter by where the asset came from.",
+					[]string{"brand", "upload", "stock", "generated"}),
 				"limit": openrouter.NumberProp("Max assets to return (default 40)."),
 			}, nil),
 		),
 		Handler: func(ctx context.Context, brandID string, args map[string]any) (any, error) {
-			now := time.Now().UTC()
-			start := now.AddDate(-1, 0, 0).UnixMilli()
-			end := now.AddDate(0, 3, 0).UnixMilli()
-			items, err := trendlymodels.ListContentInRange(ctx, brandID, start, end, true)
+			limit := argInt(args, "limit", 40)
+			list, err := trendlymodels.ListBrandAssets(ctx, brandID, argStr(args, "source"), limit)
 			if err != nil {
 				return nil, err
 			}
-			limit := argInt(args, "limit", 40)
-			out := make([]map[string]any, 0, limit)
-			for _, ct := range items {
-				for _, a := range ct.Attachments {
-					if len(out) >= limit {
-						break
-					}
-					url := a.ImageURL
-					if url == "" {
-						url = a.PlayURL
-					}
-					if url == "" {
-						continue
-					}
-					out = append(out, map[string]any{
-						"contentId": ct.ID, "title": ct.Title, "type": a.Type, "url": url,
-					})
+			out := make([]map[string]any, 0, len(list))
+			for _, a := range list {
+				row := map[string]any{
+					"url": a.URL, "kind": a.Kind, "source": a.Source,
 				}
+				// Only what is actually set, so a long list stays cheap to read.
+				for k, v := range map[string]string{
+					"id": a.ID, "title": a.Title, "alt": a.Alt,
+					"contentId": a.OriginContentID, "credit": a.Attribution,
+				} {
+					if v != "" {
+						row[k] = v
+					}
+				}
+				// The model must know this BEFORE it proposes using a photo as
+				// a reference, or it will suggest something the generation path
+				// then refuses — which reads to the user as a broken feature
+				// rather than a licence.
+				if a.NoAIInput {
+					row["usableAsReference"] = false
+					row["note"] = "licensed for placing in a design, but NOT as an input to image generation"
+				}
+				out = append(out, row)
 			}
 			return map[string]any{"count": len(out), "assets": out}, nil
 		},
