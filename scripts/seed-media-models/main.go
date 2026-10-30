@@ -28,6 +28,11 @@
 // rates, which is what EstUSDPerSecond is for; the measured figure above is the
 // floor the code falls back to when a row carries no price at all.
 //
+// ⚠️ A ROW'S DOCUMENT ID *IS* THE PROVIDER'S model_id. It is what gets sent on
+// the wire, so a tidier-looking id — "eleven-music-v1" for what ElevenLabs
+// calls "music_v2" — is not a naming choice, it is a 422 on every generation
+// that model serves. The display name is the place for anything readable.
+//
 // Model ids come from the API itself: POST an unknown model_id and the 422
 // enumerates every valid tag. That costs nothing, where guessing at a real one
 // can cost a generation.
@@ -85,7 +90,7 @@ func catalog() []trendlymodels.MediaModel {
 		videoRow("creatify-aurora", "Creatify Aurora", 0.20, false),
 
 		{
-			ID: "eleven-music-v1", Provider: "elevenlabs",
+			ID: "music_v2", Provider: "elevenlabs",
 			DisplayName: "ElevenLabs Music", Kind: "music",
 			MinDurationS: 3, MaxDurationS: 600,
 			EstUSDPerSecond: 0.0033, Enabled: false,
