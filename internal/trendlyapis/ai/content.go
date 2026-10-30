@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/mediagen"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -553,6 +554,16 @@ func runMediaEnhance(req WSRequest, p imagePayload, model, orgID, convID string,
 		if len(baseImages) > 0 {
 			inputImages = []string{baseImages[0]}
 		}
+	}
+
+	// This path calls the provider directly rather than going through
+	// mediagen.Submit, so the seam's licence gate does not cover it. Checked
+	// explicitly instead: a stock photo whose terms forbid model input must not
+	// become one here just because the call shape is older.
+	if bad, why := mediagen.RestrictedRefs(inputImages); bad {
+		finishMediaTurn(req, p, convID, 0, nil, nil, "Enhanced")
+		wsErrorTo(req.ConnectionID, why)
+		return
 	}
 
 	prompt := buildEnhancePrompt(p.Description, p.Style, provenance, history)

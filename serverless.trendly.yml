@@ -34,6 +34,8 @@ provider:
     # Stock photography for AI-authored designs. Empty means stock placeholders
     # are skipped and the design still lands, just without photography.
     PEXELS_API_KEY: ${env:PEXELS_API_KEY, ''}
+    UNSPLASH_ACCESS_KEY: ${env:UNSPLASH_ACCESS_KEY, ''}
+    STOCK_PROVIDER: ${env:STOCK_PROVIDER, ''}
     CANVA_CLIENT_ID: ${env:CANVA_CLIENT_ID, ''}
     CANVA_CLIENT_SECRET: ${env:CANVA_CLIENT_SECRET, ''}
     CANVA_REDIRECT_URI: ${env:CANVA_REDIRECT_URI, 'https://be.trendly.now/api/integrations/canva/callback'}

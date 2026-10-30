@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -116,11 +117,31 @@ type Asset struct {
 	MimeType string
 	Width    int
 	Height   int
+	// Alt is the source's own description, for the img alt text. A stock photo
+	// arrives with one; generated media does not.
+	Alt string
 	// Attribution must travel with the asset and surface on publish where the
 	// source requires it. Empty for generated media.
 	Attribution string
 	// SourceURL is the asset's page at its origin, for a credit link.
 	SourceURL string
+	// CreatorURL links the person who made it. Some sources require the credit
+	// to point HERE rather than at the asset's page, and to carry a referral
+	// tag — the driver is what knows which, so it arrives already formed.
+	CreatorURL string
+
+	// Hotlink means this asset must be used at the URL above and NOT copied to
+	// our own storage. It inverts the rule stated at the top of this type, so a
+	// caller that hosts unconditionally would be in breach rather than merely
+	// wasteful.
+	Hotlink bool
+	// NoAIInput means this asset's licence forbids feeding it to a model. The
+	// generation path refuses such a URL outright; see RestrictedRef.
+	NoAIInput bool
+	// TrackingRef is an opaque handle some sources require the app to report
+	// back when the asset is actually USED, as opposed to merely found. Hand it
+	// to ReportUsed; never interpret it here.
+	TrackingRef string
 }
 
 // Provider is one backend for one or more Kinds.
@@ -137,9 +158,32 @@ type Provider interface {
 	Get(ctx context.Context, jobID string) (Result, error)
 }
 
+// UsageReporter is implemented by a provider whose terms require the app to
+// report that an asset was actually used — distinct from having searched for
+// it. Optional: a provider that does not implement it is simply never asked.
+type UsageReporter interface {
+	ReportUsed(ctx context.Context, a Asset) error
+}
+
+// RefGuard is implemented by a provider whose assets may not be fed to a model.
+// It reports whether a URL is one of its own restricted assets, and why, in a
+// sentence a user can act on.
+//
+// A URL, rather than an Asset, because that is all a reference ever is by the
+// time it reaches generation: the model hands back a string it was given. That
+// is also why hotlinking turns out to matter twice — an asset kept at its
+// origin carries its own provenance, while one copied into our storage would be
+// indistinguishable from a user's upload and could not be guarded at all.
+type RefGuard interface {
+	RestrictedRef(url string) (bool, string)
+}
+
 var (
 	// ErrNoProvider means nothing is registered that can serve the Spec.
 	ErrNoProvider = errors.New("mediagen: no provider for this kind")
+	// ErrRestrictedRef means a reference input is licensed in a way that
+	// forbids model input. Its message is user-facing.
+	ErrRestrictedRef = errors.New("mediagen: this image cannot be used as a generation reference")
 	// ErrNotAsynchronous is returned by Get on a provider whose work completes
 	// inside Submit.
 	ErrNotAsynchronous = errors.New("mediagen: provider has no async jobs")
@@ -196,7 +240,100 @@ func Submit(ctx context.Context, provider string, s Spec) (Result, error) {
 	if !p.Supports(s.Kind) {
 		return Result{}, fmt.Errorf("%w: %q does not serve %q", ErrNoProvider, provider, s.Kind)
 	}
+	// Checked HERE rather than at each call site, because the seam is the one
+	// place every generation already passes through. A licence restriction
+	// enforced by convention is enforced until someone adds a caller.
+	if why, bad := restrictedInput(s); bad {
+		return Result{}, fmt.Errorf("%w: %s", ErrRestrictedRef, why)
+	}
 	return p.Submit(ctx, s)
+}
+
+// restrictedInput reports whether any reference input on the Spec comes from a
+// source whose licence forbids model input, and the reason to show the user.
+//
+// Every slot that reaches a model is checked, not just ImageRefs: a start frame
+// and a source video are model input in exactly the same sense, and the
+// restriction is about the content, not the field it arrived in.
+func restrictedInput(s Spec) (string, bool) {
+	refs := make([]string, 0, len(s.ImageRefs)+3)
+	for _, r := range s.ImageRefs {
+		refs = append(refs, r.URL)
+	}
+	for _, r := range []*AssetRef{s.StartFrame, s.EndFrame, s.SourceVideo} {
+		if r != nil {
+			refs = append(refs, r.URL)
+		}
+	}
+	if len(refs) == 0 {
+		return "", false
+	}
+
+	for _, url := range refs {
+		if bad, why := RestrictedRef(url); bad {
+			return why, true
+		}
+	}
+	return "", false
+}
+
+// RestrictedRef reports whether a URL may not be fed to a model, and why.
+//
+// Exported because not every generation goes through Submit yet — the image
+// "enhance" path still calls its provider directly — and a licence gate that
+// only covers some of the ways in is not a gate. Callers outside this package
+// use it to refuse early, with the same sentence the seam would have produced.
+func RestrictedRef(url string) (bool, string) {
+	if strings.TrimSpace(url) == "" {
+		return false, ""
+	}
+	mu.RLock()
+	guards := make([]RefGuard, 0, len(providers))
+	for _, p := range providers {
+		if g, ok := p.(RefGuard); ok {
+			guards = append(guards, g)
+		}
+	}
+	mu.RUnlock()
+
+	for _, g := range guards {
+		if bad, why := g.RestrictedRef(url); bad {
+			return true, why
+		}
+	}
+	return false, ""
+}
+
+// RestrictedRefs is RestrictedRef over a list, returning the first reason.
+func RestrictedRefs(urls []string) (bool, string) {
+	for _, u := range urls {
+		if bad, why := RestrictedRef(u); bad {
+			return true, why
+		}
+	}
+	return false, ""
+}
+
+// ReportUsed tells a provider that an asset was actually used, where its terms
+// require that. A no-op for providers that do not implement UsageReporter, and
+// for an asset carrying no TrackingRef.
+//
+// Deliberately separate from Submit: searching for a photo and PLACING one are
+// different events, and reporting the first as the second would misstate which
+// work is actually being used — which is the whole point of the endpoint.
+func ReportUsed(ctx context.Context, provider string, a Asset) error {
+	if a.TrackingRef == "" {
+		return nil
+	}
+	p, ok := ByName(provider)
+	if !ok {
+		return fmt.Errorf("%w: %q", ErrNoProvider, provider)
+	}
+	r, ok := p.(UsageReporter)
+	if !ok {
+		return nil
+	}
+	return r.ReportUsed(ctx, a)
 }
 
 // Get polls a job on the named provider.

@@ -281,6 +281,15 @@ jobs:
           # still lands, and the tool result tells the model to say so. Adding
           # it there would fail every deploy until the key is provisioned.
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          # Unsplash is the stock provider now: Pexels paused new API key
+          # issuance around 30 Sep 2026, so PEXELS_API_KEY above may never be
+          # filled. Both drivers stay registered and STOCK_PROVIDER picks one
+          # ("unsplash" | "pexels"); left empty, the backend takes whichever
+          # actually holds a key. Same reasoning as above for staying out of the
+          # runtime-secret guard — and note an Unsplash app starts in Demo at 50
+          # requests/hour until the production application is approved.
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          STOCK_PROVIDER: ${{ vars.STOCK_PROVIDER }}
           CANVA_CLIENT_ID: ${{ vars.CANVA_CLIENT_ID }}
           CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
           CANVA_REDIRECT_URI: ${{ vars.CANVA_REDIRECT_URI }}

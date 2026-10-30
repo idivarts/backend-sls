@@ -107,6 +107,10 @@ func designServerTools() []openrouter.Tool {
 				"a scrim behind text that sits over it so the type still reads. Prefer ONE strong "+
 				"photograph per scene over several small ones. A placeholder that cannot be "+
 				"filled renders as nothing, so never make one load-bearing for the layout.\n"+
+				"Do NOT write a photo credit yourself. A stock photo's licence requires one, and "+
+				"the server adds it to the scene automatically in the bottom-left corner — so "+
+				"leave that corner clear of anything you would mind it sitting over, and never "+
+				"invent a photographer's name.\n"+
 				"Return the full HTML in `html`.",
 			openrouter.ObjectSchema(map[string]any{
 				"html":       openrouter.StringProp("The complete self-contained HTML document (a data-carousel with `slides` data-slide sections)."),

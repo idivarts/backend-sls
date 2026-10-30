@@ -45,10 +45,13 @@ func (pexelsDriver) Submit(ctx context.Context, s Spec) (Result, error) {
 
 	out := Result{Status: StatusSucceeded}
 	for _, p := range photos {
-		a := Asset{URL: p.URL, MimeType: "image/jpeg", SourceURL: p.PageURL}
+		a := Asset{URL: p.URL, MimeType: "image/jpeg", Alt: p.Alt, SourceURL: p.PageURL}
 		if p.Photographer != "" {
 			a.Attribution = "Photo by " + p.Photographer + " on Pexels"
+			a.CreatorURL = p.PhotographerURL
 		}
+		// Hotlink stays false: Pexels permits copying, so these keep the
+		// durability a design wants. Only Unsplash's terms force the other way.
 		out.Assets = append(out.Assets, a)
 	}
 	if len(out.Assets) == 0 {
