@@ -82,3 +82,16 @@ describe("a clip's own sound", () => {
         assert.match(stage.filter!, /alimiter=limit=0\.95/);
     });
 });
+
+describe("the clip's own level", () => {
+    it("is applied when it is not full", async () => {
+        const stage = await buildAudioStage(undefined, 6000, 1, [clip({ volume: 0.4 })]);
+        assert.match(stage.filter!, /volume=0\.4/);
+    });
+
+    it("is left out of the chain when it is full", async () => {
+        // Not `volume=1`, which is a filter that does nothing.
+        const stage = await buildAudioStage(undefined, 6000, 1, [clip()]);
+        assert.ok(!/\[0:a\][^;]*volume=/.test(stage.filter!));
+    });
+});

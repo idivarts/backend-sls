@@ -112,6 +112,8 @@ interface Segment {
     hasAudio?: boolean;
     /** Playback speed applied to the picture, so the sound can match it. */
     speed?: number;
+    /** 0..1 on this clip's own audio. 0 means it is not in the mix at all. */
+    volume?: number;
 }
 
 /**
@@ -258,6 +260,7 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
                 filter: local.filter,
                 hasAudio: local.hasAudio,
                 speed: local.speed,
+                volume: local.volume,
             });
         }
 
@@ -299,11 +302,15 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
         let inputIndex = 0;
         for (const seg of segments) {
             const declared = seg.inputArgs.filter((a) => a === "-i").length;
-            if (seg.hasAudio) {
+            // A muted clip is left OUT of the graph rather than mixed at zero:
+            // an input that contributes nothing is still an input to keep in
+            // step, and `volume: 0` is the documented default for footage.
+            if (seg.hasAudio && (seg.volume ?? 1) > 0) {
                 clipAudio.push({
                     inputIndex,
                     startMs: Math.round((seg.plan.startFrames / fps) * 1000),
                     speed: seg.speed,
+                    volume: seg.volume,
                 });
             }
             inputIndex += declared;
@@ -467,6 +474,8 @@ interface StagedInput {
     hasAudio?: boolean;
     /** Playback speed applied to the picture, so the sound can match it. */
     speed?: number;
+    /** 0..1 on this clip's own audio. 0 means it is not in the mix at all. */
+    volume?: number;
 }
 
 /**
@@ -520,6 +529,15 @@ async function stage(
             // mute, and a generated clip only speaks when it was asked to.
             hasAudio: await hasAudioTrack(path),
             speed,
+            // Footage carries an explicit level and its documented default is
+            // SILENT — `cut_footage` sets 0 on every piece whose speech is not
+            // the point, so the cut cannot talk over the music bed. A generated
+            // clip has no such field: asking for `generateAudio` was already
+            // the decision, so sound it was given is sound it keeps.
+            volume:
+                source.kind === "footage"
+                    ? source.volume ?? 0
+                    : 1,
             // -ss before -i seeks by keyframe and is far cheaper than decoding
             // from the top; the trim is a user-facing in-point, not a
             // frame-exact edit, so keyframe accuracy is the right trade.

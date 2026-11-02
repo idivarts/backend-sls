@@ -76,6 +76,8 @@ export interface ClipAudio {
     startMs: number;
     /** Playback speed applied to the picture; the sound has to match it. */
     speed?: number;
+    /** 0..1 on this clip's own audio. Defaults to full. */
+    volume?: number;
 }
 
 /**
@@ -179,7 +181,12 @@ export async function buildAudioStage(
 
     if (clips.length) {
         const laid = clips.map((c, i) => {
-            const chain = [atempoChain(c.speed ?? 1), "asetpts=PTS-STARTPTS"].filter(Boolean);
+            const level = c.volume ?? 1;
+            const chain = [
+                atempoChain(c.speed ?? 1),
+                level === 1 ? "" : `volume=${level}`,
+                "asetpts=PTS-STARTPTS",
+            ].filter(Boolean);
             // Every clip is seeked (`-ss`), so its audio arrives with the
             // source's timestamps. Reset them, then place the clip where the
             // frame-aligned plan put the picture: `adelay` is what keeps sound
