@@ -231,29 +231,41 @@ func decodeGeneration(httpReq *http.Request, op string) (*VideoGeneration, error
 	// surprise. Treating it as a failure would reject a generation that had
 	// already been accepted — and charged for.
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		// Read once, for every branch below. The body is the only place this
+		// API says what it actually refused: a 422 names the field, and an auth
+		// refusal carries a `detail.status` of its own. Keeping it for the
+		// default branch alone is what a 403 on Seedance cost — the guess
+		// reached CloudWatch, the reason did not, and the only way left to
+		// learn it was to spend another generation.
+		detail := bodySnippet(resp.Body)
+
 		// These three all read as "auth is broken" and none of them is, so each
 		// says what it actually means. Measured against a real workspace: a key
 		// that works perfectly well for music and voice returns 402 here,
 		// because generating through the Image & Video API needs a Pro plan or
 		// above — a billing upgrade, not a new key. Sending someone to rotate
 		// credentials over that wastes a morning.
+		//
+		// Each of these is a reading of the status code rather than a quote, so
+		// the body rides along behind it. Where the two disagree, the body is
+		// the one that came from the API.
 		switch resp.StatusCode {
 		case http.StatusPaymentRequired:
 			return nil, fmt.Errorf(
-				"elevenlabs: video %s refused (402) — the workspace needs a Pro plan or above for the Image & Video API",
-				op)
+				"elevenlabs: video %s refused (402) — the workspace needs a Pro plan or above for the Image & Video API: %s",
+				op, detail)
 		case http.StatusUnauthorized, http.StatusForbidden:
 			return nil, fmt.Errorf(
-				"elevenlabs: video %s refused (%d) — the key needs the Image & Video permission",
-				op, resp.StatusCode)
+				"elevenlabs: video %s refused (%d) — likely the key's Image & Video permission: %s",
+				op, resp.StatusCode, detail)
 		}
-		// Everything else carries the body, truncated. A 422 from this API
-		// names the exact field it refused and why — "Extra inputs are not
-		// permitted", "Field required", the valid model tags — and throwing
-		// that away leaves a caller with a status code and no way to learn
-		// what is wrong except by spending another generation.
+		// Everything else carries the body too. A 422 from this API names the
+		// exact field it refused and why — "Extra inputs are not permitted",
+		// "Field required", the valid model tags — and throwing that away
+		// leaves a caller with a status code and no way to learn what is wrong
+		// except by spending another generation.
 		return nil, fmt.Errorf("elevenlabs: video %s returned %d: %s",
-			op, resp.StatusCode, bodySnippet(resp.Body))
+			op, resp.StatusCode, detail)
 	}
 	var out VideoGeneration
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
