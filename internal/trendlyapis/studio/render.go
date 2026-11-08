@@ -121,7 +121,7 @@ func RenderStudio(c *gin.Context) {
 		return
 	}
 
-	if err := rendering.SubmitStudioRender(brandID, contentID, studioID); err != nil {
+	if err := rendering.SubmitStudioRender(brandID, contentID, studioID, req.Force); err != nil {
 		// Logged and reported to Sentry, because the user-facing sentence is
 		// deliberately vague and this was the ONLY record of why a render
 		// refused. Every studio render on dev answered this 502 for want of

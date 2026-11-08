@@ -479,6 +479,30 @@ export async function markStudioRenderFailed(
  * the calendar card reads the pointer and would otherwise keep showing the
  * previous render until something else happened to refresh it.
  */
+/**
+ * A render that is already done, said again.
+ *
+ * ⚠️ A SKIP MUST NOT LEAVE THE DOCUMENT CLAIMING WORK IS PENDING. The caller
+ * queues the studio as `queued` BEFORE dispatching — so the app shows the job
+ * the instant the request returns — and the worker then skips anything that
+ * already has a renderUrl. Those two together left a studio reading `queued`
+ * for ever, with a finished video sitting right beside the status, and the only
+ * way out was another render. The duplicate delivery this skip exists to absorb
+ * is exactly when it happens.
+ */
+export async function markStudioRenderAlreadyDone(
+    brandId: string,
+    contentId: string,
+    studioId: string
+): Promise<void> {
+    await firestore()
+        .doc(`brands/${brandId}/contents/${contentId}/studios/${studioId}`)
+        .set(
+            { renderStatus: RenderStatus.Done, renderError: "", updatedAt: Date.now() },
+            { merge: true }
+        );
+}
+
 export async function setStudioRenderResult(
     brandId: string,
     contentId: string,
