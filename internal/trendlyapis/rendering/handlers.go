@@ -302,13 +302,21 @@ var errNoQueue = errors.New("render queue is not configured for this stage")
 // find them. Nothing about the timeline travels in the job, because a job that
 // described the timeline could describe one that no longer matches the
 // documents.
-func SubmitStudioRender(brandID, contentID, studioID string) error {
+// ⚠️ `force` has to travel. It did not, and the consequence was a re-render
+// that CHARGED AND DID NOTHING: the handler honoured `force` for its own gates
+// and billed the wallet, the job went out with Force false, and the worker —
+// which skips a studio that already has a renderUrl unless forced — logged
+// "already rendered, skipping", exited successfully, and left the studio stuck
+// on `queued` for ever. The user paid and watched a spinner that would never
+// stop. SubmitTarget had carried force all along; only this one dropped it.
+func SubmitStudioRender(brandID, contentID, studioID string, force bool) error {
 	return dispatch(RenderJob{
 		BrandID:    brandID,
 		ContentID:  contentID,
 		RevisionID: studioID,
 		StudioID:   studioID,
 		DocType:    "studio",
+		Force:      force,
 	})
 }
 

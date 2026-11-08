@@ -34,6 +34,7 @@ import {
     getStudioForRender,
     markFailed,
     markStarted,
+    markStudioRenderAlreadyDone,
     markStudioRenderFailed,
     markStudioRenderStarted,
     recordFrameAsset,
@@ -326,9 +327,13 @@ async function runStudioJob(job: RenderJob, startedAt: number): Promise<void> {
     const loaded = await getStudioForRender(brandId, contentId, studioId);
     if (!loaded) throw new Error(`studio ${studioId} not found`);
 
-    // A duplicate queue delivery must not re-render, or re-charge.
+    // A duplicate queue delivery must not re-render, or re-charge. But it must
+    // also not leave the studio claiming to be working: the caller marks it
+    // `queued` before dispatching, so returning here without settling the
+    // status stranded it on "queued" with a finished video beside it.
     if (loaded.studio.renderUrl && !job.force) {
         console.log(`[render] studio ${studioId} already rendered, skipping`);
+        await markStudioRenderAlreadyDone(brandId, contentId, studioId).catch(() => undefined);
         return;
     }
 
