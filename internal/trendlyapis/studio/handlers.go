@@ -1,8 +1,10 @@
 package studio
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
@@ -100,10 +102,84 @@ func OpenStudio(c *gin.Context) {
 		return
 	}
 	s.ID = id
+
+	// ── The migration off the old design shape ──────────────────────────────
+	//
+	// A design used to be ONE document with N [data-slide] elements inside it,
+	// which is why the old studio could not reorder or regenerate a single
+	// scene. If this content has such a design, its slides become the studio's
+	// first scenes, so opening the studio on existing work shows that work
+	// rather than an empty rail — and the user is not asked to rebuild by hand
+	// something they already made.
+	//
+	// ⚠️ LAZY, AND IT ONLY EVER RUNS ONCE. It happens here, on the one open
+	// that creates the studio, so a studio that already has scenes can never be
+	// overwritten by it. There is deliberately no batch job across every
+	// brand's designs: a migration that rewrites documents nobody is looking at
+	// can only be discovered by its damage, whereas this one is discovered by
+	// the user it just helped. A failure leaves an empty studio and the design
+	// untouched, which is recoverable; the design is never modified or deleted.
+	migrated := migrateDesignIntoStudio(ctx, brandID, contentID, id, content, format)
+
 	_ = trendlymodels.SetContentStudioRef(ctx, brandID, contentID, &trendlymodels.StudioRef{
-		StudioID: id, SceneCount: 0, DurationMs: 0,
+		StudioID: id, SceneCount: migrated, DurationMs: 0,
 	})
+	if migrated > 0 {
+		// Reloaded so the response carries the scenes and the order, rather
+		// than an empty studio the client would have to re-fetch.
+		if fresh, gerr := trendlymodels.GetStudio(ctx, brandID, contentID, id); gerr == nil && fresh != nil {
+			s = fresh
+		}
+	}
 	respondWithStudio(c, brandID, contentID, s)
+}
+
+// migrateDesignIntoStudio turns this content's existing design into scenes.
+// Returns how many scenes it created; 0 means there was nothing to convert.
+func migrateDesignIntoStudio(
+	ctx context.Context,
+	brandID, contentID, studioID string,
+	content *trendlymodels.Content,
+	format string,
+) int {
+	if content.DesignRef == nil || content.DesignRef.RevisionID == "" {
+		return 0
+	}
+	rev, err := trendlymodels.GetDesignRevision(brandID, contentID, content.DesignRef.RevisionID)
+	if err != nil || rev == nil || strings.TrimSpace(rev.HTML) == "" {
+		return 0
+	}
+
+	scenes, err := ScenesFromDesign(rev.HTML, rev.DurationMs, format)
+	if err != nil || len(scenes) == 0 {
+		return 0
+	}
+
+	order := make([]string, 0, len(scenes))
+	for i := range scenes {
+		sc := scenes[i]
+		sceneID, cerr := trendlymodels.CreateStudioScene(ctx, brandID, contentID, studioID, &sc)
+		if cerr != nil {
+			// Stop at the first failure rather than pressing on. A partial
+			// conversion is still the user's work in the right order, and it is
+			// visibly short — whereas skipping a failed slide would silently
+			// drop a scene from the middle of their video.
+			break
+		}
+		order = append(order, sceneID)
+	}
+	if len(order) == 0 {
+		return 0
+	}
+	if uerr := trendlymodels.UpdateStudio(ctx, brandID, contentID, studioID, []firestore.Update{
+		{Path: "sceneOrder", Value: order},
+	}); uerr != nil {
+		// The scenes exist but the order did not land. OrderedScenes appends
+		// anything missing from sceneOrder rather than hiding it, so they are
+		// still reachable — which is exactly why it does that.
+		return len(order)
+	}
+	return len(order)
 }
 
 // GetStudio returns a studio with its scenes, in order, and its real length.
