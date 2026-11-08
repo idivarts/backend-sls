@@ -45,6 +45,7 @@ import {
     type MeasuredClip,
 } from "../../../shared-libs/design/composition-runtime";
 import { buildAudioStage, type ClipAudio } from "./audio";
+import { PLAIN_CROSSFADE, resolveTransition, supportedTransitions } from "./xfade";
 import { hasAudioTrack } from "./ingest";
 import { config } from "./config";
 import { runFfmpeg } from "./encode";
@@ -89,6 +90,14 @@ interface ClipPlan {
     overlapFrames: number;
     /** Its start on the composition timeline, in frames. */
     startFrames: number;
+    /**
+     * Which cross-fade to draw during the overlap, as an xfade name.
+     *
+     * Carried on the plan rather than looked up again from the composition: the
+     * plan is what the graph builder is handed, and a second lookup is a second
+     * chance to pair the wrong clip with the wrong transition.
+     */
+    style?: string;
 }
 
 /** An overlay staged as a transparent frame sequence. */
@@ -138,7 +147,7 @@ function planClips(measurement: CompositionMeasurement): { plans: ClipPlan[]; to
             if (overlapFrames > half) overlapFrames = half;
         }
         const startFrames = clip.index === 0 ? 0 : cursor - overlapFrames;
-        plans.push({ index: clip.index, frames, overlapFrames, startFrames });
+        plans.push({ index: clip.index, frames, overlapFrames, startFrames, style: clip.transition.style });
         cursor = startFrames + frames;
     }
     return { plans, totalFrames: cursor };
@@ -334,7 +343,14 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
         );
         tempFiles.push(...audioStage.tempFiles);
 
-        const videoFilter = buildVideoGraph(segments, width, height, fps, overlays);
+        const videoFilter = buildVideoGraph(
+            segments,
+            width,
+            height,
+            fps,
+            overlays,
+            await supportedTransitions()
+        );
         const filter = audioStage.filter ? `${videoFilter};${audioStage.filter}` : videoFilter;
 
         const args = [
@@ -625,7 +641,11 @@ function buildVideoGraph(
     width: number,
     height: number,
     fps: number,
-    overlays: StagedOverlay[] = []
+    overlays: StagedOverlay[] = [],
+    // Which xfade names this FFmpeg actually has. Passed in rather than probed
+    // here so the graph builder stays a pure function of its inputs — it is
+    // asserted on directly in composition.test.ts.
+    transitions: Set<string> = new Set([PLAIN_CROSSFADE])
 ): string {
     const toSeconds = (frames: number) => (frames / fps).toFixed(3);
     const parts: string[] = [];
@@ -643,8 +663,12 @@ function buildVideoGraph(
         if (overlap > 0) {
             const offset = toSeconds(segments[i].plan.startFrames);
             const duration = toSeconds(overlap);
+            // The transition the studio asked for, if this build has it. It was
+            // `fade` always, which is why a wipe, a dip to black and a whip all
+            // published as the same cross-fade.
+            const style = resolveTransition(segments[i].plan.style, transitions);
             parts.push(
-                `[${acc}][v${i}]xfade=transition=fade:duration=${duration}:offset=${offset}[${next}]`
+                `[${acc}][v${i}]xfade=transition=${style}:duration=${duration}:offset=${offset}[${next}]`
             );
         } else {
             parts.push(`[${acc}][v${i}]concat=n=2:v=1:a=0[${next}]`);
