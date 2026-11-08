@@ -471,6 +471,24 @@ functions:
       # silently no-op enqueue happened before with SOCIAL_SYNC_QUEUE_URL.
       STUDIO_JOB_QUEUE_URL:
         Ref: StudioJobQueue
+      # ⚠️ The studio's Render button dispatches to AWS Batch, and these two
+      # were missing — so `submitBatchJob` returned errNoQueue and EVERY studio
+      # render answered 502 `dispatch_failed`. It has never worked.
+      #
+      # Which is precisely the failure the comment above warns about, one
+      # function later: the queue and the job definition both exist, the IAM
+      # grant for batch:SubmitJob is provider-wide so every function already
+      # had permission, and the only missing thing was telling THIS function
+      # their names. Nothing failed at deploy time and nothing logged a cause;
+      # the render just refused, with a message about trying again.
+      #
+      # `render-preflight` made it worse by answering `renderable: true` — it
+      # only inspects the studio, so it cheerfully approved a render that the
+      # very next call could not start.
+      VIDEO_RENDER_JOB_QUEUE:
+        Ref: RenderJobQueue
+      VIDEO_RENDER_JOB_DEFINITION:
+        Ref: RenderJobDefinition
   trendly_matchmaking_apis:
     handler: functions/trendly_matchmaking/main.go
     package:

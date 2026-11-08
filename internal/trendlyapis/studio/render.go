@@ -25,12 +25,14 @@ package studio
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
+	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
 
 type renderStudioRequest struct {
@@ -120,6 +122,19 @@ func RenderStudio(c *gin.Context) {
 	}
 
 	if err := rendering.SubmitStudioRender(brandID, contentID, studioID); err != nil {
+		// Logged and reported to Sentry, because the user-facing sentence is
+		// deliberately vague and this was the ONLY record of why a render
+		// refused. Every studio render on dev answered this 502 for want of
+		// two environment variables, and the logs said nothing at all — the
+		// cause had to be found by reading `submitBatchJob` and then checking
+		// the deployed function's configuration by hand.
+		log.Printf("studio render dispatch failed for %s/%s/%s: %v",
+			brandID, contentID, studioID, err)
+		mysentry.Capture(err, map[string]string{
+			"op":       "studio.render.dispatch",
+			"brandId":  brandID,
+			"studioId": studioID,
+		})
 		_ = trendlymodels.MarkStudioRenderFailed(ctx, brandID, contentID, studioID,
 			"We couldn't start the render. Please try again.")
 		c.JSON(http.StatusBadGateway, gin.H{
