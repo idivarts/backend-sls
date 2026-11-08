@@ -446,11 +446,23 @@ func DeleteStudio(ctx context.Context, brandID, contentID, studioID string) erro
 		return err
 	}
 	for _, sc := range scenes {
-		if len(sc.MediaIDs) > 0 {
-			_ = AdjustAssetRefCounts(ctx, brandID, sc.MediaIDs, -1)
-		}
+		// Delete FIRST, release the media SECOND — the order DeleteStudioScene
+		// already uses, and the only safe one.
+		//
+		// Reversed, a scene delete that fails after the decrement leaves the
+		// count too LOW while the scene still references the media, and a
+		// sweep is then free to archive something a live scene is showing.
+		// This way the failure leaves the count too HIGH, which only makes
+		// the media un-archivable until someone fixes it by hand.
+		//
+		// Un-archivable is an inconvenience; archived-while-in-use loses the
+		// user's work. When a counter cannot be updated atomically with the
+		// thing it counts, it should fail toward the recoverable side.
 		if _, derr := scenesCollection(brandID, contentID, studioID).Doc(sc.ID).Delete(ctx); derr != nil {
 			return derr
+		}
+		if len(sc.MediaIDs) > 0 {
+			_ = AdjustAssetRefCounts(ctx, brandID, sc.MediaIDs, -1)
 		}
 	}
 	_, err = studioDoc(brandID, contentID, studioID).Delete(ctx)
