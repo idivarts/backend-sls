@@ -92,14 +92,14 @@ export interface IngestJob {
     url: string;
 }
 
-/** Soundtrack to mux into a video render. */
-export interface ContentAudio {
-    musicUrl?: string;
-    voiceoverUrl?: string;
-    musicVolume?: number;
-    voiceoverVolume?: number;
-    duckMusic?: boolean;
-}
+/**
+ * Soundtrack to mux into a video render.
+ *
+ * Shared with the studio conversion rather than declared twice: a studio's
+ * sound arrives here as `placements`, and the renderer must not be able to
+ * learn about a field the conversion does not produce.
+ */
+export type { CompositionAudio as ContentAudio } from "../../../shared-libs/design/composition-runtime";
 
 export interface RenderResult {
     /** Public CDN urls, slide order for images; one entry for video. */

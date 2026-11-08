@@ -1,6 +1,8 @@
 package trendlymodels
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/firestore"
@@ -160,5 +162,99 @@ func TestUpdateSceneRefusesLayerWrites(t *testing.T) {
 			[]firestore.Update{{Path: path, Value: 1}}); err == nil {
 			t.Errorf("should refuse a %q write", path)
 		}
+	}
+}
+
+// ── The narration's audio is a media reference too ─────────────────────────
+//
+// It was not counted, which meant the one thing in the studio the brand has
+// actually paid cash for — a generated voiceover — sat at refCount 0 while a
+// scene was speaking it, free for an archive sweep to take. That mattered less
+// while the export ignored the voice entirely; now that the export reads it and
+// REFUSES to render a scene whose line has gone, an archived voiceover turns
+// from silent loss into a blocked publish.
+func TestSceneMediaIDsCountsTheSpokenLine(t *testing.T) {
+	sc := &StudioScene{
+		Layers:    []StudioLayer{{ID: "l1", Kind: "media", MediaID: "pic"}},
+		Narration: &SceneNarration{Line: "A line.", MediaID: "vo1"},
+	}
+	got := SceneMediaIDs(sc)
+	if len(got) != 2 || got[0] != "pic" || got[1] != "vo1" {
+		t.Fatalf("got %v, want [pic vo1]", got)
+	}
+
+	// A line nobody has generated yet is the ordinary state of a new scene and
+	// references nothing.
+	bare := &StudioScene{
+		Layers:    []StudioLayer{{ID: "l1", Kind: "media", MediaID: "pic"}},
+		Narration: &SceneNarration{Line: "A line."},
+	}
+	if got := SceneMediaIDs(bare); len(got) != 1 || got[0] != "pic" {
+		t.Errorf("an ungenerated line references nothing, got %v", got)
+	}
+
+	// The same row as both picture and voice is one reference to count.
+	same := &StudioScene{
+		Layers:    []StudioLayer{{ID: "l1", Kind: "media", MediaID: "x"}},
+		Narration: &SceneNarration{Line: "A line.", MediaID: "x"},
+	}
+	if got := SceneMediaIDs(same); len(got) != 1 {
+		t.Errorf("one row used twice is one reference, got %v", got)
+	}
+}
+
+// ⚠️ THE TRAP THIS LOCKS SHUT. SetSceneLayers computes the new reference set
+// from a scene it builds itself, and that scene used to be `{Layers: layers}`.
+// The moment SceneMediaIDs started counting the narration, a `next` built from
+// layers alone described a scene with no voice — so editing a scene's PICTURES
+// would have released its voiceover, and the next archive sweep would have
+// deleted the audio of a scene that still spoke.
+func TestLayerEditDoesNotReleaseTheVoiceover(t *testing.T) {
+	before := &StudioScene{
+		Layers:    []StudioLayer{{ID: "l1", Kind: "media", MediaID: "old"}},
+		Narration: &SceneNarration{Line: "A line.", MediaID: "vo1"},
+	}
+	// Exactly what SetSceneLayers builds, narration carried across.
+	next := &StudioScene{
+		Layers:    []StudioLayer{{ID: "l1", Kind: "media", MediaID: "new"}},
+		Narration: before.Narration,
+	}
+
+	_, removed := diffStrings(SceneMediaIDs(before), SceneMediaIDs(next))
+	for _, id := range removed {
+		if id == "vo1" {
+			t.Fatalf("swapping a picture released the voiceover: removed %v", removed)
+		}
+	}
+	if len(removed) != 1 || removed[0] != "old" {
+		t.Errorf("only the replaced picture should be released, got %v", removed)
+	}
+}
+
+// Same shape as the studio-level audio guard, and for the same reason: without
+// it, the next handler to write `narration` through the generic updater
+// reopens the hole, and the symptom appears weeks later nowhere near the cause.
+//
+// ⚠️ Asserts on the error's TEXT. With no credentials the Firestore call fails
+// regardless, so `err != nil` alone would pass with the guard deleted.
+func TestUpdateStudioSceneRefusesNarration(t *testing.T) {
+	refused := func(t *testing.T, u firestore.Update, label string) {
+		t.Helper()
+		err := UpdateStudioScene(context.Background(), "b", "c", "s", "sc", []firestore.Update{u})
+		if err == nil || !strings.Contains(err.Error(), "SetSceneNarration") {
+			t.Errorf("UpdateStudioScene should refuse %s by the guard, got %v", label, err)
+		}
+	}
+	refused(t, firestore.Update{Path: "narration", Value: nil}, "Path narration")
+	// Firestore treats a FieldPath slice identically, so a guard that only
+	// knows dotted strings is one a caller walks straight past.
+	refused(t, firestore.Update{FieldPath: firestore.FieldPath{"narration"}, Value: nil}, "FieldPath narration")
+
+	// A scene's own settings still go the light way. This reaches Firestore and
+	// fails there; the assertion is only that the guard did not stop it.
+	err := UpdateStudioScene(context.Background(), "b", "c", "s", "sc",
+		[]firestore.Update{{Path: "durationMs", Value: 1000}})
+	if err != nil && strings.Contains(err.Error(), "SetSceneNarration") {
+		t.Errorf("durationMs should not be refused by the guard: %v", err)
 	}
 }

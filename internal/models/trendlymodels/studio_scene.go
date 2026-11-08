@@ -189,7 +189,11 @@ func SetSceneLayers(ctx context.Context, brandID, contentID, studioID, sceneID s
 	if layers == nil {
 		layers = []StudioLayer{}
 	}
-	next := &StudioScene{Layers: layers}
+	// The narration comes along even though this call does not touch it:
+	// SceneMediaIDs counts the spoken line's audio, and a `next` built from
+	// layers alone describes a scene with no voice — so the diff below would
+	// release the voiceover of any scene whose pictures were edited.
+	next := &StudioScene{Layers: layers, Narration: before.Narration}
 	nextIDs := SceneMediaIDs(next)
 
 	updates := []firestore.Update{
@@ -225,8 +229,11 @@ func UpdateStudioScene(ctx context.Context, brandID, contentID, studioID, sceneI
 	for _, u := range updates {
 		// Both spellings — see updatePath. This guard predates that helper and
 		// had the same hole.
-		if p := updatePath(u); p == "layers" || p == "mediaIds" {
+		switch p := updatePath(u); p {
+		case "layers", "mediaIds":
 			return fmt.Errorf("UpdateStudioScene: %q moves media reference counts; use SetSceneLayers", p)
+		case "narration":
+			return fmt.Errorf("UpdateStudioScene: %q moves media reference counts; use SetSceneNarration", p)
 		}
 	}
 	updates = append(updates, firestore.Update{Path: "updatedAt", Value: time.Now().UnixMilli()})
@@ -264,22 +271,79 @@ func DeleteStudioScene(ctx context.Context, brandID, contentID, studioID, sceneI
 	return nil
 }
 
+// SetSceneNarration replaces a scene's spoken line and moves the reference
+// count of the audio it points at.
+//
+// Narration goes through its own function for the same reason layers do: the
+// line carries a mediaId, so writing it changes which assets the scene holds a
+// reference to, and the only correct way to move a count is by the DIFFERENCE
+// between what was there and what is there now. Clearing and re-adding would
+// drop an unchanged voiceover to zero for an instant, and an archive sweep
+// landing in that instant deletes something a scene is speaking.
+//
+// A nil narration clears the line, which releases its audio.
+func SetSceneNarration(ctx context.Context, brandID, contentID, studioID, sceneID string,
+	narration *SceneNarration) error {
+
+	before, err := GetStudioScene(ctx, brandID, contentID, studioID, sceneID)
+	if err != nil {
+		return err
+	}
+	if before == nil {
+		return fmt.Errorf("SetSceneNarration: no scene %s", sceneID)
+	}
+
+	next := &StudioScene{Layers: before.Layers, Narration: narration}
+	nextIDs := SceneMediaIDs(next)
+
+	if _, err := scenesCollection(brandID, contentID, studioID).Doc(sceneID).Update(ctx, []firestore.Update{
+		{Path: "narration", Value: narration},
+		{Path: "mediaIds", Value: nextIDs},
+		{Path: "updatedAt", Value: time.Now().UnixMilli()},
+	}); err != nil {
+		return err
+	}
+
+	added, removed := diffStrings(before.MediaIDs, nextIDs)
+	if len(added) > 0 {
+		_ = AdjustAssetRefCounts(ctx, brandID, added, 1)
+	}
+	if len(removed) > 0 {
+		_ = AdjustAssetRefCounts(ctx, brandID, removed, -1)
+	}
+	return nil
+}
+
 // ── Pure helpers: measurement and derivation ────────────────────────────────
 
-// SceneMediaIDs is every piece of media a scene's layers reference, deduped.
+// SceneMediaIDs is every piece of media a scene references, deduped.
 //
 // Deduped because the same media placed twice in one scene must count once, or
 // clearing the scene leaves the count stuck above zero and the media can never
 // be archived.
+//
+// ⚠️ THE NARRATION'S AUDIO COUNTS. It used to not, and the consequence was that
+// a generated voiceover — the one thing in the studio the brand has actually
+// paid cash for — had a reference count of zero while a scene was speaking it,
+// so an archive sweep was free to take it. The export now reads that audio and
+// REFUSES to render a scene whose line has gone, which turns a silent loss into
+// a blocked publish; making it un-archivable is the other half of that.
+//
+// Every caller therefore has to hand over a scene with its narration attached.
+// A caller that passes layers alone computes a set that is missing the voice,
+// and the diff against it releases the voice — see SetSceneLayers.
 func SceneMediaIDs(sc *StudioScene) []string {
 	if sc == nil {
 		return nil
 	}
-	ids := make([]string, 0, len(sc.Layers))
+	ids := make([]string, 0, len(sc.Layers)+1)
 	for _, l := range sc.Layers {
 		if l.MediaID != "" {
 			ids = append(ids, l.MediaID)
 		}
+	}
+	if sc.Narration != nil && sc.Narration.MediaID != "" {
+		ids = append(ids, sc.Narration.MediaID)
 	}
 	return dedupeStrings(ids)
 }

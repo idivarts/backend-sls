@@ -383,22 +383,35 @@ func PatchScene(c *gin.Context) {
 		}
 		updates = append(updates, firestore.Update{Path: "transitionIn", Value: req.TransitionIn})
 	}
-	if req.Narration != nil {
-		if problem := validateNarration(req.Narration); problem != "" {
+	// Narration is lifted OUT of the generic update: its mediaId holds a
+	// reference to a piece of audio, so it has to go through the model function
+	// that moves the count. UpdateStudioScene refuses the path outright.
+	narration := req.Narration
+	if narration != nil {
+		if problem := validateNarration(narration); problem != "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_narration", "message": problem})
 			return
 		}
-		updates = append(updates, firestore.Update{Path: "narration", Value: req.Narration})
 	}
-	if len(updates) == 0 {
+	if len(updates) == 0 && narration == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "nothing to change"})
 		return
 	}
 
-	if err := trendlymodels.UpdateStudioScene(c.Request.Context(), brandID, contentID, studioID,
-		c.Param("sceneId"), updates); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
+	sceneID := c.Param("sceneId")
+	if len(updates) > 0 {
+		if err := trendlymodels.UpdateStudioScene(c.Request.Context(), brandID, contentID, studioID,
+			sceneID, updates); err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if narration != nil {
+		if err := trendlymodels.SetSceneNarration(c.Request.Context(), brandID, contentID, studioID,
+			sceneID, narration); err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			return
+		}
 	}
 	reloadAndRespond(c, brandID, contentID, studioID)
 }

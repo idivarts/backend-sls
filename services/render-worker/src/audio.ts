@@ -21,6 +21,7 @@ import { unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ContentAudio } from "./types";
+import type { AudioPlacement } from "../../../shared-libs/design/composition-runtime";
 
 export interface AudioStage {
     /** FFmpeg args that declare the audio inputs, in order after the video. */
@@ -81,6 +82,40 @@ export interface ClipAudio {
 }
 
 /**
+ * The length to READ from the source, which only an explicit trim decides.
+ *
+ * ⚠️ Deliberately not derived from the media row's `durationMs`. This value
+ * becomes the input's `-t`, which HARD TRUNCATES, and nothing guarantees the
+ * row's duration matches its file: `mediastore.Put` does not write the field at
+ * all for generated audio, so whatever is there came from somewhere else. A row
+ * reading 1.8s for a 2.4s line would have cut the last word off every export,
+ * with no error to point at. An untrimmed placement gets no `-t` and plays out.
+ */
+function trimWindowMs(p: AudioPlacement): number | undefined {
+    const inMs = Math.max(0, p.trimInMs ?? 0);
+    if (p.trimOutMs !== undefined && p.trimOutMs > inMs) return p.trimOutMs - inMs;
+    return undefined;
+}
+
+/**
+ * How long the placement sounds for, when that is knowable — for anchoring a
+ * fade-out only.
+ *
+ * Undefined is a real answer and not a failure: with neither a trim nor a
+ * duration, nothing here knows where the sound ends, and the honest response is
+ * not to fade. Guessing an end cuts the voice off mid-word. The row's duration
+ * is trusted HERE, where being wrong costs a fade in the wrong place, and not
+ * for `-t`, where being wrong costs the words.
+ */
+function soundingMs(p: AudioPlacement): number | undefined {
+    const window = trimWindowMs(p);
+    if (window !== undefined) return window;
+    const inMs = Math.max(0, p.trimInMs ?? 0);
+    if (p.durationMs !== undefined && p.durationMs > inMs) return p.durationMs - inMs;
+    return undefined;
+}
+
+/**
  * `atempo` only accepts 0.5–2.0 per instance, so anything beyond that is a
  * chain. Changing tempo rather than resampling is the point: a clip played at
  * 2x should sound faster, not an octave higher.
@@ -110,6 +145,13 @@ function atempoChain(speed: number): string {
  * clipping.
  */
 const MIX = "duration=longest:dropout_transition=0:normalize=0";
+/**
+ * One sample format and layout for everything entering the mix.
+ *
+ * Mono narration over a stereo bed is the ordinary case, and `amix` negotiating
+ * a layout from its first input is how one of them ends up in a single ear.
+ */
+const STEREO = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo";
 const LIMITER = "alimiter=limit=0.95";
 
 /**
@@ -129,7 +171,14 @@ export async function buildAudioStage(
     const empty: AudioStage = { inputArgs: [], filter: null, outputArgs: ["-an"], tempFiles: [] };
     // Clip audio alone is a soundtrack. This used to test the soundtrack only,
     // which is why a content with one talking clip and no music rendered mute.
-    if (!audio?.musicUrl && !audio?.voiceoverUrl && clips.length === 0) return empty;
+    if (
+        !audio?.musicUrl &&
+        !audio?.voiceoverUrl &&
+        !audio?.placements?.length &&
+        clips.length === 0
+    ) {
+        return empty;
+    }
 
     const musicVol = audio?.musicVolume ?? 0.7;
     const voiceVol = audio?.voiceoverVolume ?? 1;
@@ -138,6 +187,7 @@ export async function buildAudioStage(
     const inputArgs: string[] = [];
     const tempFiles: string[] = [];
     const labels: { music?: number; voice?: number } = {};
+    const placed: { input: number; placement: AudioPlacement }[] = [];
     let index = firstInputIndex;
 
     try {
@@ -154,6 +204,19 @@ export async function buildAudioStage(
             tempFiles.push(path);
             inputArgs.push("-i", path);
             labels.voice = index++;
+        }
+        for (const p of audio?.placements ?? []) {
+            const path = await download(p.url, "placed");
+            tempFiles.push(path);
+            // Trimmed on the INPUT rather than with `atrim`, so FFmpeg seeks
+            // instead of decoding and discarding — and so the stream arriving
+            // at the filter graph is already only the part that is wanted.
+            const inS = (p.trimInMs ?? 0) / 1000;
+            if (inS > 0) inputArgs.push("-ss", inS.toFixed(3));
+            const window = trimWindowMs(p);
+            if (window !== undefined) inputArgs.push("-t", (window / 1000).toFixed(3));
+            inputArgs.push("-i", path);
+            placed.push({ input: index++, placement: p });
         }
     } catch (err) {
         // A failed voiceover fetch must not strand the music file: nothing
@@ -204,9 +267,36 @@ export async function buildAudioStage(
     }
 
     if (labels.voice !== undefined) {
-        parts.push(`[${labels.voice}:a]volume=${voiceVol}[v]`);
+        // Same aformat as a placement, and for the same reason: a mono
+        // voiceover mixed with a stereo bed left amix to negotiate a layout per
+        // input, which is how a voice ends up in one ear.
+        parts.push(`[${labels.voice}:a]${STEREO},volume=${voiceVol}[v]`);
         fg.push("[v]");
     }
+
+    // ── Placed sound: narration, and effects ────────────────────────────────
+    // Each one is positioned with `adelay` exactly as a clip's own audio is,
+    // against the same measured timeline. This is what a studio's voiceover
+    // arrives as: anchored to a scene by the conversion, resolved to a
+    // millisecond here.
+    placed.forEach(({ input, placement }, i) => {
+        const level = placement.volume ?? 1;
+        const length = soundingMs(placement);
+        const chain: string[] = [STEREO];
+        if (level !== 1) chain.push(`volume=${level}`);
+        if (placement.fadeInMs && placement.fadeInMs > 0) {
+            chain.push(`afade=t=in:st=0:d=${(placement.fadeInMs / 1000).toFixed(3)}`);
+        }
+        if (placement.fadeOutMs && placement.fadeOutMs > 0 && length !== undefined) {
+            const start = Math.max(0, (length - placement.fadeOutMs) / 1000);
+            chain.push(`afade=t=out:st=${start.toFixed(3)}:d=${(placement.fadeOutMs / 1000).toFixed(3)}`);
+        }
+        // The input was seeked, so its timestamps start wherever the trim did.
+        chain.push("asetpts=PTS-STARTPTS");
+        if (placement.startMs > 0) chain.push(`adelay=${Math.round(placement.startMs)}:all=1`);
+        parts.push(`[${input}:a]${chain.join(",")}[pl${i}]`);
+        fg.push(`[pl${i}]`);
+    });
 
     let foreground: string | null = null;
     if (fg.length === 1) {
