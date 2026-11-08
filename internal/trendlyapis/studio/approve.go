@@ -71,6 +71,22 @@ func ApproveRun(c *gin.Context) {
 		}
 	}
 
+	// Still being planned. A plan that does not exist yet cannot be approved,
+	// and saying so beats letting it fall through to "that plan can't be read"
+	// — which is the message for a CORRUPT plan and would send the user off to
+	// re-plan something that is about to arrive on its own.
+	//
+	// Guarded at the API because the client cannot be relied on to hide the
+	// button: `refused` there is computed from fatal problems, so a run with no
+	// problems yet reads as approvable. Same principle as the fatal gate above.
+	if run.Status == trendlymodels.RunPlanning {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "plan_not_ready",
+			"message": "The director is still working on this plan. Give it a moment.",
+		})
+		return
+	}
+
 	var plan director.Plan
 	if uerr := json.Unmarshal([]byte(run.PlanJSON), &plan); uerr != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
