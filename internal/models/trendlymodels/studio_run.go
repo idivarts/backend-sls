@@ -192,6 +192,89 @@ func UpdateStudioRun(ctx context.Context, brandID, contentID, studioID, runID st
 	return err
 }
 
+// ── Closing a run ───────────────────────────────────────────────────────────
+//
+// A run goes `running` the moment its scenes are materialised, and the work
+// that follows happens one scene at a time, in separate requests, driven by
+// whoever is holding the studio open. So nothing on the server knows the run is
+// over except the scenes themselves — which is why the close is computed from
+// them rather than announced by a caller.
+//
+// ⚠️ THIS IS WHY A RUN USED TO STAY `running` FOREVER. The materialise wrote
+// seven pending scenes, marked the run running, and handed off; the client
+// never took the hand-off, and nothing ever looked at the run again. A run that
+// is permanently `running` is indistinguishable from one that is working, which
+// is the state that hid the bug for three hours. Settling here means the run
+// closes even when the client dies after the last scene lands.
+
+// runOutcome decides what a run's status should become, given every scene in
+// the studio.
+//
+// Pure, and separately tested, because it is the whole of the decision: the
+// Firestore around it is bookkeeping.
+//
+//   - settle is false while ANY scene of the run is still pending, and for a
+//     run that owns no scenes at all (a run whose scenes were deleted has
+//     nothing to report, and closing it would be inventing an outcome).
+//   - failed only when EVERY scene failed. A run of seven where one scene did
+//     not come back is a run that produced six scenes, and calling it `failed`
+//     would tell the user their video is gone when it is on the rail in front
+//     of them. The individual failure is already visible on the scene.
+func runOutcome(scenes []StudioScene, runID string) (settle bool, status string) {
+	mine, failed := 0, 0
+	for _, sc := range scenes {
+		if sc.RunID != runID {
+			continue
+		}
+		if sc.Pending {
+			return false, ""
+		}
+		mine++
+		if sc.Gen != nil && sc.Gen.Status == "failed" {
+			failed++
+		}
+	}
+	if mine == 0 {
+		return false, ""
+	}
+	if failed == mine {
+		return true, RunFailed
+	}
+	return true, RunDone
+}
+
+// SettleStudioRunIfComplete closes a run once none of its scenes are pending.
+//
+// Safe to call after every scene that stops being pending, including the ones
+// that stopped by failing: it is a no-op unless this was the last one. Errors
+// are the caller's to ignore — a run left open is a cosmetic problem, and
+// failing a scene's own request over it would be worse.
+func SettleStudioRunIfComplete(ctx context.Context, brandID, contentID, studioID, runID string) error {
+	if runID == "" {
+		return nil
+	}
+	run, err := GetStudioRun(ctx, brandID, contentID, studioID, runID)
+	if err != nil || run == nil {
+		return err
+	}
+	// Only a live run closes. A cancelled or already-settled run must not be
+	// reopened by a straggler scene finishing after the fact.
+	if run.Status != RunApproved && run.Status != RunRunning {
+		return nil
+	}
+	scenes, err := ListStudioScenes(ctx, brandID, contentID, studioID)
+	if err != nil {
+		return err
+	}
+	settle, status := runOutcome(scenes, runID)
+	if !settle {
+		return nil
+	}
+	return UpdateStudioRun(ctx, brandID, contentID, studioID, runID, []firestore.Update{
+		{Path: "status", Value: status},
+	})
+}
+
 // ListStudioRuns returns a studio's runs, newest first.
 func ListStudioRuns(ctx context.Context, brandID, contentID, studioID string, limit int) ([]StudioRun, error) {
 	if limit <= 0 {

@@ -533,15 +533,28 @@ func SetSceneGeneratedMedia(ctx context.Context, brandID, contentID, studioID, s
 	}); err != nil {
 		return true, err
 	}
+	// The clip landed, so this may have been the run's last outstanding scene.
+	_ = SettleStudioRunIfComplete(ctx, brandID, contentID, studioID, sc.RunID)
 	return true, nil
 }
 
 // MarkSceneGenerationFailed records that a scene's generation did not produce a
 // clip, so the rail can show it as failed rather than as forever pending.
 func MarkSceneGenerationFailed(ctx context.Context, brandID, contentID, studioID, sceneID, reason string) error {
-	return UpdateStudioScene(ctx, brandID, contentID, studioID, sceneID, []firestore.Update{
+	if err := UpdateStudioScene(ctx, brandID, contentID, studioID, sceneID, []firestore.Update{
 		{Path: "pending", Value: false},
 		{Path: "gen.status", Value: "failed"},
 		{Path: "gen.error", Value: reason},
-	})
+	}); err != nil {
+		return err
+	}
+	// A run whose last scene FAILED is just as finished as one whose last
+	// scene worked. Settling only on success is how a run full of failures
+	// stays `running` forever.
+	sc, err := GetStudioScene(ctx, brandID, contentID, studioID, sceneID)
+	if err != nil || sc == nil {
+		return nil
+	}
+	_ = SettleStudioRunIfComplete(ctx, brandID, contentID, studioID, sc.RunID)
+	return nil
 }
