@@ -33,6 +33,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/studiojobs"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/ai"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
@@ -259,6 +261,26 @@ type generateSceneRequest struct {
 //
 // One scene per request, which is what makes the rail fill visibly and a
 // failure cost one scene rather than the whole run.
+// GenerateScene asks for ONE scene's HTML.
+// POST …/studios/:studioId/scenes/:sceneId/generate
+//
+// ⚠️ THIS NO LONGER GENERATES ANYTHING. It validates, charges the gate, marks
+// the scene queued and hands the work to the studio queue — 202, not 200.
+//
+// It used to do the model call inline, and could not. A design is a frontier
+// model emitting a whole HTML document: 25–40 seconds against a Lambda capped
+// at 30. On dev, three of five scenes in a real run died at exactly 29.999s,
+// and because the request context carries the Lambda deadline, the write that
+// would have recorded the failure used an expired context and was dropped. The
+// scenes could not even say they had failed. One wrote its layers and died
+// before the update clearing `pending`, so it held a finished design and still
+// said "Making…".
+//
+// There is no version of that which works. 30 seconds is the ceiling on every
+// HTTP function here, the gateway gives up at 29 regardless of the Lambda, and
+// the work genuinely takes longer. So the request stops waiting, and the
+// client watches the scene document instead — which it was already subscribed
+// to, so the rail fills by itself as each design lands.
 func GenerateScene(c *gin.Context) {
 	brandID, contentID, studioID, ok := guard(c, true)
 	if !ok {
@@ -269,6 +291,18 @@ func GenerateScene(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	sceneID := c.Param("sceneId")
+
+	// Refused up front rather than after the scene is marked queued. Without
+	// this a missing env var would mark the scene pending and enqueue into
+	// nothing — a scene stuck at "Making…", which is the precise failure this
+	// whole change exists to delete.
+	if !studiojobs.Configured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "generator_unavailable",
+			"message": "Scene generation is not available right now. Please try again later.",
+		})
+		return
+	}
 
 	s, err := trendlymodels.GetStudio(ctx, brandID, contentID, studioID)
 	if err != nil || s == nil {
@@ -281,6 +315,9 @@ func GenerateScene(c *gin.Context) {
 		return
 	}
 
+	// The gate stays HERE, in the request, even though the spending happens in
+	// the worker. A 402 is something the user has to see and act on, and a
+	// refusal discovered by a background job is a refusal nobody reads.
 	model, blocked := gateDesign(c, brandID)
 	if blocked {
 		return
@@ -303,6 +340,106 @@ func GenerateScene(c *gin.Context) {
 		approach = trendlymodels.SceneMotion
 	}
 
+	// Everything the worker needs goes ON THE SCENE, so the job message stays
+	// three ids and a type. A message carrying the brief would be a second
+	// copy of it, and the two would disagree the first time someone edited the
+	// scene between the enqueue and the run.
+	// Built FROM the scene's existing record, not over it. A scene may carry
+	// cast ids, a chain or a start frame that belong to it rather than to this
+	// request, and writing a fresh struct would silently drop them — the kind
+	// of loss that only shows up later as a face changing between clips.
+	gen := trendlymodels.SceneGeneration{}
+	if sc.Gen != nil {
+		gen = *sc.Gen
+	}
+	gen.Model = model
+	gen.Prompt = brief
+	gen.Status = trendlymodels.SceneGenQueued
+	gen.QueuedAt = nowMs()
+	gen.Error = ""
+	if gen.Params == nil {
+		gen.Params = map[string]interface{}{}
+	}
+	gen.Params["approach"] = approach
+
+	if err := trendlymodels.MarkSceneGenerationQueued(ctx, brandID, contentID, studioID, sceneID,
+		&gen); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not queue the scene"})
+		return
+	}
+
+	if err := studiojobs.Enqueue(studiojobs.Message{
+		Type:      studiojobs.JobSceneDesign,
+		BrandID:   brandID,
+		ContentID: contentID,
+		StudioID:  studioID,
+		SceneID:   sceneID,
+	}); err != nil {
+		// The scene is marked queued and nothing is coming, so say so on the
+		// scene as well as in the response. A pending scene with no job is the
+		// one state this design must never leave behind.
+		_ = trendlymodels.MarkSceneGenerationFailed(ctx, brandID, contentID, studioID, sceneID,
+			"we couldn't start the generation")
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error":   "enqueue_failed",
+			"message": "We couldn't start that scene. Please try again.",
+		})
+		return
+	}
+
+	// 202, and the scene as it now reads. The client watches Firestore for the
+	// design; it does not poll this.
+	reloadAndRespondWith(c, http.StatusAccepted, brandID, contentID, studioID)
+}
+
+// ExecuteSceneDesignJob is the worker half: the model call and the writes.
+//
+// Runs on studio_sqs, which has 900 seconds. The budget helpers still apply —
+// the numbers are just no longer absurd — because a worker that spends its
+// entire ceiling on the model has nothing left to record what happened, and
+// that is the failure mode this moved to escape.
+//
+// ⚠️ ALWAYS RECORDS AN OUTCOME. The caller swallows the error to stop SQS
+// replaying the batch, and a replayed design is a second frontier-model call
+// for a scene the user already paid for. So every path here ends with the
+// scene either done or failed, never still queued.
+func ExecuteSceneDesignJob(ctx context.Context, msg studiojobs.Message) error {
+	brandID, contentID, studioID, sceneID := msg.BrandID, msg.ContentID, msg.StudioID, msg.SceneID
+
+	sc, err := trendlymodels.GetStudioScene(ctx, brandID, contentID, studioID, sceneID)
+	if err != nil {
+		return err
+	}
+	if sc == nil {
+		// Deleted between the enqueue and the run. An ordinary outcome.
+		log.Printf("studiojobs: scene_design for a missing scene %s/%s/%s/%s",
+			brandID, contentID, studioID, sceneID)
+		return nil
+	}
+	if sc.Gen == nil || sc.Gen.Prompt == "" {
+		return trendlymodels.MarkSceneGenerationFailed(ctx, brandID, contentID, studioID, sceneID,
+			"there was nothing to make this scene from")
+	}
+	// Idempotency. SQS is at-least-once, and a redelivery of a job that
+	// already finished would charge for the same design twice and overwrite a
+	// scene the user may have edited since.
+	if sc.Gen.Status != trendlymodels.SceneGenQueued {
+		log.Printf("studiojobs: scene_design already %s for %s, skipping", sc.Gen.Status, sceneID)
+		return nil
+	}
+
+	s, err := trendlymodels.GetStudio(ctx, brandID, contentID, studioID)
+	if err != nil || s == nil {
+		return trendlymodels.MarkSceneGenerationFailed(ctx, brandID, contentID, studioID, sceneID,
+			"the studio was deleted")
+	}
+
+	approach := trendlymodels.SceneMotion
+	if a, _ := sc.Gen.Params["approach"].(string); a == trendlymodels.SceneComposite {
+		approach = trendlymodels.SceneComposite
+	}
+	brief := sc.Gen.Prompt
+
 	sys := sceneSystemPrompt(approach, s.Width, s.Height, sc.DurationMs) +
 		ai.DesignContextFor(brandID) +
 		"\n\nBRAND CSS (declare these once at the top of the document and use them):\n" +
@@ -317,58 +454,32 @@ func GenerateScene(c *gin.Context) {
 			sc.Narration.Line
 	}
 
-	// ⚠️ THE MODEL MAY NOT HAVE THE WHOLE REQUEST. This Lambda is capped at 30
-	// seconds and the request context carries that deadline, so a design that
-	// runs to the deadline takes the bookkeeping down with it: every Firestore
-	// write after it uses the same expired context and fails silently, and the
-	// scene is left `pending` forever.
-	//
-	// That is not hypothetical — it is how five scenes of a real approved run
-	// ended up stuck. Three generations hit the ceiling at exactly 29.999s,
-	// returned 502, and could not record their own failure; one landed its
-	// layers and died before the update that clears `pending`, leaving a scene
-	// that HAS its design and still says "Making…".
-	//
-	// So the model gets the budget minus a reserve, and the reserve is spent
-	// on saying what happened. A clean failure is retryable; a stranded scene
-	// is not.
 	genCtx, cancelGen := modelBudget(ctx)
 	defer cancelGen()
 
 	resp, err := openrouter.ChatCompletion(genCtx, openrouter.ChatRequest{
-		Model: model,
+		Model: sc.Gen.Model,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: sys},
 			{Role: "user", Content: user},
 		},
 	})
-	if err != nil {
-		// The reserve, on a context the generation's own expiry cannot touch.
-		bookCtx, cancelBook := bookkeepingCtx(ctx)
-		defer cancelBook()
+	bookCtx, cancelBook := bookkeepingCtx(ctx)
+	defer cancelBook()
 
+	if err != nil {
 		reason := "the model did not answer"
 		if errors.Is(err, context.DeadlineExceeded) {
-			reason = "the design took longer than we can wait for. Try again, or shorten the brief."
+			reason = "the design took too long. Try again, or shorten the brief."
 		}
-		_ = markSceneGenFailed(bookCtx, brandID, contentID, studioID, sceneID, reason)
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error":   "generation_failed",
-			"reason":  "timeout",
-			"message": "We couldn't design that scene. Please try again.",
-		})
-		return
+		return trendlymodels.MarkSceneGenerationFailed(bookCtx, brandID, contentID, studioID, sceneID, reason)
 	}
 	ai.MeterBrandUsage(brandID, resp.Usage)
 
 	html := cleanHTML(firstContent(resp))
 	if html == "" {
-		_ = markSceneGenFailed(ctx, brandID, contentID, studioID, sceneID, "the model returned no document")
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error":   "generation_empty",
-			"message": "That came back empty. Please try again.",
-		})
-		return
+		return trendlymodels.MarkSceneGenerationFailed(bookCtx, brandID, contentID, studioID, sceneID,
+			"the model returned no document")
 	}
 
 	// The HTML layer REPLACES whatever was there. A generated scene is a take,
@@ -380,35 +491,24 @@ func GenerateScene(c *gin.Context) {
 		Slot: trendlymodels.SlotFull,
 		HTML: html,
 	}}
-	// Same reserve for the success path, and for the same reason: the run that
-	// exposed this had a scene whose layers were written and whose `pending`
-	// was not, because the deadline fell between the two.
-	saveCtx, cancelSave := bookkeepingCtx(ctx)
-	defer cancelSave()
-
-	if err := trendlymodels.SetSceneLayers(saveCtx, brandID, contentID, studioID, sceneID, layers, approach); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "could not save the scene"})
-		return
+	if err := trendlymodels.SetSceneLayers(bookCtx, brandID, contentID, studioID, sceneID, layers, approach); err != nil {
+		// The design exists but is not saved. Said on the scene, because a
+		// scene left queued is the one thing this must never produce.
+		_ = trendlymodels.MarkSceneGenerationFailed(bookCtx, brandID, contentID, studioID, sceneID,
+			"we couldn't save that scene")
+		return err
 	}
-	if err := trendlymodels.UpdateStudioScene(saveCtx, brandID, contentID, studioID, sceneID, []firestore.Update{
+	if err := trendlymodels.UpdateStudioScene(bookCtx, brandID, contentID, studioID, sceneID, []firestore.Update{
 		{Path: "pending", Value: false},
-		{Path: "gen", Value: &trendlymodels.SceneGeneration{
-			Model:  model,
-			Prompt: brief,
-			Status: "done",
-		}},
+		{Path: "gen.status", Value: trendlymodels.SceneGenDone},
+		{Path: "gen.error", Value: ""},
 	}); err != nil {
-		// The scene HAS its design; only the bookkeeping failed. Reporting an
-		// error here would make the user regenerate something that worked.
-		c.Header("X-Scene-Bookkeeping", "failed")
+		return err
 	}
 
-	// This may have been the last scene the run was waiting on. Ignored on
-	// purpose: the scene is saved either way, and a run left open is cosmetic
-	// next to failing a request for work that succeeded.
-	_ = trendlymodels.SettleStudioRunIfComplete(saveCtx, brandID, contentID, studioID, sc.RunID)
-
-	reloadAndRespond(c, brandID, contentID, studioID)
+	// This may have been the last scene the run was waiting on.
+	_ = trendlymodels.SettleStudioRunIfComplete(bookCtx, brandID, contentID, studioID, sc.RunID)
+	return nil
 }
 
 // gateDesign refuses the call when the wallet is empty or the plan unlocks no

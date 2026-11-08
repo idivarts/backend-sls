@@ -238,6 +238,16 @@ func nowMs() int64 { return time.Now().UnixMilli() }
 // order or the duration — which is the habit that produced two disagreeing
 // timelines in the first place.
 func respondWithStudio(c *gin.Context, brandID, contentID string, s *trendlymodels.Studio) {
+	respondWithStudioStatus(c, http.StatusOK, brandID, contentID, s)
+}
+
+// respondWithStudioStatus is the same answer under a chosen status code.
+//
+// 202 exists for the paths that have ACCEPTED work rather than done it — a
+// queued scene design, for instance. The body is identical either way, because
+// the client wants the studio as it now reads regardless; only the code says
+// whether anything is still coming.
+func respondWithStudioStatus(c *gin.Context, status int, brandID, contentID string, s *trendlymodels.Studio) {
 	ctx := c.Request.Context()
 	scenes, err := trendlymodels.ListStudioScenes(ctx, brandID, contentID, s.ID)
 	if err != nil {
@@ -256,7 +266,7 @@ func respondWithStudio(c *gin.Context, brandID, contentID string, s *trendlymode
 		RenderURL:  s.RenderURL,
 	})
 
-	c.JSON(http.StatusOK, gin.H{
+	c.JSON(status, gin.H{
 		"studio": s,
 		"scenes": m.Scenes,
 		"timeline": gin.H{
@@ -267,10 +277,15 @@ func respondWithStudio(c *gin.Context, brandID, contentID string, s *trendlymode
 }
 
 func reloadAndRespond(c *gin.Context, brandID, contentID, studioID string) {
+	reloadAndRespondWith(c, http.StatusOK, brandID, contentID, studioID)
+}
+
+// reloadAndRespondWith re-reads the studio and answers under a chosen code.
+func reloadAndRespondWith(c *gin.Context, status int, brandID, contentID, studioID string) {
 	s, err := trendlymodels.GetStudio(c.Request.Context(), brandID, contentID, studioID)
 	if err != nil || s == nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not re-read the studio"})
 		return
 	}
-	respondWithStudio(c, brandID, contentID, s)
+	respondWithStudioStatus(c, status, brandID, contentID, s)
 }

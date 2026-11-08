@@ -43,16 +43,53 @@ type JobType = string
 const (
 	// JobDirectorPlan asks the director for a plan and stores it on the run.
 	JobDirectorPlan JobType = "director_plan"
+
+	// JobSceneDesign writes ONE scene's HTML.
+	//
+	// It moved here for exactly the reason the package exists. A design is a
+	// frontier model emitting a whole HTML document, and on dev it reliably
+	// took 25–40s against a Lambda capped at 30 — three of five scenes in a
+	// real run died at precisely 29.999s. Worse, the request context carries
+	// that deadline, so the write that records the failure used an expired
+	// context and was dropped: the scenes could not even say they had failed,
+	// and sat at "Making…" indefinitely.
+	//
+	// No synchronous HTTP path can hold this work. The queue's worker has 900
+	// seconds, which is an order of magnitude more than a design needs.
+	JobSceneDesign JobType = "scene_design"
 )
 
 // Message is the payload shape. BrandID, ContentID and StudioID are always
-// required; RunID identifies the row the worker writes its answer to.
+// required; the rest identifies the row the worker writes its answer to, and
+// which one that is depends on the type — RunID for a plan, SceneID for a
+// scene design. `Target` reports whether a message has the one it needs, so a
+// malformed job is dropped rather than retried against nothing.
 type Message struct {
 	Type      JobType `json:"type"`
 	BrandID   string  `json:"brandId"`
 	ContentID string  `json:"contentId"`
 	StudioID  string  `json:"studioId"`
-	RunID     string  `json:"runId"`
+	RunID     string  `json:"runId,omitempty"`
+	SceneID   string  `json:"sceneId,omitempty"`
+}
+
+// Target reports whether the message names everything its type needs.
+//
+// ⚠️ Per type, deliberately. The first version required RunID for every
+// message, which would have silently dropped every scene design: a regenerate
+// of a hand-built scene has no run at all.
+func (m Message) Target() bool {
+	if m.BrandID == "" || m.ContentID == "" || m.StudioID == "" {
+		return false
+	}
+	switch m.Type {
+	case JobDirectorPlan:
+		return m.RunID != ""
+	case JobSceneDesign:
+		return m.SceneID != ""
+	default:
+		return false
+	}
 }
 
 // Configured reports whether a queue is available.
