@@ -173,7 +173,7 @@ export async function ingestVideo(url: string, brandId: string): Promise<IngestO
     }
 }
 
-function runProbe(args: string[]): Promise<string> {
+export function runProbe(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
         const ff = spawn("ffprobe", args, { stdio: ["ignore", "pipe", "pipe"] });
         let out = "";
@@ -187,7 +187,14 @@ function runProbe(args: string[]): Promise<string> {
     });
 }
 
-async function download(url: string, path: string): Promise<void> {
+/**
+ * Fetch a video to disk.
+ *
+ * Exported because the frame-extract job needs exactly this and nothing else;
+ * two copies of "download a file" is how one of them ends up without the
+ * status check.
+ */
+export async function download(url: string, path: string): Promise<void> {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`could not fetch the video (HTTP ${res.status})`);
     const { writeFile } = await import("node:fs/promises");

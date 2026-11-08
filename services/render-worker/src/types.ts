@@ -13,12 +13,22 @@ export interface RenderJob {
      * design; "composition" renders an authored timeline; "ingest" looks at an
      * uploaded video and records what is in it.
      *
+     * "frame" cuts one still out of a video and files it as its own media,
+     * which is how a chained generation gets its start frame.
+     *
+     * "studio" renders a Design Studio: the worker reads the studio and its
+     * scenes, converts them into a composition, and renders THAT. There is no
+     * second renderer — the composition path already gets the frame-grid
+     * arithmetic a cross-fade depends on right, and two implementations of it
+     * is two places for a half-frame error to make a dissolve fade from
+     * nothing.
+     *
      * "video" is not the pre-composition path kept alive beside a new one — it
      * goes through the composition renderer too, as a one-clip composition
      * derived from the design in memory. The timeline is the only primitive;
      * this field only says where the job reads from and writes back to.
      */
-    docType: "image" | "video" | "composition" | "ingest";
+    docType: "image" | "video" | "composition" | "ingest" | "frame" | "studio";
     /**
      * Re-render a revision that already has a renderUrl. Off by default so a
      * duplicate queue delivery is a no-op rather than a second charge.
@@ -27,11 +37,22 @@ export interface RenderJob {
     /** Opaque id (Batch job / Lambda request) recorded for support. */
     jobId?: string;
     /**
-     * For an ingest job: the video to look at. `revisionId` carries the asset
-     * id in that case — one field for "the document this job is about", so the
-     * status writers do not need a second shape.
+     * For an ingest or frame job: the video to look at. `revisionId` carries
+     * the asset id in that case — one field for "the document this job is
+     * about", so the status writers do not need a second shape.
      */
     sourceUrl?: string;
+    /**
+     * For a frame job: how far into the source to cut. Negative (the caller
+     * sends -1) means the LAST frame, which the worker has to compute because
+     * only it can probe the real length.
+     */
+    atMs?: number;
+    /**
+     * For a studio job: which studio. `revisionId` carries it too, for the
+     * status writers, but naming it explicitly keeps the job readable.
+     */
+    studioId?: string;
 }
 
 /** What the worker found in Firestore and is about to render. */

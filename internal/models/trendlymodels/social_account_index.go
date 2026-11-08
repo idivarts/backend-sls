@@ -58,9 +58,9 @@ type SocialAccountIndex struct {
 	// Older docs stored one owner inline. AllOwners() synthesizes an owner from
 	// these when Owners is empty; AddSocialAccountOwner migrates them into Owners
 	// and clears them on the next write.
-	App     string `json:"app,omitempty" firestore:"app,omitempty"`
-	BrandID string `json:"brandId,omitempty" firestore:"brandId,omitempty"`
-	UserID  string `json:"userId,omitempty" firestore:"userId,omitempty"`
+	App      string `json:"app,omitempty" firestore:"app,omitempty"`
+	BrandID  string `json:"brandId,omitempty" firestore:"brandId,omitempty"`
+	UserID   string `json:"userId,omitempty" firestore:"userId,omitempty"`
 	SocialID string `json:"socialId,omitempty" firestore:"socialId,omitempty"`
 
 	UpdatedAt int64 `json:"updatedAt" firestore:"updatedAt"`

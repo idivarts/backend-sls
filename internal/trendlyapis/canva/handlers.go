@@ -1,23 +1,17 @@
 package canva
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/constants"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	canvapkg "github.com/idivarts/backend-sls/pkg/canva"
-	"github.com/idivarts/backend-sls/pkg/mys3"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 )
 
 // canvaEntitled reports whether the brand's org plan includes the Canva bridge.
@@ -300,7 +294,7 @@ func HandleReturn(c *gin.Context) {
 		c.JSON(http.StatusAccepted, gin.H{"jobId": jobID, "status": "in_progress"})
 		return
 	}
-	storedURL, err := downloadAndStore(url, brandID, format)
+	storedURL, err := downloadAndStore(c.Request.Context(), url, brandID, format)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not store export"})
 		return
@@ -391,45 +385,40 @@ func pollExport(token, jobID string) string {
 	return ""
 }
 
-// downloadAndStore copies a (24h-valid) Canva export URL into our attachment
-// bucket and returns the permanent CloudFront URL.
-func downloadAndStore(srcURL, brandID, format string) (string, error) {
-	resp, err := http.Get(srcURL)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("canva export download %s", resp.Status)
-	}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	bucket := os.Getenv("ATTACHMENT_S3_BUCKET_NAME")
-	cdn := os.Getenv("ATTACHMENT_CF_DISTRIBUTION_URL")
-	if bucket == "" {
-		return "", fmt.Errorf("ATTACHMENT_S3_BUCKET_NAME not set")
-	}
-	ext := format
+// downloadAndStore copies a (24h-valid) Canva export URL into our bucket,
+// files it in the brand's media library, and returns the permanent CDN URL.
+//
+// ⚠️ The hosting is not optional: a Canva export URL dies within the day, and a
+// scene pointing at a dead URL is a scene that cannot be re-rendered. The
+// library row is not optional either — a design a brand exported is theirs to
+// reuse, and before this it was stored with nothing pointing at it.
+func downloadAndStore(ctx context.Context, srcURL, brandID, format string) (string, error) {
+	kind := trendlymodels.AssetKindImage
 	ctype := "image/png"
-	if format == "mp4" {
-		ctype = "video/mp4"
-	} else if format == "jpg" {
+	switch format {
+	case "mp4":
+		ctype, kind = "video/mp4", trendlymodels.AssetKindVideo
+	case "jpg":
 		ctype = "image/jpeg"
 	}
-	filename := fmt.Sprintf("file_%d_canva_%s.%s", time.Now().Unix(), uuid.NewString(), ext)
-	key := fmt.Sprintf("uploads/%s", filename)
-	if _, err := mys3.Client.PutObject(&s3.PutObjectInput{
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(data),
-		ContentType: aws.String(ctype),
-	}); err != nil {
+	stored, err := mediastore.HostFromURL(ctx, mediastore.Spec{
+		BrandID: brandID,
+		// The attachment bucket under `uploads/`, which is where Canva
+		// exports have always landed. Kept rather than migrated: the URLs are
+		// already in designs and published posts.
+		Target:      mediastore.TargetAttachment,
+		Prefix:      "uploads",
+		Filename:    "canva." + format,
+		ContentType: ctype,
+		Kind:        kind,
+		Source:      trendlymodels.AssetSourceGenerated,
+		Origin: &trendlymodels.AssetOrigin{
+			Kind:     trendlymodels.AssetOriginGenerated,
+			Provider: "canva",
+		},
+	}, srcURL)
+	if err != nil {
 		return "", err
 	}
-	if cdn != "" {
-		return fmt.Sprintf("%s/uploads/%s", strings.TrimRight(cdn, "/"), filename), nil
-	}
-	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key), nil
+	return stored.URL, nil
 }

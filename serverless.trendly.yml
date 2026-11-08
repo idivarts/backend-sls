@@ -450,6 +450,8 @@ functions:
         - 'templates/*'
     timeout: 30
     events:
+      # The Design Studio: studios, scenes, layers, order.
+      - http: ANY /api/studio/{proxy+}
       # ElevenLabs audio (music + voiceover) and Canva Connect deep-edit bridge.
       - http: ANY /api/media/{proxy+}
       - http: ANY /api/integrations/canva/{proxy+}

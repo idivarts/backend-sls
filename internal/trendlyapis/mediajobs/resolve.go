@@ -14,6 +14,7 @@ package mediajobs
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -48,7 +49,7 @@ func resolveSucceeded(ctx context.Context, job *trendlymodels.MediaJob, res medi
 	// Done first, too, so a failed copy leaves the job pending and the next
 	// poll tries again with a freshly signed URL, rather than leaving a
 	// succeeded job pointing at nothing.
-	hosted, err := hostFromURL(res.Assets[0].URL, job.BrandID)
+	hosted, mediaID, err := hostFromURL(ctx, res.Assets[0].URL, job)
 	if err != nil || hosted == "" {
 		log.Printf("mediajobs: could not copy %s to storage: %v", job.ID, err)
 		return err
@@ -63,8 +64,7 @@ func resolveSucceeded(ctx context.Context, job *trendlymodels.MediaJob, res medi
 		return nil
 	}
 
-	placed, err := trendlymodels.SetCompositionClipURL(
-		job.BrandID, job.ContentID, job.CompositionID, job.ClipID, hosted)
+	placed, err := placeResult(ctx, job, hosted, mediaID)
 	if err != nil {
 		return err
 	}
@@ -72,22 +72,37 @@ func resolveSucceeded(ctx context.Context, job *trendlymodels.MediaJob, res medi
 		// By the time a generation finishes the user may well have deleted the
 		// clip. That is an ordinary outcome, not an error — but the asset is
 		// still theirs, and it is already in the library below.
-		log.Printf("mediajobs: clip %s was gone by the time %s landed", job.ClipID, job.ID)
+		log.Printf("mediajobs: the target of %s was gone by the time it landed", job.ID)
 	}
 
-	// Into the library either way, so a clip that was paid for is reusable even
-	// if the timeline it was made for has moved on.
-	if _, _, aerr := trendlymodels.RecordAsset(ctx, job.BrandID, &trendlymodels.Asset{
-		Kind:            trendlymodels.AssetKindVideo,
-		Source:          trendlymodels.AssetSourceGenerated,
-		URL:             hosted,
-		Title:           job.Prompt,
-		Provider:        job.Provider,
-		OriginContentID: job.ContentID,
-	}); aerr != nil {
-		log.Printf("mediajobs: could not file %s in the library: %v", job.ID, aerr)
-	}
+	// The library row was written by hostFromURL, in the same step as the
+	// bytes. It used to be a second call here, which meant a clip could be
+	// stored and not filed — paid for, and then unfindable.
 	return nil
+}
+
+// placeResult puts a finished clip where its job said it belongs.
+//
+// One job shape, two destinations: a clip on a composition timeline or a scene
+// in a studio. Dispatching here rather than in two copies of resolveSucceeded
+// is what keeps the hosting, the charge and the refund identical for both.
+//
+// A false return means the target is gone — the user deleted the scene or the
+// clip while the generation ran. That is an ordinary outcome: the media is in
+// the library regardless, so nothing they paid for is lost.
+func placeResult(ctx context.Context, job *trendlymodels.MediaJob, hosted, mediaID string) (bool, error) {
+	if job.StudioID != "" && job.SceneID != "" {
+		if mediaID == "" {
+			// A studio scene references media by ID, not by URL — that is what
+			// makes the same clip in two scenes one library row. Without an id
+			// there is nothing to point the scene at.
+			return false, fmt.Errorf("mediajobs: job %s has no media id to place", job.ID)
+		}
+		return trendlymodels.SetSceneGeneratedMedia(
+			ctx, job.BrandID, job.ContentID, job.StudioID, job.SceneID, mediaID)
+	}
+	return trendlymodels.SetCompositionClipURL(
+		job.BrandID, job.ContentID, job.CompositionID, job.ClipID, hosted)
 }
 
 func resolveFailed(ctx context.Context, job *trendlymodels.MediaJob, reason string) error {
@@ -100,6 +115,15 @@ func resolveFailed(ctx context.Context, job *trendlymodels.MediaJob, reason stri
 	}
 	if !changed {
 		return nil
+	}
+
+	// A studio scene left `pending` forever is worse than one marked failed:
+	// the rail shows a placeholder the user cannot fill and cannot clear.
+	if job.StudioID != "" && job.SceneID != "" {
+		if merr := trendlymodels.MarkSceneGenerationFailed(
+			ctx, job.BrandID, job.ContentID, job.StudioID, job.SceneID, reason); merr != nil {
+			log.Printf("mediajobs: could not mark scene %s failed: %v", job.SceneID, merr)
+		}
 	}
 
 	// Give the tokens back. The provider does not charge for a failed

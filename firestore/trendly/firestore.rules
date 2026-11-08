@@ -340,6 +340,54 @@ service cloud.firestore {
                            && !request.resource.data.diff(resource.data).affectedKeys()
                                .hasAny(compositionRenderFields());
         }
+
+        // ── The Design Studio ────────────────────────────────────────────────
+        // brands/{brandId}/contents/{contentId}/studios/{studioId} and its
+        // scenes, renders and director runs.
+        //
+        // ⚠️ READ-ONLY TO CLIENTS, which is deliberately the opposite of
+        // designs and compositions next door. Every scene write moves MEDIA
+        // REFERENCE COUNTS — placing media increments, clearing decrements,
+        // swapping moves only the difference — and those counts are what make
+        // "archive, never hard-delete" enforceable. A client writing scenes
+        // directly would have to maintain them on every one of a dozen edit
+        // paths, and the first path that forgot would either strand media as
+        // permanently un-archivable or let a sweep delete something still on
+        // screen. Neither is recoverable by hand.
+        //
+        // The app loses nothing for it: it subscribes here for live state and
+        // applies each edit optimistically, so a drag still lands instantly
+        // while the write goes through /api/studio in the background.
+        //
+        // Public read follows the content's own share toggle, so a shared post
+        // can show its scenes.
+        match /studios/{studioId} {
+          allow read:  if (isAuthenticated() && isBrandMember(brandId))
+                          || contentShared(brandId, contentId);
+          allow write: if false;
+
+          match /scenes/{sceneId} {
+            allow read:  if (isAuthenticated() && isBrandMember(brandId))
+                            || contentShared(brandId, contentId);
+            allow write: if false;
+          }
+
+          // A render's status and output. Written only by the worker, after
+          // the wallet has been charged — the same reason a composition's
+          // render fields are not client-writable.
+          match /renders/{renderId} {
+            allow read:  if isAuthenticated() && isBrandMember(brandId);
+            allow write: if false;
+          }
+
+          // A director run: its plan, its node graph, what it cost. Read so
+          // the storyboard can follow a run live; never written by a client,
+          // because the plan is what authorises the spending.
+          match /runs/{runId} {
+            allow read:  if isAuthenticated() && isBrandMember(brandId);
+            allow write: if false;
+          }
+        }
       }
 
       // ── The brand's media library ────────────────────────────────────────
@@ -354,6 +402,20 @@ service cloud.firestore {
       // through POST /api/v2/brands/:brandId/assets, which stamps provenance
       // itself rather than accepting it.
       match /assets/{assetId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
+      }
+
+      // ── Per-brand rollups ───────────────────────────────────────────────
+      // brands/{brandId}/aggregates/{name}. Today: `mediaUsage`, the brand's
+      // storage total, maintained with atomic increments as media is filed and
+      // archived.
+      //
+      // Read by any brand member — it is their own number, shown on settings.
+      // NOT client-writable, and that is the whole point of it being a separate
+      // document: it is a counter that will one day be billed from, and a
+      // client able to write it could report any figure it liked.
+      match /aggregates/{name} {
         allow read:  if isAuthenticated() && isBrandMember(brandId);
         allow write: if false;
       }

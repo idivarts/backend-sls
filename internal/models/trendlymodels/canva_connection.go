@@ -22,7 +22,7 @@ type CanvaConnection struct {
 	RefreshToken string `json:"-" firestore:"refreshToken"` // secret, single-use rotated
 	Scope        string `json:"scope,omitempty" firestore:"scope,omitempty"`
 	// ExpiresAt is the access-token expiry (epoch ms). Refresh when near.
-	ExpiresAt int64 `json:"expiresAt" firestore:"expiresAt"`
+	ExpiresAt int64  `json:"expiresAt" firestore:"expiresAt"`
 	CanvaUser string `json:"canvaUser,omitempty" firestore:"canvaUser,omitempty"`
 	Connected bool   `json:"connected" firestore:"connected"`
 	CreatedAt int64  `json:"createdAt" firestore:"createdAt"`

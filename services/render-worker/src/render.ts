@@ -21,6 +21,7 @@
 import { closeBrowser, getBrowser } from "./browser";
 import { config } from "./config";
 import { renderComposition } from "./composition";
+import { extractFrame } from "./frame";
 import { ingestVideo } from "./ingest";
 import { captureSlides } from "./image";
 import { loadDesign } from "./page";
@@ -30,16 +31,22 @@ import {
     getComposition,
     getContentAudio,
     getRevision,
+    getStudioForRender,
     markFailed,
     markStarted,
+    markStudioRenderFailed,
+    markStudioRenderStarted,
+    recordFrameAsset,
     setIngest,
     setProgress,
     setResult,
+    setStudioRenderResult,
 } from "./firestore";
 import { renderFailed, renderSucceeded } from "./metrics";
 import { makeThumbnail } from "./thumbnail";
 import type { RenderJob, RenderTarget } from "./types";
-import { compositionFromDesign } from "../../../shared-libs/design/composition-runtime";
+import { compositionFromDesign, measureComposition } from "../../../shared-libs/design/composition-runtime";
+import { parseSceneHtmlRef, studioToComposition } from "../../../shared-libs/design/studio-runtime";
 
 /**
  * Turn a thrown error into something worth showing a brand manager. Anything
@@ -127,6 +134,14 @@ async function runJobInner(job: RenderJob): Promise<void> {
     try {
         if (job.docType === "ingest") {
             await runIngestJob(job);
+            return;
+        }
+        if (job.docType === "frame") {
+            await runFrameJob(job);
+            return;
+        }
+        if (job.docType === "studio") {
+            await runStudioJob(job, startedAt);
             return;
         }
         if (job.docType === "composition") {
@@ -288,6 +303,127 @@ async function runDesignJob(job: RenderJob, target: RenderTarget, startedAt: num
  * failed ingest must degrade to "we could not read this one" rather than
  * looking like a lost upload.
  */
+/**
+ * Render a Design Studio.
+ *
+ * The studio is CONVERTED into a Composition and handed to the existing
+ * renderer. `studioToComposition` is shared with the app, so the timeline the
+ * user scrubbed and the one that encodes are the same arithmetic — including
+ * how much time a transition takes off its two neighbours.
+ *
+ * ⚠️ A non-empty `problems` list REFUSES the render rather than rendering what
+ * it can. A layered scene cannot export yet (a composition clip is one
+ * full-frame source with no concept of a slot), and rendering only the base
+ * layer would publish something nobody approved. The backend checks the same
+ * conditions before charging; this is the backstop for a studio edited between
+ * the request and the job starting.
+ */
+async function runStudioJob(job: RenderJob, startedAt: number): Promise<void> {
+    const { brandId, contentId } = job;
+    const studioId = job.studioId ?? job.revisionId;
+    if (!studioId) throw new Error("a studio job needs a studio id");
+
+    const loaded = await getStudioForRender(brandId, contentId, studioId);
+    if (!loaded) throw new Error(`studio ${studioId} not found`);
+
+    // A duplicate queue delivery must not re-render, or re-charge.
+    if (loaded.studio.renderUrl && !job.force) {
+        console.log(`[render] studio ${studioId} already rendered, skipping`);
+        return;
+    }
+
+    const { composition, problems, notes } = studioToComposition(
+        loaded.studio as never,
+        loaded.scenes as never,
+        loaded.media
+    );
+    if (problems.length) {
+        // The user's own words back, not a stack trace: the first problem is
+        // the one to fix, and listing all of them turns a fixable state into a
+        // wall of text.
+        await markStudioRenderFailed(brandId, contentId, studioId, problems[0]);
+        throw new Error(`studio ${studioId} is not renderable: ${problems.join("; ")}`);
+    }
+    if (notes.length) console.log(`[render] studio ${studioId}: ${notes.join(" ")}`);
+
+    await markStudioRenderStarted(brandId, contentId, studioId, job.jobId);
+    const browser = await getBrowser();
+
+    const { mp4, poster } = await renderComposition({
+        browser,
+        composition,
+        // A studio scene carries its HTML on the layer rather than in a
+        // `designs` revision, so the synthetic id is resolved from the scenes
+        // already in hand. An ordinary revision id still falls through to
+        // Firestore, which is what lets a studio mix in an older design.
+        loadRevision: async (ref) => {
+            const parsed = parseSceneHtmlRef(ref);
+            if (parsed) {
+                const scene = loaded.scenes[parsed.sceneId] as
+                    | { layers?: { kind?: string; html?: string }[] }
+                    | undefined;
+                const html = scene?.layers?.find((l) => l.kind === "html")?.html;
+                if (!html) throw new Error(`scene ${parsed.sceneId} has no html`);
+                return { html, width: loaded.studio.width, height: loaded.studio.height };
+            }
+            const revision = await getRevision(brandId, contentId, ref);
+            if (!revision?.html) throw new Error(`design revision ${ref} has no html`);
+            return { html: revision.html, width: revision.width, height: revision.height };
+        },
+        audio: await getContentAudio(brandId, contentId),
+    });
+
+    const videoUrl = await upload(mp4, "mp4", "video/mp4");
+    const posterUrl = poster.length ? await upload(poster, "png", "image/png") : undefined;
+
+    const measured = measureComposition(composition);
+    await setStudioRenderResult(
+        brandId,
+        contentId,
+        studioId,
+        videoUrl,
+        posterUrl,
+        measured.clips.length,
+        measured.totalMs
+    );
+    renderSucceeded({
+        docType: "studio",
+        durationMs: Date.now() - startedAt,
+        outputs: 1,
+        bytes: mp4.length,
+        revisionId: studioId,
+    });
+}
+
+/**
+ * Cut one frame out of a video and file it as media.
+ *
+ * No render target and no status document: a frame job is not a render of
+ * anything, it produces a new asset. Which is why a failure here only logs and
+ * rethrows — there is no half-finished document to mark, and Batch's retry is
+ * the right handler for a transient download.
+ */
+async function runFrameJob(job: RenderJob): Promise<void> {
+    const sourceMediaId = job.revisionId;
+    const url = job.sourceUrl ?? "";
+    if (!sourceMediaId || !url) throw new Error("a frame job needs a media id and a url");
+
+    const frame = await extractFrame(url, job.atMs ?? -1);
+    const uploaded = await upload(frame.bytes, "png", "image/png");
+    const mediaId = await recordFrameAsset(job.brandId, {
+        url: uploaded,
+        sizeBytes: frame.bytes.length,
+        width: frame.width,
+        height: frame.height,
+        sourceMediaId,
+        atMs: frame.atMs,
+        sourceDurationMs: frame.sourceDurationMs,
+    });
+    console.log(
+        `[frame] ${sourceMediaId} @${frame.atMs}ms of ${frame.sourceDurationMs}ms -> ${mediaId}`
+    );
+}
+
 async function runIngestJob(job: RenderJob): Promise<void> {
     const assetId = job.revisionId;
     const url = job.sourceUrl ?? "";

@@ -1,18 +1,22 @@
+// Package videos hands out pre-signed uploads for video files.
+//
+// ⚠️ See the note in internal/s3/images: the hand-out is the only moment the
+// backend sees a user's own upload, so the library row is filed here, pending,
+// and confirmed by the app afterwards.
+//
+// This target is the RAW bucket, whose `raw_videos/` prefix triggers the
+// transcoding pipeline. Generated video must not come through here — it is
+// already encoded, and re-transcoding it costs time and quality for nothing.
 package videos
 
 import (
-	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 )
 
 // Check if the filename has a video extension
@@ -42,38 +46,27 @@ func S3UploadHandler(ctx *gin.Context) {
 		return
 	}
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-	svc := s3.New(sess)
-
-	// Get s3 bucket name from environment variable
-	bucketName := os.Getenv("VIDEO_S3_BUCKET_NAME")
-	domainUrl := os.Getenv("CLOUDFRONT_DISTRIBUTION_URL")
-
-	filename = fmt.Sprintf("file_%d_%s", time.Now().Unix(), filename)
-
-	bucketKey := fmt.Sprintf("raw_videos/%s", filename)
-	videoUrl := fmt.Sprintf("%s/%s", domainUrl, bucketKey)
-
-	// // Get the file extension
-	// ext := filepath.Ext(filename)
-	// // Remove the extension from the filename
-	// fileWithoutExtension := strings.TrimSuffix(filename, ext)
-
-	// appleUrl := fmt.Sprintf("%s/outputs/%s.m3u8", domainUrl, fileWithoutExtension)
-	// playUrl := fmt.Sprintf("%s/outputs/%s.mpd", domainUrl, fileWithoutExtension)
-
-	req, _ := svc.PutObjectRequest(&s3.PutObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    &bucketKey,
+	out, err := mediastore.PresignUpload(ctx.Request.Context(), mediastore.Spec{
+		BrandID:   ctx.Query("brandId"),
+		Target:    mediastore.TargetVideo,
+		Filename:  filename,
+		Kind:      trendlymodels.AssetKindVideo,
+		Source:    trendlymodels.AssetSourceUpload,
+		ContentID: ctx.Query("contentId"),
+		CreatedBy: ctx.GetString("userId"),
+		Origin:    &trendlymodels.AssetOrigin{Kind: trendlymodels.AssetOriginUpload},
 	})
-	url, err := req.Presign(15 * time.Minute)
 	if err != nil {
-		log.Println("Failed to sign request", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"uploadUrl": url, "appleUrl": videoUrl, "playUrl": videoUrl})
+	// appleUrl and playUrl are the same address today; both are returned
+	// because the apps' upload callers read them by name.
+	ctx.JSON(http.StatusOK, gin.H{
+		"uploadUrl": out.UploadURL,
+		"appleUrl":  out.AppleURL,
+		"playUrl":   out.PlayURL,
+		"mediaId":   out.MediaID,
+	})
 }

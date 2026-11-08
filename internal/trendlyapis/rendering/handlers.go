@@ -43,9 +43,18 @@ type RenderJob struct {
 	RevisionID string `json:"revisionId"`
 	DocType    string `json:"docType"`
 	Force      bool   `json:"force,omitempty"`
-	// SourceURL carries the video for an ingest job, where RevisionID is the
-	// asset id rather than a revision.
+	// SourceURL carries the video for an ingest or frame job, where RevisionID
+	// is the media id rather than a revision.
 	SourceURL string `json:"sourceUrl,omitempty"`
+	// AtMs is how far into the source a `frame` job should cut. -1 means the
+	// LAST frame, which is the one chaining actually wants and the one a
+	// caller cannot compute without knowing the clip's exact length — the
+	// worker has ffprobe and we do not.
+	AtMs int `json:"atMs,omitempty"`
+	// StudioID targets a Design Studio render. The worker reads the studio and
+	// its scenes, converts them into a composition and renders that, so
+	// `revisionId` carries the studio id for the status writers.
+	StudioID string `json:"studioId,omitempty"`
 }
 
 type startRenderRequest struct {
@@ -198,7 +207,12 @@ func dispatch(job RenderJob) error {
 	// lane: Fargate, not the image Lambda, whose ceiling an encode would hit.
 	// Ingest joins the video lane: it downloads a whole file and writes a
 	// dozen frames to disk, which the image Lambda's 512MB /tmp cannot take.
-	if job.DocType == "video" || job.DocType == "composition" || job.DocType == "ingest" {
+	// So does a frame extract, for the plainer reason that ffmpeg is in the
+	// worker's container and nowhere else. A studio render IS a composition
+	// render with one more resolution step in front of it, so it takes the
+	// same lane for the same reason.
+	if job.DocType == "video" || job.DocType == "composition" ||
+		job.DocType == "ingest" || job.DocType == "frame" || job.DocType == "studio" {
 		return submitBatchJob(job, string(body))
 	}
 	queueURL := os.Getenv("IMAGE_RENDER_QUEUE_URL")
@@ -281,6 +295,45 @@ var errNoQueue = errors.New("render queue is not configured for this stage")
 // upload useful rather than a feature someone opted into, and billing a user
 // for looking at their own file would be a strange place to meter. The vision
 // pass that follows IS metered, where a model is actually called.
+// SubmitStudioRender hands a whole studio to the worker.
+//
+// The worker resolves the studio and its scenes, converts them into a
+// composition and renders that — so this carries only the three ids it needs to
+// find them. Nothing about the timeline travels in the job, because a job that
+// described the timeline could describe one that no longer matches the
+// documents.
+func SubmitStudioRender(brandID, contentID, studioID string) error {
+	return dispatch(RenderJob{
+		BrandID:    brandID,
+		ContentID:  contentID,
+		RevisionID: studioID,
+		StudioID:   studioID,
+		DocType:    "studio",
+	})
+}
+
+// SubmitFrameExtract asks the worker to cut one frame out of a video and file
+// it as its own piece of media.
+//
+// This is what makes chaining possible. A chained generation needs the LAST
+// frame of the previous clip as its start frame, and `atMs: -1` says so rather
+// than making the caller guess a duration — the worker has ffprobe, the backend
+// does not, and a guess that lands past the end produces a black frame that
+// then becomes the next clip's opening image.
+//
+// It is also how an anchor still gets made from a clip, and how "use the frame
+// where she picks up the cup" becomes a real asset instead of a description.
+func SubmitFrameExtract(brandID, sourceMediaID, url string, atMs int) error {
+	return dispatch(RenderJob{
+		BrandID:    brandID,
+		ContentID:  "-",
+		RevisionID: sourceMediaID,
+		DocType:    "frame",
+		SourceURL:  url,
+		AtMs:       atMs,
+	})
+}
+
 func SubmitIngest(brandID, assetID, url string) error {
 	return dispatch(RenderJob{
 		BrandID:    brandID,

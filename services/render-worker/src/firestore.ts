@@ -274,3 +274,227 @@ export async function failIngest(brandId: string, assetId: string, reason: strin
         { merge: true }
     );
 }
+
+/**
+ * File an extracted frame as its own piece of media.
+ *
+ * ⚠️ Written HERE, in the same step as the upload, for the same reason the Go
+ * side funnels every put through pkg/mediastore: bytes with no row are bytes
+ * nothing can find, count a reference to, or measure. The worker owns these
+ * bytes, so it owns the row.
+ *
+ * Field names mirror internal/models/trendlymodels/asset.go — change one,
+ * change both. `origin.sourceMediaId` + `origin.atMs` are what make a chain
+ * legible weeks later: the start frame of beat 3 reads as "media X at 7,920ms"
+ * rather than as an anonymous PNG nobody can place.
+ */
+export async function recordFrameAsset(
+    brandId: string,
+    out: {
+        url: string;
+        s3Key?: string;
+        sizeBytes: number;
+        width: number;
+        height: number;
+        sourceMediaId: string;
+        atMs: number;
+        sourceDurationMs: number;
+    }
+): Promise<string> {
+    const now = Date.now();
+    const atSecs = (out.atMs / 1000).toFixed(2);
+    const ref = await firestore().collection(`brands/${brandId}/assets`).add({
+        kind: "image",
+        source: "generated",
+        status: "ready",
+        url: out.url,
+        s3Key: out.s3Key ?? "",
+        sizeBytes: out.sizeBytes,
+        width: out.width,
+        height: out.height,
+        mimeType: "image/png",
+        refCount: 0,
+        // Readable without opening the row, because this is what the picker
+        // shows under the thumbnail.
+        title: `Frame at ${atSecs}s`,
+        sourceMediaId: out.sourceMediaId,
+        origin: {
+            kind: "frame",
+            sourceMediaId: out.sourceMediaId,
+            atMs: out.atMs,
+            at: now,
+        },
+        createdAt: now,
+        updatedAt: now,
+    });
+
+    // The brand's storage rollup, kept current here too. A counter maintained
+    // on one of two writers drifts in exactly one direction and is then
+    // useless as a billing figure.
+    await firestore()
+        .doc(`brands/${brandId}/aggregates/mediaUsage`)
+        .set(
+            {
+                bytesTotal: FieldValue.increment(out.sizeBytes),
+                countVisible: FieldValue.increment(1),
+                bytesByKind: { image: FieldValue.increment(out.sizeBytes) },
+                updatedAt: now,
+            },
+            { merge: true }
+        )
+        .catch(() => undefined);
+
+    return ref.id;
+}
+
+// ── The Design Studio ───────────────────────────────────────────────────────
+//
+// A studio renders by being converted into a Composition and handed to the
+// renderer that already exists, so what the worker needs from Firestore is the
+// studio, its scenes, and the media rows those scenes point at.
+//
+// Field names mirror internal/models/trendlymodels/studio.go and
+// shared-libs/firestore/trendly-pro/models/studio.ts. Change one, change all
+// three — the conversion depends on reading the same shape the app writes.
+
+/** Everything a studio render needs, read in one pass. */
+export interface StudioForRender {
+    studio: Record<string, unknown> & {
+        id: string;
+        width: number;
+        height: number;
+        fps: number;
+        sceneOrder: string[];
+        renderUrl?: string;
+    };
+    /** Scenes keyed by id, which is what the conversion takes. */
+    scenes: Record<string, Record<string, unknown> & { id: string }>;
+    /** Media keyed by id: just what rendering needs from each row. */
+    media: Record<string, { url: string; kind: "image" | "video" | "audio"; durationMs?: number }>;
+}
+
+export async function getStudioForRender(
+    brandId: string,
+    contentId: string,
+    studioId: string
+): Promise<StudioForRender | null> {
+    const db = firestore();
+    const base = `brands/${brandId}/contents/${contentId}/studios/${studioId}`;
+
+    const doc = await db.doc(base).get();
+    if (!doc.exists) return null;
+    const studio = { id: doc.id, ...(doc.data() as Record<string, unknown>) } as StudioForRender["studio"];
+
+    const sceneSnap = await db.collection(`${base}/scenes`).get();
+    const scenes: StudioForRender["scenes"] = {};
+    const mediaIds = new Set<string>();
+    sceneSnap.forEach((s) => {
+        const data = s.data() as Record<string, unknown>;
+        scenes[s.id] = { id: s.id, ...data };
+        for (const id of (data.mediaIds as string[] | undefined) ?? []) mediaIds.add(id);
+        for (const layer of (data.layers as { mediaId?: string }[] | undefined) ?? []) {
+            if (layer.mediaId) mediaIds.add(layer.mediaId);
+        }
+    });
+
+    // Read each media row once. The same still in four scenes is one row, and
+    // re-reading it per scene is four round trips for one answer.
+    const media: StudioForRender["media"] = {};
+    await Promise.all(
+        [...mediaIds].map(async (id) => {
+            const snap = await db.doc(`brands/${brandId}/assets/${id}`).get();
+            if (!snap.exists) return;
+            const a = snap.data() as { url?: string; kind?: string; durationMs?: number };
+            if (!a.url) return;
+            media[id] = {
+                url: a.url,
+                kind: (a.kind as "image" | "video" | "audio") ?? "image",
+                durationMs: a.durationMs,
+            };
+        })
+    );
+
+    return { studio, scenes, media };
+}
+
+export async function markStudioRenderStarted(
+    brandId: string,
+    contentId: string,
+    studioId: string,
+    jobId?: string
+): Promise<void> {
+    await firestore()
+        .doc(`brands/${brandId}/contents/${contentId}/studios/${studioId}`)
+        .set(
+            {
+                renderStatus: RenderStatus.Rendering,
+                renderId: jobId ?? "",
+                renderError: "",
+                updatedAt: Date.now(),
+            },
+            { merge: true }
+        );
+}
+
+export async function markStudioRenderFailed(
+    brandId: string,
+    contentId: string,
+    studioId: string,
+    reason: string
+): Promise<void> {
+    await firestore()
+        .doc(`brands/${brandId}/contents/${contentId}/studios/${studioId}`)
+        .set(
+            { renderStatus: RenderStatus.Failed, renderError: reason, updatedAt: Date.now() },
+            { merge: true }
+        );
+}
+
+/**
+ * Record a finished studio render.
+ *
+ * The url goes on the studio AND on the content's cached `studioRef`, because
+ * the calendar card reads the pointer and would otherwise keep showing the
+ * previous render until something else happened to refresh it.
+ */
+export async function setStudioRenderResult(
+    brandId: string,
+    contentId: string,
+    studioId: string,
+    videoUrl: string,
+    posterUrl: string | undefined,
+    sceneCount: number,
+    durationMs: number
+): Promise<void> {
+    const db = firestore();
+    const now = Date.now();
+
+    await db.doc(`brands/${brandId}/contents/${contentId}/studios/${studioId}`).set(
+        {
+            renderStatus: RenderStatus.Done,
+            renderUrl: videoUrl,
+            renderError: "",
+            updatedAt: now,
+        },
+        { merge: true }
+    );
+
+    await db.doc(`brands/${brandId}/contents/${contentId}`).set(
+        {
+            studioRef: {
+                studioId,
+                sceneCount,
+                durationMs,
+                renderUrl: videoUrl,
+                updatedAt: now,
+            },
+            attachments: [
+                posterUrl
+                    ? { type: "video", playUrl: videoUrl, appleUrl: videoUrl, thumbUrl: posterUrl }
+                    : { type: "video", playUrl: videoUrl, appleUrl: videoUrl },
+            ],
+            updatedAt: now,
+        },
+        { merge: true }
+    );
+}

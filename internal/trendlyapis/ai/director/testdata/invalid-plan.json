@@ -1,0 +1,40 @@
+{
+  "summary": "A plan built to break every rule the manifest states, so the validator can be seen refusing it.",
+  "canvas": {"width": 1080, "height": 1920, "fps": 30, "aspect": "9:16"},
+  "transitionPreset": "dramatic",
+  "audio": {"musicApproach": "generate", "musicModel": "suno-v4", "voiceModel": "veo-3.1-fast-generate-001", "duckMusic": true},
+  "scenes": [
+    {
+      "id": "s1", "beat": "", "approach": "video", "durationMs": 2000,
+      "transitionIn": {"kind": "dissolve", "ms": 400},
+      "layers": [{"kind": "media", "slot": "full", "assetRequestId": "a1"}],
+      "narration": "Sunday nights used to be the worst part of my week."
+    },
+    {
+      "id": "s2", "beat": "A 5-second Veo clip, which Veo refuses", "approach": "video", "durationMs": 1800,
+      "transitionIn": {"kind": "blur-dissolve", "ms": 1200},
+      "layers": [
+        {"kind": "media", "slot": "full", "assetRequestId": "a2"},
+        {"kind": "media", "slot": "centre-stage", "assetRequestId": "a3"},
+        {"kind": "media", "slot": "left", "reuseMediaId": "md_does_not_exist"},
+        {"kind": "html", "slot": "full", "htmlBrief": "the writing"},
+        {"kind": "media", "slot": "right", "assetRequestId": "a_missing"}
+      ]
+    },
+    {
+      "id": "s3", "beat": "A layer that sets nothing", "approach": "composite", "durationMs": 2500,
+      "transitionIn": {"kind": "cut", "ms": 0},
+      "layers": [{"kind": "media", "slot": "full"}],
+      "fitToNarration": true
+    }
+  ],
+  "assetRequests": [
+    {"id": "a1", "kind": "video", "intent": "empty calendar still", "model": "veo-3.1-fast-generate-001", "prompt": "empty calendar", "durationS": 4, "aspect": "9:16", "startFrameFromAssetId": "a2", "estCostUsd": 0.60},
+    {"id": "a2", "kind": "video", "intent": "laptop at night", "model": "veo-3.1-fast-generate-001", "prompt": "laptop", "durationS": 5, "aspect": "9:16", "estCostUsd": 0.75},
+    {"id": "a3", "kind": "video", "intent": "ultrawide desk", "model": "bytedance-seedance-v2", "prompt": "desk", "durationS": 15, "aspect": "21:9", "estCostUsd": 6.00},
+    {"id": "a4", "kind": "image", "intent": "unused still", "model": "google/gemini-3-pro-image-preview", "prompt": "logo", "estCostUsd": 0.14},
+    {"id": "a5", "kind": "image", "intent": "stock desk as a reference", "model": "google/gemini-3.1-flash-image-preview", "prompt": "desk", "refMediaIds": ["md_stock_desk"], "estCostUsd": 0.04}
+  ],
+  "estCostUsd": 7.53,
+  "notes": ["Every line here corresponds to a real failure mode."]
+}

@@ -110,6 +110,13 @@ var seedanceAspects = []string{"21:9", "16:9", "4:3", "1:1", "3:4", "9:16"}
 func catalog() []trendlymodels.MediaModel {
 	return []trendlymodels.MediaModel{
 		// Veo takes a SET of lengths — 5s is a 422 — and tops out at 1080p.
+		//
+		// ⚠️ 8 SECONDS IS THE CEILING, and it is the provider's rather than
+		// ours: every duration_secs outside {4, 6, 8} comes back "Input should
+		// be 4, 6 or 8" — 30 and 45 included. Nothing this API serves makes a
+		// 30s clip in one call except Seedance v2.5, which is access-denied
+		// below, and nothing makes 45 at all. A longer video is several clips
+		// on the composition timeline, not a longer generation.
 		videoRow(videoSpec{
 			id: "veo-3.1-fast-generate-001", name: "Veo 3.1 Fast", usdPerSecond: 0.15,
 			keyframes: true, nativeAudio: true,
@@ -126,6 +133,21 @@ func catalog() []trendlymodels.MediaModel {
 		// Seedance takes a RANGE, goes further than Veo, and does take start
 		// and end frames — all three of which the first pass of this file got
 		// wrong, by copying Veo's shape instead of asking.
+		//
+		// ⚠️ ALL FOUR ARE TURNED OFF IN THE REGISTRY, and turning one back on
+		// costs a generation to learn why. ElevenLabs gates ByteDance behind
+		// per-workspace approval and refuses an otherwise-valid request:
+		//
+		//	403 model_access_denied — "ByteDance models are disabled by default
+		//	and require explicit approval before use. Contact support to request
+		//	access."  (param: model_id)
+		//
+		// Not the key and not the plan: the same key serves music and voice,
+		// and the workspace is on Pro. No cheap probe finds this out, because
+		// the access check runs AFTER body validation — an incomplete request
+		// answers 422 and reads as authorized. The rows stay here with their
+		// capabilities intact, so the day support approves ByteDance the only
+		// thing to change is the review gate.
 		videoRow(videoSpec{
 			id: "bytedance-seedance-v2", name: "Seedance v2", usdPerSecond: 0.40,
 			keyframes: true, nativeAudio: true, minS: 4, maxS: 15,

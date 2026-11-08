@@ -1,20 +1,14 @@
 package media
 
 import (
-	"bytes"
-	"fmt"
+	"context"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/elevenlabs"
-	"github.com/idivarts/backend-sls/pkg/mys3"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 )
 
 // ── What a generation costs ─────────────────────────────────────────────────
@@ -102,7 +96,12 @@ func GenerateMusic(c *gin.Context) {
 		return
 	}
 
-	url, err := UploadAudio(audio, brandID)
+	url, err := UploadAudioWithOrigin(c.Request.Context(), audio, brandID, &trendlymodels.AssetOrigin{
+		Kind:     trendlymodels.AssetOriginGenerated,
+		Provider: "elevenlabs",
+		Model:    trendlymodels.EnabledModelID(c.Request.Context(), "music"),
+		Prompt:   req.Prompt,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not store audio"})
 		return
@@ -157,7 +156,15 @@ func GenerateVoiceover(c *gin.Context) {
 		return
 	}
 
-	url, err := UploadAudio(audio, brandID)
+	// The library row carries the line and the voice, so a voiceover the brand
+	// paid for can be reused in another scene instead of regenerated — which is
+	// the whole reason generated media is filed at all.
+	url, err := UploadAudioWithOrigin(c.Request.Context(), audio, brandID, &trendlymodels.AssetOrigin{
+		Kind:     trendlymodels.AssetOriginGenerated,
+		Provider: "elevenlabs",
+		Model:    model,
+		Prompt:   req.Text,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not store audio"})
 		return
@@ -204,28 +211,40 @@ func ListGeneratedAudio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"audio": items})
 }
 
-// UploadAudio stores generated audio bytes in the attachment bucket under the
-// audio/ prefix and returns the CloudFront URL (same convention as image/video
-// uploads so the app plays it directly). Exported so the AI audio tools reuse it.
+// UploadAudio stores generated audio and files it in the brand's media library.
+//
+// The address convention is unchanged — the attachment bucket under `audio/`,
+// fronted by the same CDN — because the apps play those URLs directly and they
+// are already in saved compositions.
+//
+// Exported so the AI audio tools reuse it. The library row is what makes a
+// voiceover the brand paid for reusable in another scene instead of regenerated.
 func UploadAudio(a *elevenlabs.Audio, brandID string) (string, error) {
-	bucket := os.Getenv("ATTACHMENT_S3_BUCKET_NAME")
-	cdn := os.Getenv("ATTACHMENT_CF_DISTRIBUTION_URL")
-	if bucket == "" {
-		return "", fmt.Errorf("ATTACHMENT_S3_BUCKET_NAME not set")
+	return UploadAudioWithOrigin(context.Background(), a, brandID, nil)
+}
+
+// UploadAudioWithOrigin is UploadAudio with provenance — the model, the voice,
+// and the line that was said.
+func UploadAudioWithOrigin(ctx context.Context, a *elevenlabs.Audio, brandID string, origin *trendlymodels.AssetOrigin) (string, error) {
+	if origin == nil {
+		origin = &trendlymodels.AssetOrigin{
+			Kind:     trendlymodels.AssetOriginGenerated,
+			Provider: "elevenlabs",
+		}
 	}
-	filename := fmt.Sprintf("file_%d_audio_%s.%s", time.Now().Unix(), uuid.NewString(), a.Ext)
-	key := fmt.Sprintf("audio/%s", filename)
-	_, err := mys3.Client.PutObject(&s3.PutObjectInput{
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(a.Data),
-		ContentType: aws.String(a.ContentType),
-	})
+	stored, err := mediastore.Put(ctx, mediastore.Spec{
+		BrandID:     brandID,
+		Target:      mediastore.TargetAttachment,
+		Prefix:      "audio",
+		Filename:    "audio." + a.Ext,
+		ContentType: a.ContentType,
+		Kind:        trendlymodels.AssetKindAudio,
+		Source:      trendlymodels.AssetSourceGenerated,
+		Origin:      origin,
+		Title:       origin.Prompt,
+	}, a.Data)
 	if err != nil {
 		return "", err
 	}
-	if cdn != "" {
-		return fmt.Sprintf("%s/audio/%s", strings.TrimRight(cdn, "/"), filename), nil
-	}
-	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key), nil
+	return stored.URL, nil
 }

@@ -1,75 +1,49 @@
 package mediajobs
 
-import (
-	"bytes"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"strings"
-	"time"
+// Hosting a provider's output.
+//
+// This used to put the bytes in the bucket itself. It now goes through
+// pkg/mediastore, which stores AND files in one step — the two must not be
+// separable, because a generated clip that is stored but not filed is a clip
+// the brand paid for and can never find again.
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/google/uuid"
-	"github.com/idivarts/backend-sls/pkg/mys3"
+import (
+	"context"
+
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 )
 
-// hostFromURL copies a provider's output into our own bucket and returns the
-// CDN url.
+// hostFromURL copies a provider's output into our own bucket, files it in the
+// brand's library, and returns the CDN url plus the library id.
 //
 // Not optional for generated video. The provider hands back a SIGNED url that
-// expires about an hour out, and a composition is a document people re-render
+// expires about an hour out, and a timeline is a document people re-render
 // weeks later — a clip pointing at an expired url is a timeline nobody can
 // render again.
 //
-// Follows the same convention as the apps' own pre-signed uploads: same bucket,
-// the shared `uploads/` prefix, the same CloudFront host. A generated clip then
-// lives alongside the user's own files and needs no special handling anywhere
-// downstream.
-func hostFromURL(url, brandID string) (string, error) {
-	resp, err := downloadClient.Get(url)
+// The library row carries the model and the prompt, which is how "the clip
+// where she picks up the cup" is findable afterwards.
+func hostFromURL(ctx context.Context, url string, job *trendlymodels.MediaJob) (string, string, error) {
+	stored, err := mediastore.HostFromURL(ctx, mediastore.Spec{
+		BrandID: job.BrandID,
+		Target:  mediastore.TargetImage,
+		Kind:    trendlymodels.AssetKindVideo,
+		Source:  trendlymodels.AssetSourceGenerated,
+		Title:   job.Prompt,
+		Origin: &trendlymodels.AssetOrigin{
+			Kind:      trendlymodels.AssetOriginGenerated,
+			Provider:  job.Provider,
+			Model:     job.ModelID,
+			Prompt:    job.Prompt,
+			JobID:     job.ID,
+			ContentID: job.ContentID,
+		},
+		ContentID: job.ContentID,
+		CreatedBy: job.CreatedBy,
+	}, url)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("mediajobs: download returned %d", resp.StatusCode)
-	}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	ext := "mp4"
-	switch {
-	case strings.Contains(contentType, "webm"):
-		ext = "webm"
-	case strings.Contains(contentType, "quicktime"):
-		ext = "mov"
-	}
-	if contentType == "" {
-		contentType = "video/mp4"
-	}
-
-	bucket := os.Getenv("IMAGE_S3_BUCKET_NAME")
-	cdn := strings.TrimRight(os.Getenv("IMAGE_CF_DISTRIBUTION_URL"), "/")
-	if bucket == "" || cdn == "" {
-		return "", fmt.Errorf("mediajobs: IMAGE_S3_BUCKET_NAME / IMAGE_CF_DISTRIBUTION_URL are not set")
-	}
-	key := fmt.Sprintf("uploads/file_%d_clip_%s.%s", time.Now().Unix(), uuid.NewString(), ext)
-	if _, err := mys3.Client.PutObject(&s3.PutObjectInput{
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(data),
-		ContentType: aws.String(contentType),
-	}); err != nil {
-		return "", err
-	}
-	return cdn + "/" + key, nil
+	return stored.URL, stored.MediaID, nil
 }
-
-// downloadClient is generous on time: a finished clip is tens of megabytes and
-// comes from a provider's CDN, not ours.
-var downloadClient = &http.Client{Timeout: 5 * time.Minute}

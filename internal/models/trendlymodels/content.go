@@ -171,6 +171,16 @@ type Content struct {
 	// so the absence of this field means "nobody has edited the timeline", not
 	// "this content predates timelines".
 	CompositionRef *ContentCompositionRef `json:"compositionRef,omitempty" firestore:"compositionRef,omitempty"`
+	// StudioRef points at the content's Design Studio document.
+	//
+	// The studio supersedes DesignRef + CompositionRef: those two were a
+	// single HTML document and a separate timeline that both claimed to say
+	// what scene 3 was. Both stay for content authored before the studio, and
+	// Phase 5 retires them.
+	//
+	// ⚠️ The counts on it are a CACHE, and the document is client-writable.
+	// Anything that charges or publishes recomputes from the scenes.
+	StudioRef *StudioRef `json:"studioRef,omitempty" firestore:"studioRef,omitempty"`
 	// Audio holds the generated music/voiceover attached to a video content.
 	Audio *ContentAudio `json:"audio,omitempty" firestore:"audio,omitempty"`
 	// Canva deep-edit bridge references (Module 3).

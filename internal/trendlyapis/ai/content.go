@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -9,19 +8,15 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/mediagen"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -883,26 +878,23 @@ func handleContentGenWS(req WSRequest) {
 }
 
 // ───────────────────────── S3 upload helpers ─────────────────────────
+//
+// ⚠️ These go through pkg/mediastore, which stores the bytes AND files a row in
+// the brand's media library in one step. They used to put the object in the
+// bucket and stop there, which meant every AI-generated image the product has
+// ever made was stored and unfindable: no row, no provenance, no reference
+// count, and nothing to pick from when the user wanted the same picture again.
+//
+// The optional origin argument is variadic so the callers that know what they
+// generated can say so without every intermediate helper having to thread it.
+// A row with no prompt is still a row; a missing row is a lost asset.
 
-var s3Client *s3.S3
-
-func getS3() *s3.S3 {
-	if s3Client != nil {
-		return s3Client
-	}
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-	s3Client = s3.New(sess)
-	return s3Client
-}
-
-func uploadBase64Image(b64, brandID string) (string, error) {
+func uploadBase64Image(b64, brandID string, origin ...*trendlymodels.AssetOrigin) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
 		return "", err
 	}
-	return uploadBytes(data, "image/png", brandID, "png")
+	return uploadBytes(data, "image/png", brandID, "png", origin...)
 }
 
 // imageDownloadClient fetches hosted image results. It has an explicit timeout
@@ -911,7 +903,7 @@ func uploadBase64Image(b64, brandID string) (string, error) {
 // client stuck "streaming").
 var imageDownloadClient = &http.Client{Timeout: 60 * time.Second}
 
-func uploadFromURL(url, brandID string) (string, error) {
+func uploadFromURL(url, brandID string, origin ...*trendlymodels.AssetOrigin) (string, error) {
 	httpResp, err := imageDownloadClient.Get(url)
 	if err != nil {
 		return "", err
@@ -928,35 +920,36 @@ func uploadFromURL(url, brandID string) (string, error) {
 	} else if strings.Contains(ct, "webp") {
 		ext = "webp"
 	}
-	return uploadBytes(data, ct, brandID, ext)
+	return uploadBytes(data, ct, brandID, ext, origin...)
 }
 
-// uploadBytes stores an image in S3 following the same convention as the
-// /s3/v1/images pre-sign endpoint used by the apps (useAWSContext): same bucket,
-// the shared `uploads/` prefix, and the CloudFront URL the apps already render.
-// AI-generated images thus live alongside user uploads and need no special
-// handling on the client.
-func uploadBytes(data []byte, contentType, brandID, ext string) (string, error) {
-	bucket := os.Getenv("IMAGE_S3_BUCKET_NAME")
-	cdn := os.Getenv("IMAGE_CF_DISTRIBUTION_URL")
-	if bucket == "" {
-		return "", fmt.Errorf("IMAGE_S3_BUCKET_NAME not set")
+// uploadBytes stores an image and files it in the brand's library.
+//
+// The address convention is unchanged — same bucket, the shared `uploads/`
+// prefix, the CloudFront URL the apps already render — so a generated image
+// still lives alongside a user's own uploads and needs no special handling on
+// the client.
+func uploadBytes(data []byte, contentType, brandID, ext string, origin ...*trendlymodels.AssetOrigin) (string, error) {
+	var org *trendlymodels.AssetOrigin
+	if len(origin) > 0 && origin[0] != nil {
+		org = origin[0]
+	} else {
+		org = &trendlymodels.AssetOrigin{Kind: trendlymodels.AssetOriginGenerated}
 	}
-	filename := fmt.Sprintf("file_%d_ai_%s.%s", time.Now().Unix(), uuid.NewString(), ext)
-	key := fmt.Sprintf("uploads/%s", filename)
-	_, err := getS3().PutObject(&s3.PutObjectInput{
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(key),
-		Body:        bytes.NewReader(data),
-		ContentType: aws.String(contentType),
-	})
+	stored, err := mediastore.Put(context.Background(), mediastore.Spec{
+		BrandID:     brandID,
+		Target:      mediastore.TargetImage,
+		Filename:    "ai." + ext,
+		ContentType: contentType,
+		Kind:        trendlymodels.AssetKindImage,
+		Source:      trendlymodels.AssetSourceGenerated,
+		Origin:      org,
+		Title:       org.Prompt,
+	}, data)
 	if err != nil {
 		return "", err
 	}
-	if cdn != "" {
-		return fmt.Sprintf("%s/uploads/%s", strings.TrimRight(cdn, "/"), filename), nil
-	}
-	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key), nil
+	return stored.URL, nil
 }
 
 func decodePayload(in map[string]any, out any) error {
