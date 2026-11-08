@@ -33,20 +33,19 @@ func TestARenderableStudioPasses(t *testing.T) {
 	}
 }
 
-// The refusal that matters most. A layered scene cannot export yet, and
-// rendering only its base layer would publish something nobody approved —
-// which is worse than refusing, because nobody would know it happened.
-func TestALayeredSceneIsRefusedBeforeCharging(t *testing.T) {
+// This used to assert that a layered scene was refused outright. It no longer
+// is: a stack of stills is a LAYOUT, Chromium draws layouts, and the
+// conversion composes it into one document. The refusal narrowed to the case
+// that genuinely cannot work — see TestAStackWithVideoIsRefusedByItsLayer —
+// and this test now asserts the narrowing rather than the old blanket rule.
+func TestAStillOverAStillExportsRatherThanRefusing(t *testing.T) {
 	s, scenes, media := renderableStudio()
 	scenes[0].Layers = append(scenes[0].Layers,
 		StudioLayer{ID: "l2", Kind: "media", Slot: SlotPipBR, MediaID: "m1"})
 
 	ok, problem, _ := StudioRenderable(s, scenes, media)
-	if ok {
-		t.Fatal("a layered scene should refuse to render")
-	}
-	if problem == "" {
-		t.Fatal("a refusal has to carry a sentence the user can act on")
+	if !ok {
+		t.Fatalf("a still inset over a still should export, got %q", problem)
 	}
 }
 
