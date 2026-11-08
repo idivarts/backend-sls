@@ -369,6 +369,11 @@ func GenerateScene(c *gin.Context) {
 		c.Header("X-Scene-Bookkeeping", "failed")
 	}
 
+	// This may have been the last scene the run was waiting on. Ignored on
+	// purpose: the scene is saved either way, and a run left open is cosmetic
+	// next to failing a request for work that succeeded.
+	_ = trendlymodels.SettleStudioRunIfComplete(ctx, brandID, contentID, studioID, sc.RunID)
+
 	reloadAndRespond(c, brandID, contentID, studioID)
 }
 
@@ -401,11 +406,10 @@ func gateDesign(c *gin.Context, brandID string) (model string, blocked bool) {
 }
 
 func markSceneGenFailed(ctx context.Context, brandID, contentID, studioID, sceneID, reason string) error {
-	return trendlymodels.UpdateStudioScene(ctx, brandID, contentID, studioID, sceneID, []firestore.Update{
-		{Path: "pending", Value: false},
-		{Path: "gen.status", Value: "failed"},
-		{Path: "gen.error", Value: reason},
-	})
+	// Deliberately the model's marker rather than a second copy of the same
+	// three updates: it also settles the run, and a scene that failed here
+	// would otherwise hold its run open forever.
+	return trendlymodels.MarkSceneGenerationFailed(ctx, brandID, contentID, studioID, sceneID, reason)
 }
 
 // sceneSystemPrompt is the contract for ONE scene's document.
