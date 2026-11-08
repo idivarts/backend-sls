@@ -32,11 +32,14 @@ package studio
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
+	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/studiojobs"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/ai"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/ai/director"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
@@ -52,8 +55,27 @@ type planRunRequest struct {
 	TargetSeconds int `json:"targetSeconds"`
 }
 
-// PlanRun asks the director for a plan and stores it for approval.
-// POST …/studios/:studioId/plan
+// PlanRun accepts a planning request and hands it to the studio queue.
+// POST …/studios/:studioId/plan  →  202 {runId, status:"planning"}
+//
+// ⚠️ IT DOES NOT WAIT FOR THE PLAN, and it cannot. API Gateway's integration
+// timeout is 29 seconds and is not configurable; a director plan is one or two
+// calls to a frontier reasoning model, each emitting a whole storyboard as
+// JSON. Measured against the deployed dev stack this returned 504 at 30s on
+// both a cold and a warm call, with NO run stored, because the write happened
+// after the planner answered. Raising the Lambda timeout cannot help — the
+// gateway gives up first.
+//
+// So the row is created in `planning` state and the work moves to studio_sqs.
+// The client polls GET …/runs/:runId, which already existed, because a plan was
+// always meant to be read back later rather than only returned once.
+//
+// What stays SYNCHRONOUS is everything the user must be told immediately:
+// whether the studio and content exist, whether their plan or wallet allows a
+// plan at all (402 with a reason, so the UI shows the right prompt in context),
+// and whether any models are switched on. Those are cheap, and deferring them
+// would turn an instant, explainable refusal into a spinner that resolves into
+// one.
 func PlanRun(c *gin.Context) {
 	brandID, contentID, studioID, ok := guard(c, true)
 	if !ok {
@@ -71,27 +93,24 @@ func PlanRun(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no such studio"})
 		return
 	}
-	content, err := trendlymodels.GetContent(brandID, contentID)
-	if err != nil || content == nil {
+	if content, cerr := trendlymodels.GetContent(brandID, contentID); cerr != nil || content == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no such content"})
 		return
 	}
 
+	// The money gate stays here. A 402 must arrive while the user is looking at
+	// the button they pressed, with the reason that decides which prompt to
+	// show — a top-up or a tier.
 	model, blocked := gatePlanner(c, brandID)
 	if blocked {
 		return
 	}
 
-	manifest, err := director.BuildManifest(ctx, brandID, content, s, req.Mode, req.TargetSeconds)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "could not read what this brand has"})
-		return
-	}
 	// An empty model list is the NORMAL state of a workspace where nothing has
 	// been enabled — `enabled` is a review gate. Said plainly rather than left
 	// for the planner to discover, because a plan that can only reuse existing
 	// media is a reasonable plan and the user should know that is why.
-	if len(manifest.Models) == 0 {
+	if !anyGenerativeModelEnabled(ctx) {
 		c.JSON(http.StatusOK, gin.H{
 			"runId":   "",
 			"message": "No AI models are switched on for your workspace, so a plan could only reuse media you already have. Ask us to enable them.",
@@ -99,10 +118,118 @@ func PlanRun(c *gin.Context) {
 		return
 	}
 
-	userMsg, err := director.BuildUserMessage(manifest, req.Brief)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "could not assemble the brief"})
+	// Checked BEFORE the row is written. With no queue the row would sit in
+	// `planning` forever and the user would watch a spinner that never
+	// resolves — which reads as slowness rather than breakage, and is the worst
+	// failure shape available. Env vars are per function in
+	// serverless.trendly.yml, so this is a real possibility, not a theoretical
+	// one.
+	if !studiojobs.Configured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "planner_unavailable",
+			"message": "The director isn't available right now. Please try again shortly.",
+		})
 		return
+	}
+
+	// The model is stored on the run so the worker uses the one this request
+	// gated on, rather than re-resolving it and possibly picking another.
+	run := &trendlymodels.StudioRun{
+		Status:    trendlymodels.RunPlanning,
+		Mode:      req.Mode,
+		Brief:     strings.TrimSpace(req.Brief),
+		Model:     model,
+		CreatedBy: c.GetString("userId"),
+	}
+	runID, err := trendlymodels.CreateStudioRun(ctx, brandID, contentID, studioID, run)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not start the plan"})
+		return
+	}
+
+	if err := studiojobs.Enqueue(studiojobs.Message{
+		Type:      studiojobs.JobDirectorPlan,
+		BrandID:   brandID,
+		ContentID: contentID,
+		StudioID:  studioID,
+		RunID:     runID,
+	}); err != nil {
+		// The row would otherwise be a permanent "planning". Marked failed so
+		// the storyboard can say so and offer a retry.
+		_ = trendlymodels.UpdateStudioRun(ctx, brandID, contentID, studioID, runID,
+			[]firestore.Update{
+				{Path: "status", Value: trendlymodels.RunFailed},
+				{Path: "error", Value: "could not be queued"},
+			})
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not start the plan"})
+		return
+	}
+
+	// 202: accepted, not done. The client polls the run.
+	c.JSON(http.StatusAccepted, gin.H{
+		"runId":  runID,
+		"status": trendlymodels.RunPlanning,
+	})
+}
+
+// anyGenerativeModelEnabled reports whether anything can be generated at all.
+//
+// Cheaper than building a manifest just to count models, which is why the check
+// is here and not behind BuildManifest: this runs on every plan request, and
+// the manifest reads the design system and the media library too.
+func anyGenerativeModelEnabled(ctx context.Context) bool {
+	for _, m := range trendlymodels.CachedMediaModels(ctx) {
+		if !m.Enabled {
+			continue
+		}
+		switch m.Kind {
+		case "video", "image", "music", "voice":
+			return true
+		}
+	}
+	return false
+}
+
+// ExecutePlanJob is the queued half: it does the planning and writes the answer
+// onto the run row.
+//
+// Runs in studio_sqs, where the timeout is minutes rather than seconds. Every
+// exit path updates the run — a row left in `planning` is indistinguishable
+// from slowness, so "failed with a reason" is always better than silence.
+func ExecutePlanJob(ctx context.Context, msg studiojobs.Message) error {
+	brandID, contentID, studioID, runID := msg.BrandID, msg.ContentID, msg.StudioID, msg.RunID
+
+	fail := func(reason string) error {
+		return trendlymodels.UpdateStudioRun(ctx, brandID, contentID, studioID, runID,
+			[]firestore.Update{
+				{Path: "status", Value: trendlymodels.RunFailed},
+				{Path: "error", Value: reason},
+			})
+	}
+
+	run, err := trendlymodels.GetStudioRun(ctx, brandID, contentID, studioID, runID)
+	if err != nil || run == nil {
+		// Nothing to write to. Returning nil drops the message rather than
+		// retrying forever against a row that does not exist.
+		log.Printf("studiojobs: director_plan for a missing run %s/%s/%s/%s", brandID, contentID, studioID, runID)
+		return nil
+	}
+	s, err := trendlymodels.GetStudio(ctx, brandID, contentID, studioID)
+	if err != nil || s == nil {
+		return fail("the studio was deleted")
+	}
+	content, err := trendlymodels.GetContent(brandID, contentID)
+	if err != nil || content == nil {
+		return fail("the content was deleted")
+	}
+
+	manifest, err := director.BuildManifest(ctx, brandID, content, s, run.Mode, 0)
+	if err != nil {
+		return fail("could not read what this brand has")
+	}
+	userMsg, err := director.BuildUserMessage(manifest, run.Brief)
+	if err != nil {
+		return fail("could not assemble the brief")
 	}
 
 	messages := []openrouter.Message{
@@ -110,17 +237,13 @@ func PlanRun(c *gin.Context) {
 		{Role: "user", Content: userMsg},
 	}
 
-	plan, problems, raw, perr := planOnce(ctx, brandID, model, messages)
+	plan, problems, raw, perr := planOnce(ctx, brandID, run.Model, messages)
 	if perr != nil {
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error":   "planning_failed",
-			"message": "The director didn't answer. Please try again.",
-		})
-		return
+		return fail("the director didn't answer")
 	}
-	// Validated against the manifest the planner was GIVEN, not a freshly
-	// built one: a wallet that moved between the call and the check would make
-	// a plan fail validation for a reason that had nothing to do with it.
+	// Validated against the manifest the planner was GIVEN, not a freshly built
+	// one: a wallet that moved between the call and the check would make a plan
+	// fail validation for a reason that had nothing to do with it.
 	if len(problems) == 0 {
 		problems = plan.Validate(manifest)
 	}
@@ -133,7 +256,7 @@ func PlanRun(c *gin.Context) {
 		messages = append(messages,
 			openrouter.Message{Role: "assistant", Content: raw},
 			openrouter.Message{Role: "user", Content: director.RepairMessage(problems)})
-		if repaired, rproblems, rraw, rerr := planOnce(ctx, brandID, model, messages); rerr == nil {
+		if repaired, rproblems, rraw, rerr := planOnce(ctx, brandID, run.Model, messages); rerr == nil {
 			if len(rproblems) == 0 {
 				rproblems = repaired.Validate(manifest)
 			}
@@ -144,45 +267,22 @@ func PlanRun(c *gin.Context) {
 	storyboard := director.Storyboard(plan, manifest, problems)
 	_, derived := plan.DerivedCosts(manifest)
 
-	run := &trendlymodels.StudioRun{
-		Status:     trendlymodels.RunPlanned,
-		Mode:       manifest.Budget.Mode,
-		Brief:      strings.TrimSpace(req.Brief),
-		PlanJSON:   raw,
-		Storyboard: storyboard,
-		Problems:   flattenProblems(problems),
-		EstCostUSD: derived,
-		Model:      model,
-		CreatedBy:  c.GetString("userId"),
-	}
 	// A plan that could never run is stored as REFUSED rather than discarded:
 	// the problems are the useful part, and the user is entitled to see why
 	// their brief was turned down.
+	status := trendlymodels.RunPlanned
 	if director.Fatal(problems) {
-		run.Status = trendlymodels.RunRefused
+		status = trendlymodels.RunRefused
 	}
 
-	runID, err := trendlymodels.CreateStudioRun(ctx, brandID, contentID, studioID, run)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "could not store the plan"})
-		return
-	}
-
-	statusCode := http.StatusOK
-	if director.Fatal(problems) {
-		// 422: the request was understood and the answer is a plan that cannot
-		// be run. Not a 500 — nothing is broken — and not a 200, because the
-		// client must not offer an Approve button for it.
-		statusCode = http.StatusUnprocessableEntity
-	}
-	c.JSON(statusCode, gin.H{
-		"runId":      runID,
-		"status":     run.Status,
-		"storyboard": storyboard,
-		"problems":   run.Problems,
-		"estCostUsd": derived,
-		"plan":       json.RawMessage(raw),
-	})
+	return trendlymodels.UpdateStudioRun(ctx, brandID, contentID, studioID, runID,
+		[]firestore.Update{
+			{Path: "status", Value: status},
+			{Path: "planJson", Value: raw},
+			{Path: "storyboard", Value: storyboard},
+			{Path: "problems", Value: flattenProblems(problems)},
+			{Path: "estCostUsd", Value: derived},
+		})
 }
 
 // planOnce makes one planner call and validates the answer.
