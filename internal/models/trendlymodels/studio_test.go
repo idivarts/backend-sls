@@ -39,18 +39,33 @@ func TestLaneMediaIDsAreDistinctAndOrdered(t *testing.T) {
 // handler to write `audio` through the generic updater reopens the hole, and
 // the symptom — a render that comes back silent weeks afterwards — points
 // nowhere near the cause.
+//
+// ⚠️ Every assertion here checks the error's TEXT, not just that there was one.
+// With no credentials the Firestore call fails anyway, so `err != nil` is true
+// whether the guard fired or not: an earlier version of this test passed with
+// the guard deliberately broken.
 func TestUpdateStudioRefusesTheAudioObject(t *testing.T) {
-	for _, path := range []string{"audio", "audio.lanes"} {
-		err := UpdateStudio(context.Background(), "b", "c", "s",
-			[]firestore.Update{{Path: path, Value: nil}})
-		if err == nil {
-			t.Errorf("UpdateStudio should refuse %q", path)
+	refused := func(t *testing.T, u firestore.Update, label string) {
+		t.Helper()
+		err := UpdateStudio(context.Background(), "b", "c", "s", []firestore.Update{u})
+		if err == nil || !strings.Contains(err.Error(), "SetStudioAudio") {
+			t.Errorf("UpdateStudio should refuse %s by the guard, got %v", label, err)
 		}
 	}
+	for _, path := range []string{"audio", "audio.lanes"} {
+		refused(t, firestore.Update{Path: path, Value: nil}, "Path "+path)
+	}
+	// The other spelling. Firestore treats a FieldPath slice identically, so a
+	// guard that only knows dotted strings is one the next handler walks past
+	// without noticing it has done anything wrong.
+	for _, fp := range []firestore.FieldPath{{"audio"}, {"audio", "lanes"}} {
+		refused(t, firestore.Update{FieldPath: fp, Value: nil}, "FieldPath "+strings.Join(fp, "."))
+	}
+
 	// The two fields that name no media stay allowed, or parking the
-	// director's request would need the heavyweight path for nothing. These
-	// reach Firestore and fail there, which is not what is under test — the
-	// assertion is only that they are not refused by the guard.
+	// director's request would need the heavyweight path for nothing. This
+	// reaches Firestore and fails there, which is not what is under test — the
+	// assertion is only that the guard did not stop it.
 	err := UpdateStudio(context.Background(), "b", "c", "s",
 		[]firestore.Update{{Path: "audio.voiceId", Value: "v"}})
 	if err != nil && strings.Contains(err.Error(), "SetStudioAudio") {

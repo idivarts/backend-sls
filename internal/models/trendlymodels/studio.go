@@ -25,6 +25,7 @@ package trendlymodels
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -467,13 +468,29 @@ func GetStudio(ctx context.Context, brandID, contentID, studioID string) (*Studi
 // `audio.voiceId` and `audio.musicRequest` are fine — neither names media.
 func UpdateStudio(ctx context.Context, brandID, contentID, studioID string, updates []firestore.Update) error {
 	for _, u := range updates {
-		if u.Path == "audio" || u.Path == "audio.lanes" {
-			return fmt.Errorf("UpdateStudio: %q must go through SetStudioAudio", u.Path)
+		// Both spellings. `firestore.Update` takes either a dotted Path or a
+		// FieldPath, and a guard that knows only one is a guard the next
+		// handler walks past without noticing.
+		if p := updatePath(u); p == "audio" || p == "audio.lanes" {
+			return fmt.Errorf("UpdateStudio: %q must go through SetStudioAudio", p)
 		}
 	}
 	updates = append(updates, firestore.Update{Path: "updatedAt", Value: time.Now().UnixMilli()})
 	_, err := studioDoc(brandID, contentID, studioID).Update(ctx, updates)
 	return err
+}
+
+// updatePath is an update's target as one dotted string, whichever of the two
+// ways the caller spelled it.
+//
+// Firestore accepts a dotted `Path` or a `FieldPath` slice and treats them
+// identically, so the refcount guards have to as well — otherwise the one
+// spelling nobody thought to check becomes the way the rule gets broken.
+func updatePath(u firestore.Update) string {
+	if u.Path != "" {
+		return u.Path
+	}
+	return strings.Join(u.FieldPath, ".")
 }
 
 // SetStudioAudio replaces the audio object and moves the media reference counts
