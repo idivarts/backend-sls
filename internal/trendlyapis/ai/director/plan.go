@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -1149,12 +1150,42 @@ func inventedSpecific(line string) string {
 	if percentRe.MatchString(line) {
 		return "a percentage"
 	}
-	if figureRe.MatchString(line) {
+	for _, m := range figureRe.FindAllString(line, -1) {
 		// Plain small numbers are ordinary speech ("three things", "day one"),
 		// so only a figure big enough to read as a statistic counts.
+		//
+		// ⚠️ But a bare four-digit number is usually a YEAR, and a year is not
+		// a claim. "Back in 2024 we had no idea" was being refused as an
+		// invented figure — fatally, so one ordinary line about when something
+		// happened killed the whole plan.
+		if looksLikeYear(m) {
+			continue
+		}
 		return "a figure"
 	}
 	return ""
+}
+
+// looksLikeYear reports whether a matched figure is really a date.
+//
+// Deliberately narrow: a BARE four-digit number between 1900 and 2099. A
+// thousands separator ("1,200") or five digits ("10000") is never a year, so
+// those still count.
+//
+// The trade-off, stated plainly: a year-shaped statistic slips through —
+// "1999 customers" reads as a year to this check. That is the right way round.
+// Missing one rare phrasing costs a warning nobody sees; refusing every line
+// that mentions a year makes the whole provenance rule unusable, and a rule
+// people have to work around teaches them to distrust all of it.
+func looksLikeYear(m string) bool {
+	if len(m) != 4 {
+		return false
+	}
+	n, err := strconv.Atoi(m)
+	if err != nil {
+		return false
+	}
+	return n >= 1900 && n <= 2099
 }
 
 var (
