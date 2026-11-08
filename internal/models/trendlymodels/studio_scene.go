@@ -538,6 +538,20 @@ func SetSceneGeneratedMedia(ctx context.Context, brandID, contentID, studioID, s
 	return true, nil
 }
 
+// MarkSceneGenerationQueued puts a scene into the "a job is coming" state.
+//
+// `pending` and the generation record move together, in one write. They are
+// what the rail and the pick-up strip read, and a scene that is pending with
+// no generation record — or carries one while not pending — is a scene whose
+// two halves disagree about whether anything is happening to it.
+func MarkSceneGenerationQueued(ctx context.Context, brandID, contentID, studioID, sceneID string,
+	gen *SceneGeneration) error {
+	return UpdateStudioScene(ctx, brandID, contentID, studioID, sceneID, []firestore.Update{
+		{Path: "pending", Value: true},
+		{Path: "gen", Value: gen},
+	})
+}
+
 // MarkSceneGenerationFailed records that a scene's generation did not produce a
 // clip, so the rail can show it as failed rather than as forever pending.
 func MarkSceneGenerationFailed(ctx context.Context, brandID, contentID, studioID, sceneID, reason string) error {

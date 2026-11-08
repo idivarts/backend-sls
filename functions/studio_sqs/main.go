@@ -15,12 +15,18 @@ import (
 // handler is the worker for Design Studio work that cannot fit in an HTTP
 // request.
 //
-// Today that is one job: the director's plan. API Gateway's integration
+// Two jobs: the director's plan, and a scene's design. API Gateway's integration
 // timeout is 29 seconds and is not configurable, while a plan is one or two
 // calls to a frontier reasoning model emitting a whole storyboard as JSON — it
 // returned 504 at 30s against the deployed dev stack, cold and warm, with
 // nothing stored. The HTTP endpoint now creates the run in `planning` state and
 // hands it here; the client polls GET …/runs/:runId.
+//
+// A scene design is here for the same reason as the plan, measured the same
+// way: 25–40s of frontier model against a 30s HTTP ceiling, with three of five
+// scenes in a real run dying at exactly 29.999s and unable to record that they
+// had — the request context carries the Lambda deadline, so the write that
+// reports a failure expires with it.
 //
 // ⚠️ Errors are swallowed per record rather than returned. Returning an error
 // makes SQS replay the WHOLE batch, and a replayed plan is a second call to a
@@ -36,7 +42,9 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 			mysentry.Capture(err, map[string]string{"lambda": "studio_sqs", "op": "unmarshal"})
 			continue
 		}
-		if msg.BrandID == "" || msg.ContentID == "" || msg.StudioID == "" || msg.RunID == "" {
+		// Per type — a scene design names a scene, not a run, and the old
+		// blanket "RunID must be set" would have dropped every one of them.
+		if !msg.Target() {
 			log.Println("studio_sqs: incomplete message, skipping:", record.Body)
 			continue
 		}
@@ -51,6 +59,18 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 					"op":       "director_plan",
 					"brandId":  msg.BrandID,
 					"studioId": msg.StudioID,
+				})
+			}
+		case studiojobs.JobSceneDesign:
+			if err := studio.ExecuteSceneDesignJob(ctx, msg); err != nil {
+				log.Printf("studio_sqs: scene design failed for %s/%s/%s scene %s: %v",
+					msg.BrandID, msg.ContentID, msg.StudioID, msg.SceneID, err)
+				mysentry.Capture(err, map[string]string{
+					"lambda":   "studio_sqs",
+					"op":       "scene_design",
+					"brandId":  msg.BrandID,
+					"studioId": msg.StudioID,
+					"sceneId":  msg.SceneID,
 				})
 			}
 		default:

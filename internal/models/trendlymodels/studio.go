@@ -189,6 +189,17 @@ type SceneNarration struct {
 }
 
 // SceneGeneration records how a scene's media was generated.
+// Scene generation statuses.
+//
+// `queued` means a job is on the studio queue for this scene and the worker
+// will record an outcome. It is the state the rail draws as "Making…", and the
+// one thing that must never be left behind by a path that then does nothing.
+const (
+	SceneGenQueued = "queued"
+	SceneGenDone   = "done"
+	SceneGenFailed = "failed"
+)
+
 type SceneGeneration struct {
 	Model  string                 `json:"model" firestore:"model"`
 	Prompt string                 `json:"prompt" firestore:"prompt"`
@@ -196,6 +207,16 @@ type SceneGeneration struct {
 	JobID  string                 `json:"jobId,omitempty" firestore:"jobId,omitempty"`
 	Status string                 `json:"status,omitempty" firestore:"status,omitempty"`
 	Error  string                 `json:"error,omitempty" firestore:"error,omitempty"`
+
+	// QueuedAt is when the job was put on the queue, in epoch ms.
+	//
+	// It exists so a client can tell a scene being worked on from one that was
+	// abandoned. Before the generation moved to the queue those looked
+	// identical — `pending` with `status: queued` — and a run stranded hours
+	// earlier was indistinguishable from one a worker had picked up a second
+	// ago. The worker's ceiling is 900s, so anything older than that with no
+	// outcome is stranded, not slow.
+	QueuedAt int64 `json:"queuedAt,omitempty" firestore:"queuedAt,omitempty"`
 
 	// ChainedFromSceneID means this scene continues the previous one as one
 	// unbroken motion, generated from its last frame.
