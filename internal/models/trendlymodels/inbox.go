@@ -69,9 +69,9 @@ type InboxContact struct {
 }
 
 type InboxConversation struct {
-	ID        string    `json:"id" firestore:"id"`
-	Kind      InboxKind `json:"kind" firestore:"kind"`
-	Channel   Platform  `json:"channel" firestore:"channel"` // "instagram" | "facebook"
+	ID      string    `json:"id" firestore:"id"`
+	Kind    InboxKind `json:"kind" firestore:"kind"`
+	Channel Platform  `json:"channel" firestore:"channel"` // "instagram" | "facebook"
 
 	Participant InboxParticipant `json:"participant" firestore:"participant"`
 

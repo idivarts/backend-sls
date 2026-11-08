@@ -63,6 +63,7 @@ var registry = []Registered{
 
 	// Assets & media
 	mediaLibrary(),
+	searchMedia(),
 	footageLibrary(),
 	generatedAssets(),
 

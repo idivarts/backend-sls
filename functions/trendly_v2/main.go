@@ -96,6 +96,15 @@ func handleManagerAPIs() {
 	managerApisV1.POST("/brands/:brandId/assets", assets.RecordAsset)
 	managerApisV1.DELETE("/brands/:brandId/assets/:assetId", assets.DeleteAsset)
 
+	// The media collection. /assets is the brand's history (stored rows plus a
+	// derived view of old attachments); /media is what can be placed in a
+	// scene right now, plus the lifecycle calls a real collection needs.
+	managerApisV1.GET("/brands/:brandId/media", assets.ListMedia)
+	managerApisV1.GET("/brands/:brandId/media/usage", assets.MediaUsage)
+	managerApisV1.POST("/brands/:brandId/media/:mediaId/confirm", assets.ConfirmMedia)
+	managerApisV1.POST("/brands/:brandId/media/:mediaId/archive", assets.ArchiveMedia)
+	managerApisV1.POST("/brands/:brandId/media/:mediaId/frame", assets.ExtractFrame)
+
 	// Generated video. Returns 202 with a job id — a clip takes minutes, so
 	// the strip shows it queued and a webhook or the polling cron resolves it.
 	managerApisV1.POST("/brands/:brandId/contents/:contentId/clips/generate", mediajobs.GenerateClip)

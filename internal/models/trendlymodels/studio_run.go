@@ -1,0 +1,213 @@
+package trendlymodels
+
+// A director run — brands/{brandId}/contents/{contentId}/studios/{studioId}/runs/{runId}.
+//
+// ── What a run is ───────────────────────────────────────────────────────────
+// One plan, its approval, and the work that followed from it. It exists as a
+// document rather than as a request/response for three reasons, each of which
+// is a thing people actually do:
+//
+//   - APPROVE LATER. A plan is read, thought about, and approved — possibly on
+//     another device. A plan that lived only in a response would have to be
+//     re-planned, which costs money and produces a different plan.
+//   - SEE WHAT IT COST. A run that spent real money is something the user is
+//     entitled to look back at, including when it half failed.
+//   - NOT RUN TWICE. The approval is recorded on the document, so two taps on
+//     a slow button cannot both start the work.
+//
+// ⚠️ THE PLAN IS STORED AS OPAQUE JSON. It is the planner's output, versioned
+// by whatever the director package understood on the day — not a model anything
+// queries. Giving it Firestore fields would freeze a shape that is still
+// changing, and an old run would then read as corrupt rather than as old.
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"cloud.google.com/go/firestore"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
+	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+// Run statuses.
+const (
+	// RunPlanned has a plan and is waiting for a person.
+	RunPlanned = "planned"
+	// RunApproved has been accepted and the work has started.
+	RunApproved = "approved"
+	RunRunning  = "running"
+	RunDone     = "done"
+	RunFailed   = "failed"
+	// RunRefused never got a usable plan: the planner could not produce one
+	// without a fatal problem. Kept rather than deleted, because the problems
+	// are the useful part.
+	RunRefused = "refused"
+	// RunCancelled was stopped by the user partway.
+	RunCancelled = "cancelled"
+)
+
+// StudioRun is one plan and what came of it.
+type StudioRun struct {
+	ID string `json:"id" firestore:"-"`
+
+	// Status: planned | approved | running | done | failed | refused | cancelled.
+	Status string `json:"status" firestore:"status"`
+	// Mode is the user's intent — economy | balanced | cinematic. They pick an
+	// intent, never a model.
+	Mode string `json:"mode" firestore:"mode"`
+	// Brief is what the user asked for, in their words. Kept so a run is
+	// legible months later without reading the plan.
+	Brief string `json:"brief" firestore:"brief"`
+
+	// PlanJSON is the planner's output, verbatim. See the note above.
+	PlanJSON string `json:"planJson,omitempty" firestore:"planJson,omitempty"`
+	// Storyboard is the human-readable rendering of the plan, as it was shown
+	// for approval. Stored because it is the thing the user actually agreed
+	// to — re-rendering it later from a newer printer could show something
+	// subtly different from what they approved.
+	Storyboard string `json:"storyboard,omitempty" firestore:"storyboard,omitempty"`
+
+	// Problems are the validator's findings. A fatal one means the plan was
+	// never runnable; warnings were shown and could be overridden.
+	Problems []RunProblem `json:"problems,omitempty" firestore:"problems,omitempty"`
+
+	// SceneIDs are the scenes this run created, in plan order, so a cancelled
+	// or failed run can be undone without guessing which scenes were its.
+	SceneIDs []string `json:"sceneIds,omitempty" firestore:"sceneIds,omitempty"`
+
+	// EstCostUSD is what the registry priced the plan at — OUR number, not the
+	// planner's claim about itself.
+	EstCostUSD float64 `json:"estCostUsd,omitempty" firestore:"estCostUsd,omitempty"`
+	// ChargedTokens is what the wallet actually paid across the run.
+	ChargedTokens int64 `json:"chargedTokens,omitempty" firestore:"chargedTokens,omitempty"`
+
+	Model     string `json:"model,omitempty" firestore:"model,omitempty"`
+	Error     string `json:"error,omitempty" firestore:"error,omitempty"`
+	CreatedBy string `json:"createdBy,omitempty" firestore:"createdBy,omitempty"`
+
+	CreatedAt  int64 `json:"createdAt" firestore:"createdAt"`
+	ApprovedAt int64 `json:"approvedAt,omitempty" firestore:"approvedAt,omitempty"`
+	UpdatedAt  int64 `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
+}
+
+// RunProblem is one validator finding, flattened for storage.
+type RunProblem struct {
+	Field   string `json:"field" firestore:"field"`
+	Message string `json:"message" firestore:"message"`
+	Fatal   bool   `json:"fatal" firestore:"fatal"`
+}
+
+func runsCollection(brandID, contentID, studioID string) *firestore.CollectionRef {
+	return studioDoc(brandID, contentID, studioID).Collection("runs")
+}
+
+// CreateStudioRun stores a plan awaiting approval.
+func CreateStudioRun(ctx context.Context, brandID, contentID, studioID string, r *StudioRun) (string, error) {
+	now := time.Now().UnixMilli()
+	if r.CreatedAt == 0 {
+		r.CreatedAt = now
+	}
+	r.UpdatedAt = now
+	if r.Status == "" {
+		r.Status = RunPlanned
+	}
+	ref, _, err := runsCollection(brandID, contentID, studioID).Add(ctx, r)
+	if err != nil {
+		return "", fmt.Errorf("CreateStudioRun: %w", err)
+	}
+	return ref.ID, nil
+}
+
+// GetStudioRun reads one run, or (nil, nil) when absent.
+func GetStudioRun(ctx context.Context, brandID, contentID, studioID, runID string) (*StudioRun, error) {
+	doc, err := runsCollection(brandID, contentID, studioID).Doc(runID).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var r StudioRun
+	if err := doc.DataTo(&r); err != nil {
+		return nil, err
+	}
+	r.ID = doc.Ref.ID
+	return &r, nil
+}
+
+// ApproveStudioRun moves a planned run to approved, ONCE.
+//
+// Guarded in a transaction, which is the whole reason this is not an Update: a
+// run that starts twice generates everything twice and charges for both. Two
+// taps on a slow button is the ordinary way that happens.
+//
+// Returns false when the run was already approved — which is a no-op, not an
+// error, because the second tap should simply do nothing.
+func ApproveStudioRun(ctx context.Context, brandID, contentID, studioID, runID string) (bool, error) {
+	ref := runsCollection(brandID, contentID, studioID).Doc(runID)
+	approved := false
+
+	err := firestoredb.Client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if err != nil {
+			return err
+		}
+		var r StudioRun
+		if err := snap.DataTo(&r); err != nil {
+			return err
+		}
+		if r.Status != RunPlanned {
+			approved = false
+			return nil
+		}
+		approved = true
+		return tx.Update(ref, []firestore.Update{
+			{Path: "status", Value: RunApproved},
+			{Path: "approvedAt", Value: time.Now().UnixMilli()},
+			{Path: "updatedAt", Value: time.Now().UnixMilli()},
+		})
+	})
+	if err != nil {
+		return false, err
+	}
+	return approved, nil
+}
+
+// UpdateStudioRun applies partial updates and stamps updatedAt.
+func UpdateStudioRun(ctx context.Context, brandID, contentID, studioID, runID string,
+	updates []firestore.Update) error {
+	updates = append(updates, firestore.Update{Path: "updatedAt", Value: time.Now().UnixMilli()})
+	_, err := runsCollection(brandID, contentID, studioID).Doc(runID).Update(ctx, updates)
+	return err
+}
+
+// ListStudioRuns returns a studio's runs, newest first.
+func ListStudioRuns(ctx context.Context, brandID, contentID, studioID string, limit int) ([]StudioRun, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	iter := runsCollection(brandID, contentID, studioID).
+		OrderBy("createdAt", firestore.Desc).Limit(limit).Documents(ctx)
+	defer iter.Stop()
+
+	out := []StudioRun{}
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return out, err
+		}
+		var r StudioRun
+		if err := doc.DataTo(&r); err != nil {
+			continue
+		}
+		r.ID = doc.Ref.ID
+		out = append(out, r)
+	}
+	return out, nil
+}

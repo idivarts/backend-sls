@@ -1,16 +1,16 @@
+// Package attachments hands out pre-signed uploads for contract and chat files.
+//
+// It routes through pkg/mediastore so the codebase has exactly one S3 writer,
+// but it files NO library row, and that is deliberate: a document a brand sends
+// an influencer is not the brand's media. Filing it would offer someone's
+// signed agreement in the scene picker.
 package attachments
 
 import (
-	"fmt"
-	"log"
 	"net/http"
-	"os"
-	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 )
 
 func S3UploadHandler(ctx *gin.Context) {
@@ -20,28 +20,17 @@ func S3UploadHandler(ctx *gin.Context) {
 		return
 	}
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-	svc := s3.New(sess)
-
-	// Get s3 bucket name from environment variable
-	bucketName := os.Getenv("ATTACHMENT_S3_BUCKET_NAME")
-	domainUrl := os.Getenv("ATTACHMENT_CF_DISTRIBUTION_URL")
-
-	filename = fmt.Sprintf("file_%d_%s", time.Now().Unix(), filename)
-	imageUrl := fmt.Sprintf("%s/uploads/%s", domainUrl, filename)
-
-	req, _ := svc.PutObjectRequest(&s3.PutObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(fmt.Sprintf("uploads/%s", filename)),
+	out, err := mediastore.PresignUpload(ctx.Request.Context(), mediastore.Spec{
+		Target:   mediastore.TargetAttachment,
+		Filename: filename,
+		// Not the brand's media: a contract or a chat file, which must never
+		// turn up in the scene picker.
+		NoLibrary: true,
 	})
-	url, err := req.Presign(15 * time.Minute)
 	if err != nil {
-		log.Println("Failed to sign request", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"uploadUrl": url, "attachmentUrl": imageUrl})
+	ctx.JSON(http.StatusOK, gin.H{"uploadUrl": out.UploadURL, "attachmentUrl": out.URL})
 }

@@ -1,7 +1,6 @@
 package mediajobs
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -58,6 +57,9 @@ type generateClipRequest struct {
 //
 // Returns 202 with the job id. The clip shows as queued on the strip until the
 // job resolves — which is minutes away, so nothing here waits for it.
+//
+// The validation, the gates and the charge all live in SubmitVideo, shared with
+// the Design Studio's own generation. This handler only translates HTTP.
 func GenerateClip(c *gin.Context) {
 	brandID := c.Param("brandId")
 	contentID := c.Param("contentId")
@@ -73,156 +75,35 @@ func GenerateClip(c *gin.Context) {
 		return
 	}
 
-	// The registry decides what a model can do, not the caller. A request for a
-	// capability the chosen model lacks is refused here rather than silently
-	// dropped by the provider — the user pays either way, and a clip that
-	// ignores the end frame they pinned is a clip they did not ask for.
-	model, err := trendlymodels.GetMediaModel(c.Request.Context(), req.ModelID)
-	if err != nil || model == nil || !model.Enabled || model.Kind != "video" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "unknown_model",
-			"message": "That video model isn't available.",
-		})
-		return
-	}
-	if req.StartFrameURL != "" && !model.StartFrame {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "unsupported_capability",
-			"message": "This model can't start from an image. Pick another, or remove the start frame.",
-		})
-		return
-	}
-	if req.EndFrameURL != "" && !model.EndFrame {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "unsupported_capability",
-			"message": "This model can't end on an image. Pick another, or remove the end frame.",
-		})
-		return
-	}
-	if secs := req.DurationSecs; secs > 0 {
-		// An exact set beats the bounds where a model has one. Veo takes 4, 6 or
-		// 8 and refuses 5 — the provider's 422 is the same money and a worse
-		// message, so the refusal happens here.
-		if len(model.DurationsS) > 0 && !containsInt(model.DurationsS, secs) {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "unsupported_capability",
-				"message": fmt.Sprintf("This model makes clips of %s seconds. Pick one of those.",
-					joinInts(model.DurationsS)),
-			})
-			return
-		}
-		if model.MinDurationS > 0 && secs < model.MinDurationS {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "unsupported_capability",
-				"message": "That clip is shorter than this model can make.",
-			})
-			return
-		}
-		// Refused rather than clamped. A clip silently cut to the model's cap
-		// is one the user paid for and did not ask for, and the timeline it
-		// was sized for now has a gap.
-		if model.MaxDurationS > 0 && secs > model.MaxDurationS {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "unsupported_capability",
-				"message": "That clip is longer than this model can make. Split it across two clips.",
-			})
-			return
-		}
-	}
-
-	orgID := orgIDForBrand(brandID)
-	tokens := trendlymodels.GenerativeVideoTokenCost(model, req.DurationSecs)
-
-	// Gated on the wallet, and on the plan the model asks for. Both refuse
-	// BEFORE the provider is called, because a generation is charged the
-	// moment it is accepted.
-	if locked, reason := videoLocked(orgID, model); locked {
-		c.JSON(http.StatusPaymentRequired, gin.H{
-			"error":   "upgrade_required",
-			"reason":  reason,
-			"feature": "generative_video",
-			"cost":    tokens,
-		})
-		return
-	}
-
-	spec := mediagen.Spec{
-		Kind:          mediagen.KindVideo,
+	out, refusal := SubmitVideo(c.Request.Context(), VideoRequest{
+		BrandID:   brandID,
+		ContentID: contentID,
+		Target: Target{
+			CompositionID: req.CompositionID,
+			ClipID:        req.ClipID,
+		},
 		ModelID:       req.ModelID,
 		Prompt:        req.Prompt,
 		AspectRatio:   req.AspectRatio,
 		DurationSecs:  req.DurationSecs,
 		Resolution:    req.Resolution,
-		NativeAudio:   model.NativeAudio,
 		GenerateAudio: req.GenerateAudio,
-	}
-	if req.StartFrameURL != "" {
-		spec.StartFrame = &mediagen.AssetRef{URL: req.StartFrameURL}
-	}
-	if req.EndFrameURL != "" {
-		spec.EndFrame = &mediagen.AssetRef{URL: req.EndFrameURL}
-	}
-
-	res, err := mediagen.Submit(c.Request.Context(), model.Provider, spec)
-	if err != nil {
-		// Logged with the model and the provider's own words. The user gets a
-		// sentence they can act on, which is deliberately not the provider's
-		// error — but without this line a refused generation is a 502 with no
-		// trace anywhere, and the only way to learn why is to spend another
-		// one.
-		log.Printf("mediajobs: submit %s via %s failed: %v", req.ModelID, model.Provider, err)
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error":   "submit_failed",
-			"message": "Couldn't start this clip. Please try again.",
-		})
-		return
-	}
-	if res.JobID == "" {
-		log.Printf("mediajobs: submit %s via %s returned no job id: %s",
-			req.ModelID, model.Provider, res.Error)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "submit_failed", "message": res.Error})
-		return
-	}
-
-	// Charged on acceptance, refunded if it fails. The provider bills on
-	// acceptance too, and holding the charge until completion would let a
-	// drained wallet queue unlimited work.
-	if orgID != "" && tokens > 0 {
-		if _, derr := trendlymodels.DeductTokens(orgID, tokens); derr != nil {
-			log.Printf("mediajobs: deduct %d for org %s: %v", tokens, orgID, derr)
-		}
-	}
-
-	job := &trendlymodels.MediaJob{
-		ID:             res.JobID,
-		Provider:       model.Provider,
-		Kind:           "video",
-		ModelID:        req.ModelID,
-		Prompt:         req.Prompt,
-		BrandID:        brandID,
-		ContentID:      contentID,
-		CompositionID:  req.CompositionID,
-		ClipID:         req.ClipID,
-		Status:         trendlymodels.MediaJobPending,
-		ChargedTokens:  tokens,
-		OrganizationID: orgID,
-		CreatedBy:      c.GetString("userId"),
-	}
-	if err := trendlymodels.CreateMediaJob(c.Request.Context(), job); err != nil {
-		// The generation is already running and already charged. Losing the
-		// record would orphan it, so this is loud.
-		log.Printf("mediajobs: could not record job %s: %v", res.JobID, err)
-		c.JSON(http.StatusBadGateway, gin.H{
-			"error":   "submit_failed",
-			"message": "The clip started but we couldn't track it. Please contact support.",
-		})
+		StartFrameURL: req.StartFrameURL,
+		EndFrameURL:   req.EndFrameURL,
+		CreatedBy:     c.GetString("userId"),
+	})
+	if refusal != nil {
+		// Passed through as decided. Re-interpreting it here would collapse
+		// `tokens_exhausted` and `plan_locked` into one answer, and they want
+		// opposite things from the user.
+		c.JSON(refusal.Status, refusal.Body)
 		return
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"jobId":       res.JobID,
+		"jobId":       out.JobID,
 		"status":      trendlymodels.MediaJobPending,
-		"tokensSpent": gin.H{"charged": tokens > 0, "tokens": tokens},
+		"tokensSpent": gin.H{"charged": out.Tokens > 0, "tokens": out.Tokens},
 	})
 }
 

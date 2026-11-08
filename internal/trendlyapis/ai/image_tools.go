@@ -293,13 +293,15 @@ func imageDesignHTML(urls []string, w, h int) string {
 //
 // It takes both a plain URL and a data: URI, because providers differ on which
 // they hand back and callers should not have to care.
-func hostAsset(src, brandID string) (string, error) {
+// The optional origin travels with the bytes into the media library, so a
+// generated image is findable afterwards by what it was asked to be.
+func hostAsset(src, brandID string, origin ...*trendlymodels.AssetOrigin) (string, error) {
 	const dataPNG = "data:image/png;base64,"
 	if strings.HasPrefix(src, dataPNG) {
-		return uploadBase64Image(strings.TrimPrefix(src, dataPNG), brandID)
+		return uploadBase64Image(strings.TrimPrefix(src, dataPNG), brandID, origin...)
 	}
 	if src == "" {
 		return "", nil
 	}
-	return uploadFromURL(src, brandID)
+	return uploadFromURL(src, brandID, origin...)
 }

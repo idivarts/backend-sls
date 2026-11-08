@@ -95,6 +95,57 @@ type Asset struct {
 	CreatedAt       int64  `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt       int64  `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
 
+	// ── Bytes and lifecycle ─────────────────────────────────────────────
+	//
+	// Added when media became a COLLECTION rather than a convenience: every
+	// byte that leaves for S3 gets a row here whether anything uses it or not,
+	// so there is a history to pick from, a reference count that makes
+	// deletion safe, and a per-brand byte total that is real on the day
+	// storage is ever charged for.
+	//
+	// S3Bucket/S3Key are the authority on WHERE the bytes are. The URL is a
+	// CDN address and cannot be used to measure, re-read or remove an object:
+	// two CloudFront distributions front the same bucket, and a URL says
+	// nothing about which key it maps to.
+	S3Bucket string `json:"s3Bucket,omitempty" firestore:"s3Bucket,omitempty"`
+	S3Key    string `json:"s3Key,omitempty" firestore:"s3Key,omitempty"`
+	// SizeBytes is read back from S3 with a HEAD, never taken from a client.
+	// A number the uploader reports is a number the uploader can understate,
+	// and this one is meant to be billable.
+	SizeBytes int64 `json:"sizeBytes,omitempty" firestore:"sizeBytes,omitempty"`
+
+	// Status is the lifecycle: pending | ready | archived | failed.
+	//
+	// `pending` exists because a pre-signed upload is registered BEFORE its
+	// bytes exist — the backend hands out a URL and never sees the transfer —
+	// so the row is written at hand-out and confirmed afterwards. A pending
+	// row is not offered in the picker; an abandoned one is swept.
+	Status string `json:"status,omitempty" firestore:"status,omitempty"`
+
+	// RefCount is how many scenes, layers and published contents point at
+	// this media. It is what makes "archive, never hard-delete" enforceable:
+	// bytes with a live reference cannot be removed, and bytes with none can.
+	//
+	// Maintained with atomic increments, so two scenes placing the same media
+	// at once cannot both read 0 and both write 1.
+	RefCount int `json:"refCount,omitempty" firestore:"refCount,omitempty"`
+
+	// Origin is what produced this: an upload, a model and its prompt, a
+	// render of a revision, a frame cut out of another piece of media.
+	//
+	// It is the first thing a person asks of anything in the library ("where
+	// did this come from?") and the first thing the AI needs in order to reuse
+	// it ("the still I made of the founder"), which is why it is structured
+	// rather than a label.
+	Origin *AssetOrigin `json:"origin,omitempty" firestore:"origin,omitempty"`
+
+	// SourceMediaID points at the media this was derived from — the clip a
+	// frame was taken from, the still an upscale came from. Duplicated out of
+	// Origin so it can be queried on its own.
+	SourceMediaID string `json:"sourceMediaId,omitempty" firestore:"sourceMediaId,omitempty"`
+
+	ArchivedAt int64 `json:"archivedAt,omitempty" firestore:"archivedAt,omitempty"`
+
 	// Derived marks a row that is NOT stored — it was reconstructed from a
 	// content attachment for the union. Never written; a caller that wants to
 	// edit such a row must create a real one first.
@@ -111,7 +162,55 @@ const (
 	AssetSourceUpload    = "upload"
 	AssetSourceStock     = "stock"
 	AssetSourceGenerated = "generated"
+
+	// Lifecycle. A row with no status at all predates the registry and is
+	// treated as ready: there are rows in production older than this field,
+	// and reading them as "not finished uploading" would hide a brand's whole
+	// history behind a sweep.
+	AssetStatusPending  = "pending"
+	AssetStatusReady    = "ready"
+	AssetStatusArchived = "archived"
+	AssetStatusFailed   = "failed"
+
+	// What produced a piece of media.
+	AssetOriginUpload    = "upload"
+	AssetOriginGenerated = "generated"
+	AssetOriginRender    = "render"
+	AssetOriginFrame     = "frame"
+	AssetOriginStock     = "stock"
+	AssetOriginHosted    = "hosted"
 )
+
+// AssetOrigin records what produced a piece of media, in the terms of whatever
+// produced it. Exactly one of the shapes below is filled in.
+type AssetOrigin struct {
+	// Kind: upload | generated | render | frame | stock | hosted.
+	Kind string `json:"kind" firestore:"kind"`
+
+	// Provider and Model name the generator ("elevenlabs",
+	// "veo-3.1-fast-generate-001"). Prompt is what it was asked for, kept
+	// because "the one where she is laughing" is how a person finds it again.
+	Provider string `json:"provider,omitempty" firestore:"provider,omitempty"`
+	Model    string `json:"model,omitempty" firestore:"model,omitempty"`
+	Prompt   string `json:"prompt,omitempty" firestore:"prompt,omitempty"`
+	JobID    string `json:"jobId,omitempty" firestore:"jobId,omitempty"`
+
+	// RevisionID is the design or composition revision a render came from.
+	RevisionID string `json:"revisionId,omitempty" firestore:"revisionId,omitempty"`
+	ContentID  string `json:"contentId,omitempty" firestore:"contentId,omitempty"`
+	// StudioID and SceneID are set when the studio produced it.
+	StudioID string `json:"studioId,omitempty" firestore:"studioId,omitempty"`
+	SceneID  string `json:"sceneId,omitempty" firestore:"sceneId,omitempty"`
+
+	// SourceMediaID + AtMs describe a frame cut out of other media: which
+	// media, and how far into it. This is what makes a chained generation
+	// legible afterwards — the start frame of beat 3 is "media X at 7,920ms",
+	// not an anonymous PNG.
+	SourceMediaID string `json:"sourceMediaId,omitempty" firestore:"sourceMediaId,omitempty"`
+	AtMs          int    `json:"atMs,omitempty" firestore:"atMs,omitempty"`
+
+	At int64 `json:"at,omitempty" firestore:"at,omitempty"`
+}
 
 func assetsCollection(brandID string) *firestore.CollectionRef {
 	return firestoredb.Client.Collection(fmt.Sprintf("brands/%s/assets", brandID))

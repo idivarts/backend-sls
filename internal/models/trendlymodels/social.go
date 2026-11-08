@@ -5,21 +5,21 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/firestore"
-	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 	"github.com/idivarts/backend-sls/pkg/facebook"
+	firestoredb "github.com/idivarts/backend-sls/pkg/firebase/firestore"
 )
 
 type Socials struct {
-	ID                string                      `json:"id" firestore:"id"`
-	Name              string                      `json:"name" firestore:"name"`
-	Image             string                      `json:"image" firestore:"image"`
-	IsInstagram       bool                        `json:"isInstagram" firestore:"isInstagram"`
-	ConnectedID       *string                     `json:"connectedId,omitempty" firestore:"connectedId"`
-	UserID            string                      `json:"userId" firestore:"userId"`
-	OwnerName         string                      `json:"ownerName" firestore:"ownerName"`
+	ID                string                     `json:"id" firestore:"id"`
+	Name              string                     `json:"name" firestore:"name"`
+	Image             string                     `json:"image" firestore:"image"`
+	IsInstagram       bool                       `json:"isInstagram" firestore:"isInstagram"`
+	ConnectedID       *string                    `json:"connectedId,omitempty" firestore:"connectedId"`
+	UserID            string                     `json:"userId" firestore:"userId"`
+	OwnerName         string                     `json:"ownerName" firestore:"ownerName"`
 	InstaProfile      *facebook.InstagramProfile `json:"instaProfile,omitempty" firestore:"instaProfile"`
 	FBProfile         *facebook.FacebookProfile  `json:"fbProfile,omitempty" firestore:"fbProfile"`
-	SocialScreenShots []string                    `json:"socialScreenShots,omitempty" firestore:"socialScreenShots"`
+	SocialScreenShots []string                   `json:"socialScreenShots,omitempty" firestore:"socialScreenShots"`
 }
 
 type GraphType int

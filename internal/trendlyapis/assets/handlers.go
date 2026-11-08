@@ -147,18 +147,28 @@ func RecordAsset(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"id": id, "created": created})
 }
 
-// DeleteAsset removes an asset from the library.
+// DeleteAsset takes an asset out of the library.
 // DELETE /api/v2/brands/:brandId/assets/:assetId
 //
-// The file itself is left alone. A design or a published post may already point
-// at it, and removing it from the library must not break media that is live.
+// ⚠️ It ARCHIVES rather than deletes, and the row is no longer removed either.
+// The file was always left alone, which was right — a design or a published
+// post may point at it. What was wrong was dropping the row: the bytes then
+// stayed in the bucket with nothing describing them, which is precisely the
+// state the media collection exists to make impossible. An archived row keeps
+// the history, keeps the brand's storage figure honest, and disappears from
+// every picker.
+//
+// This route is kept for the clients that already call it. `force` is implied,
+// because deleting from the library has never asked about references and
+// suddenly refusing would break those clients; the dedicated archive endpoint
+// in media.go is the one that enforces the reference check.
 func DeleteAsset(c *gin.Context) {
 	brandID := c.Param("brandId")
 	if _, ok := middlewares.RequireFeaturePrivilege(c, brandID,
 		trendlymodels.FeatureContentCalendar, trendlymodels.PrivCalendarEditor); !ok {
 		return
 	}
-	if err := trendlymodels.DeleteAsset(c.Request.Context(), brandID, c.Param("assetId")); err != nil {
+	if err := trendlymodels.ArchiveAsset(c.Request.Context(), brandID, c.Param("assetId"), true); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not remove the asset"})
 		return
 	}

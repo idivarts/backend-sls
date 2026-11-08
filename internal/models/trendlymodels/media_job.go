@@ -37,12 +37,19 @@ type MediaJob struct {
 	ModelID string `json:"modelId" firestore:"modelId"`
 	Prompt  string `json:"prompt,omitempty" firestore:"prompt,omitempty"`
 
-	// Where the result belongs. A job exists to fill a specific clip on a
-	// specific composition; without all four it has nowhere to land.
+	// Where the result belongs. A job fills EITHER a clip on a composition
+	// timeline or a scene in a studio — one of the two pairs is set, never
+	// both. Without one of them the clip has nowhere to land.
 	BrandID       string `json:"brandId" firestore:"brandId"`
 	ContentID     string `json:"contentId" firestore:"contentId"`
-	CompositionID string `json:"compositionId" firestore:"compositionId"`
-	ClipID        string `json:"clipId" firestore:"clipId"`
+	CompositionID string `json:"compositionId,omitempty" firestore:"compositionId,omitempty"`
+	ClipID        string `json:"clipId,omitempty" firestore:"clipId,omitempty"`
+	// StudioID + SceneID target a Design Studio scene. The scene's stack is
+	// replaced with the clip when the job resolves, because a generated clip
+	// is a TAKE and not an addition — appending would leave the previous
+	// attempt underneath, visible wherever the new one does not cover it.
+	StudioID string `json:"studioId,omitempty" firestore:"studioId,omitempty"`
+	SceneID  string `json:"sceneId,omitempty" firestore:"sceneId,omitempty"`
 
 	// Status mirrors mediagen.Status: pending | succeeded | failed.
 	Status string `json:"status" firestore:"status"`

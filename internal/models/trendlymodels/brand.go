@@ -110,11 +110,11 @@ type BrandBilling struct {
 	// fields above without breaking existing webhook code. `BillingStatus` still
 	// holds the raw Razorpay status; `AccessState` is OUR app-level state that the
 	// paywall/lock + cron drive.
-	Provider           *string `json:"provider,omitempty" firestore:"provider,omitempty"`                     // "razorpay" (web) | "revenuecat" (native IAP); future MoR
-	AccessState        *string `json:"accessState,omitempty" firestore:"accessState,omitempty"`               // "active" | "past_due" | "locked" | "canceled"
-	BillingMode        *string `json:"billingMode,omitempty" firestore:"billingMode,omitempty"`               // "recurring" | "invoice"
-	BillingAnchorDay   *int    `json:"billingAnchorDay,omitempty" firestore:"billingAnchorDay,omitempty"`     // always 1
-	PeriodEnd          *int64  `json:"periodEnd,omitempty" firestore:"periodEnd,omitempty"`                   // end of current paid month (next 1st, or IAP expiry)
+	Provider           *string `json:"provider,omitempty" firestore:"provider,omitempty"`                 // "razorpay" (web) | "revenuecat" (native IAP); future MoR
+	AccessState        *string `json:"accessState,omitempty" firestore:"accessState,omitempty"`           // "active" | "past_due" | "locked" | "canceled"
+	BillingMode        *string `json:"billingMode,omitempty" firestore:"billingMode,omitempty"`           // "recurring" | "invoice"
+	BillingAnchorDay   *int    `json:"billingAnchorDay,omitempty" firestore:"billingAnchorDay,omitempty"` // always 1
+	PeriodEnd          *int64  `json:"periodEnd,omitempty" firestore:"periodEnd,omitempty"`               // end of current paid month (next 1st, or IAP expiry)
 	ProratedFirstMonth *bool   `json:"proratedFirstMonth,omitempty" firestore:"proratedFirstMonth,omitempty"`
 
 	// ── Native In-App Purchase (RevenueCat) fields ──

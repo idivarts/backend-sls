@@ -1,18 +1,21 @@
+// Package images hands out pre-signed uploads for image files.
+//
+// ⚠️ The pre-sign goes through pkg/mediastore rather than straight to S3, and
+// not for tidiness: the hand-out is the ONLY moment the backend is involved in
+// a user's own upload. The bytes go from their device to the bucket without
+// passing through here, so an object that is not filed at hand-out time is an
+// object nothing will ever know about. When a brand is supplied, mediastore
+// files a `pending` row now and the app confirms it once the PUT returns.
 package images
 
 import (
-	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 )
 
 // Check if the filename has an image extension
@@ -42,28 +45,27 @@ func S3UploadHandler(ctx *gin.Context) {
 		return
 	}
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-	svc := s3.New(sess)
-
-	// Get s3 bucket name from environment variable
-	bucketName := os.Getenv("IMAGE_S3_BUCKET_NAME")
-	domainUrl := os.Getenv("IMAGE_CF_DISTRIBUTION_URL")
-
-	filename = fmt.Sprintf("file_%d_%s", time.Now().Unix(), filename)
-	imageUrl := fmt.Sprintf("%s/uploads/%s", domainUrl, filename)
-
-	req, _ := svc.PutObjectRequest(&s3.PutObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(fmt.Sprintf("uploads/%s", filename)),
+	// brandId is optional and backward compatible: the influencer app has no
+	// brand, and an older brand-app build that does not send one still gets a
+	// working upload — it just does not appear in the library until it does.
+	out, err := mediastore.PresignUpload(ctx.Request.Context(), mediastore.Spec{
+		BrandID:   ctx.Query("brandId"),
+		Target:    mediastore.TargetImage,
+		Filename:  filename,
+		Kind:      trendlymodels.AssetKindImage,
+		Source:    trendlymodels.AssetSourceUpload,
+		ContentID: ctx.Query("contentId"),
+		CreatedBy: ctx.GetString("userId"),
+		Origin:    &trendlymodels.AssetOrigin{Kind: trendlymodels.AssetOriginUpload},
 	})
-	url, err := req.Presign(15 * time.Minute)
 	if err != nil {
-		log.Println("Failed to sign request", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"uploadUrl": url, "imageUrl": imageUrl})
+	ctx.JSON(http.StatusOK, gin.H{
+		"uploadUrl": out.UploadURL,
+		"imageUrl":  out.URL,
+		"mediaId":   out.MediaID,
+	})
 }
