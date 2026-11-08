@@ -25,6 +25,7 @@ package trendlymodels
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -263,12 +264,59 @@ type AudioLane struct {
 	TrimOutMs int  `json:"trimOutMs,omitempty" firestore:"trimOutMs,omitempty"`
 }
 
+// MusicRequest is a bed the director planned that nobody has applied yet.
+//
+// Approval must not spend money or overwrite sound on its own: generating is a
+// metered call the user has not made, and a studio being approved onto may
+// already have a bed the user chose. So the plan's intent is parked here and
+// the sound panel offers it in one tap.
+//
+// It is not dropped, which is what used to happen, because the plan's music is
+// the part hardest to re-describe — "32 seconds, builds at 0:18" is a
+// judgement about the edit, not something a user retypes from memory.
+type MusicRequest struct {
+	// Approach is "generate" (costs money when applied) or "reuse" (a row the
+	// brand already owns). Reuse waits too: the reason to wait is the bed that
+	// may already be there, not the price.
+	Approach string `json:"approach" firestore:"approach"`
+	ModelID  string `json:"modelId,omitempty" firestore:"modelId,omitempty"`
+	Prompt   string `json:"prompt,omitempty" firestore:"prompt,omitempty"`
+	MediaID  string `json:"mediaId,omitempty" firestore:"mediaId,omitempty"`
+	// Dismissed records a decline, so it stops being offered without the
+	// judgement behind it being lost.
+	Dismissed bool `json:"dismissed,omitempty" firestore:"dismissed,omitempty"`
+}
+
 // StudioAudio holds the lanes and the document's one voice.
 type StudioAudio struct {
 	Lanes []AudioLane `json:"lanes,omitempty" firestore:"lanes,omitempty"`
 	// VoiceID is ONE voice for the whole document. Not per scene: two voices
 	// across a 30-second reel reads as two videos spliced together.
-	VoiceID string `json:"voiceId,omitempty" firestore:"voiceId,omitempty"`
+	VoiceID      string        `json:"voiceId,omitempty" firestore:"voiceId,omitempty"`
+	MusicRequest *MusicRequest `json:"musicRequest,omitempty" firestore:"musicRequest,omitempty"`
+}
+
+// LaneMediaIDs is the distinct media an audio object references.
+//
+// Separate from SceneMediaIDs because the two are counted against different
+// documents: a scene's media hangs off the scene, a lane's off the studio. The
+// sets overlap in practice — a clip used as footage and as its own sound — and
+// a row referenced twice should be counted twice, which is why these are never
+// merged into one list.
+func LaneMediaIDs(a *StudioAudio) []string {
+	if a == nil {
+		return []string{}
+	}
+	seen := map[string]bool{}
+	out := []string{}
+	for _, l := range a.Lanes {
+		if l.MediaID == "" || seen[l.MediaID] {
+			continue
+		}
+		seen[l.MediaID] = true
+		out = append(out, l.MediaID)
+	}
+	return out
 }
 
 // StudioScene is one moment on the timeline.
@@ -414,10 +462,78 @@ func GetStudio(ctx context.Context, brandID, contentID, studioID string) (*Studi
 }
 
 // UpdateStudio applies partial updates and stamps updatedAt.
+// Refuses the audio object wholesale, for the same reason UpdateStudioScene
+// refuses a layer list: lanes carry media references, and a lane list written
+// without moving the counts with it is a library that can no longer be tidied.
+// `audio.voiceId` and `audio.musicRequest` are fine — neither names media.
 func UpdateStudio(ctx context.Context, brandID, contentID, studioID string, updates []firestore.Update) error {
+	for _, u := range updates {
+		// Both spellings. `firestore.Update` takes either a dotted Path or a
+		// FieldPath, and a guard that knows only one is a guard the next
+		// handler walks past without noticing.
+		if p := updatePath(u); p == "audio" || p == "audio.lanes" {
+			return fmt.Errorf("UpdateStudio: %q must go through SetStudioAudio", p)
+		}
+	}
 	updates = append(updates, firestore.Update{Path: "updatedAt", Value: time.Now().UnixMilli()})
 	_, err := studioDoc(brandID, contentID, studioID).Update(ctx, updates)
 	return err
+}
+
+// updatePath is an update's target as one dotted string, whichever of the two
+// ways the caller spelled it.
+//
+// Firestore accepts a dotted `Path` or a `FieldPath` slice and treats them
+// identically, so the refcount guards have to as well — otherwise the one
+// spelling nobody thought to check becomes the way the rule gets broken.
+func updatePath(u firestore.Update) string {
+	if u.Path != "" {
+		return u.Path
+	}
+	return strings.Join(u.FieldPath, ".")
+}
+
+// SetStudioAudio replaces the audio object and moves the media reference counts
+// the lanes imply.
+//
+// ⚠️ Lane media was never counted at all before this, which meant a soundtrack
+// could sit on a studio with refCount 0 and the archive sweep was free to
+// archive the bytes out from under a render. The bug is invisible until a
+// render comes back silent.
+//
+// The DIFFERENCE is applied, not a clear-and-re-add: replacing one lane of two
+// would otherwise drop the untouched lane's media to zero for an instant, and a
+// sweep landing in that instant deletes something in use.
+func SetStudioAudio(ctx context.Context, brandID, contentID, studioID string, audio *StudioAudio) error {
+	before, err := GetStudio(ctx, brandID, contentID, studioID)
+	if err != nil {
+		return err
+	}
+	if before == nil {
+		return fmt.Errorf("SetStudioAudio: no studio %s", studioID)
+	}
+	if audio == nil {
+		audio = &StudioAudio{}
+	}
+	if audio.Lanes == nil {
+		audio.Lanes = []AudioLane{}
+	}
+
+	if _, err := studioDoc(brandID, contentID, studioID).Update(ctx, []firestore.Update{
+		{Path: "audio", Value: audio},
+		{Path: "updatedAt", Value: time.Now().UnixMilli()},
+	}); err != nil {
+		return err
+	}
+
+	added, removed := diffStrings(LaneMediaIDs(before.Audio), LaneMediaIDs(audio))
+	if len(added) > 0 {
+		_ = AdjustAssetRefCounts(ctx, brandID, added, 1)
+	}
+	if len(removed) > 0 {
+		_ = AdjustAssetRefCounts(ctx, brandID, removed, -1)
+	}
+	return nil
 }
 
 // SetSceneOrder replaces the order.
@@ -441,6 +557,14 @@ func SetSceneOrder(ctx context.Context, brandID, contentID, studioID string, ord
 // decrementing would leave every piece of media the studio used permanently
 // un-archivable, which is a library that can never be tidied.
 func DeleteStudio(ctx context.Context, brandID, contentID, studioID string) error {
+	// Read the studio before anything is deleted, because its audio lanes hold
+	// media references too and the document is about to go. A bed left counted
+	// after its studio is gone is permanently un-archivable.
+	studio, err := GetStudio(ctx, brandID, contentID, studioID)
+	if err != nil {
+		return err
+	}
+
 	scenes, err := ListStudioScenes(ctx, brandID, contentID, studioID)
 	if err != nil {
 		return err
@@ -476,8 +600,18 @@ func DeleteStudio(ctx context.Context, brandID, contentID, studioID string) erro
 		return rerr
 	}
 
-	_, err = studioDoc(brandID, contentID, studioID).Delete(ctx)
-	return err
+	if _, err := studioDoc(brandID, contentID, studioID).Delete(ctx); err != nil {
+		return err
+	}
+
+	// The lanes' media, released last and only once the document is actually
+	// gone — the same ordering the scenes above use, and for the same reason.
+	if studio != nil {
+		if ids := LaneMediaIDs(studio.Audio); len(ids) > 0 {
+			_ = AdjustAssetRefCounts(ctx, brandID, ids, -1)
+		}
+	}
+	return nil
 }
 
 // ListStudios returns a content's studios, newest first.

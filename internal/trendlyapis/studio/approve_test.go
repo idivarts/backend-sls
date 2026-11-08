@@ -69,3 +69,46 @@ func TestTheChosenVideoModelIsCarriedOntoTheScene(t *testing.T) {
 		t.Errorf("model = %q, want empty for a scene with no video request", got)
 	}
 }
+
+// The plan's music was dropped on the floor at approval. These lock in the two
+// halves of the fix: an actionable intent survives, and a hollow one does not
+// become an offer the user can tap for silence.
+func TestMusicRequestSurvivesApproval(t *testing.T) {
+	req := musicRequestFor(director.AudioPlan{
+		MusicApproach: "generate",
+		MusicModel:    "music_v2",
+		MusicPrompt:   "  Warm lo-fi, 32 seconds, builds at 0:18  ",
+	})
+	if req == nil {
+		t.Fatal("a generate approach with a prompt should park a request")
+	}
+	if req.Approach != "generate" || req.ModelID != "music_v2" {
+		t.Errorf("approach/model not carried: %+v", req)
+	}
+	// Trimmed, because the prompt is shown to the user as the offer's body.
+	if req.Prompt != "Warm lo-fi, 32 seconds, builds at 0:18" {
+		t.Errorf("prompt not trimmed: %q", req.Prompt)
+	}
+
+	reuse := musicRequestFor(director.AudioPlan{MusicApproach: "reuse", MusicMediaID: "med_1"})
+	if reuse == nil || reuse.Approach != "reuse" || reuse.MediaID != "med_1" {
+		t.Errorf("reuse not carried: %+v", reuse)
+	}
+}
+
+// An empty offer is worse than no offer: the user taps it and gets silence.
+func TestAnEmptyMusicIntentIsNotAnOffer(t *testing.T) {
+	cases := []director.AudioPlan{
+		{MusicApproach: "none"},
+		{},
+		{MusicApproach: "generate"}, // no prompt
+		{MusicApproach: "generate", MusicPrompt: " "},
+		{MusicApproach: "reuse"},                   // no library row
+		{MusicApproach: "vibes", MusicPrompt: "x"}, // the validator already refused this
+	}
+	for i, a := range cases {
+		if got := musicRequestFor(a); got != nil {
+			t.Errorf("case %d should park nothing, got %+v", i, got)
+		}
+	}
+}

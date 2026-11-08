@@ -182,13 +182,24 @@ func materialise(
 		updates = append(updates, firestore.Update{Path: "locations", Value: locs})
 	}
 
+	// ── The plan's sound ──
+	//
+	// Written FIELD BY FIELD, never as a whole StudioAudio. Writing the object
+	// replaced it: a studio approved onto after the user had added a bed or a
+	// voiceover lost those lanes, silently, at the moment they said yes to
+	// something unrelated. Approval may add to the sound; it may not reset it.
 	if plan.Audio.VoiceID != "" {
-		updates = append(updates, firestore.Update{
-			Path: "audio",
-			// One voice for the document. Two voices across a 30-second reel
-			// reads as two videos spliced together.
-			Value: &trendlymodels.StudioAudio{VoiceID: plan.Audio.VoiceID},
-		})
+		// One voice for the document. Two voices across a 30-second reel reads
+		// as two videos spliced together.
+		updates = append(updates, firestore.Update{Path: "audio.voiceId", Value: plan.Audio.VoiceID})
+	}
+	// The music is PARKED, not applied. Generating a bed is a metered call the
+	// user has not made, and a studio may already have one — so the plan's
+	// intent waits for a tap in the sound panel. Dropping it, which is what
+	// happened before, lost the hardest part of the plan to re-describe: "32
+	// seconds, builds at 0:18" is a judgement about the edit.
+	if req := musicRequestFor(plan.Audio); req != nil {
+		updates = append(updates, firestore.Update{Path: "audio.musicRequest", Value: req})
 	}
 	if plan.Canvas.Fps > 0 {
 		updates = append(updates, firestore.Update{Path: "fps", Value: plan.Canvas.Fps})
@@ -337,4 +348,35 @@ func orSlot(slot string) string {
 		return trendlymodels.SlotFull
 	}
 	return slot
+}
+
+// musicRequestFor turns a plan's music intent into a pending request, or nil
+// when the plan asked for no music.
+//
+// A plan that names an approach but neither a prompt nor a library row has said
+// nothing actionable, so it produces nothing: an empty offer in the sound panel
+// is worse than no offer, because the user taps it and gets silence.
+func musicRequestFor(a director.AudioPlan) *trendlymodels.MusicRequest {
+	switch a.MusicApproach {
+	case "generate":
+		if strings.TrimSpace(a.MusicPrompt) == "" {
+			return nil
+		}
+		return &trendlymodels.MusicRequest{
+			Approach: "generate",
+			ModelID:  a.MusicModel,
+			Prompt:   strings.TrimSpace(a.MusicPrompt),
+		}
+	case "reuse":
+		if strings.TrimSpace(a.MusicMediaID) == "" {
+			return nil
+		}
+		return &trendlymodels.MusicRequest{
+			Approach: "reuse",
+			MediaID:  strings.TrimSpace(a.MusicMediaID),
+		}
+	default:
+		// "none", or an approach the validator already refused.
+		return nil
+	}
 }

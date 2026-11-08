@@ -96,7 +96,7 @@ func GenerateMusic(c *gin.Context) {
 		return
 	}
 
-	url, err := UploadAudioWithOrigin(c.Request.Context(), audio, brandID, &trendlymodels.AssetOrigin{
+	mediaID, url, err := UploadAudioMedia(c.Request.Context(), audio, brandID, &trendlymodels.AssetOrigin{
 		Kind:     trendlymodels.AssetOriginGenerated,
 		Provider: "elevenlabs",
 		Model:    trendlymodels.EnabledModelID(c.Request.Context(), "music"),
@@ -120,7 +120,11 @@ func GenerateMusic(c *gin.Context) {
 
 	trendlymodels.MeterUSD(orgID, MusicCostUSD(lengthMs))
 
-	c.JSON(http.StatusOK, gin.H{"id": id, "url": url, "kind": "music", "durationMs": lengthMs, "title": strings.TrimSpace(req.Title)})
+	// `mediaId` is the library row, which is what a lane or a narration must
+	// reference; `id` stays the generated-audio document, which the audio list
+	// is keyed by. They are different documents and conflating them is the bug
+	// UploadAudioMedia exists to end.
+	c.JSON(http.StatusOK, gin.H{"id": id, "mediaId": mediaID, "url": url, "kind": "music", "durationMs": lengthMs, "title": strings.TrimSpace(req.Title)})
 }
 
 // GenerateVoiceover proxies ElevenLabs TTS, stores the bytes, records the doc
@@ -159,7 +163,7 @@ func GenerateVoiceover(c *gin.Context) {
 	// The library row carries the line and the voice, so a voiceover the brand
 	// paid for can be reused in another scene instead of regenerated — which is
 	// the whole reason generated media is filed at all.
-	url, err := UploadAudioWithOrigin(c.Request.Context(), audio, brandID, &trendlymodels.AssetOrigin{
+	mediaID, url, err := UploadAudioMedia(c.Request.Context(), audio, brandID, &trendlymodels.AssetOrigin{
 		Kind:     trendlymodels.AssetOriginGenerated,
 		Provider: "elevenlabs",
 		Model:    model,
@@ -186,7 +190,10 @@ func GenerateVoiceover(c *gin.Context) {
 
 	trendlymodels.MeterUSD(orgID, TTSCostUSD(req.Text))
 
-	c.JSON(http.StatusOK, gin.H{"id": id, "url": url, "kind": "voiceover", "durationMs": durMs})
+	// `mediaId` is the library row the scene's narration points at. The app has
+	// been reading this key since the studio shipped; it was never sent, so
+	// every narration fell back to the generated-audio id.
+	c.JSON(http.StatusOK, gin.H{"id": id, "mediaId": mediaID, "url": url, "kind": "voiceover", "durationMs": durMs})
 }
 
 // ListVoices proxies the ElevenLabs voice catalogue for the picker.
@@ -225,7 +232,30 @@ func UploadAudio(a *elevenlabs.Audio, brandID string) (string, error) {
 
 // UploadAudioWithOrigin is UploadAudio with provenance — the model, the voice,
 // and the line that was said.
+//
+// Returns the URL only, which is all its three remaining callers want. Anything
+// that has to REFERENCE the clip afterwards wants UploadAudioMedia instead: see
+// the warning there.
 func UploadAudioWithOrigin(ctx context.Context, a *elevenlabs.Audio, brandID string, origin *trendlymodels.AssetOrigin) (string, error) {
+	_, url, err := UploadAudioMedia(ctx, a, brandID, origin)
+	return url, err
+}
+
+// UploadAudioMedia stores the bytes and returns the LIBRARY ROW'S id alongside
+// the URL.
+//
+// ⚠️ The id matters more than it looks. A studio's audio lane and a scene's
+// narration both point at audio by media id, and the registry is what makes a
+// reference count — so a lane holding anything else is a lane whose bytes a
+// sweep may archive while a render is using them.
+//
+// This exists because the id was being thrown away: both audio endpoints
+// answered with the GeneratedAudio document's id under the key `id`, the app
+// read `json.mediaId || json.id`, and `mediaId` was never present — so every
+// generated voiceover has been referenced by an id the media library does not
+// know. Returning the row's id is the fix; the generated-audio id stays in the
+// response under its own key, because the audio list is keyed by it.
+func UploadAudioMedia(ctx context.Context, a *elevenlabs.Audio, brandID string, origin *trendlymodels.AssetOrigin) (string, string, error) {
 	if origin == nil {
 		origin = &trendlymodels.AssetOrigin{
 			Kind:     trendlymodels.AssetOriginGenerated,
@@ -244,7 +274,7 @@ func UploadAudioWithOrigin(ctx context.Context, a *elevenlabs.Audio, brandID str
 		Title:       origin.Prompt,
 	}, a.Data)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return stored.URL, nil
+	return stored.MediaID, stored.URL, nil
 }

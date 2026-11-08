@@ -223,8 +223,10 @@ func UpdateStudioScene(ctx context.Context, brandID, contentID, studioID, sceneI
 	updates []firestore.Update) error {
 
 	for _, u := range updates {
-		if u.Path == "layers" || u.Path == "mediaIds" {
-			return fmt.Errorf("UpdateStudioScene: %q moves media reference counts; use SetSceneLayers", u.Path)
+		// Both spellings — see updatePath. This guard predates that helper and
+		// had the same hole.
+		if p := updatePath(u); p == "layers" || p == "mediaIds" {
+			return fmt.Errorf("UpdateStudioScene: %q moves media reference counts; use SetSceneLayers", p)
 		}
 	}
 	updates = append(updates, firestore.Update{Path: "updatedAt", Value: time.Now().UnixMilli()})

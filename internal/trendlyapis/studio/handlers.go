@@ -173,23 +173,32 @@ func PatchStudio(c *gin.Context) {
 		}
 		updates = append(updates, firestore.Update{Path: "transitionPreset", Value: *req.TransitionPreset})
 	}
-	if req.Audio != nil {
-		updates = append(updates, firestore.Update{Path: "audio", Value: req.Audio})
-	}
+	// Audio is written on its own, through the model function that moves the
+	// lanes' media reference counts. It cannot ride in `updates` — UpdateStudio
+	// refuses the field precisely so this path cannot be bypassed.
+	audio := req.Audio
 	if req.Cast != nil {
 		updates = append(updates, firestore.Update{Path: "cast", Value: *req.Cast})
 	}
 	if req.Locations != nil {
 		updates = append(updates, firestore.Update{Path: "locations", Value: *req.Locations})
 	}
-	if len(updates) == 0 {
+	if len(updates) == 0 && audio == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "nothing to change"})
 		return
 	}
 
-	if err := trendlymodels.UpdateStudio(c.Request.Context(), brandID, contentID, studioID, updates); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "could not update the studio"})
-		return
+	if len(updates) > 0 {
+		if err := trendlymodels.UpdateStudio(c.Request.Context(), brandID, contentID, studioID, updates); err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "could not update the studio"})
+			return
+		}
+	}
+	if audio != nil {
+		if err := trendlymodels.SetStudioAudio(c.Request.Context(), brandID, contentID, studioID, audio); err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "could not update the studio's sound"})
+			return
+		}
 	}
 	reloadAndRespond(c, brandID, contentID, studioID)
 }
