@@ -1,6 +1,9 @@
 package trendlymodels
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func renderScene(id string, layers []StudioLayer) StudioScene {
 	return StudioScene{ID: id, DurationMs: 3000, PrimaryKind: SceneImage, Layers: layers}
@@ -30,20 +33,19 @@ func TestARenderableStudioPasses(t *testing.T) {
 	}
 }
 
-// The refusal that matters most. A layered scene cannot export yet, and
-// rendering only its base layer would publish something nobody approved —
-// which is worse than refusing, because nobody would know it happened.
-func TestALayeredSceneIsRefusedBeforeCharging(t *testing.T) {
+// This used to assert that a layered scene was refused outright. It no longer
+// is: a stack of stills is a LAYOUT, Chromium draws layouts, and the
+// conversion composes it into one document. The refusal narrowed to the case
+// that genuinely cannot work — see TestAStackWithVideoIsRefusedByItsLayer —
+// and this test now asserts the narrowing rather than the old blanket rule.
+func TestAStillOverAStillExportsRatherThanRefusing(t *testing.T) {
 	s, scenes, media := renderableStudio()
 	scenes[0].Layers = append(scenes[0].Layers,
 		StudioLayer{ID: "l2", Kind: "media", Slot: SlotPipBR, MediaID: "m1"})
 
 	ok, problem, _ := StudioRenderable(s, scenes, media)
-	if ok {
-		t.Fatal("a layered scene should refuse to render")
-	}
-	if problem == "" {
-		t.Fatal("a refusal has to carry a sentence the user can act on")
+	if !ok {
+		t.Fatalf("a still inset over a still should export, got %q", problem)
 	}
 }
 
@@ -118,5 +120,86 @@ func TestADissolveNeedsNoNote(t *testing.T) {
 func TestSceneHTMLRefMatchesTheSharedFormat(t *testing.T) {
 	if got := StudioSceneHTMLRef("st1", "sc9"); got != "studio:st1:sc9" {
 		t.Errorf("ref = %q, want studio:st1:sc9", got)
+	}
+}
+
+// ── The mirror, and why it has its own tests ───────────────────────────────
+//
+// StudioRenderable is a SECOND implementation of the rules in
+// shared-libs/design/studio-runtime.ts, and the file says so at the top. When
+// the TypeScript side narrowed its refusals, this one did not — and because
+// THIS is what the preflight and the render gate call, the backend went on
+// refusing a layered scene the worker would have rendered happily. Every test
+// passed and the deploy was green; it was caught by rendering a split screen on
+// dev and reading the 400.
+//
+// These lock the narrowed rules in place on this side.
+
+func layered(layers ...StudioLayer) []StudioScene {
+	return []StudioScene{{ID: "a", DurationMs: 3000, Layers: layers}}
+}
+
+func htmlLayer(id string) StudioLayer {
+	return StudioLayer{ID: id, Kind: "html", Slot: "full", HTML: "<div>x</div>"}
+}
+
+func TestASplitScreenOfStillsCanExport(t *testing.T) {
+	// It used to be refused outright with "flatten it to one layer to render".
+	st := &Studio{SceneOrder: []string{"a"}, Width: 1080, Height: 1920, FPS: 30}
+	ok, problem, _ := StudioRenderable(st, layered(htmlLayer("l1"), htmlLayer("l2")), nil)
+	if !ok {
+		t.Fatalf("a two-layer stack of documents should export, got %q", problem)
+	}
+}
+
+func TestAStackWithVideoIsRefusedByItsLayer(t *testing.T) {
+	// Footage is decoded by FFmpeg and never by Chromium, so it cannot go in a
+	// composed document. The refusal names the layer, not the stack.
+	st := &Studio{SceneOrder: []string{"a"}, Width: 1080, Height: 1920, FPS: 30}
+	media := map[string]*Asset{"v": {URL: "https://cdn/x.mp4", Kind: AssetKindVideo}}
+	ok, problem, _ := StudioRenderable(st,
+		layered(htmlLayer("l1"), StudioLayer{ID: "l2", Kind: "media", MediaID: "v"}), media)
+	if ok {
+		t.Fatal("a stack containing video cannot export")
+	}
+	if !strings.Contains(problem, "layer 2 is video") {
+		t.Errorf("the refusal should name the layer, got %q", problem)
+	}
+}
+
+func TestAStackIsRefusedWhenALAYERSMediaIsGone(t *testing.T) {
+	// The second layer, specifically — the check used to look at Layers[0] only,
+	// so anything wrong with a layer behind the first was invisible to it.
+	st := &Studio{SceneOrder: []string{"a"}, Width: 1080, Height: 1920, FPS: 30}
+	ok, problem, _ := StudioRenderable(st,
+		layered(htmlLayer("l1"), StudioLayer{ID: "l2", Kind: "media", MediaID: "gone"}), nil)
+	if ok {
+		t.Fatal("a stack whose media is missing cannot export")
+	}
+	if !strings.Contains(problem, "layer 2") {
+		t.Errorf("the refusal should name the layer, got %q", problem)
+	}
+}
+
+func TestOnlyAWhipIsStillNoted(t *testing.T) {
+	// The other six are drawn by the xfade of the same name now. A note about
+	// all of them would be telling the user something untrue.
+	st := &Studio{SceneOrder: []string{"a", "b"}, Width: 1080, Height: 1920, FPS: 30}
+	scene := func(id, kind string) StudioScene {
+		sc := StudioScene{ID: id, DurationMs: 3000, Layers: []StudioLayer{htmlLayer("l1")}}
+		if kind != "" {
+			sc.TransitionIn = &Transition{Kind: kind, DurationMs: 400}
+		}
+		return sc
+	}
+	for _, kind := range []string{TransitionDissolve, TransitionWipe, TransitionSlide, TransitionDip} {
+		_, _, notes := StudioRenderable(st, []StudioScene{scene("a", ""), scene("b", kind)}, nil)
+		if len(notes) != 0 {
+			t.Errorf("%s renders as itself and needs no note, got %v", kind, notes)
+		}
+	}
+	_, _, notes := StudioRenderable(st, []StudioScene{scene("a", ""), scene("b", TransitionWhip)}, nil)
+	if len(notes) != 1 || !strings.Contains(notes[0], "fast slide") {
+		t.Errorf("a whip should still be noted, got %v", notes)
 	}
 }

@@ -16,14 +16,22 @@ package trendlymodels
 //
 // The two limitations worth knowing:
 //
-//  1. A LAYERED SCENE CANNOT EXPORT YET. A composition clip is one full-frame
-//     source with no concept of a slot, so a split screen is previewable and
-//     not renderable. Rendering only the base layer would publish something
-//     nobody approved, which is worse than refusing.
-//  2. STYLISED TRANSITIONS RENDER AS DISSOLVES. The composition runtime knows
-//     `cut` and `fade`. That is a note rather than a refusal — the output is
-//     still the right length and the right cut points — but it has to be said,
-//     or someone approves a whip pan and publishes a cross-fade.
+//  1. A LAYERED SCENE EXPORTS UNLESS IT CONTAINS VIDEO. A stack of pictures and
+//     documents is a layout, and Chromium draws layouts, so the conversion
+//     composes it into one document. Footage is decoded by FFmpeg and never by
+//     the browser, so a stack containing video still cannot export — and the
+//     refusal names the layer rather than the stack.
+//  2. ONLY A WHIP IS NOT ITSELF. Each transition is drawn by the xfade of the
+//     same name; a whip pan needs directional motion blur, which xfade has
+//     nothing for, so it renders as the slide and says so.
+//
+// ⚠️ THIS FILE IS THE REASON TO BE CAREFUL. When the TypeScript side narrowed
+// both of those refusals, this one did not — and because THIS is what the
+// preflight and the render gate call, the backend kept refusing a layered scene
+// the worker would happily have rendered. The deploy was green and every test
+// passed; it was caught by rendering a split screen on dev and reading the 400.
+// Two implementations of one rule stay in step only while somebody remembers
+// they exist.
 
 import (
 	"context"
@@ -59,11 +67,6 @@ func StudioRenderable(
 			return false, fmt.Sprintf(
 				"Scene %d is empty. Put something in it or remove it.", position), nil
 		}
-		if len(sc.Layers) > 1 {
-			return false, fmt.Sprintf(
-				"Scene %d has %d layers. Layered scenes can be previewed but not exported yet — "+
-					"flatten it to one layer to render.", position, len(sc.Layers)), nil
-		}
 		if EffectiveSceneMs(sc) <= 0 {
 			return false, fmt.Sprintf("Scene %d has no length.", position), nil
 		}
@@ -72,36 +75,52 @@ func StudioRenderable(
 				"Scene %d is still being made. Wait for it to land before rendering.", position), nil
 		}
 
-		layer := sc.Layers[0]
-		switch layer.Kind {
-		case "html":
-			if layer.HTML == "" {
-				return false, fmt.Sprintf("Scene %d has no design in it.", position), nil
+		// Every layer, not just the first. A stack is composed into one
+		// document, so each layer in it has to be drawable — and a stack is
+		// refused for the LAYER that cannot be drawn rather than for being a
+		// stack, which is the difference between "flatten it" and "that one is
+		// a video".
+		stack := len(sc.Layers) > 1
+		for li, layer := range sc.Layers {
+			where := fmt.Sprintf("Scene %d", position)
+			if stack {
+				where = fmt.Sprintf("Scene %d's layer %d", position, li+1)
 			}
-		case "media":
-			a := media[layer.MediaID]
-			if a == nil || a.URL == "" {
-				return false, fmt.Sprintf(
-					"Scene %d's media is missing. It may have been archived — replace it.",
-					position), nil
+			switch layer.Kind {
+			case "html":
+				if layer.HTML == "" {
+					return false, where + " has no design in it.", nil
+				}
+			case "media":
+				a := media[layer.MediaID]
+				if a == nil || a.URL == "" {
+					return false, where +
+						"'s media is missing. It may have been archived — replace it.", nil
+				}
+				if a.Kind == AssetKindAudio {
+					return false, where + " points at audio, which cannot be a picture.", nil
+				}
+				if stack && a.Kind == AssetKindVideo {
+					// The one thing a composed document cannot hold.
+					return false, fmt.Sprintf(
+						"Scene %d can't be exported yet because layer %d is video. A split "+
+							"screen of stills or type over a still does export — it's video "+
+							"inside a stack that doesn't.", position, li+1), nil
+				}
+			default:
+				return false, where + " has nothing renderable in it.", nil
 			}
-			if a.Kind == AssetKindAudio {
-				return false, fmt.Sprintf(
-					"Scene %d points at audio, which cannot be a picture.", position), nil
-			}
-		default:
-			return false, fmt.Sprintf("Scene %d has nothing renderable in it.", position), nil
 		}
 
-		if i > 0 && sc.TransitionIn != nil &&
-			sc.TransitionIn.Kind != TransitionCut && sc.TransitionIn.Kind != TransitionDissolve {
+		// Only a whip. The other six are drawn by the xfade of the same name.
+		if i > 0 && sc.TransitionIn != nil && sc.TransitionIn.Kind == TransitionWhip {
 			stylised = true
 		}
 	}
 
 	if stylised {
 		notes = append(notes,
-			"Wipes, slides and whips render as dissolves for now. The cuts land in the same places.")
+			"A whip renders as a fast slide — the blur it needs isn't something the encoder can draw yet.")
 	}
 	return true, "", notes
 }
