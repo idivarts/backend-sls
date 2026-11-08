@@ -34,6 +34,14 @@ import (
 
 // Run statuses.
 const (
+	// RunPlanning has been asked for but the planner has not answered yet.
+	//
+	// The row exists from the moment the request is accepted, so a plan is
+	// never invisible while it is being made: the storyboard can show "working
+	// on it" against a real id, and a reload finds it again. A director plan
+	// does not fit in an HTTP request (see internal/studiojobs), so this is the
+	// state a run is created in.
+	RunPlanning = "planning"
 	// RunPlanned has a plan and is waiting for a person.
 	RunPlanned = "planned"
 	// RunApproved has been accepted and the work has started.
