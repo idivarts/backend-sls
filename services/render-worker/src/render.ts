@@ -47,7 +47,11 @@ import { renderFailed, renderSucceeded } from "./metrics";
 import { makeThumbnail } from "./thumbnail";
 import type { RenderJob, RenderTarget } from "./types";
 import { compositionFromDesign, measureComposition } from "../../../shared-libs/design/composition-runtime";
-import { parseSceneHtmlRef, studioToComposition } from "../../../shared-libs/design/studio-runtime";
+import {
+    composeStackHtml,
+    parseSceneHtmlRef,
+    studioToComposition,
+} from "../../../shared-libs/design/studio-runtime";
 
 /**
  * Turn a thrown error into something worth showing a brand manager. Anything
@@ -367,9 +371,23 @@ async function runStudioJob(job: RenderJob, startedAt: number): Promise<void> {
                 const scene = loaded.scenes[parsed.sceneId] as
                     | { layers?: { kind?: string; html?: string }[] }
                     | undefined;
-                const html = scene?.layers?.find((l) => l.kind === "html")?.html;
+                const layers = scene?.layers ?? [];
+                const { width, height } = loaded.studio;
+                // A STACK is composed into one document, by the same shared
+                // function the conversion vetted it with — so the layout the
+                // export draws is the layout the preview measured. A single
+                // html layer still takes its own html verbatim: composing it
+                // would wrap a document that is already a whole document.
+                if (layers.length > 1) {
+                    return {
+                        html: composeStackHtml(layers as never, loaded.media, width, height),
+                        width,
+                        height,
+                    };
+                }
+                const html = layers.find((l) => l.kind === "html")?.html;
                 if (!html) throw new Error(`scene ${parsed.sceneId} has no html`);
-                return { html, width: loaded.studio.width, height: loaded.studio.height };
+                return { html, width, height };
             }
             const revision = await getRevision(brandId, contentId, ref);
             if (!revision?.html) throw new Error(`design revision ${ref} has no html`);
