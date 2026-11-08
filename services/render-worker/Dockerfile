@@ -27,6 +27,17 @@ COPY services/render-worker/package.json services/render-worker/package-lock.jso
 RUN cd services/render-worker && npm ci --ignore-scripts
 
 COPY shared-libs/design ./shared-libs/design
+# ⚠️ design/ is NOT self-contained any more. studio-runtime.ts imports the
+# studio document contract from firestore/trendly-pro/models, which is the
+# point of that file — the app and this worker must measure a studio the same
+# way, and a second copy of the types in design/ would be the two-sources-of-
+# truth bug the studio exists to remove. So the models travel with it.
+#
+# Copied as a directory rather than the two files the chain needs today
+# (studio.ts -> asset.ts), because tsc only type-checks what is actually
+# imported: adding a third import later must not break the image build, which
+# is a failure only CI sees, ten minutes in.
+COPY shared-libs/firestore/trendly-pro/models ./shared-libs/firestore/trendly-pro/models
 COPY services/render-worker/tsconfig.json ./services/render-worker/
 COPY services/render-worker/src ./services/render-worker/src
 RUN cd services/render-worker && npm run build
