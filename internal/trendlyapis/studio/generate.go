@@ -31,6 +31,7 @@ package studio
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -316,7 +317,25 @@ func GenerateScene(c *gin.Context) {
 			sc.Narration.Line
 	}
 
-	resp, err := openrouter.ChatCompletion(ctx, openrouter.ChatRequest{
+	// ⚠️ THE MODEL MAY NOT HAVE THE WHOLE REQUEST. This Lambda is capped at 30
+	// seconds and the request context carries that deadline, so a design that
+	// runs to the deadline takes the bookkeeping down with it: every Firestore
+	// write after it uses the same expired context and fails silently, and the
+	// scene is left `pending` forever.
+	//
+	// That is not hypothetical — it is how five scenes of a real approved run
+	// ended up stuck. Three generations hit the ceiling at exactly 29.999s,
+	// returned 502, and could not record their own failure; one landed its
+	// layers and died before the update that clears `pending`, leaving a scene
+	// that HAS its design and still says "Making…".
+	//
+	// So the model gets the budget minus a reserve, and the reserve is spent
+	// on saying what happened. A clean failure is retryable; a stranded scene
+	// is not.
+	genCtx, cancelGen := modelBudget(ctx)
+	defer cancelGen()
+
+	resp, err := openrouter.ChatCompletion(genCtx, openrouter.ChatRequest{
 		Model: model,
 		Messages: []openrouter.Message{
 			{Role: "system", Content: sys},
@@ -324,9 +343,18 @@ func GenerateScene(c *gin.Context) {
 		},
 	})
 	if err != nil {
-		_ = markSceneGenFailed(ctx, brandID, contentID, studioID, sceneID, "the model did not answer")
+		// The reserve, on a context the generation's own expiry cannot touch.
+		bookCtx, cancelBook := bookkeepingCtx(ctx)
+		defer cancelBook()
+
+		reason := "the model did not answer"
+		if errors.Is(err, context.DeadlineExceeded) {
+			reason = "the design took longer than we can wait for. Try again, or shorten the brief."
+		}
+		_ = markSceneGenFailed(bookCtx, brandID, contentID, studioID, sceneID, reason)
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error":   "generation_failed",
+			"reason":  "timeout",
 			"message": "We couldn't design that scene. Please try again.",
 		})
 		return
@@ -352,11 +380,17 @@ func GenerateScene(c *gin.Context) {
 		Slot: trendlymodels.SlotFull,
 		HTML: html,
 	}}
-	if err := trendlymodels.SetSceneLayers(ctx, brandID, contentID, studioID, sceneID, layers, approach); err != nil {
+	// Same reserve for the success path, and for the same reason: the run that
+	// exposed this had a scene whose layers were written and whose `pending`
+	// was not, because the deadline fell between the two.
+	saveCtx, cancelSave := bookkeepingCtx(ctx)
+	defer cancelSave()
+
+	if err := trendlymodels.SetSceneLayers(saveCtx, brandID, contentID, studioID, sceneID, layers, approach); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not save the scene"})
 		return
 	}
-	if err := trendlymodels.UpdateStudioScene(ctx, brandID, contentID, studioID, sceneID, []firestore.Update{
+	if err := trendlymodels.UpdateStudioScene(saveCtx, brandID, contentID, studioID, sceneID, []firestore.Update{
 		{Path: "pending", Value: false},
 		{Path: "gen", Value: &trendlymodels.SceneGeneration{
 			Model:  model,
@@ -372,7 +406,7 @@ func GenerateScene(c *gin.Context) {
 	// This may have been the last scene the run was waiting on. Ignored on
 	// purpose: the scene is saved either way, and a run left open is cosmetic
 	// next to failing a request for work that succeeded.
-	_ = trendlymodels.SettleStudioRunIfComplete(ctx, brandID, contentID, studioID, sc.RunID)
+	_ = trendlymodels.SettleStudioRunIfComplete(saveCtx, brandID, contentID, studioID, sc.RunID)
 
 	reloadAndRespond(c, brandID, contentID, studioID)
 }
@@ -499,4 +533,51 @@ func parsePlannedScenes(raw string) []plannedScene {
 		return nil
 	}
 	return out
+}
+
+// ── Spending a Lambda's 30 seconds ─────────────────────────────────────────
+//
+// Every HTTP-facing function in this service is capped at 30 seconds, and the
+// request context carries that deadline. A model call is allowed to use most
+// of it; what it is NOT allowed to do is use all of it, because the writes
+// that record the outcome run on the same context and a context past its
+// deadline fails every one of them — silently, since their errors are ignored
+// on purpose so a saved scene is never reported as lost.
+//
+// The result of getting this wrong is the thing this file now works hard to
+// avoid: a scene that says "Making…" with nothing coming.
+
+// bookkeepingReserve is how much of the request is kept back for writing down
+// what happened. Two Firestore round trips and the response, with room for a
+// retry — measured against runs where the whole generation took 24.8s and the
+// writes that followed took well under a second.
+const bookkeepingReserve = 6 * time.Second
+
+// modelBudget gives the generation everything except the reserve.
+//
+// Falls back to a fixed budget when the context carries no deadline, which is
+// the case in tests and in any local run outside Lambda.
+func modelBudget(ctx context.Context) (context.Context, context.CancelFunc) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return context.WithTimeout(ctx, 30*time.Second-bookkeepingReserve)
+	}
+	budget := time.Until(deadline) - bookkeepingReserve
+	if budget <= 0 {
+		// Already inside the reserve. Let the caller fail immediately and
+		// spend what is left saying so, rather than starting a call that
+		// cannot finish and costs money either way.
+		budget = time.Millisecond
+	}
+	return context.WithTimeout(ctx, budget)
+}
+
+// bookkeepingCtx is for the writes that record an outcome.
+//
+// Detached from the request, so the generation's own expiry — or a client that
+// has already given up and disconnected — cannot cancel the write that says
+// what happened to the scene. Bounded all the same, because an uncancellable
+// write would simply hang until the Lambda is killed.
+func bookkeepingCtx(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), bookkeepingReserve-time.Second)
 }
