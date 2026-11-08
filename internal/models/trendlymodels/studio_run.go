@@ -219,3 +219,45 @@ func ListStudioRuns(ctx context.Context, brandID, contentID, studioID string, li
 	}
 	return out, nil
 }
+
+// DeleteStudioRuns removes every run under a studio.
+//
+// ⚠️ Firestore does NOT delete a document's subcollections when the document
+// goes. A deleted studio's runs would survive it: invisible to anything that
+// walks from the studio, still billable, and still holding the full planJson of
+// every plan ever made for content the user believes is gone. That last part
+// matters — a plan carries the brief and the script.
+//
+// Batched because a studio that has been planned a dozen times should not need
+// a dozen round trips, and because this runs inside a delete the user is
+// waiting on.
+func DeleteStudioRuns(ctx context.Context, brandID, contentID, studioID string) error {
+	for {
+		iter := runsCollection(brandID, contentID, studioID).Limit(200).Documents(ctx)
+		batch := firestoredb.Client.BulkWriter(ctx)
+		n := 0
+		for {
+			doc, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				iter.Stop()
+				return err
+			}
+			if _, err := batch.Delete(doc.Ref); err != nil {
+				iter.Stop()
+				return err
+			}
+			n++
+		}
+		iter.Stop()
+		batch.End()
+		// Fewer than the page size means that was the last page. Looping on a
+		// full page rather than once, so a studio with hundreds of runs is
+		// fully cleared instead of mostly cleared.
+		if n < 200 {
+			return nil
+		}
+	}
+}

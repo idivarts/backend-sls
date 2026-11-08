@@ -465,6 +465,17 @@ func DeleteStudio(ctx context.Context, brandID, contentID, studioID string) erro
 			_ = AdjustAssetRefCounts(ctx, brandID, sc.MediaIDs, -1)
 		}
 	}
+	// The runs go too. Firestore does not delete subcollections with their
+	// parent, so without this a deleted studio leaves every plan ever made for
+	// it behind — invisible, billable, and still holding the brief and script
+	// in planJson.
+	//
+	// Before the studio doc, so a failure here leaves a studio that can be
+	// deleted again rather than an unreachable pile of runs.
+	if rerr := DeleteStudioRuns(ctx, brandID, contentID, studioID); rerr != nil {
+		return rerr
+	}
+
 	_, err = studioDoc(brandID, contentID, studioID).Delete(ctx)
 	return err
 }
