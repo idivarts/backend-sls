@@ -114,7 +114,7 @@ func ApproveRun(c *gin.Context) {
 		return
 	}
 
-	sceneIDs, problems := materialise(ctx, brandID, contentID, studioID, plan)
+	sceneIDs, problems := materialise(ctx, brandID, contentID, studioID, runID, plan)
 
 	updates := []firestore.Update{
 		{Path: "sceneIds", Value: sceneIDs},
@@ -145,6 +145,9 @@ func ApproveRun(c *gin.Context) {
 func materialise(
 	ctx context.Context,
 	brandID, contentID, studioID string,
+	// runID is stamped on every scene this plan creates, so the rail can draw
+	// one run's scenes as one batch without loading the runs themselves.
+	runID string,
 	plan director.Plan,
 ) (sceneIDs []string, problems []string) {
 	// ── Document level, first ──
@@ -297,6 +300,7 @@ func materialise(
 		if len(sc.Layers) > 0 {
 			sc.PrimaryKind = primaryKindFor(ctx, brandID, sc.Layers)
 		}
+		sc.RunID = runID
 
 		id, err := trendlymodels.CreateStudioScene(ctx, brandID, contentID, studioID, sc)
 		if err != nil {

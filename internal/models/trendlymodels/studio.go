@@ -253,15 +253,31 @@ type AudioLane struct {
 	SceneID   string `json:"sceneId,omitempty" firestore:"sceneId,omitempty"`
 	OffsetMs  int    `json:"offsetMs,omitempty" firestore:"offsetMs,omitempty"`
 
-	Volume float64 `json:"volume,omitempty" firestore:"volume,omitempty"`
+	// ⚠️ POINTERS, because for both of these the ZERO VALUE IS A REAL CHOICE
+	// and `omitempty` cannot tell it from "not set".
+	//
+	// They were plain values, and the consequences were a toggle and a slider
+	// that did nothing:
+	//
+	//   • `duckMusic: false` was dropped on write, so the stored lane had no
+	//     duckMusic at all — and absent means ON, because ducking is the
+	//     default. The sound panel's ducking switch could be turned off, would
+	//     redraw as off, and the export ducked anyway. Found by turning it off
+	//     on dev and measuring the rendered MP4.
+	//   • `volume: 0` was dropped too, so a lane muted by hand fell back to the
+	//     0.7 default and the bed the user silenced played at 70%.
+	//
+	// A nil Volume means "no opinion, use the default"; a nil DuckMusic means
+	// the same. Only a pointer can say "I chose zero".
+	Volume *float64 `json:"volume,omitempty" firestore:"volume,omitempty"`
 	// DuckMusic lowers the bed under this lane. On by default for voiceover:
 	// a bed at full level under a voice is the commonest reason a render
 	// sounds amateur.
-	DuckMusic bool `json:"duckMusic,omitempty" firestore:"duckMusic,omitempty"`
-	FadeInMs  int  `json:"fadeInMs,omitempty" firestore:"fadeInMs,omitempty"`
-	FadeOutMs int  `json:"fadeOutMs,omitempty" firestore:"fadeOutMs,omitempty"`
-	TrimInMs  int  `json:"trimInMs,omitempty" firestore:"trimInMs,omitempty"`
-	TrimOutMs int  `json:"trimOutMs,omitempty" firestore:"trimOutMs,omitempty"`
+	DuckMusic *bool `json:"duckMusic,omitempty" firestore:"duckMusic,omitempty"`
+	FadeInMs  int   `json:"fadeInMs,omitempty" firestore:"fadeInMs,omitempty"`
+	FadeOutMs int   `json:"fadeOutMs,omitempty" firestore:"fadeOutMs,omitempty"`
+	TrimInMs  int   `json:"trimInMs,omitempty" firestore:"trimInMs,omitempty"`
+	TrimOutMs int   `json:"trimOutMs,omitempty" firestore:"trimOutMs,omitempty"`
 }
 
 // MusicRequest is a bed the director planned that nobody has applied yet.
@@ -351,6 +367,15 @@ type StudioScene struct {
 	// Pending is set while a generation is in flight, so the rail shows a
 	// placeholder rather than an empty scene the user might try to fill.
 	Pending bool `json:"pending,omitempty" firestore:"pending,omitempty"`
+
+	// RunID is the run that created this scene, when one did.
+	//
+	// On the SCENE rather than read back from run.sceneIds, because the rail
+	// draws scenes and has to group them without loading every run a studio
+	// has ever had. Absent on a scene a person added by hand — and absence
+	// meaning "mine" is the useful half: without it, six scenes the AI planned
+	// look exactly like six unrelated ones.
+	RunID string `json:"runId,omitempty" firestore:"runId,omitempty"`
 
 	CreatedAt int64 `json:"createdAt" firestore:"createdAt"`
 	UpdatedAt int64 `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`

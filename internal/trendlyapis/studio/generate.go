@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
@@ -158,9 +159,37 @@ func PlanScenes(c *gin.Context) {
 		planned = planned[:maxPlannedScenes]
 	}
 
+	// A run document for this batch, BEFORE the scenes, so every scene can
+	// carry its id.
+	//
+	// plan-scenes used to create no run at all, which left the rail unable to
+	// tell "these six are one thing the AI planned" from six unrelated scenes,
+	// and left the user with no record of a batch that spent real money. A
+	// director plan already got a run for exactly those reasons; a planned
+	// batch is the same thing with a shorter approval step, so it gets one too.
+	//
+	// A failure here is NOT fatal: the scenes are the valuable part, and
+	// refusing to plan because the bookkeeping row could not be written would
+	// be the tool getting in the way. The scenes are then ungrouped, which is
+	// how the rail already draws hand-made ones.
+	runID, runErr := trendlymodels.CreateStudioRun(ctx, brandID, contentID, studioID, &trendlymodels.StudioRun{
+		Status: trendlymodels.RunRunning,
+		Brief:  strings.TrimSpace(req.Brief),
+		Model:  model,
+		// Approved by the act of asking: plan-scenes is the one-tap path, with
+		// no storyboard to read first. Recorded so a run is never in a state
+		// nobody chose.
+		ApprovedAt: time.Now().UnixMilli(),
+		CreatedBy:  c.GetString("userId"),
+	})
+	if runErr != nil {
+		runID = ""
+	}
+
 	// Write them ALL before returning, empty and pending. This is what puts
 	// the shape of the video on the rail in about a second — the expensive
 	// per-scene work then fills in visibly rather than behind a spinner.
+	created := make([]string, 0, len(planned))
 	for _, p := range planned {
 		duration := p.DurationMs
 		if duration <= 0 {
@@ -171,6 +200,7 @@ func PlanScenes(c *gin.Context) {
 			DurationMs:  duration,
 			PrimaryKind: trendlymodels.SceneEmpty,
 			Pending:     true,
+			RunID:       runID,
 			Layers:      []trendlymodels.StudioLayer{},
 			// The brief travels on the scene so the per-scene generate call is
 			// self-contained: the client sends a scene id, not a transcript of
@@ -194,12 +224,22 @@ func PlanScenes(c *gin.Context) {
 		if t := strings.TrimSpace(p.Transition); t != "" && knownTransition(t) && t != trendlymodels.TransitionCut {
 			sc.TransitionIn = &trendlymodels.Transition{Kind: t, DurationMs: 400}
 		}
-		if _, err := trendlymodels.CreateStudioScene(ctx, brandID, contentID, studioID, sc); err != nil {
+		id, err := trendlymodels.CreateStudioScene(ctx, brandID, contentID, studioID, sc)
+		if err != nil {
 			// Stop at the first failure rather than pressing on: a partial
 			// plan is still usable, and the user can see exactly how far it
 			// got instead of being told it worked.
 			break
 		}
+		created = append(created, id)
+	}
+
+	// Which scenes were this run's, in plan order — so a run can be undone
+	// later without guessing, exactly as an approved director run records.
+	if runID != "" && len(created) > 0 {
+		_ = trendlymodels.UpdateStudioRun(ctx, brandID, contentID, studioID, runID, []firestore.Update{
+			{Path: "sceneIds", Value: created},
+		})
 	}
 
 	reloadAndRespond(c, brandID, contentID, studioID)

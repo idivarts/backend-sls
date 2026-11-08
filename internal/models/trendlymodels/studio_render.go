@@ -145,6 +145,13 @@ func MarkStudioRenderQueued(ctx context.Context, brandID, contentID, studioID, j
 	return UpdateStudio(ctx, brandID, contentID, studioID, []firestore.Update{
 		{Path: "renderStatus", Value: DesignRenderQueued},
 		{Path: "renderId", Value: jobID},
+		// Cleared here and not only when a worker starts. A previous failure's
+		// message outlived it: the studio read `renderStatus: queued` with
+		// "We couldn't start the render. Please try again." still sitting
+		// beside it, so a render that was queued and working looked like one
+		// that had just failed. Whoever queues a new attempt owns retiring the
+		// last one's excuse — the worker may not pick it up for a minute.
+		{Path: "renderError", Value: ""},
 	})
 }
 
