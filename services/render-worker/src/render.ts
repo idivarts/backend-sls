@@ -332,7 +332,7 @@ async function runStudioJob(job: RenderJob, startedAt: number): Promise<void> {
         return;
     }
 
-    const { composition, problems, notes } = studioToComposition(
+    const { composition, audio: studioAudio, problems, notes } = studioToComposition(
         loaded.studio as never,
         loaded.scenes as never,
         loaded.media
@@ -370,7 +370,12 @@ async function runStudioJob(job: RenderJob, startedAt: number): Promise<void> {
             if (!revision?.html) throw new Error(`design revision ${ref} has no html`);
             return { html: revision.html, width: revision.width, height: revision.height };
         },
-        audio: await getContentAudio(brandId, contentId),
+        // The studio's own sound wins outright. The content-level soundtrack
+        // is only consulted when the studio declares none at all — it belongs
+        // to the OLD design stage, which has its own audio panel, and a studio
+        // that has been given a bed must not also inherit one the user set
+        // somewhere else. (That fallback goes away with the old stage.)
+        audio: loaded.hasOwnAudio ? studioAudio : await getContentAudio(brandId, contentId),
     });
 
     const videoUrl = await upload(mp4, "mp4", "video/mp4");

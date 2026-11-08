@@ -316,10 +316,20 @@ async function renderTimeline(input: CompositionInput): Promise<VideoOutput> {
             inputIndex += declared;
         }
 
+        // Counted, not assumed. The loop above already counts `-i` per segment
+        // for exactly this reason, and then this call used to assume one input
+        // each — two answers to the same question in one function. They agree
+        // today only because every stage happens to declare a single input, and
+        // the day one declares two, the placed narration lands on a video
+        // stream and the render fails or mixes the wrong thing.
+        const overlayInputs = overlays.reduce(
+            (n, o) => n + o.inputArgs.filter((a) => a === "-i").length,
+            0
+        );
         const audioStage = await buildAudioStage(
             audio,
             totalMs,
-            segments.length + overlays.length,
+            inputIndex + overlayInputs,
             clipAudio
         );
         tempFiles.push(...audioStage.tempFiles);

@@ -13,6 +13,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, Firestore } from "firebase-admin/firestore";
 import { config } from "./config";
 import type { Composition } from "../../../shared-libs/design/composition-runtime";
+import { studioAudioMediaIds } from "../../../shared-libs/design/studio-runtime";
 import type { ContentAudio, DesignRevision, RenderTarget } from "./types";
 
 export const RenderStatus = {
@@ -366,9 +367,19 @@ export interface StudioForRender {
         fps: number;
         sceneOrder: string[];
         renderUrl?: string;
+        /** Declared, not cast: the sound's media is found through this field. */
+        audio?: { lanes?: { mediaId?: string }[] };
     };
+    /**
+     * Whether the studio declared any sound of its own. When it did, the
+     * content-level soundtrack is NOT consulted — see `runStudioJob`.
+     */
+    hasOwnAudio: boolean;
     /** Scenes keyed by id, which is what the conversion takes. */
-    scenes: Record<string, Record<string, unknown> & { id: string }>;
+    scenes: Record<
+        string,
+        Record<string, unknown> & { id: string; narration?: { mediaId?: string } }
+    >;
     /** Media keyed by id: just what rendering needs from each row. */
     media: Record<string, { url: string; kind: "image" | "video" | "audio"; durationMs?: number }>;
 }
@@ -397,6 +408,13 @@ export async function getStudioForRender(
         }
     });
 
+    // The SOUND's media, which hangs off the document's lanes and each scene's
+    // narration rather than off a layer. Walking only the layers — which is
+    // what this did — loaded the pictures and none of the audio, so a studio
+    // with a bed and a generated voiceover rendered silent with nothing to
+    // say why: the urls were never fetched to begin with.
+    for (const id of studioAudioMediaIds(studio, scenes)) mediaIds.add(id);
+
     // Read each media row once. The same still in four scenes is one row, and
     // re-reading it per scene is four round trips for one answer.
     const media: StudioForRender["media"] = {};
@@ -414,7 +432,11 @@ export async function getStudioForRender(
         })
     );
 
-    return { studio, scenes, media };
+    const hasOwnAudio =
+        (studio.audio?.lanes?.length ?? 0) > 0 ||
+        Object.values(scenes).some((s) => !!s.narration?.mediaId);
+
+    return { studio, scenes, media, hasOwnAudio };
 }
 
 export async function markStudioRenderStarted(
