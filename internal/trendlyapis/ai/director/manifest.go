@@ -106,6 +106,34 @@ type Manifest struct {
 	Budget       Budget             `json:"budget"`
 	Capabilities StudioCapabilities `json:"studioCapabilities"`
 	Tools        map[string][]Tool  `json:"tools"`
+
+	// Voices the narration can speak in, with enough label to choose between
+	// them. Handed over for the same reason the model list is: a plan naming
+	// something that does not exist is invalid, and a planner asked to produce
+	// an id it has never seen will either invent one or leave it blank.
+	//
+	// ⚠️ IT USED TO BE NEITHER. The planner was told a voiceId was required
+	// and never shown one, so it left the field empty and the plan was refused
+	// as FATAL — a dead end a user could do nothing about, since the id lives
+	// in a provider's account and not anywhere they can read.
+	Voices []VoiceOption `json:"voiceCatalogue,omitempty"`
+
+	// PreferredVoiceID is the voice this studio already speaks in, if any.
+	//
+	// Ranked above the catalogue when filling a gap: a studio that has been
+	// narrated before should go on sounding like itself, and silently
+	// switching voices between runs is worse than any catalogue pick.
+	PreferredVoiceID string `json:"preferredVoiceId,omitempty"`
+}
+
+// VoiceOption is one voice the narration could use.
+type VoiceOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Labels is the provider's own description, flattened — "american · calm ·
+	// narration". Enough for a planner to match a voice to the content's tone,
+	// which is the judgement we actually want the model making.
+	Labels string `json:"labels,omitempty"`
 }
 
 // ModelByID finds an enabled model. A plan naming anything else is invalid,

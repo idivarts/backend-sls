@@ -36,6 +36,13 @@ provider:
     # refuses the whole generation, so this stays off until the endpoint exists;
     # the polling sweep resolves every job either way.
     ELEVENLABS_WEBHOOKS: ${env:ELEVENLABS_WEBHOOKS, ''}
+    # The voice a narrated plan falls back to when the planner named none AND
+    # the voice catalogue could not be read. Optional: empty just means the
+    # last resort is the first catalogue entry instead. An env var rather than
+    # a constant because stock voice ids belong to the provider and can be
+    # retired — a hardcoded one turns their spring cleaning into silent
+    # narration.
+    ELEVENLABS_FALLBACK_VOICE_ID: ${env:ELEVENLABS_FALLBACK_VOICE_ID, ''}
     # Stock photography for AI-authored designs. Empty means stock placeholders
     # are skipped and the design still lands, just without photography.
     PEXELS_API_KEY: ${env:PEXELS_API_KEY, ''}

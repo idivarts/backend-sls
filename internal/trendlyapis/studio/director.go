@@ -241,6 +241,13 @@ func ExecutePlanJob(ctx context.Context, msg studiojobs.Message) error {
 	if perr != nil {
 		return fail("the director didn't answer")
 	}
+	// Fill the document voice BEFORE validating, so a plan is never refused
+	// over a field the user cannot supply. Voice ids live in a provider
+	// account; "pick one and plan again" asks for something nobody holds.
+	if voiceID, supplied := plan.EnsureVoice(manifest); supplied {
+		log.Printf("director: no voice in the plan, using %s for %s/%s", voiceID, brandID, studioID)
+	}
+
 	// Validated against the manifest the planner was GIVEN, not a freshly built
 	// one: a wallet that moved between the call and the check would make a plan
 	// fail validation for a reason that had nothing to do with it.
@@ -257,6 +264,8 @@ func ExecutePlanJob(ctx context.Context, msg studiojobs.Message) error {
 			openrouter.Message{Role: "assistant", Content: raw},
 			openrouter.Message{Role: "user", Content: director.RepairMessage(problems)})
 		if repaired, rproblems, rraw, rerr := planOnce(ctx, brandID, run.Model, messages); rerr == nil {
+			// The repair round gets the same guarantee as the first.
+			repaired.EnsureVoice(manifest)
 			if len(rproblems) == 0 {
 				rproblems = repaired.Validate(manifest)
 			}
