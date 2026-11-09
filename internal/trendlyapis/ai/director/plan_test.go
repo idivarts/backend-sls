@@ -31,6 +31,17 @@ func loadInvalid(t *testing.T) Plan {
 	return p
 }
 
+// hasProblemContaining ignores severity — for the rules that are reported but
+// deliberately do not block.
+func hasProblemContaining(ps []Problem, sub string) bool {
+	for _, p := range ps {
+		if strings.Contains(p.Message, sub) {
+			return true
+		}
+	}
+	return false
+}
+
 func hasFatalContaining(ps []Problem, sub string) bool {
 	for _, p := range ps {
 		if p.Fatal && strings.Contains(p.Message, sub) {

@@ -169,8 +169,18 @@ where EVERY line is invented is refused: that is a video about nobody's
 product. Never invent a price, a percentage or a figure: those must trace to the
 script, the caption or a documented brand fact.
 
-voiceId for the document. Our narration will not lip-sync to a generated mouth,
-so do not show anyone speaking straight to camera.
+PICK THE VOICE. If anything is narrated, set audio.voiceId to one of the ids in
+voiceCatalogue — the one whose labels best suit this content and this brand's
+tone. Choose on fit: an energetic social voice for a punchy hook-led reel, a
+calm narration voice for an explainer. Do NOT invent an id, and do NOT leave
+the field empty because you are unsure; an unremarkable catalogue voice is a
+far better outcome than none, and one voice for the whole document is what
+keeps every line sounding like the same person. If preferredVoiceId is set,
+this studio has already been narrated in that voice — use it unless the content
+genuinely calls for a different one, and say why in a note if you change it.
+
+Our narration will not lip-sync to a generated mouth, so do not show anyone
+speaking straight to camera.
 
 COSTS ARE PRICED FOR YOU. Put your own rough estimate in estCostUsd if you
 like, but the run cap is enforced against the registry's own per-second and

@@ -959,8 +959,17 @@ func (p Plan) validateConsistency(m Manifest, byID map[string]AssetRequest) []Pr
 	}
 
 	// Rule: one voice for the document; a second speaker has to be declared.
+	//
+	// ⚠️ NOT FATAL, deliberately. It used to be, and it was the one refusal a
+	// user could do nothing about: voice ids live in a provider account, so
+	// "fix it and plan again" asked for something nobody holds, and a plan
+	// that was otherwise fine died on a blank field. EnsureVoice now fills it
+	// — from the studio's own voice, the catalogue, or the configured
+	// fallback — and runs before this. So reaching here means every one of
+	// those was empty too, which is an environment problem rather than a bad
+	// plan, and refusing the plan would not fix it.
 	if p.Audio.VoiceModel != "" && p.Audio.VoiceID == "" {
-		add("audio", "no voiceId — narration generated without a fixed voice is a different voice per line", true)
+		add("audio", "no voice could be chosen, so each narrated line may be read in a different voice", false)
 	}
 	for _, sc := range p.Scenes {
 		if sc.VoiceID != "" && sc.VoiceID != p.Audio.VoiceID && sc.VoiceWhy == "" {

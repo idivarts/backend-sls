@@ -25,9 +25,13 @@ package director
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/pkg/elevenlabs"
 )
 
 // How many library rows the planner sees.
@@ -60,6 +64,12 @@ func BuildManifest(
 	m := Manifest{
 		Capabilities: DefaultCapabilities(),
 		Tools:        ToolInventory(),
+		Voices:       voiceCatalogue(),
+	}
+	if studio.Audio != nil {
+		// What this studio already speaks in, so a second run does not
+		// silently change the narrator.
+		m.PreferredVoiceID = studio.Audio.VoiceID
 	}
 
 	// ── The post ──
@@ -312,4 +322,69 @@ func aspectOf(w, h int) string {
 		return "16:9"
 	}
 	return "1:1"
+}
+
+// ── The voice catalogue ────────────────────────────────────────────────────
+
+// voiceCacheTTL is how long a listing is reused.
+//
+// Voices change when somebody adds or clones one, which is rare and never
+// urgent. Every plan hitting the provider's API would add a round trip to the
+// slowest call in the product for a list that is effectively static.
+const voiceCacheTTL = 30 * time.Minute
+
+// voiceCatalogueLimit caps how many voices reach the prompt.
+//
+// An account with hundreds of cloned voices would otherwise push real context
+// — the script, the brand facts, the media library — out of the planner's
+// window to list voices it will never choose. Enough to choose well is the
+// goal, not completeness.
+const voiceCatalogueLimit = 40
+
+var (
+	voiceCacheMu   sync.Mutex
+	voiceCacheAt   time.Time
+	voiceCacheList []VoiceOption
+)
+
+// voiceCatalogue returns the voices a plan may choose from.
+//
+// ⚠️ A FAILURE HERE IS NOT A FAILURE TO PLAN. The provider being unreachable,
+// or a key being unset, returns an empty catalogue and nothing else: the plan
+// goes ahead and EnsureVoice falls back. Refusing to plan because a voice list
+// could not be fetched would recreate — one layer down — exactly the dead end
+// this change exists to remove.
+func voiceCatalogue() []VoiceOption {
+	voiceCacheMu.Lock()
+	defer voiceCacheMu.Unlock()
+
+	if time.Since(voiceCacheAt) < voiceCacheTTL && voiceCacheList != nil {
+		return voiceCacheList
+	}
+
+	voices, err := elevenlabs.ListVoices()
+	if err != nil {
+		log.Println("director: could not list voices, planning without a catalogue:", err)
+		// Cached as empty on purpose, so a provider outage costs one failed
+		// call per TTL rather than one per plan.
+		voiceCacheAt, voiceCacheList = time.Now(), []VoiceOption{}
+		return voiceCacheList
+	}
+
+	out := make([]VoiceOption, 0, len(voices))
+	for _, v := range voices {
+		if v.VoiceID == "" {
+			continue
+		}
+		out = append(out, VoiceOption{
+			ID:     v.VoiceID,
+			Name:   v.Name,
+			Labels: FlattenVoiceLabels(v.Labels),
+		})
+		if len(out) == voiceCatalogueLimit {
+			break
+		}
+	}
+	voiceCacheAt, voiceCacheList = time.Now(), out
+	return out
 }

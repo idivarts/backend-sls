@@ -176,8 +176,16 @@ func TestVoiceIDRequiredAndOverrideNeedsAReason(t *testing.T) {
 			}},
 		}
 	}
-	if !hasFatalContaining(base("", "", "").Validate(fixture(t, "balanced", 8)), "no voiceId") {
-		t.Error("narration without a fixed voice was accepted")
+	// A missing voice used to be FATAL. It is not any more, and must not be:
+	// voice ids live in a provider account, so refusing the plan asked the
+	// user to supply something nobody holds and killed an otherwise fine plan
+	// on a blank field. EnsureVoice fills it; this is only the last-resort
+	// note for when even the fallback is empty.
+	if Fatal(base("", "", "").Validate(fixture(t, "balanced", 8))) {
+		t.Error("a missing voice must never block a plan")
+	}
+	if !hasProblemContaining(base("", "", "").Validate(fixture(t, "balanced", 8)), "different voice") {
+		t.Error("a missing voice should still be reported, just not as fatal")
 	}
 	if !hasFatalContaining(base("v_rachel", "v_adam", "").Validate(fixture(t, "balanced", 8)), "overrides the document voice with no reason") {
 		t.Error("an unexplained second voice was accepted")
