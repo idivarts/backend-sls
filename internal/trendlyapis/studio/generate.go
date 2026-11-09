@@ -647,11 +647,29 @@ func parsePlannedScenes(raw string) []plannedScene {
 // The result of getting this wrong is the thing this file now works hard to
 // avoid: a scene that says "Making…" with nothing coming.
 
-// bookkeepingReserve is how much of the request is kept back for writing down
-// what happened. Two Firestore round trips and the response, with room for a
-// retry — measured against runs where the whole generation took 24.8s and the
-// writes that followed took well under a second.
+// bookkeepingReserve is the MINIMUM kept back for writing down what happened —
+// what a 30-second HTTP request can spare.
+//
+// ⚠️ IT IS A FLOOR, NOT THE WINDOW. Treating it as the window is a mistake I
+// made and shipped: the generation moved to a worker with 900 seconds, and the
+// writes that follow it were still being squeezed into five. Two of three
+// scenes then saved their design and failed to record that they had —
+//
+//	scene design failed … rpc error: code = DeadlineExceeded
+//	Duration: 43505.75 ms
+//
+// — leaving exactly the half-written scene the move to a queue was meant to
+// abolish: a finished design still saying "Making…".
 const bookkeepingReserve = 6 * time.Second
+
+// bookkeepingMax caps the window where there is time to spare.
+//
+// SetSceneLayers writes a whole HTML document and diffs the scene's media
+// references; UpdateStudioScene follows it. Neither is slow, but five seconds
+// for both was not enough in practice, and a worker holding 900 seconds has no
+// reason to be stingy. Capped all the same, because a write that cannot finish
+// in a minute is not going to.
+const bookkeepingMax = 60 * time.Second
 
 // modelBudget gives the generation everything except the reserve.
 //
@@ -674,10 +692,28 @@ func modelBudget(ctx context.Context) (context.Context, context.CancelFunc) {
 
 // bookkeepingCtx is for the writes that record an outcome.
 //
-// Detached from the request, so the generation's own expiry — or a client that
-// has already given up and disconnected — cannot cancel the write that says
-// what happened to the scene. Bounded all the same, because an uncancellable
-// write would simply hang until the Lambda is killed.
+// Detached from the caller, so the generation's own expiry — or a client that
+// has already given up — cannot cancel the write that says what happened to
+// the scene. Bounded all the same, because an uncancellable write would simply
+// hang until the Lambda is killed.
+//
+// The window SCALES with what the caller actually has. An HTTP handler can
+// spare seconds; the queue worker has minutes. Giving the worker the handler's
+// reserve is what stranded two scenes with their designs saved and their
+// status unwritten.
 func bookkeepingCtx(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.WithoutCancel(ctx), bookkeepingReserve-time.Second)
+	window := bookkeepingReserve - time.Second
+
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		// No deadline at all: outside Lambda, or a detached context. Take the
+		// cap rather than the floor — there is nothing to be frugal for.
+		return context.WithTimeout(context.WithoutCancel(ctx), bookkeepingMax)
+	}
+	// A second back from whatever is left, so the writes end before the
+	// process does and have a chance to report their own failure.
+	if spare := time.Until(deadline) - time.Second; spare > window {
+		window = min(spare, bookkeepingMax)
+	}
+	return context.WithTimeout(context.WithoutCancel(ctx), window)
 }
