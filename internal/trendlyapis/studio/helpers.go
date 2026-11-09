@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
@@ -288,4 +289,35 @@ func reloadAndRespondWith(c *gin.Context, status int, brandID, contentID, studio
 		return
 	}
 	respondWithStudioStatus(c, status, brandID, contentID, s)
+}
+
+// ── Model output is not guaranteed to be valid UTF-8 ───────────────────────
+//
+// Firestore speaks protobuf over gRPC, and protobuf string fields MUST be
+// valid UTF-8. A model that emits a truncated multi-byte sequence — half an
+// emoji at a token boundary is the usual way — produces a string Go will
+// happily carry around and the marshaler then refuses:
+//
+//	rpc error: code = Internal desc = grpc: error while marshaling:
+//	string field contains invalid UTF-8
+//
+// The whole write fails, not the offending field. On a director plan that
+// meant 121 seconds of frontier-model work, already paid for, thrown away —
+// and the run left in `planning` forever, because the error came from the one
+// call that was supposed to record the outcome.
+//
+// Dropping the bad bytes rather than refusing: what arrives is overwhelmingly
+// valid text with one broken sequence in it, and losing a stray byte is
+// strictly better than losing the plan.
+
+// safeForFirestore strips byte sequences that are not valid UTF-8.
+//
+// Apply to ANYTHING a model produced before it is written. The plan JSON, the
+// storyboard, a problem message and a generated HTML document are all model
+// output, and any of them can carry a broken sequence.
+func safeForFirestore(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	return strings.ToValidUTF8(s, "")
 }

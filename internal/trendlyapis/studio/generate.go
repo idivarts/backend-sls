@@ -476,7 +476,9 @@ func ExecuteSceneDesignJob(ctx context.Context, msg studiojobs.Message) error {
 	}
 	ai.MeterBrandUsage(brandID, resp.Usage)
 
-	html := cleanHTML(firstContent(resp))
+	// Model output, straight into a Firestore string field — the same hazard
+	// that threw away a whole director plan. See safeForFirestore.
+	html := safeForFirestore(cleanHTML(firstContent(resp)))
 	if html == "" {
 		return trendlymodels.MarkSceneGenerationFailed(bookCtx, brandID, contentID, studioID, sceneID,
 			"the model returned no document")
