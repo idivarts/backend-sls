@@ -284,14 +284,28 @@ func ExecutePlanJob(ctx context.Context, msg studiojobs.Message) error {
 		status = trendlymodels.RunRefused
 	}
 
-	return trendlymodels.UpdateStudioRun(ctx, brandID, contentID, studioID, runID,
+	// ⚠️ EVERY ONE OF THESE IS MODEL OUTPUT. Firestore's protobuf refuses a
+	// string field that is not valid UTF-8, and it refuses the WHOLE write —
+	// so one truncated multi-byte sequence in the storyboard throws away the
+	// plan as well. See safeForFirestore.
+	if err := trendlymodels.UpdateStudioRun(ctx, brandID, contentID, studioID, runID,
 		[]firestore.Update{
 			{Path: "status", Value: status},
-			{Path: "planJson", Value: raw},
-			{Path: "storyboard", Value: storyboard},
+			{Path: "planJson", Value: safeForFirestore(raw)},
+			{Path: "storyboard", Value: safeForFirestore(storyboard)},
 			{Path: "problems", Value: flattenProblems(problems)},
 			{Path: "estCostUsd", Value: derived},
-		})
+		}); err != nil {
+		// ⚠️ THE RUN MUST NOT BE LEFT `planning`. This is the call that
+		// records the outcome, so its failure is the one failure that can
+		// strand a run forever — the user watches "the director is still
+		// working on this" against a job that finished minutes ago and will
+		// never speak again. Say it failed, with the plain-ASCII reason that
+		// could not possibly be what the first write choked on.
+		log.Printf("director: could not store plan for run %s: %v", runID, err)
+		return fail("we couldn't save that plan. Please try planning it again")
+	}
+	return nil
 }
 
 // planOnce makes one planner call and validates the answer.
@@ -366,8 +380,11 @@ func ListRuns(c *gin.Context) {
 func flattenProblems(ps []director.Problem) []trendlymodels.RunProblem {
 	out := make([]trendlymodels.RunProblem, 0, len(ps))
 	for _, p := range ps {
+		// A problem message quotes what the planner wrote — a scene id, a
+		// model name, a fragment of its own JSON — so it carries the same
+		// invalid-UTF-8 risk as the plan itself.
 		out = append(out, trendlymodels.RunProblem{
-			Field: p.Where, Message: p.Message, Fatal: p.Fatal,
+			Field: safeForFirestore(p.Where), Message: safeForFirestore(p.Message), Fatal: p.Fatal,
 		})
 	}
 	return out
