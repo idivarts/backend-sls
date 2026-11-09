@@ -88,3 +88,62 @@ func TestBookkeepingSurvivesTheRequestBeingCancelled(t *testing.T) {
 		t.Fatal("bookkeeping must still be bounded, or it hangs until the kill")
 	}
 }
+
+// ── The window the writes actually get ─────────────────────────────────────
+//
+// These exist because the first version shipped one number for every caller.
+// A 5s window carved out of a 30s HTTP request was then handed to a worker
+// holding 900s, and two of three scenes saved their design and could not
+// record that they had — the exact half-written state the queue was meant to
+// abolish.
+
+// The queue worker. 900s available, so the writes must get the cap, not the
+// HTTP handler's floor.
+func TestTheWorkerGetsAGenerousWindow(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 900*time.Second)
+	defer cancel()
+
+	book, cancelBook := bookkeepingCtx(ctx)
+	defer cancelBook()
+
+	deadline, ok := book.Deadline()
+	if !ok {
+		t.Fatal("bookkeeping must stay bounded")
+	}
+	if left := time.Until(deadline); left < 55*time.Second {
+		t.Fatalf("a worker with 900s gave its writes only %v", left)
+	}
+}
+
+// A long context must not hand the writes an unbounded-in-practice window.
+func TestTheWindowIsCapped(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 900*time.Second)
+	defer cancel()
+
+	book, cancelBook := bookkeepingCtx(ctx)
+	defer cancelBook()
+
+	deadline, _ := book.Deadline()
+	if left := time.Until(deadline); left > bookkeepingMax {
+		t.Fatalf("window = %v, above the %v cap", left, bookkeepingMax)
+	}
+}
+
+// The HTTP shape: reached with only the reserve left, the window is the floor
+// and must still fit inside what remains.
+func TestATightCallerStillGetsTheFloorAndNoMore(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), bookkeepingReserve)
+	defer cancel()
+
+	book, cancelBook := bookkeepingCtx(ctx)
+	defer cancelBook()
+
+	deadline, _ := book.Deadline()
+	left := time.Until(deadline)
+	if left > bookkeepingReserve {
+		t.Fatalf("window %v exceeds what the caller had (%v)", left, bookkeepingReserve)
+	}
+	if left < 3*time.Second {
+		t.Fatalf("window %v is too small to write two documents", left)
+	}
+}
