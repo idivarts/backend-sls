@@ -232,6 +232,36 @@ type SceneGeneration struct {
 
 	CastIDs    []string `json:"castIds,omitempty" firestore:"castIds,omitempty"`
 	LocationID string   `json:"locationId,omitempty" firestore:"locationId,omitempty"`
+
+	// AssetRequestID is the plan's request this scene's footage comes from.
+	//
+	// ⚠️ IT IS NOT ONE REQUEST PER SCENE. The planner deliberately serves two
+	// scenes from one longer generation when they share a cast member, a place
+	// and a framing — six 4-second scenes off three 8-second clips, trimmed.
+	// Submitting per SCENE would generate six, cost twice as much, and throw
+	// away the consistency that made the planner group them. Whatever submits
+	// generations groups by this id first.
+	AssetRequestID string `json:"assetRequestId,omitempty" firestore:"assetRequestId,omitempty"`
+
+	// DurationSecs is what the plan asked the model for, which is the CLIP's
+	// length and not the scene's: a scene showing half of an 8-second clip
+	// still needs all 8 generated.
+	DurationSecs int `json:"durationSecs,omitempty" firestore:"durationSecs,omitempty"`
+
+	// NativeAudio lets the video model emit its own sound. Off unless the plan
+	// asked: a generated clip's own voice under our narration is two voices at
+	// once, different in every clip.
+	NativeAudio bool `json:"nativeAudio,omitempty" firestore:"nativeAudio,omitempty"`
+
+	// OverlayBrief is the type that goes OVER the footage.
+	//
+	// It lives beside the video prompt rather than in it because a video scene
+	// has two things to make, and they used to collide: the layer walk kept one
+	// `brief` and the overlay, being the later layer, overwrote the video
+	// request's prompt. The scene then said "generate with Veo" and carried a
+	// prompt describing a text card — an 8-second video of a headline, paid
+	// for, from a plan that asked for a person at a desk.
+	OverlayBrief string `json:"overlayBrief,omitempty" firestore:"overlayBrief,omitempty"`
 }
 
 // CastMember is a person who appears in more than one generated clip.

@@ -160,17 +160,38 @@ func materialise(
 	if len(plan.Cast) > 0 {
 		cast := make([]trendlymodels.CastMember, 0, len(plan.Cast))
 		for _, m := range plan.Cast {
-			cast = append(cast, trendlymodels.CastMember{
+			member := trendlymodels.CastMember{
 				ID:          m.ID,
 				Description: m.Description,
 				// Verbatim. Paraphrasing the wardrobe between clips is how a
 				// navy jumper becomes a blue shirt.
 				Look: m.Look,
-				// The anchor is a MEDIA id, and the plan's anchor is an asset
-				// request that has not run yet — so it is left empty and set
-				// when the still lands. A plan cannot pre-fill a reference to
-				// something that does not exist.
-			})
+			}
+			// ⚠️ A PLAN'S ANCHOR IS SOMETIMES ALREADY REAL. Two fields express
+			// it: `anchorAssetId` is a still that has yet to be generated, and
+			// cannot be carried — but `anchorMediaId` is a library row that
+			// exists right now, and dropping it is not caution, it is data
+			// loss. The cost is specific: `resolveCast` refuses a member above
+			// two generated clips without an anchor, so a plan that correctly
+			// chose an existing still had its third clip rejected by a rule
+			// the plan had already satisfied.
+			//
+			// Checked against the library rather than trusted: an id the model
+			// invented would otherwise become a reference URL lookup that
+			// fails mid-generation, where here it is simply not an anchor.
+			//
+			// `noAiInput` is checked for the same reason. A still whose licence
+			// forbids feeding it to a model is not an anchor, however real it
+			// is — carrying it would satisfy the appearance count at approval
+			// and then refuse at submission, which moves the complaint from
+			// "this plan needs an anchor", said while the user is reading the
+			// plan, to "that still can't be used", said minutes later.
+			if m.AnchorMediaID != "" {
+				if a, err := trendlymodels.GetAsset(ctx, brandID, m.AnchorMediaID); err == nil && a != nil && !a.NoAIInput {
+					member.AnchorMediaID = m.AnchorMediaID
+				}
+			}
+			cast = append(cast, member)
 		}
 		updates = append(updates, firestore.Update{Path: "cast", Value: cast})
 	}
@@ -178,9 +199,17 @@ func materialise(
 	if len(plan.Locations) > 0 {
 		locs := make([]trendlymodels.StudioLocation, 0, len(plan.Locations))
 		for _, l := range plan.Locations {
-			locs = append(locs, trendlymodels.StudioLocation{
+			loc := trendlymodels.StudioLocation{
 				ID: l.ID, Description: l.Description, Look: l.Look,
-			})
+			}
+			// Same rule as the cast above: an anchor that already exists and
+			// may be fed to a model is carried; an asset request is not.
+			if l.AnchorMediaID != "" {
+				if a, err := trendlymodels.GetAsset(ctx, brandID, l.AnchorMediaID); err == nil && a != nil && !a.NoAIInput {
+					loc.AnchorMediaID = l.AnchorMediaID
+				}
+			}
+			locs = append(locs, loc)
 		}
 		updates = append(updates, firestore.Update{Path: "locations", Value: locs})
 	}
@@ -254,49 +283,29 @@ func materialise(
 		}
 
 		// Layers. A reuse is filled now; anything that has to be made leaves
-		// the scene pending with the brief on it, so the per-scene endpoints
-		// are self-contained — they take a scene id, not a plan.
-		brief, needsMaking := "", false
+		// the scene pending with the brief on it, so whatever submits it is
+		// self-contained — it takes a scene id, not a plan.
 		for li, lp := range sp.Layers {
-			switch {
-			case lp.ReuseMediaID != "":
-				sc.Layers = append(sc.Layers, trendlymodels.StudioLayer{
-					ID:        fmt.Sprintf("l%d_%d", li, nowMs()),
-					Kind:      "media",
-					Slot:      orSlot(lp.Slot),
-					MediaID:   lp.ReuseMediaID,
-					Fit:       "cover",
-					TrimInMs:  lp.TrimInMs,
-					TrimOutMs: lp.TrimOutMs,
-					Volume:    lp.Volume,
-				})
-			case lp.HTMLBrief != "":
-				brief, needsMaking = lp.HTMLBrief, true
-			case lp.AssetRequestID != "":
-				if ar, ok := byRequest[lp.AssetRequestID]; ok {
-					if ar.Prompt != "" {
-						brief = ar.Prompt
-					} else {
-						brief = ar.Intent
-					}
-					needsMaking = true
-				}
+			if lp.ReuseMediaID == "" {
+				continue
 			}
+			sc.Layers = append(sc.Layers, trendlymodels.StudioLayer{
+				ID:        fmt.Sprintf("l%d_%d", li, nowMs()),
+				Kind:      "media",
+				Slot:      orSlot(lp.Slot),
+				MediaID:   lp.ReuseMediaID,
+				Fit:       "cover",
+				TrimInMs:  lp.TrimInMs,
+				TrimOutMs: lp.TrimOutMs,
+				Volume:    lp.Volume,
+			})
 		}
 
-		if needsMaking {
+		if gen := genIntent(sp, byRequest); gen != nil {
 			sc.Pending = true
-			sc.Gen = &trendlymodels.SceneGeneration{
-				Prompt: brief,
-				Status: "queued",
-			}
-			// Which approach the planner chose, so the client asks the right
-			// endpoint without re-reading the plan.
-			if sp.Approach == trendlymodels.SceneVideo {
-				sc.PrimaryKind = trendlymodels.SceneEmpty
-				sc.Gen.Model = videoModelFor(sp, byRequest)
-			}
+			sc.Gen = gen
 		}
+
 		if len(sc.Layers) > 0 {
 			sc.PrimaryKind = primaryKindFor(ctx, brandID, sc.Layers)
 		}
@@ -312,6 +321,107 @@ func materialise(
 	}
 
 	return sceneIDs, problems
+}
+
+// genIntent decides what a planned scene has to have made, or nil when nothing
+// does. Everything a submission needs, read off the plan once.
+//
+// ⚠️ THE OVERLAY AND THE FOOTAGE ARE TWO BRIEFS, NOT ONE. This used to keep a
+// single `brief` that each layer overwrote as the walk went on, so a video
+// scene carrying type over it ended up with the model the plan chose for the
+// footage and the words the plan wrote for the CAPTION: "generate with Veo",
+// prompt "Editable bold top-third hook…". Nothing submitted it, which is the
+// only reason that never became an 8-second video of a text box charged to a
+// brand. They are kept apart and chosen between by the approach the plan
+// declared.
+//
+// Pulled out of the materialisation loop so it can be tested without a
+// Firestore client — the bug above was invisible in a 60-line loop and obvious
+// the moment it had a name.
+func genIntent(
+	sp director.ScenePlan,
+	byRequest map[string]director.AssetRequest,
+) *trendlymodels.SceneGeneration {
+	htmlBrief, assetBrief := "", ""
+	var footage *director.AssetRequest
+	needsMaking := false
+
+	for _, lp := range sp.Layers {
+		switch {
+		case lp.ReuseMediaID != "":
+			// Already on the scene; nothing to make.
+		case lp.HTMLBrief != "":
+			htmlBrief, needsMaking = lp.HTMLBrief, true
+		case lp.AssetRequestID != "":
+			ar, ok := byRequest[lp.AssetRequestID]
+			if !ok {
+				// A layer pointing at a request the plan does not contain.
+				// The validator refuses that, so reaching here means a stored
+				// plan from before the rule — skipped rather than turned into
+				// a generation with an empty prompt.
+				continue
+			}
+			assetBrief, needsMaking = promptFor(ar), true
+			if ar.Kind == "video" {
+				req := ar
+				footage = &req
+			}
+		}
+	}
+
+	if !needsMaking {
+		return nil
+	}
+
+	gen := &trendlymodels.SceneGeneration{
+		Prompt: assetBrief,
+		Status: trendlymodels.SceneGenQueued,
+	}
+	if gen.Prompt == "" {
+		gen.Prompt = htmlBrief
+	}
+	model := ""
+	if footage != nil {
+		model = videoModelFor(sp, byRequest)
+	}
+	// ⚠️ NO MODEL, NO VIDEO INTENT. An approved plan cannot get here — the
+	// validator makes an unenabled or missing model a fatal problem — but if
+	// one ever did, marking the scene as a video generation with nothing to
+	// submit it to would strand it at "Making…" with no job, which is the
+	// precise failure this whole change exists to end. Falling through leaves
+	// a pending scene with a prompt and no model, which the design fill can
+	// pick up and a person can see.
+	if sp.Approach != trendlymodels.SceneVideo || footage == nil || model == "" {
+		return gen
+	}
+
+	// The whole generation intent, carried.
+	//
+	// Without it a submission has a model and a prompt and nothing else — no
+	// cast, so no `look` appended and no anchor attached, which between them
+	// are every rule that keeps one face across three clips. The plan knew all
+	// of this; the scene simply dropped it on the floor.
+	gen.Model = model
+	gen.Prompt = promptFor(*footage)
+	gen.AssetRequestID = footage.ID
+	gen.CastIDs = footage.CastIDs
+	gen.LocationID = footage.LocationID
+	gen.DurationSecs = footage.DurationS
+	gen.NativeAudio = footage.NativeAudio
+	// Kept, not dropped: the plan wants type over the clip, and this is the
+	// only record of what it should say.
+	gen.OverlayBrief = htmlBrief
+	return gen
+}
+
+// promptFor is what to actually send a model for a request: its prompt, or its
+// intent when the planner gave no prompt. Intent is the fallback on purpose —
+// it survives a model change, where a prompt is written for one model.
+func promptFor(ar director.AssetRequest) string {
+	if p := strings.TrimSpace(ar.Prompt); p != "" {
+		return p
+	}
+	return strings.TrimSpace(ar.Intent)
 }
 
 // videoModelFor finds the model the plan chose for a scene's generation, so the
