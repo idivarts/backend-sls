@@ -201,3 +201,44 @@ func GenerativeVideoTokenCost(model *MediaModel, durationSecs int) int64 {
 	}
 	return TokensForCost(usd * renderCostMarkupX)
 }
+
+// ── What a price actually costs the user ────────────────────────────────────
+//
+// Everything above converts a provider cost into TOKENS, because tokens are
+// what a wallet holds. Anything that QUOTES a price before the work happens
+// needs the same number in dollars, and getting it by a different route is how
+// the two came apart:
+//
+//   the approve screen showed  DerivedCosts → the raw provider cost
+//   the wallet was charged     GenerativeVideoTokenCost → raw × 2 × 1.30
+//
+// so a plan quoted at $3.60 took $9.36 off the wallet. Nobody had lied; the
+// estimate and the charge were simply computed in two places from two
+// different ideas of what a price is.
+//
+// These two are the dollar-denominated truth, and they are deliberately thin
+// wrappers over the SAME constants the charging path uses, so a change to
+// either multiplier moves the quote and the charge together.
+
+// GenerativeMarkupX is the retry-and-refund markup on generated media. It
+// stacks with BillingMarginX, so generated video sells at 2.6x modelled cost.
+const GenerativeMarkupX = renderCostMarkupX
+
+// BilledUSD is what a raw provider cost takes off a wallet, in dollars —
+// margin included, and nothing else.
+func BilledUSD(costUSD float64) float64 {
+	if costUSD <= 0 {
+		return 0
+	}
+	return costUSD * BillingMarginX
+}
+
+// BilledGenerativeUSD is the same for generated media, which also carries the
+// retry markup. Mirrors GenerativeVideoTokenCost exactly; `TestQuoteMatchesCharge`
+// is what keeps it mirroring.
+func BilledGenerativeUSD(costUSD float64) float64 {
+	if costUSD <= 0 {
+		return 0
+	}
+	return costUSD * GenerativeMarkupX * BillingMarginX
+}
