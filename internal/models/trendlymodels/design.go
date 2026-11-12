@@ -43,6 +43,23 @@ import (
 // already owns Design* for the v2 content-scoped revisions. Both collections
 // are alive until Phase 6 retires v2; the rename back to Design* belongs in
 // that change, not before.
+// ⚠️ THE COLLECTION ID `designs` IS SHARED WITH v2.
+//
+// v2 stores content-scoped revisions at
+// brands/{brandId}/contents/{contentId}/designs/{revisionId} — the same
+// collection id as this one. content_design.go ListStuckRenders runs a
+// COLLECTION-GROUP query over `designs`, so it sees both kinds of document.
+//
+// Today that is harmless, by one detail: the sweep filters on
+// `renderStartedAt < cutoff`, a v3 design has no such field, and a Firestore
+// inequality skips documents where the field is absent. The path guard in
+// that loop would skip them anyway.
+//
+// So do NOT add a `renderStartedAt` field here without giving v3 its own
+// sweep. The moment it exists, v3 designs enter that query, get dropped by
+// the path guard, and a stranded v3 render is invisible to the only thing
+// that closes stranded renders — while the sweep still looks healthy.
+// design_test.go asserts the field's absence so this cannot happen quietly.
 const designsSubcollection = "designs"
 
 // The render lifecycle strings are the ones content_design.go already owns

@@ -2,6 +2,7 @@ package trendlymodels
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -114,5 +115,34 @@ func TestZeroFPSGetsADefault(t *testing.T) {
 	}()
 	if d.Format.FPS != 30 {
 		t.Fatalf("FPS = %d, want the 30 default", d.Format.FPS)
+	}
+}
+
+// The collection id `designs` is shared with v2's content-scoped revisions at
+// brands/{b}/contents/{c}/designs/{r}, and content_design.go sweeps stuck
+// renders with a COLLECTION-GROUP query over it, filtered on renderStartedAt.
+//
+// A v3 design is excluded today only because it has no such field — Firestore
+// inequalities skip documents where the field is absent. Give the v3 model a
+// renderStartedAt and these documents silently enter that sweep, get dropped
+// by its path guard, and stranded v3 renders become invisible while the sweep
+// still reports healthy.
+//
+// So this test fails on sight if the field appears, to force the question:
+// does v3 now need its own sweep?
+func TestDesignHasNoRenderStartedAtFieldUntilV3HasItsOwnSweep(t *testing.T) {
+	typ := reflect.TypeOf(Design{})
+	for i := 0; i < typ.NumField(); i++ {
+		tag := typ.Field(i).Tag.Get("firestore")
+		name := strings.Split(tag, ",")[0]
+		if name == "renderStartedAt" {
+			t.Fatalf(
+				"Design now has a renderStartedAt field (%s). It shares the `designs` collection id "+
+					"with v2, whose ListStuckRenders collection-group query filters on exactly that "+
+					"field — these documents will enter the sweep and be dropped by its path guard. "+
+					"Give v3 its own stuck-render sweep before adding this.",
+				typ.Field(i).Name,
+			)
+		}
 	}
 }
