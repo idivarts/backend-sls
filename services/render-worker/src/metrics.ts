@@ -12,6 +12,8 @@
  * else degrades visibly in the app, but a worker failing every job looks, from
  * inside the product, exactly like nobody rendering anything.
  */
+import type { RenderDocType } from "./types";
+
 const NAMESPACE = "Trendly/Render";
 
 type Dimensions = Record<string, string>;
@@ -44,7 +46,7 @@ function emit(metrics: Record<string, number>, dimensions: Dimensions, extra: Re
 }
 
 export function renderSucceeded(opts: {
-    docType: "image" | "video" | "composition" | "ingest" | "frame" | "studio";
+    docType: RenderDocType;
     durationMs: number;
     outputs: number;
     bytes: number;
@@ -63,7 +65,7 @@ export function renderSucceeded(opts: {
 }
 
 export function renderFailed(opts: {
-    docType: "image" | "video" | "composition" | "ingest" | "frame" | "studio";
+    docType: RenderDocType;
     durationMs: number;
     revisionId: string;
     reason: string;
