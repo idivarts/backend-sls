@@ -32,6 +32,7 @@ package studio
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -53,6 +54,10 @@ type planRunRequest struct {
 	// TargetSeconds is what they asked for. 0 lets the planner decide, which
 	// it then has to say out loud in its summary.
 	TargetSeconds int `json:"targetSeconds"`
+	// Attachments are files the user handed over with the brief, each with the
+	// handle they referred to it by. Handle and media id only — everything
+	// else about the file is read from the library row server-side.
+	Attachments []trendlymodels.RunAttachment `json:"attachments"`
 }
 
 // PlanRun accepts a planning request and hands it to the studio queue.
@@ -134,12 +139,28 @@ func PlanRun(c *gin.Context) {
 
 	// The model is stored on the run so the worker uses the one this request
 	// gated on, rather than re-resolving it and possibly picking another.
+	// Rejected here rather than in the worker, because a cap the user has
+	// exceeded is something they can fix immediately and a 202 followed by a
+	// refused run two minutes later is a worse way to say the same thing.
+	if len(req.Attachments) > director.MaxAttachments {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "too_many_attachments",
+			"message": fmt.Sprintf("You can attach up to %d files to one brief.",
+				director.MaxAttachments),
+		})
+		return
+	}
+
 	run := &trendlymodels.StudioRun{
-		Status:    trendlymodels.RunPlanning,
-		Mode:      req.Mode,
-		Brief:     strings.TrimSpace(req.Brief),
-		Model:     model,
-		CreatedBy: c.GetString("userId"),
+		Status: trendlymodels.RunPlanning,
+		Mode:   req.Mode,
+		Brief:  strings.TrimSpace(req.Brief),
+		// Stored unresolved. Resolution reads the library, which is the
+		// worker's job — and doing it here would mean a file deleted between
+		// the request and the plan resolved anyway.
+		Attachments: req.Attachments,
+		Model:       model,
+		CreatedBy:   c.GetString("userId"),
 	}
 	runID, err := trendlymodels.CreateStudioRun(ctx, brandID, contentID, studioID, run)
 	if err != nil {
@@ -227,6 +248,20 @@ func ExecutePlanJob(ctx context.Context, msg studiojobs.Message) error {
 	if err != nil {
 		return fail("could not read what this brand has")
 	}
+	// Resolved BEFORE the model call, so a brief whose files cannot be found
+	// is refused without spending anything. A silent drop would be worse than
+	// a refusal in every way: the brief still reads perfectly, the plan comes
+	// back without the file, and nothing says why.
+	if aProblems := manifest.AttachUserMedia(ctx, brandID, run.Attachments); director.Fatal(aProblems) {
+		return trendlymodels.UpdateStudioRun(ctx, brandID, contentID, studioID, runID,
+			[]firestore.Update{
+				{Path: "status", Value: trendlymodels.RunRefused},
+				{Path: "problems", Value: flattenProblems(aProblems)},
+				{Path: "storyboard", Value: safeForFirestore(
+					director.Storyboard(director.Plan{}, manifest, aProblems))},
+			})
+	}
+
 	userMsg, err := director.BuildUserMessage(manifest, run.Brief)
 	if err != nil {
 		return fail("could not assemble the brief")

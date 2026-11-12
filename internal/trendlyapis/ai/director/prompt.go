@@ -216,6 +216,10 @@ func BuildUserMessage(m Manifest, brief string) (string, error) {
 	} else {
 		b.WriteString(strings.TrimSpace(brief) + "\n")
 	}
+	// Above the manifest, not inside it: the manifest is forty library rows
+	// and a model list, and the four files the user deliberately chose should
+	// not have to be found in there.
+	b.WriteString(AttachmentBlock(m.Attachments))
 	b.WriteString("\nCAPABILITY MANIFEST:\n")
 	b.Write(raw)
 	b.WriteString("\n\nReturn the plan as a single JSON object and nothing else.")
