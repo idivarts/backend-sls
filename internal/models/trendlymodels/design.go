@@ -268,17 +268,30 @@ func MarkBrandDesignRenderQueued(ctx context.Context, brandID, designID string) 
 }
 
 // SetDesignRenderProgress is called by the worker as frames land.
+// ⚠️ This deliberately does NOT go through UpdateBrandDesign, because that
+// stamps updatedAt — and updatedAt is the key ListBrandDesigns sorts on. A
+// render reports progress many times over, so routing it through the normal
+// update would make a rendering design climb to the top of the index list
+// again and again while someone is reading it, and rewrite the sort key for
+// every live subscriber on each tick. Progress is render state, not an edit.
 func SetBrandDesignRenderProgress(ctx context.Context, brandID, designID string, fraction float64) error {
+	if brandID == "" || designID == "" {
+		return fmt.Errorf("SetBrandDesignRenderProgress: empty brandID or designID")
+	}
 	if fraction < 0 {
 		fraction = 0
 	}
 	if fraction > 1 {
 		fraction = 1
 	}
-	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+	_, err := designDoc(brandID, designID).Update(ctx, []firestore.Update{
 		{Path: "renderStatus", Value: DesignRenderRendering},
 		{Path: "renderProgress", Value: fraction},
 	})
+	if err != nil {
+		return fmt.Errorf("SetBrandDesignRenderProgress: %w", err)
+	}
+	return nil
 }
 
 // SetDesignRenderResult records a finished render.

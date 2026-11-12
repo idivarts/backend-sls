@@ -53,22 +53,50 @@ export interface HyperframesEnvOptions {
 }
 
 /**
+ * The absolute path to the CLI entry point.
+ *
+ * Resolved through the module graph rather than left to `npx` or PATH,
+ * because every invocation runs with cwd set to the MATERIALISED PROJECT —
+ * a temp directory outside this package, with no node_modules of its own.
+ * `npx --no-install` would search that directory's (empty) chain and then
+ * PATH, find nothing, and fail every render.
+ */
+function hyperframesEntry(): string {
+    if (process.env.TRENDLY_HYPERFRAMES_ENTRY) return process.env.TRENDLY_HYPERFRAMES_ENTRY;
+    const pkgJson = require.resolve("hyperframes/package.json");
+    return join(dirname(pkgJson), "bin", "hyperframes.mjs");
+}
+
+/**
  * The environment every invocation runs with.
  *
- * `HYPERFRAMES_NO_TELEMETRY` and `DO_NOT_TRACK` are not optional: this worker
- * renders other people's brand material, and nothing about it should leave the
- * container. No provider keys are passed here either — media generation is a
- * separate, metered step, and a key absent from this environment is a
- * capability that cannot be billed by accident.
+ * Built from an ALLOWLIST, not from `...process.env`. Spreading the task
+ * environment would hand the subprocess every variable the Lambda has —
+ * including HEYGEN_API_KEY once Phase 4 adds it to provider.environment — and
+ * a render that can reach a paid API is a render that can spend outside the
+ * wallet, with no 402 in front of it. Media generation is a separate, metered
+ * step; a key absent from this environment is a capability that cannot be
+ * billed by accident.
+ *
+ * Telemetry is off for the same class of reason: this worker renders other
+ * people's brand material, and none of it should leave the container.
  */
+const ENV_ALLOWLIST = ["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "NODE_ENV", "CONTAINER"];
+
 export function hyperframesEnv(opts: HyperframesEnvOptions = {}): NodeJS.ProcessEnv {
-    return {
-        ...process.env,
-        HYPERFRAMES_NO_TELEMETRY: "1",
-        DO_NOT_TRACK: "1",
-        HYPERFRAMES_FFMPEG_PATH: opts.ffmpegPath ?? process.env.HYPERFRAMES_FFMPEG_PATH ?? "/usr/bin/ffmpeg",
-        HYPERFRAMES_FFPROBE_PATH: opts.ffprobePath ?? process.env.HYPERFRAMES_FFPROBE_PATH ?? "/usr/bin/ffprobe",
-    };
+    const env: NodeJS.ProcessEnv = {};
+    for (const key of ENV_ALLOWLIST) {
+        const value = process.env[key];
+        if (value !== undefined) env[key] = value;
+    }
+    env.HYPERFRAMES_NO_TELEMETRY = "1";
+    env.DO_NOT_TRACK = "1";
+    env.HYPERFRAMES_FFMPEG_PATH = opts.ffmpegPath ?? process.env.HYPERFRAMES_FFMPEG_PATH ?? "/usr/bin/ffmpeg";
+    env.HYPERFRAMES_FFPROBE_PATH = opts.ffprobePath ?? process.env.HYPERFRAMES_FFPROBE_PATH ?? "/usr/bin/ffprobe";
+    if (process.env.PRODUCER_HEADLESS_SHELL_PATH) {
+        env.PRODUCER_HEADLESS_SHELL_PATH = process.env.PRODUCER_HEADLESS_SHELL_PATH;
+    }
+    return env;
 }
 
 export interface CliResult {
@@ -92,7 +120,7 @@ export function runHyperframes(
 ): Promise<CliResult> {
     const timeoutMs = opts.timeoutMs ?? 15 * 60_000;
     return new Promise((resolvePromise, reject) => {
-        const child = spawn("npx", ["--no-install", "hyperframes", ...args], {
+        const child = spawn(process.execPath, [hyperframesEntry(), ...args], {
             cwd: projectDir,
             env: opts.env ?? hyperframesEnv(),
         });
@@ -188,21 +216,8 @@ function collectFindings(node: unknown, out: CheckFinding[]): void {
 export async function checkProject(projectDir: string): Promise<CheckOutcome> {
     const res = await runHyperframes(projectDir, ["check", "--json"], { timeoutMs: 5 * 60_000 });
 
-    const start = res.stdout.indexOf("{");
-    const end = res.stdout.lastIndexOf("}");
-    if (start === -1 || end === -1) {
-        return {
-            ok: false,
-            errors: [],
-            warnings: [],
-            problem: "The design could not be checked before rendering.",
-        };
-    }
-
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(res.stdout.slice(start, end + 1));
-    } catch {
+    const parsed = await readCheckReport(projectDir, res.stdout);
+    if (!parsed) {
         return {
             ok: false,
             errors: [],
@@ -223,6 +238,45 @@ export async function checkProject(projectDir: string): Promise<CheckOutcome> {
         warnings,
         problem: ok ? undefined : errors[0]?.message ?? "This design has a problem that would stop it rendering.",
     };
+}
+
+/**
+ * Get the check report, preferring the file the CLI writes over its stdout.
+ *
+ * Slicing stdout between the first '{' and the last '}' looked fine until you
+ * notice the CLI already prints `@hf-progress {…}` lines on the render path
+ * and a trailing `report saved to …` line after check. One brace-bearing
+ * notice ahead of the payload and the slice starts in the wrong place, the
+ * parse throws, and the gate fails CLOSED for every design — with a message
+ * blaming the design rather than the parser.
+ *
+ * Every run writes an authoritative report to .hyperframes/artifacts/checks,
+ * so that is read first; stdout is only the fallback for a version that stops
+ * writing one.
+ */
+async function readCheckReport(projectDir: string, stdout: string): Promise<unknown | null> {
+    const dir = join(projectDir, ".hyperframes", "artifacts", "checks");
+    try {
+        const names = (await readdir(dir)).filter((n) => n.endsWith(".json"));
+        if (names.length > 0) {
+            const withTimes = await Promise.all(
+                names.map(async (n) => ({ n, mtime: (await stat(join(dir, n))).mtimeMs }))
+            );
+            withTimes.sort((a, b) => b.mtime - a.mtime);
+            return JSON.parse(await readFile(join(dir, withTimes[0].n), "utf8"));
+        }
+    } catch {
+        /* fall through to stdout */
+    }
+
+    const start = stdout.indexOf("{");
+    const end = stdout.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) return null;
+    try {
+        return JSON.parse(stdout.slice(start, end + 1));
+    } catch {
+        return null;
+    }
 }
 
 export interface HyperframesRenderResult {

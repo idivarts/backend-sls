@@ -18,13 +18,39 @@ test("telemetry is off on every invocation", () => {
     assert.equal(env.DO_NOT_TRACK, "1");
 });
 
-test("no provider key is handed to the CLI", () => {
-    // Media generation is a separate, metered step. A key that is absent from
-    // this environment is a capability that cannot be billed by accident, so
-    // this is enforcement rather than convention.
-    const env = hyperframesEnv();
-    for (const key of ["HEYGEN_API_KEY", "HEYGEN_ACCESS_TOKEN", "HYPERFRAMES_API_KEY", "ELEVENLABS_API_KEY"]) {
-        assert.equal(env[key], undefined, `${key} must not reach the render subprocess`);
+test("no provider key is handed to the CLI, even when the task has one", () => {
+    // The first version of this test only checked that the keys were absent,
+    // which passed vacuously because the local environment has none. It would
+    // have gone on passing after Phase 4 adds HEYGEN_API_KEY to
+    // provider.environment, while every render subprocess quietly inherited a
+    // billable credential. So the keys are INJECTED here and the allowlist has
+    // to drop them.
+    const injected = {
+        HEYGEN_API_KEY: "hg-should-not-leak",
+        HEYGEN_ACCESS_TOKEN: "hg-token-should-not-leak",
+        HYPERFRAMES_API_KEY: "hf-should-not-leak",
+        ELEVENLABS_API_KEY: "el-should-not-leak",
+        OPENROUTER_API_KEY: "or-should-not-leak",
+        AWS_SECRET_ACCESS_KEY: "aws-should-not-leak",
+    };
+    const saved: Record<string, string | undefined> = {};
+    for (const [k, v] of Object.entries(injected)) {
+        saved[k] = process.env[k];
+        process.env[k] = v;
+    }
+    try {
+        const env = hyperframesEnv();
+        for (const key of Object.keys(injected)) {
+            assert.equal(env[key], undefined, `${key} must not reach the render subprocess`);
+        }
+        // and the allowlist still gives the subprocess what it needs to run
+        assert.ok(env.PATH, "PATH must survive the allowlist");
+        assert.equal(env.HYPERFRAMES_NO_TELEMETRY, "1");
+    } finally {
+        for (const [k, v] of Object.entries(saved)) {
+            if (v === undefined) delete process.env[k];
+            else process.env[k] = v;
+        }
     }
 });
 
