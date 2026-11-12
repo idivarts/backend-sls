@@ -186,6 +186,14 @@ idx collectibles COLLECTION_GROUP field-path=campaignId,order=ascending
 # brand-context:310 — collectionGroup("orgMembers") where managerId ==
 idx orgMembers COLLECTION_GROUP field-path=managerId,order=ascending
 
+# =============================================================================
+# designs  (Design Studio v3) — brands/{brandId}/designs/{designId}
+# =============================================================================
+# design.go ListDesigns: orderBy updatedAt desc, no filter. The composite index
+# (contentId, updatedAt) does NOT cover this — contentId is its leading field,
+# and a bare orderBy cannot use a prefix it does not constrain.
+idx designs COLLECTION field-path=updatedAt,order=descending
+
 echo
 echo "Done. Index builds are async — track with:"
 echo "  gcloud firestore operations list --database=\"$DATABASE\" --project=\"$PROJECT\""

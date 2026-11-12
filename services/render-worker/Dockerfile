@@ -65,6 +65,15 @@ RUN cd services/render-worker && npm ci --omit=dev --ignore-scripts \
 
 COPY --from=build /app/services/render-worker/dist ./services/render-worker/dist
 
+# GSAP, vendored rather than fetched.
+#
+# `hyperframes init` writes a jsdelivr <script> tag, which would make every
+# render depend on a CDN being reachable. Baking it into the image and copying
+# it into each project is what lets a render run with no network at all — and
+# a render that cannot reach the internet cannot leak a brand's material to
+# one either. Pinned to the version Hyperframes 0.9.39 expects.
+COPY services/render-worker/vendor/ /app/services/render-worker/vendor/
+
 # Brand fonts, if any are dropped in. Kept last so adding one doesn't rebuild
 # Chromium. Quicksand belongs here once the design prompt is allowed to ask for
 # it by name (Phase 3).

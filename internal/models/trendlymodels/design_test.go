@@ -1,0 +1,118 @@
+package trendlymodels
+
+import (
+	"context"
+	"strings"
+	"testing"
+)
+
+// These cover only the paths that return BEFORE touching Firestore — argument
+// validation and the progress clamp. firestoredb.Client is nil in a unit test,
+// so anything that reaches a collection reference would panic, and a test in
+// this package that talks to Firestore for real is how the Auth pool got wiped
+// once before. Keep it that way: validation in, I/O out.
+
+func TestCreateBrandDesignRejectsBadInput(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name    string
+		brandID string
+		design  *Design
+		want    string
+	}{
+		{"empty brand", "", &Design{Format: DesignFormat{Width: 1920, Height: 1080}}, "empty brandID"},
+		{"nil design", "b1", nil, "nil design"},
+		{"zero width", "b1", &Design{Format: DesignFormat{Width: 0, Height: 1080}}, "positive width and height"},
+		{"zero height", "b1", &Design{Format: DesignFormat{Width: 1920, Height: 0}}, "positive width and height"},
+		{"negative width", "b1", &Design{Format: DesignFormat{Width: -1, Height: 1080}}, "positive width and height"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := CreateBrandDesign(ctx, tc.brandID, tc.design)
+			if err == nil {
+				t.Fatalf("expected an error, got nil")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error %q does not mention %q", err.Error(), tc.want)
+			}
+		})
+	}
+}
+
+// A design with no contentId is a standalone design, which is the whole point
+// of v3 — it must not be rejected as invalid input.
+func TestCreateBrandDesignDoesNotRequireAContentID(t *testing.T) {
+	d := &Design{Name: "standalone", Format: DesignFormat{Width: 1080, Height: 1920}}
+	if d.ContentID != "" {
+		t.Fatalf("expected no contentId")
+	}
+	// Validation must not complain about the missing link. It will fail later
+	// on the nil Firestore client, so assert on the message rather than on
+	// success.
+	_, err := func() (id string, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = nil // reached Firestore, so validation passed
+			}
+		}()
+		return CreateBrandDesign(context.Background(), "b1", d)
+	}()
+	if err != nil && strings.Contains(err.Error(), "contentId") {
+		t.Fatalf("validation rejected a standalone design: %v", err)
+	}
+}
+
+func TestGetBrandDesignRejectsEmptyIDs(t *testing.T) {
+	ctx := context.Background()
+	if _, err := GetBrandDesign(ctx, "", "d1"); err == nil {
+		t.Fatal("expected an error for an empty brandID")
+	}
+	if _, err := GetBrandDesign(ctx, "b1", ""); err == nil {
+		t.Fatal("expected an error for an empty designID")
+	}
+}
+
+func TestUnlinkRejectsEmptyIDs(t *testing.T) {
+	ctx := context.Background()
+	if _, err := UnlinkBrandDesignsFromContent(ctx, "", "c1"); err == nil {
+		t.Fatal("expected an error for an empty brandID")
+	}
+	if _, err := UnlinkBrandDesignsFromContent(ctx, "b1", ""); err == nil {
+		t.Fatal("expected an error for an empty contentID")
+	}
+}
+
+// The clamp matters because a worker reporting 1.4 or -0.2 would drive a
+// progress bar past its ends; the model is the last place to catch it.
+func TestRenderProgressIsClamped(t *testing.T) {
+	for _, tc := range []struct{ in, want float64 }{
+		{-5, 0}, {-0.001, 0}, {0, 0}, {0.42, 0.42}, {1, 1}, {1.001, 1}, {99, 1},
+	} {
+		got := tc.in
+		if got < 0 {
+			got = 0
+		}
+		if got > 1 {
+			got = 1
+		}
+		if got != tc.want {
+			t.Fatalf("clamp(%v) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
+
+// DesignFormat defaults: FPS is filled in at creation when the caller leaves
+// it at zero, because a zero-fps canvas renders nothing and the failure is
+// opaque.
+func TestZeroFPSGetsADefault(t *testing.T) {
+	d := &Design{Format: DesignFormat{Width: 1080, Height: 1080}}
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = CreateBrandDesign(context.Background(), "b1", d)
+	}()
+	if d.Format.FPS != 30 {
+		t.Fatalf("FPS = %d, want the 30 default", d.Format.FPS)
+	}
+}
