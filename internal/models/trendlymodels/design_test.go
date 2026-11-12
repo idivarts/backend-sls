@@ -146,3 +146,27 @@ func TestDesignHasNoRenderStartedAtFieldUntilV3HasItsOwnSweep(t *testing.T) {
 		}
 	}
 }
+
+// The v3 render price deliberately reuses the one-clip video curve rather
+// than introducing a second one. These lock in the two properties that
+// matter: it is never free, and it grows with the film.
+func TestDesignV3RenderTokenCost(t *testing.T) {
+	zero := DesignV3RenderTokenCost(0)
+	if zero <= 0 {
+		t.Fatalf("an unmeasured design must not render for free, got %d", zero)
+	}
+	// A design whose duration is not known yet is priced as a short film,
+	// not as nothing — the fallback has to behave like a real duration.
+	if zero != DesignV3RenderTokenCost(10_000) {
+		t.Fatalf("the zero-duration fallback should price as 10s, got %d vs %d",
+			zero, DesignV3RenderTokenCost(10_000))
+	}
+	short := DesignV3RenderTokenCost(5_000)
+	long := DesignV3RenderTokenCost(60_000)
+	if long <= short {
+		t.Fatalf("a longer film must not be cheaper: 5s=%d, 60s=%d", short, long)
+	}
+	if DesignV3RenderTokenCost(-1) != zero {
+		t.Fatalf("a negative duration must fall back like zero does")
+	}
+}

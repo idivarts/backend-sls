@@ -467,6 +467,15 @@ functions:
     events:
       # The Design Studio: studios, scenes, layers, order.
       - http: ANY /api/studio/{proxy+}
+      # Design Studio v3: brand-level designs, independent of any content.
+      # Its own route tree rather than more paths under /api/studio, because
+      # every studio route is content-scoped and a v3 design is not.
+      #
+      # ⚠️ Registering the routes in main.go is only half of it. Without this
+      # event API Gateway has nothing mapped to /api/design and every call
+      # 404s before the Lambda is ever invoked — the handler code looks
+      # perfectly correct while the feature does not exist.
+      - http: ANY /api/design/{proxy+}
       # ElevenLabs audio (music + voiceover) and Canva Connect deep-edit bridge.
       - http: ANY /api/media/{proxy+}
       - http: ANY /api/integrations/canva/{proxy+}

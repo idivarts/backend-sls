@@ -392,6 +392,21 @@ func DeleteContentInRange(ctx context.Context, brandID string, start, end int64)
 		if protectedContentStatuses[ct.Status] || ct.ScheduleExecutionArn != "" || len(ct.PublishedIds) > 0 {
 			continue
 		}
+		// Designs outlive the content they were made for.
+		//
+		// A v3 design lives at brands/{brandId}/designs/{designId} and points
+		// back with an optional contentId. Deleting the content must CLEAR
+		// that field, never take the design with it — that is the entire
+		// meaning of "a design is an independent object", and this is the one
+		// place the data layer can honour it.
+		//
+		// Done BEFORE the delete: unlinking after would leave a window where
+		// the content is gone and the designs still point at a dead id, and
+		// if the process died in that window they would point at it for ever.
+		// A failure here skips the delete rather than orphaning them.
+		if _, uerr := UnlinkBrandDesignsFromContent(ctx, brandID, doc.Ref.ID); uerr != nil {
+			continue
+		}
 		if _, e := doc.Ref.Delete(ctx); e == nil {
 			removed = append(removed, doc.Ref.ID)
 		}
