@@ -390,6 +390,26 @@ service cloud.firestore {
         }
       }
 
+      // ── Designs (Design Studio v3) ───────────────────────────────────────
+      // brands/{brandId}/designs/{designId}. TOP-LEVEL under the brand, not
+      // under a content: v3 makes a design its own object and keeps the link
+      // to a content as an optional `contentId` FIELD. That is what lets it be
+      // opened from the Playground section of the drawer, and what lets it
+      // outlive the content it was made for.
+      //
+      // Read by any brand member — the studio subscribes live for render
+      // progress, which is what makes a render survive a page reload.
+      //
+      // NOT client-writable, and deliberately so. The document carries the
+      // render lifecycle and the pointer to the project in S3; a client able
+      // to write renderStatus or projectPrefix could mark an unrendered design
+      // done, or point it at another brand's files. Every mutation goes
+      // through the backend (Admin SDK bypasses these rules).
+      match /designs/{designId} {
+        allow read:  if isAuthenticated() && isBrandMember(brandId);
+        allow write: if false;
+      }
+
       // ── The brand's media library ────────────────────────────────────────
       // brands/{brandId}/assets/{assetId}. Brand-scoped on purpose: an asset
       // uploaded while editing one post is meant to be reachable from another.
