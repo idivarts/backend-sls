@@ -30,6 +30,7 @@
  * A design that fails the gate never reaches the encoder.
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
@@ -91,8 +92,20 @@ export function hyperframesEnv(opts: HyperframesEnvOptions = {}): NodeJS.Process
     }
     env.HYPERFRAMES_NO_TELEMETRY = "1";
     env.DO_NOT_TRACK = "1";
-    env.HYPERFRAMES_FFMPEG_PATH = opts.ffmpegPath ?? process.env.HYPERFRAMES_FFMPEG_PATH ?? "/usr/bin/ffmpeg";
-    env.HYPERFRAMES_FFPROBE_PATH = opts.ffprobePath ?? process.env.HYPERFRAMES_FFPROBE_PATH ?? "/usr/bin/ffprobe";
+    // ffmpeg is pointed at only when we actually know where it is.
+    //
+    // An earlier version defaulted to /usr/bin/ffmpeg, which is right for our
+    // image (apt) and wrong for theirs (/usr/local/bin, a pinned static
+    // build). Setting the variable to a path that does not exist is worse
+    // than not setting it: the CLI trusts it, fails with "Configured path
+    // does not exist", and tells the user to apt-get install an ffmpeg that
+    // is already there. Unset, it resolves from PATH, which is correct in
+    // both images. Found by running this module against the real CLI; no
+    // unit test would have noticed.
+    const ffmpeg = opts.ffmpegPath ?? process.env.HYPERFRAMES_FFMPEG_PATH;
+    const ffprobe = opts.ffprobePath ?? process.env.HYPERFRAMES_FFPROBE_PATH;
+    if (ffmpeg && existsSync(ffmpeg)) env.HYPERFRAMES_FFMPEG_PATH = ffmpeg;
+    if (ffprobe && existsSync(ffprobe)) env.HYPERFRAMES_FFPROBE_PATH = ffprobe;
     if (process.env.PRODUCER_HEADLESS_SHELL_PATH) {
         env.PRODUCER_HEADLESS_SHELL_PATH = process.env.PRODUCER_HEADLESS_SHELL_PATH;
     }

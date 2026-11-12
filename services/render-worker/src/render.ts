@@ -28,6 +28,11 @@ import { loadDesign } from "./page";
 import { upload } from "./s3";
 import {
     failIngest,
+    getDesignV3,
+    markDesignV3Failed,
+    markDesignV3Started,
+    setDesignV3Progress,
+    setDesignV3Result,
     getComposition,
     getContentAudio,
     getRevision,
@@ -45,6 +50,7 @@ import {
 } from "./firestore";
 import { renderFailed, renderSucceeded } from "./metrics";
 import { makeThumbnail } from "./thumbnail";
+import { renderDesignV3 } from "./design-v3";
 import type { RenderJob, RenderTarget } from "./types";
 import { compositionFromDesign, measureComposition } from "../../../shared-libs/design/composition-runtime";
 import {
@@ -119,6 +125,15 @@ function jobTarget(job: RenderJob): RenderTarget {
 }
 
 export async function runJob(job: RenderJob): Promise<void> {
+    // v3 is handled before anything else, because every path below assumes a
+    // CONTENT-SCOPED target: jobTarget() builds brands/{b}/contents/{c}/… and
+    // a v3 design has no contentId at all. Falling through would write the
+    // failure to brands/{b}/contents//designs/{id} — an invalid path, so the
+    // error handler itself would throw and the real reason would be lost.
+    if (job.docType === "hfdesign") {
+        await runHyperframesDesignJob(job);
+        return;
+    }
     try {
         await withJobTimeout(runJobInner(job), job.revisionId);
     } catch (err) {
@@ -468,6 +483,80 @@ async function runIngestJob(job: RenderJob): Promise<void> {
         const reason = err instanceof Error ? err.message : String(err);
         console.error(`[ingest] ${assetId} failed:`, reason);
         await failIngest(job.brandId, assetId, reason).catch(() => undefined);
+        throw err;
+    }
+}
+
+
+/**
+ * Render a Design Studio v3 design.
+ *
+ * Its own function rather than a branch inside runJobInner, because it shares
+ * none of that path's assumptions: no content, no revision, no composition,
+ * and a different document to write status to. The only thing it borrows is
+ * the job timeout.
+ */
+async function runHyperframesDesignJob(job: RenderJob): Promise<void> {
+    const designId = job.designId ?? job.revisionId;
+    if (!job.brandId || !designId) {
+        throw new Error("hfdesign job needs brandId and designId");
+    }
+
+    const startedAt = Date.now();
+    try {
+        const design = await getDesignV3(job.brandId, designId);
+        if (!design) throw new Error(`design ${designId} not found`);
+
+        // A duplicate queue delivery must not render — or charge — twice.
+        if (!job.force && design.renderUrl && design.renderStatus === "done") {
+            console.log(`[render] hfdesign ${designId} already rendered; skipping`);
+            return;
+        }
+
+        await markDesignV3Started(job.brandId, designId, job.jobId);
+
+        const result = await withJobTimeout(
+            renderDesignV3(
+                {
+                    brandId: job.brandId,
+                    designId,
+                    projectPrefix: design.projectPrefix,
+                    quality: job.quality,
+                    force: job.force,
+                },
+                {
+                    onProgress: (f) => setDesignV3Progress(job.brandId, designId, f),
+                    // Written before the throw so the user sees the design's
+                    // actual problem rather than a generic render failure.
+                    onCheckFailed: (problem) => markDesignV3Failed(job.brandId, designId, problem),
+                }
+            ),
+            designId
+        );
+
+        await setDesignV3Result(job.brandId, designId, result.url);
+        // Same namespace and dimensions as every other render, so the cost
+        // meter and the failure alarm cover v3 without a second dashboard.
+        renderSucceeded({
+            docType: "hfdesign",
+            durationMs: Date.now() - startedAt,
+            revisionId: designId,
+            outputs: 1,
+            bytes: result.bytes,
+        });
+        for (const warning of result.warnings) {
+            console.log(`[render] hfdesign ${designId} warning: ${warning}`);
+        }
+        console.log(`[render] hfdesign ${designId} done in ${Date.now() - startedAt}ms`);
+    } catch (err) {
+        console.error(`[render] hfdesign ${designId} failed:`, err);
+        renderFailed({
+            docType: "hfdesign",
+            durationMs: Date.now() - startedAt,
+            revisionId: designId,
+            reason: err instanceof Error ? err.message : String(err),
+        });
+        await markDesignV3Failed(job.brandId, designId, userFacing(err)).catch(() => undefined);
         throw err;
     }
 }

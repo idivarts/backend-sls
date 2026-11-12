@@ -1,3 +1,19 @@
+/**
+ * The kinds of job the worker runs. Declared once and imported, because this
+ * union previously existed in three places (the job, and both metric
+ * emitters) and adding a kind to one left the others silently behind — the
+ * new kind then rendered fine and emitted no metrics at all, which is the
+ * failure you notice a month later when someone asks what it costs.
+ */
+export type RenderDocType =
+    | "image"
+    | "video"
+    | "composition"
+    | "ingest"
+    | "frame"
+    | "studio"
+    | "hfdesign";
+
 /** The unit of work: render one revision into publishable media. */
 export interface RenderJob {
     brandId: string;
@@ -27,8 +43,14 @@ export interface RenderJob {
      * goes through the composition renderer too, as a one-clip composition
      * derived from the design in memory. The timeline is the only primitive;
      * this field only says where the job reads from and writes back to.
+     *
+     * "hfdesign" renders a Design Studio v3 design: a Hyperframes project
+     * materialised from S3 and handed to their CLI. It is the one docType
+     * that does NOT go through the composition renderer, because the whole
+     * point of v3 is that Hyperframes owns the timeline — and the one with no
+     * contentId, so it is dispatched before anything that assumes one.
      */
-    docType: "image" | "video" | "composition" | "ingest" | "frame" | "studio";
+    docType: RenderDocType;
     /**
      * Re-render a revision that already has a renderUrl. Off by default so a
      * duplicate queue delivery is a no-op rather than a second charge.
@@ -53,6 +75,14 @@ export interface RenderJob {
      * status writers, but naming it explicitly keeps the job readable.
      */
     studioId?: string;
+    /**
+     * For an hfdesign job: the v3 design at brands/{brandId}/designs/{id}.
+     * `revisionId` carries it too, so the existing status writers and logging
+     * keep working unchanged.
+     */
+    designId?: string;
+    /** For an hfdesign job: draft while iterating, delivery for the file. */
+    quality?: "draft" | "looks" | "delivery";
 }
 
 /** What the worker found in Firestore and is about to render. */

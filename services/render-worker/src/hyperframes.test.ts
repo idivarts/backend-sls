@@ -94,3 +94,20 @@ test("listProjectFiles ignores the CLI's own artifact directory", async () => {
     const files = await listProjectFiles(dir);
     assert.deepEqual(files, ["compositions/hook.html", "index.html"]);
 });
+
+test("a non-existent ffmpeg path is dropped rather than passed on", () => {
+    // Setting the variable to a path that does not exist is worse than not
+    // setting it: the CLI trusts it and then tells the user to install an
+    // ffmpeg that is already on PATH. Our image puts it in /usr/bin, theirs
+    // in /usr/local/bin, so an absolute default is wrong somewhere by
+    // construction.
+    const env = hyperframesEnv({ ffmpegPath: "/nope/ffmpeg", ffprobePath: "/nope/ffprobe" });
+    assert.equal(env.HYPERFRAMES_FFMPEG_PATH, undefined);
+    assert.equal(env.HYPERFRAMES_FFPROBE_PATH, undefined);
+});
+
+test("an ffmpeg path that exists is passed through", () => {
+    const real = process.execPath; // any file that definitely exists
+    const env = hyperframesEnv({ ffmpegPath: real });
+    assert.equal(env.HYPERFRAMES_FFMPEG_PATH, real);
+});

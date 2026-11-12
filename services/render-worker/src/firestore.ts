@@ -544,3 +544,85 @@ export async function setStudioRenderResult(
         { merge: true }
     );
 }
+
+// ── Design Studio v3 ────────────────────────────────────────────────────────
+// The Node mirror of internal/models/trendlymodels/design.go. Same rule as the
+// rest of this file: field names must match the Go struct tags exactly, and
+// nothing outside here touches getFirestore().
+//
+// ⚠️ brands/{brandId}/designs/{designId} is TOP-LEVEL under the brand. The
+// collection id `designs` is shared with v2's content-scoped revisions at
+// brands/{b}/contents/{c}/designs/{r} — different path, same id — so never
+// reach these documents with a collection-group query.
+
+const designRef = (brandId: string, designId: string) =>
+    firestore().collection("brands").doc(brandId).collection("designs").doc(designId);
+
+export interface DesignV3ForRender {
+    projectPrefix: string;
+    renderStatus?: string;
+    renderUrl?: string;
+    format?: { width?: number; height?: number; fps?: number };
+}
+
+export async function getDesignV3(brandId: string, designId: string): Promise<DesignV3ForRender | null> {
+    const snap = await designRef(brandId, designId).get();
+    if (!snap.exists) return null;
+    const d = snap.data() ?? {};
+    return {
+        projectPrefix: typeof d.projectPrefix === "string" ? d.projectPrefix : "",
+        renderStatus: typeof d.renderStatus === "string" ? d.renderStatus : undefined,
+        renderUrl: typeof d.renderUrl === "string" ? d.renderUrl : undefined,
+        format: typeof d.format === "object" && d.format ? d.format : undefined,
+    };
+}
+
+export async function markDesignV3Started(brandId: string, designId: string, jobId?: string): Promise<void> {
+    await designRef(brandId, designId).set(
+        {
+            renderStatus: RenderStatus.Rendering,
+            renderProgress: 0,
+            renderError: FieldValue.delete(),
+            ...(jobId ? { renderJobId: jobId } : {}),
+        },
+        { merge: true }
+    );
+}
+
+/**
+ * Progress only. Deliberately does NOT touch updatedAt, which is the key the
+ * Design Studio index sorts on — see the note on SetBrandDesignRenderProgress
+ * in design.go. A rendering design must not climb the list on every tick.
+ */
+export async function setDesignV3Progress(brandId: string, designId: string, progress: number): Promise<void> {
+    const clamped = Math.min(Math.max(progress, 0), 1);
+    await designRef(brandId, designId).set({ renderProgress: clamped }, { merge: true });
+}
+
+/** `reason` is shown to the user verbatim, so it must read as a sentence. */
+export async function markDesignV3Failed(brandId: string, designId: string, reason: string): Promise<void> {
+    await designRef(brandId, designId).set(
+        { renderStatus: RenderStatus.Failed, renderError: reason },
+        { merge: true }
+    );
+}
+
+export async function setDesignV3Result(
+    brandId: string,
+    designId: string,
+    url: string,
+    posterUrl?: string
+): Promise<void> {
+    await designRef(brandId, designId).set(
+        {
+            renderStatus: RenderStatus.Done,
+            renderProgress: 1,
+            renderUrl: url,
+            ...(posterUrl ? { posterUrl } : {}),
+            renderedAt: Date.now(),
+            renderError: FieldValue.delete(),
+            updatedAt: Date.now(),
+        },
+        { merge: true }
+    );
+}
