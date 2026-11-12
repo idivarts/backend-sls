@@ -35,3 +35,11 @@ env.local.sh
 /seed-media-models
 /backfill-org-brands
 /billing-cron
+
+# The render worker vendors GSAP so a Hyperframes render needs no network.
+# The bare `vendor` rule above is the Go convention and silently swallowed it:
+# `git add -A` said nothing, the commit looked clean, and the Docker build
+# failed on a COPY of a path that was never in the context. Negated here
+# rather than narrowing the Go rule, so Go vendoring keeps working.
+!services/render-worker/vendor/
+!services/render-worker/vendor/**
