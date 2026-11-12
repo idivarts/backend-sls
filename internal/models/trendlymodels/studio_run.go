@@ -68,7 +68,20 @@ type StudioRun struct {
 	Mode string `json:"mode" firestore:"mode"`
 	// Brief is what the user asked for, in their words. Kept so a run is
 	// legible months later without reading the plan.
+	//
+	// Stored AS TYPED, "@attachment1" tokens and all. A brief with the handles
+	// stripped out would read as a sentence about nothing a month later.
 	Brief string `json:"brief" firestore:"brief"`
+
+	// Attachments are the files the user handed over with this brief, and the
+	// handles they used for them.
+	//
+	// On the RUN rather than passed through the queue message, because the
+	// plan is asynchronous: the request returns 202 and the worker picks the
+	// row up later. Anything the planner needs has to survive that gap, and
+	// the row is also what makes the run legible afterwards — "@attachment1"
+	// in a stored brief means nothing without the file it pointed at.
+	Attachments []RunAttachment `json:"attachments,omitempty" firestore:"attachments,omitempty"`
 
 	// PlanJSON is the planner's output, verbatim. See the note above.
 	PlanJSON string `json:"planJson,omitempty" firestore:"planJson,omitempty"`
@@ -99,6 +112,21 @@ type StudioRun struct {
 	CreatedAt  int64 `json:"createdAt" firestore:"createdAt"`
 	ApprovedAt int64 `json:"approvedAt,omitempty" firestore:"approvedAt,omitempty"`
 	UpdatedAt  int64 `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
+}
+
+// RunAttachment is one file the user attached to a brief, and the handle they
+// referred to it by.
+//
+// The handle is stored WITHOUT its "@" and is never renumbered: remove the
+// first attachment and the second stays "attachment2", because every sentence
+// already typed points at it by name.
+//
+// Only these two fields. Kind, aspect, duration and description are read from
+// the library row when the plan runs — a client that reports them is a client
+// that can misreport them.
+type RunAttachment struct {
+	Ref     string `json:"ref" firestore:"ref"`
+	MediaID string `json:"mediaId" firestore:"mediaId"`
 }
 
 // RunProblem is one validator finding, flattened for storage.

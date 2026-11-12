@@ -103,6 +103,15 @@ type Manifest struct {
 	Brand        BrandFacts         `json:"brand"`
 	Models       []MediaModel       `json:"enabledModels"`
 	Library      []MediaItem        `json:"mediaLibrary"`
+
+	// Attachments are the files the user attached to THIS brief.
+	//
+	// A section of its own rather than a flag on a library row, because the
+	// planner has to know these are the ones the user pointed at — and a flag
+	// on one row in a list of forty does not read that way. An uploaded
+	// attachment is already in `mediaLibrary` too; what this adds is "and they
+	// meant this one".
+	Attachments []Attachment `json:"attachments,omitempty"`
 	Budget       Budget             `json:"budget"`
 	Capabilities StudioCapabilities `json:"studioCapabilities"`
 	Tools        map[string][]Tool  `json:"tools"`
@@ -194,4 +203,41 @@ func (mm MediaModel) EstCost(seconds int, chars int) float64 {
 		return mm.EstUSDPerCall
 	}
 	return 0
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Attachments — the files the user handed over with the brief
+// ─────────────────────────────────────────────────────────────────────────────
+
+// MaxAttachments caps how many files one brief may carry.
+//
+// Four. Not politeness: each image attachment eventually becomes an
+// `image_url` part on the planner's message, and four 12-megapixel photos is
+// slow, expensive, and rejected outright by some providers. Four is also about
+// as many distinct things as a single brief can meaningfully point at.
+const MaxAttachments = 4
+
+// Attachment is the resolved form the planner sees.
+//
+// What the CLIENT sends is `trendlymodels.RunAttachment` — a handle and a
+// media id, and deliberately nothing else. Kind, aspect, duration and
+// description are filled in here from the library row, because a client that
+// reports them is a client that can misreport them, and the planner makes real
+// decisions off "this is a 9:16 video of a person".
+type Attachment struct {
+	Ref        string `json:"ref"`
+	MediaID    string `json:"mediaId"`
+	Kind       string `json:"kind"`
+	Describes  string `json:"describes,omitempty"`
+	Aspect     string `json:"aspect,omitempty"`
+	DurationMs int    `json:"durationMs,omitempty"`
+}
+
+// attachmentProblem builds a fatal problem naming the handle.
+//
+// Fatal, never a silent drop: the whole brief may hang on that file — "use
+// this face throughout" is meaningless without it — and a plan that quietly
+// ignored it would look like the feature not working, with nothing to read.
+func attachmentProblem(ref, msg string) Problem {
+	return Problem{Where: "attachments.@" + ref, Message: msg, Fatal: true}
 }
