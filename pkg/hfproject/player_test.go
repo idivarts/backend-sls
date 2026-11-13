@@ -159,3 +159,38 @@ func TestBridgeOnlyObeysItsEmbedder(t *testing.T) {
 		t.Fatal("the bridge does not check the sender's marker")
 	}
 }
+
+// Phase 11. Selection has to come out of the player, because the app cannot
+// reach into a cross-origin frame to find out what was clicked.
+func TestTheBridgeReportsAndRingsASelection(t *testing.T) {
+	page := playerPage("https://cdn/player.js")
+	for _, want := range []string{
+		`post("select"`,            // out: what was clicked
+		`d.type === "highlight"`,   // in: ring this element
+		`node.closest("[id]")`,     // our films carry ids, not data-hf-id
+		`closest("[data-scene]")`,  // and the scene that owns it
+		`addEventListener("click"`, //
+		`}, true);`,                // capture phase
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the bridge is missing %s", want)
+		}
+	}
+}
+
+// The ring is created at runtime in the player's own copy of the document.
+// index.html is what the renderer opens, and it must never see it.
+func TestTheSelectionRingIsNeverPartOfTheProject(t *testing.T) {
+	page := playerPage("https://cdn/player.js")
+	if !strings.Contains(page, `d.createElement("div")`) {
+		t.Fatal("the ring should be created at runtime, not authored")
+	}
+	if !strings.Contains(page, "pointer-events:none") {
+		t.Fatal("the ring would swallow the next click")
+	}
+	// It must also not be selectable itself, or clicking a ringed element
+	// would select the ring.
+	if !strings.Contains(page, "target.id === RING") {
+		t.Fatal("the ring can be selected")
+	}
+}
