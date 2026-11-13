@@ -263,7 +263,16 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 			TrackKind:  s.TrackKind,
 		})
 	}
-	return trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes)
+	// The live player. Best-effort on purpose: a design whose player could
+	// not be written still renders, previews as stills and exports, so this
+	// must not fail an authoring run the user has already paid for.
+	previewURL, perr2 := hfproject.UploadPlayer(ctx, brandID, designID, project)
+	if perr2 != nil {
+		log.Printf("design player upload failed for %s/%s: %v", brandID, designID, perr2)
+		mysentry.Capture(perr2, map[string]string{"op": "design.author.player", "brandId": brandID, "designId": designID})
+	}
+
+	return trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes, previewURL)
 }
 
 // finishReason says how the model stopped. "length" means it ran out of room.
