@@ -189,31 +189,79 @@ export function runHyperframes(
 }
 
 /**
- * Put the vendored GSAP into the project and make index.html load it locally.
+ * Put the vendored GSAP into the project and make EVERY document load it
+ * locally.
  *
  * Rewriting any CDN tag rather than only appending one, because a project that
  * came from `hyperframes init` or from a template will carry the jsdelivr tag,
  * and leaving it in place would reintroduce the network dependency we just
  * removed — silently, since it would still render on a machine with network.
+ *
+ * ── Why every document, not just index.html ────────────────────────────────
+ * Each composition under `compositions/` is a SEPARATE document that the
+ * Hyperframes runtime mounts in its own context, so a script tag in
+ * index.html does not reach it. index.html alone was the first version of
+ * this, and it let a real render fail on dev with
+ *
+ *     check failed: Composition uses GSAP but no GSAP script is loaded.
+ *
+ * on a project whose three compositions each called `gsap.timeline()` with no
+ * tag anywhere. The run before it had passed — because that one's model output
+ * happened to include a CDN tag. That is the shape of bug worth removing
+ * rather than retrying: the project is only renderable when the model
+ * remembers something it is not reliable about, and the failure is charged to
+ * the user.
+ *
+ * So GSAP is injected wherever it is used and not loaded, with a path relative
+ * to the file being patched — `compositions/hook.html` needs `../assets/...`,
+ * not `assets/...`.
  */
 export async function vendorGsap(projectDir: string): Promise<void> {
     const dest = join(projectDir, GSAP_PROJECT_PATH);
     await mkdir(dirname(dest), { recursive: true });
     await copyFile(GSAP_VENDOR, dest);
 
-    const indexPath = join(projectDir, "index.html");
-    let html = await readFile(indexPath, "utf8");
+    for (const rel of await listProjectFiles(projectDir)) {
+        if (!/\.html?$/i.test(rel)) continue;
+        const abs = join(projectDir, rel);
+        const before = await readFile(abs, "utf8");
+        const after = patchGsapTag(before, rel);
+        if (after !== before) await writeFile(abs, after, "utf8");
+    }
+}
+
+/**
+ * Rewrite or inject the GSAP tag in one document.
+ *
+ * Exported for tests: the path arithmetic and the insertion fallbacks are the
+ * parts that break quietly, and a render is far too slow a way to find out.
+ */
+export function patchGsapTag(html: string, relPath: string): string {
+    // How many directories deep this document sits, so the vendored file can
+    // be reached from it. "compositions/hook.html" → "../".
+    const depth = relPath.split("/").length - 1;
+    const src = "../".repeat(depth) + GSAP_PROJECT_PATH;
 
     const cdnTag = /<script[^>]+src=["']https?:\/\/[^"']*gsap[^"']*["'][^>]*>\s*<\/script>/gi;
     if (cdnTag.test(html)) {
-        html = html.replace(cdnTag, `<script src="${GSAP_PROJECT_PATH}"></script>`);
-    } else if (!html.includes(GSAP_PROJECT_PATH)) {
-        // No GSAP tag at all: a project whose check would fail with "uses GSAP
-        // but no GSAP script is loaded". Insert it rather than let the render
-        // produce a film where nothing moves.
-        html = html.replace(/<\/head>/i, `  <script src="${GSAP_PROJECT_PATH}"></script>\n  </head>`);
+        return html.replace(cdnTag, `<script src="${src}"></script>`);
     }
-    await writeFile(indexPath, html, "utf8");
+
+    // Already local, however it got there.
+    if (/<script[^>]+src=["'][^"']*gsap[^"']*["']/i.test(html)) return html;
+
+    // Only inject where GSAP is actually used. A static composition that never
+    // mentions gsap does not need the 72 KB, and the check does not ask for it.
+    if (!/\bgsap\s*\./.test(html) && !/\bgsap\s*\(/.test(html)) return html;
+
+    const tag = `<script src="${src}"></script>`;
+
+    // In order of preference, so the tag lands before the code that uses it.
+    if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `  ${tag}\n</head>`);
+    if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => `${m}\n  ${tag}`);
+    // No head and no body — a bare composition fragment. Prepending still puts
+    // GSAP ahead of the inline timeline, which is all that is required.
+    return `${tag}\n${html}`;
 }
 
 export interface CheckFinding {

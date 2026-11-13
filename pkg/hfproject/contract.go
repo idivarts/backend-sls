@@ -18,6 +18,14 @@ package hfproject
 // scaffold emits a jsdelivr one, which would make every render depend on a
 // CDN; the worker vendors GSAP and rewrites any CDN tag it finds. Asking a
 // model for one would be asking it to write something we immediately undo.
+//
+// ⚠️ That makes rule 10 load-bearing on the WORKER, not on the model. The
+// first dev render to obey rule 10 exactly — no tag in index.html and none in
+// any composition — failed with "Composition uses GSAP but no GSAP script is
+// loaded", because vendorGsap patched index.html only and a composition is a
+// separate document. The model was right and the worker was wrong. If this
+// rule is ever reworded, check services/render-worker/src/hyperframes.ts
+// patchGsapTag still injects into every document that uses GSAP.
 
 // AuthoringContract is the shape and the rules of a Hyperframes project.
 const AuthoringContract = `A Hyperframes project is a DIRECTORY of HTML files, rendered to MP4 by seeking a paused timeline frame by frame.
