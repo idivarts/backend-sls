@@ -207,13 +207,29 @@ func RenderDesign(c *gin.Context) {
 		})
 		return
 	}
+	charged := false
 	if orgID != "" && tokens > 0 {
-		_, _ = trendlymodels.DeductTokens(orgID, tokens)
+		if _, derr := trendlymodels.DeductTokens(orgID, tokens); derr == nil {
+			charged = true
+		}
+	}
+
+	// From here on, every failure path must give the tokens back. The charge
+	// happens before the work so the wallet cannot be raced, which means the
+	// moment the work does not start we owe a refund — otherwise the user has
+	// paid for a render that never existed. This is not hypothetical: it is
+	// exactly what happened the first time a v3 render was fired on dev, when
+	// dispatch refused and the wallet went to -2229 for nothing.
+	refund := func() {
+		if charged {
+			_, _ = trendlymodels.RefundTokens(orgID, tokens)
+		}
 	}
 
 	// Queued BEFORE dispatch, so the app shows the job the instant this
 	// returns rather than sitting on a stale state until a worker starts.
 	if err := trendlymodels.MarkBrandDesignRenderQueued(ctx, brandID, designID); err != nil {
+		refund()
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not queue the render"})
 		return
 	}
@@ -230,6 +246,7 @@ func RenderDesign(c *gin.Context) {
 			"brandId":  brandID,
 			"designId": designID,
 		})
+		refund()
 		_ = trendlymodels.MarkBrandDesignRenderFailed(ctx, brandID, designID,
 			"We couldn't start the render. Please try again.")
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not start the render"})
