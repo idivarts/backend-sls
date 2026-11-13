@@ -84,7 +84,11 @@ func AuthorDesign(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "authoring is not available right now"})
 		return
 	}
-	if err := trendlymodels.MarkBrandDesignAuthoring(ctx, brandID, designID, trendlymodels.DesignAuthorQueued); err != nil {
+	// The brief is stored with the status, not just carried on the queue
+	// message, so the app can show the user what this design was asked to be
+	// when they come back to it.
+	brief := strings.TrimSpace(req.Brief)
+	if err := trendlymodels.QueueBrandDesignAuthoring(ctx, brandID, designID, brief); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not queue the writing"})
 		return
 	}
@@ -92,7 +96,7 @@ func AuthorDesign(c *gin.Context) {
 		Type:     studiojobs.JobDesignAuthor,
 		BrandID:  brandID,
 		DesignID: designID,
-		Brief:    req.Brief,
+		Brief:    brief,
 	}); err != nil {
 		log.Printf("design author enqueue failed for %s/%s: %v", brandID, designID, err)
 		mysentry.Capture(err, map[string]string{"op": "design.author.enqueue", "brandId": brandID, "designId": designID})

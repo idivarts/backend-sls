@@ -124,6 +124,16 @@ type Design struct {
 	AuthorStatus string `json:"authorStatus,omitempty" firestore:"authorStatus,omitempty"`
 	AuthorError  string `json:"authorError,omitempty" firestore:"authorError,omitempty"`
 
+	// Brief is what the user asked for, in their own words, kept so the app
+	// can show it back to them.
+	//
+	// Without it, reopening a design offers "Rewrite with AI" over an empty
+	// box: the user cannot see what this film was asked to be, and a rewrite
+	// starts from nothing while looking like it starts from something. The
+	// brief is also the only record of the user's intent once the model's
+	// output has replaced it, which is what makes a revision possible at all.
+	Brief string `json:"brief,omitempty" firestore:"brief,omitempty"`
+
 	// Render state. Progress and failure live on the document rather than in
 	// the request, so a render survives a page reload or a locked phone — the
 	// worker keeps going and the app re-reads this.
@@ -377,6 +387,21 @@ func MarkBrandDesignAuthoring(ctx context.Context, brandID, designID, status str
 	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
 		{Path: "authorStatus", Value: status},
 		{Path: "authorError", Value: firestore.Delete},
+	})
+}
+
+// QueueBrandDesignAuthoring marks a design as queued AND records the brief that
+// queued it, in one write.
+//
+// One write rather than two because the brief and the status it belongs to must
+// not be separable: a queued design whose brief failed to save would be written
+// from a brief the user can no longer see, and a saved brief with no queued
+// status would look like a design that was never asked for.
+func QueueBrandDesignAuthoring(ctx context.Context, brandID, designID, brief string) error {
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "authorStatus", Value: DesignAuthorQueued},
+		{Path: "authorError", Value: firestore.Delete},
+		{Path: "brief", Value: brief},
 	})
 }
 
