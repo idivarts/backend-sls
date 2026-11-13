@@ -203,3 +203,16 @@ func TestThePlayerLetsClicksReachTheFilm(t *testing.T) {
 		t.Fatal("the composition is not clickable, so nothing can be selected")
 	}
 }
+
+// Clicking away from the film must clear, or a ring stays on an element the
+// user has visibly moved on from. Pressing play must NOT clear — the
+// controls live in the same shadow tree, and retargeting makes both look
+// like the host element from outside it.
+func TestClickingAwayClearsButTheControlsDoNot(t *testing.T) {
+	page := playerPage("https://cdn/player.js")
+	for _, want := range []string{"composedPath", `contains("hfp-controls")`, `contains("hfp-container")`, "if (inControls || !inFilm) return;"} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the clear path is missing %s", want)
+		}
+	}
+}

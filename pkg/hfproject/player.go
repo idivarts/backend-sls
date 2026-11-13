@@ -229,6 +229,29 @@ const bridgeJS = `
     d.body.appendChild(ring);
   }
 
+  // ── Clicking away clears the selection ─────────────────────────────────
+  // A click inside the composition does not bubble out of its iframe, so
+  // anything arriving at THIS document landed outside the film — the
+  // letterbox either side of it, most often. That should clear, or a ring
+  // stays on an element the user has visibly moved away from.
+  //
+  // Except the controls, which live in the same shadow tree: pressing play
+  // must not deselect. composedPath is what can tell them apart, because
+  // retargeting makes both look like the host element from out here.
+  document.addEventListener("click", function (ev) {
+    var path = typeof ev.composedPath === "function" ? ev.composedPath() : [];
+    var inControls = false, inFilm = false;
+    for (var i = 0; i < path.length; i++) {
+      var cl = path[i] && path[i].classList;
+      if (!cl) continue;
+      if (cl.contains("hfp-controls")) inControls = true;
+      if (cl.contains("hfp-container") || cl.contains("hfp-iframe")) inFilm = true;
+    }
+    if (inControls || !inFilm) return;
+    post("select", { elementId: "", sceneId: "", tag: "", text: "" });
+    highlight("");
+  }, true);
+
   el.addEventListener("ready", function () { post("ready"); attachPicker(); });
   el.addEventListener("durationchange", function () { post("ready"); });
   el.addEventListener("timeupdate", function () { post("time"); });
