@@ -22,8 +22,26 @@ package hfproject
 // would be meddling with the one path that is currently working, to fix a
 // different one.
 //
-// ── Why the two scripts are shared, not per project ───────────────────────
-// They are 776 KB together and identical for every design. Copying them into
+// ── The second thing that is not obvious: GSAP ────────────────────────────
+// A composition animates with `gsap.timeline()` and Hyperframes' own docs
+// show exactly that with NO GSAP script tag, so that is what the model
+// writes. Their `init` scaffold, by contrast, loads GSAP off jsdelivr — the
+// docs and the scaffold disagree, and the project we store follows the docs.
+//
+// The RENDER path survives this because the worker copies GSAP into its own
+// materialised project and patches every document before it calls the CLI
+// (services/render-worker/src/hyperframes.ts, vendorGsap). That copy is a
+// temp directory. What sits in S3 is the project AS AUTHORED, with no GSAP
+// anywhere — so the player loaded it, the inline script threw on the first
+// `gsap.timeline()`, no timeline was ever registered, and the film came up
+// BLANK while the very same project rendered correctly.
+//
+// So the player page vendors GSAP the same way the renderer does. The two
+// paths now agree; player_test.go pins the file to the worker's byte for
+// byte so they cannot drift apart again.
+//
+// ── Why the scripts are shared, not per project ───────────────────────────
+// They are 849 KB together and identical for every design. Copying them into
 // each project prefix would add that to every authoring run and every S3
 // bill, for bytes CloudFront would then cache separately per design. They go
 // once to a versioned shared prefix and every project points at them.
@@ -44,6 +62,16 @@ var playerJS []byte
 //go:embed playerassets/runtime.js
 var runtimeJS []byte
 
+// gsapJS is a byte-for-byte copy of the renderer's vendored GSAP.
+//
+// Duplicated rather than shared because `go:embed` cannot reach outside its
+// own package directory and will not follow a symlink, and the renderer's
+// copy is where it is because a Dockerfile COPYs it into the image. The
+// duplication is held honest by a test, not by this comment.
+//
+//go:embed playerassets/gsap.js
+var gsapJS []byte
+
 // playerAssetVersion scopes the shared assets so an upgrade cannot change what
 // an existing design plays. A project written against one runtime keeps that
 // runtime until something re-uploads it.
@@ -56,22 +84,35 @@ func sharedAssetKey(name string) string {
 var headOpenRe = regexp.MustCompile(`(?i)<head[^>]*>`)
 var bodyOpenRe = regexp.MustCompile(`(?i)<body[^>]*>`)
 
-// withRuntime returns index.html with the Hyperframes runtime loaded.
+// gsapLoadedRe matches a script tag already pulling GSAP in, local or CDN.
+var gsapLoadedRe = regexp.MustCompile(`(?i)<script[^>]+src=["'][^"']*gsap[^"']*["']`)
+
+// withScripts returns index.html with the Hyperframes runtime and GSAP loaded.
 //
-// Before anything that uses it: the composition's own script builds a timeline
-// and registers it on `window.__timelines`, which the runtime creates. Put the
-// runtime after that script and the page throws on load.
-func withRuntime(indexHTML, runtimeURL string) string {
-	tag := fmt.Sprintf(`<script src=%q></script>`, runtimeURL)
+// Both must come before anything that uses them: the composition's own script
+// builds a timeline with `gsap.timeline()` and registers it on
+// `window.__timelines`, which the runtime creates. Either tag after that
+// script and the page throws on load — which is precisely the blank-player
+// bug described at the top of this file.
+//
+// A project that already loads GSAP itself — one that came from `hyperframes
+// init`, or a model that remembered the tag — is left alone. Two copies of
+// GSAP on one page is a second global clobbering the first, and the one we
+// would add loads last.
+func withScripts(indexHTML, runtimeURL, gsapURL string) string {
+	tags := fmt.Sprintf(`<script src=%q></script>`, runtimeURL)
+	if !gsapLoadedRe.MatchString(indexHTML) {
+		tags += "\n    " + fmt.Sprintf(`<script src=%q></script>`, gsapURL)
+	}
 	if loc := headOpenRe.FindStringIndex(indexHTML); loc != nil {
-		return indexHTML[:loc[1]] + "\n    " + tag + indexHTML[loc[1]:]
+		return indexHTML[:loc[1]] + "\n    " + tags + indexHTML[loc[1]:]
 	}
 	if loc := bodyOpenRe.FindStringIndex(indexHTML); loc != nil {
-		return indexHTML[:loc[1]] + "\n    " + tag + indexHTML[loc[1]:]
+		return indexHTML[:loc[1]] + "\n    " + tags + indexHTML[loc[1]:]
 	}
-	// No head and no body. Prepending still puts the runtime ahead of
-	// everything, which is all that is required.
-	return tag + "\n" + indexHTML
+	// No head and no body. Prepending still puts both ahead of everything,
+	// which is all that is required.
+	return tags + "\n" + indexHTML
 }
 
 // playerPage is the page the app embeds. Deliberately bare: it is shown inside
@@ -105,7 +146,7 @@ func playerPage(playerURL string) string {
 // time, and a missing asset breaks every preview at once — the failure that
 // matters here is the one where an upload was skipped because something
 // thought the object was already there.
-func EnsureSharedPlayerAssets(ctx context.Context, brandID string) (playerURL, runtimeURL string, err error) {
+func EnsureSharedPlayerAssets(ctx context.Context, brandID string) (playerURL, runtimeURL, gsapURL string, err error) {
 	put := func(name string, data []byte) (string, error) {
 		s, err := mediastore.Put(ctx, mediastore.Spec{
 			BrandID:     brandID,
@@ -121,12 +162,17 @@ func EnsureSharedPlayerAssets(ctx context.Context, brandID string) (playerURL, r
 		return s.URL, nil
 	}
 	if playerURL, err = put("player.js", playerJS); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if runtimeURL, err = put("runtime.js", runtimeJS); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	return playerURL, runtimeURL, nil
+	// Named for its version so a GSAP upgrade cannot change what an existing
+	// design plays, the same reason the prefix carries playerAssetVersion.
+	if gsapURL, err = put("gsap-3.15.0.min.js", gsapJS); err != nil {
+		return "", "", "", err
+	}
+	return playerURL, runtimeURL, gsapURL, nil
 }
 
 // UploadPlayer writes the two pages that make a project playable and returns
@@ -147,7 +193,7 @@ func UploadPlayer(ctx context.Context, brandID, designID string, p *Project) (st
 		return "", fmt.Errorf("hfproject.UploadPlayer: the project has no index.html")
 	}
 
-	playerURL, runtimeURL, err := EnsureSharedPlayerAssets(ctx, brandID)
+	playerURL, runtimeURL, gsapURL, err := EnsureSharedPlayerAssets(ctx, brandID)
 	if err != nil {
 		return "", err
 	}
@@ -168,7 +214,7 @@ func UploadPlayer(ctx context.Context, brandID, designID string, p *Project) (st
 		return s.URL, nil
 	}
 
-	if _, err := write("preview.html", withRuntime(indexHTML, runtimeURL)); err != nil {
+	if _, err := write("preview.html", withScripts(indexHTML, runtimeURL, gsapURL)); err != nil {
 		return "", err
 	}
 	return write("player.html", playerPage(playerURL))

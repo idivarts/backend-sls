@@ -41,6 +41,25 @@ export async function upload(
 }
 
 /**
+ * Root-level objects that are NOT part of the composition.
+ *
+ * The prefix holds two different things: the authored project, and the player
+ * pages generated from it (pkg/hfproject/player.go). Both are HTML at the
+ * root, and preview.html is index.html with two script tags — so the CLI
+ * discovers two entry points and refuses the project outright:
+ *
+ *     Multiple root-level HTML files with data-composition-id:
+ *     index.html, preview.html. The runtime may discover both as entry
+ *     points, causing duplicate audio playback.
+ *
+ * which broke every preview and render the moment the player shipped. The
+ * renderer wants the project alone, so the player pages are left in the
+ * bucket and never materialised. Matched at the root only: a scene legitimately
+ * called compositions/player.html is a scene.
+ */
+export const PLAYER_ARTEFACTS = new Set(["preview.html", "player.html"]);
+
+/**
  * Download every object under a prefix into a local directory, preserving the
  * relative layout.
  *
@@ -51,7 +70,8 @@ export async function upload(
  * The object count is returned so the caller can refuse to render a project
  * that arrived incomplete. A half-materialised project does not fail: it
  * renders a film with missing scenes, which looks like a design problem and
- * sends whoever debugs it to the wrong place entirely.
+ * sends whoever debugs it to the wrong place entirely. Skipped player pages
+ * are not counted — they were never part of the project.
  */
 export async function downloadPrefix(prefix: string, destDir: string): Promise<number> {
     const bucket = config.s3Bucket();
@@ -67,6 +87,7 @@ export async function downloadPrefix(prefix: string, destDir: string): Promise<n
             if (!obj.Key || obj.Key.endsWith("/")) continue;
             const relative = obj.Key.slice(normalised.length);
             if (!relative) continue;
+            if (PLAYER_ARTEFACTS.has(relative)) continue;
 
             // A key is attacker-influenced only as far as whoever wrote the
             // project, but `..` in one would write outside the job directory,
