@@ -80,5 +80,23 @@ COPY services/render-worker/vendor/ /app/services/render-worker/vendor/
 COPY services/render-worker/fonts/ /usr/share/fonts/truetype/trendly/
 RUN fc-cache -f || true
 
+# The HeyGen CLI, which `media-use` shells out to.
+#
+# Not optional and not a second integration: `hyperframes media-use resolve`
+# delegates bgm, image, voice and avatar-video to it, and without it every
+# declaration fails in 200ms with "heygen CLI not found — it's the free path
+# for bgm/image/voice/avatar-video". It is HeyGen's own single binary, it
+# supports linux/arm64, and it authenticates from HEYGEN_API_KEY, which the
+# Batch job definition already passes — so nothing interactive happens here
+# and no credential is baked into a layer.
+#
+# `|| true` deliberately: a film that declares no media must still render if
+# HeyGen's installer is briefly unreachable, and the media step already
+# reports a missing CLI as a warning rather than a failure. The version is
+# echoed so the build log records what the image actually got.
+RUN curl -fsSL https://static.heygen.ai/cli/install.sh | bash || true
+ENV PATH="/root/.local/bin:${PATH}"
+RUN heygen --version || echo "heygen CLI not installed; media resolution will degrade to a warning"
+
 WORKDIR /app/services/render-worker
 ENTRYPOINT ["node", "dist/services/render-worker/src/cli.js"]
