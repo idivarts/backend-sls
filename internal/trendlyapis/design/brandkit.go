@@ -135,33 +135,57 @@ func buildBrandKit(ctx context.Context, ds *trendlymodels.BrandDesignSystem) *br
 	budget := maxKitBytes
 	for _, f := range ds.Fonts {
 		role, family := sanitiseToken(f.Role), safeFamily(f.Family)
-		if role == "" || family == "" {
+		if role == "" {
 			continue
 		}
-		stack := fmt.Sprintf("'%s',%s", family, fallbackOr(f.Fallback))
-		vars = append(vars, fmt.Sprintf("--brand-font-%s:%s", role, stack))
-
-		src := strings.TrimSpace(f.URL)
-		if src == "" {
+		fallback := fallbackOr(f.Fallback)
+		if family == "" {
+			vars = append(vars, fmt.Sprintf("--brand-font-%s:%s", role, fallback))
 			continue
 		}
 		weight := safeWeight(f.Weight)
+
+		// ── A family is only named once it is DECLARED ────────────────────
+		// `check` refuses a family it cannot resolve — "used without
+		// @font-face declaration … not in the auto-resolved font list" —
+		// and that is a hard failure, so a brand whose heading face is not
+		// one of the handful the renderer knows could not author at all.
+		// Found on dev with Space Grotesk, which is a Google family and
+		// still not auto-resolved.
+		//
+		// So every family we put in a stack gets a real @font-face against
+		// a real file, and a family we could not fetch is left out of its
+		// own token rather than breaking the gate. The token itself is
+		// always defined: the prompt lists these names and a var() pointing
+		// at nothing is an invalid declaration, not a fallback.
+		src, ext := strings.TrimSpace(f.URL), ""
+		if src != "" {
+			ext = fontExt(src)
+		} else if g, gext, found := googleFontFile(ctx, family, weight); found {
+			src, ext = g, gext
+		}
+		if src == "" {
+			vars = append(vars, fmt.Sprintf("--brand-font-%s:%s", role, fallback))
+			continue
+		}
+
 		// The WEIGHT is part of the name. Keyed on the family alone, a brand
 		// using one family at two weights wrote one file and dropped the
 		// other, and every weight then rendered from whichever face won.
-		name := fmt.Sprintf("assets/fonts/%s-%s%s", slug(family), weightSlug(weight), fontExt(src))
-		if hasFile(files, name) {
-			continue
+		name := fmt.Sprintf("assets/fonts/%s-%s%s", slug(family), weightSlug(weight), ext)
+		if !hasFile(files, name) {
+			body, ok := fetchAsset(ctx, src)
+			if !ok || len(body) > budget {
+				vars = append(vars, fmt.Sprintf("--brand-font-%s:%s", role, fallback))
+				continue
+			}
+			budget -= len(body)
+			files = append(files, hfproject.File{Path: name, Content: string(body)})
+			faces = append(faces, fmt.Sprintf(
+				"@font-face{font-family:'%s';src:url('%s');font-display:block;%s}",
+				family, name, weightDecl(weight)))
 		}
-		body, ok := fetchAsset(ctx, src)
-		if !ok || len(body) > budget {
-			continue
-		}
-		budget -= len(body)
-		files = append(files, hfproject.File{Path: name, Content: string(body)})
-		faces = append(faces, fmt.Sprintf(
-			"@font-face{font-family:'%s';src:url('%s');font-display:block;%s}",
-			family, name, weightDecl(weight)))
+		vars = append(vars, fmt.Sprintf("--brand-font-%s:'%s',%s", role, family, fallback))
 	}
 
 	// ── Logo ──────────────────────────────────────────────────────────────
@@ -343,6 +367,71 @@ func fetchAsset(ctx context.Context, raw string) ([]byte, bool) {
 		return nil, false
 	}
 	return body, true
+}
+
+// googleFontsCSS is the stylesheet endpoint, behind a variable so a test can
+// point it at a local server.
+var googleFontsCSS = "https://fonts.googleapis.com/css2"
+
+// woff2Re pulls the file URLs out of that stylesheet.
+//
+// Any https host, not gstatic specifically: the URL is fetched through the
+// same guard as every other asset, so pinning the host here would add no
+// safety and would make the resolver impossible to test without reaching
+// the real endpoint.
+var woff2Re = regexp.MustCompile(`url\((https?://[^)\s]+\.woff2)\)`)
+
+// googleFontFile finds a real file for a family the brand named but gave no
+// URL for.
+//
+// ── Why ask Google rather than trust the renderer ─────────────────────────
+// The renderer resolves a SHORT list of families by itself. Everything else
+// fails `check` outright, so "it is a Google font, it will be fine" is not
+// true: Space Grotesk is a Google font and is not on that list. Asking for
+// the stylesheet gives us a real file for any family they publish, which is
+// most of what a brand will name, and it keeps the render air-gapped because
+// the bytes travel with the project.
+//
+// The browser User-Agent is not decoration: without it Google serves ttf,
+// which is several times the size for the same glyphs.
+func googleFontFile(ctx context.Context, family, weight string) (string, string, bool) {
+	q := url.Values{}
+	spec := strings.ReplaceAll(family, " ", "+")
+	if weight != "" && weight != "normal" && weight != "bold" {
+		spec += ":wght@" + weight
+	}
+	q.Set("display", "block")
+	// family carries a '+' that must not be escaped into %2B, so it is
+	// appended rather than passed through Values.Encode.
+	endpoint := fmt.Sprintf("%s?family=%s&%s", googleFontsCSS, spec, q.Encode())
+
+	ctx, cancel := context.WithTimeout(ctx, assetFetchTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", "", false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "+
+		"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	resp, err := assetClient.Do(req)
+	if err != nil {
+		return "", "", false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", "", false
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256<<10))
+	if err != nil {
+		return "", "", false
+	}
+	m := woff2Re.FindAllStringSubmatch(string(body), -1)
+	if len(m) == 0 {
+		return "", "", false
+	}
+	// Google emits one @font-face per subset and puts latin last, so the
+	// final match is the one an English-language film actually needs.
+	return m[len(m)-1][1], ".woff2", true
 }
 
 func pickLogo(logos []trendlymodels.DSLogo) string {

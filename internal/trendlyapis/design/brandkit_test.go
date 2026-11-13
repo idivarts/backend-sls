@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,6 +14,15 @@ import (
 
 // The real guard refuses a loopback host, and should: these tests serve
 // their assets from one, so they lift it for the duration.
+// No test may reach the real Google Fonts endpoint: a unit suite that needs
+// the network is a suite that fails on a train. Pointed at a loopback port
+// nothing listens on, which the asset guard refuses before any dial anyway.
+// The one test that exercises the Google path stubs it deliberately.
+func TestMain(m *testing.M) {
+	googleFontsCSS = "https://127.0.0.1:1/css2"
+	os.Exit(m.Run())
+}
+
 // kit.CSS is itself wrapped in <style>…</style>, so "contains </style>" is
 // true of every kit. What matters is whether a VALUE added a second one, or
 // any tag at all.
@@ -258,10 +268,20 @@ func TestAFamilyOrWeightThatIsNotOneIsDropped(t *testing.T) {
 	}
 	// The bad family is dropped entirely; the good one keeps a safe stack
 	// and loses only the unusable weight and fallback.
-	if !strings.Contains(kit.CSS, "--brand-font-body:'Inter',sans-serif") {
-		t.Fatalf("the valid family did not survive safely: %s", kit.CSS)
+	// Neither family is DECLARED here — no URL, and the Google resolver is
+	// stubbed out for the suite — so both reduce to a generic stack. What
+	// this test is about is that nothing escaped, and that the unsafe
+	// family never reaches a token at all.
+	if !strings.Contains(kit.CSS, "--brand-font-body:sans-serif") {
+		t.Fatalf("the valid role lost its token: %s", kit.CSS)
 	}
-	if strings.Contains(kit.CSS, "--brand-font-heading") {
+	// The token is always DEFINED — the prompt lists these names, and a
+	// var() pointing at nothing is an invalid declaration rather than a
+	// fallback — but it must carry the generic stack only.
+	if !strings.Contains(kit.CSS, "--brand-font-heading:sans-serif") {
+		t.Fatalf("the unsafe family was not reduced to its fallback: %s", kit.CSS)
+	}
+	if strings.Contains(kit.CSS, "--brand-font-heading:'") {
 		t.Fatalf("the unsafe family was kept: %s", kit.CSS)
 	}
 }
@@ -325,5 +345,75 @@ func TestTheKitStopsAtItsBudget(t *testing.T) {
 	}
 	if len(kit.Files) == 0 {
 		t.Fatal("the budget swallowed every font")
+	}
+}
+
+// A family the brand named but gave no file for is resolved from Google, so
+// that it can be DECLARED. Undeclared, `check` refuses the whole project:
+// "used without @font-face declaration … not in the auto-resolved font list".
+// Space Grotesk is a Google family and is not auto-resolved, which is how
+// this was found — on dev, as a failed preview.
+func TestAFamilyWithNoURLIsResolvedAndDeclared(t *testing.T) {
+	allowLoopbackAssets(t)
+	var asked, srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".woff2") {
+			_, _ = w.Write([]byte("woff2 bytes"))
+			return
+		}
+		asked = r.URL.String()
+		// Shaped like the real stylesheet: one @font-face per subset, latin
+		// last, which is the one an English film needs.
+		_, _ = fmt.Fprintf(w, `
+@font-face{font-family:'Space Grotesk';src:url(%[1]s/cyrillic.woff2) format('woff2');}
+@font-face{font-family:'Space Grotesk';src:url(%[1]s/latin.woff2) format('woff2');}`, srvURL)
+	}))
+	defer srv.Close()
+
+	srvURL = srv.URL
+	prev := googleFontsCSS
+	googleFontsCSS = srv.URL + "/css2"
+	t.Cleanup(func() { googleFontsCSS = prev })
+
+	// The fetch of the gstatic URL has to land somewhere too.
+	prevAllowed := assetURLAllowed
+	assetURLAllowed = func(string) bool { return true }
+	t.Cleanup(func() { assetURLAllowed = prevAllowed })
+
+	kit := buildBrandKit(context.Background(), &trendlymodels.BrandDesignSystem{
+		Fonts: []trendlymodels.DSFont{{Role: "heading", Family: "Space Grotesk", Weight: "700"}},
+	})
+	if kit == nil {
+		t.Fatal("no kit")
+	}
+	if !strings.Contains(asked, "family=Space+Grotesk:wght@700") {
+		t.Fatalf("the stylesheet was asked for the wrong thing: %q", asked)
+	}
+	if !strings.Contains(kit.CSS, "@font-face{font-family:'Space Grotesk'") {
+		t.Fatalf("the family was not declared: %s", kit.CSS)
+	}
+	if !strings.Contains(kit.CSS, "--brand-font-heading:'Space Grotesk',sans-serif") {
+		t.Fatalf("the family was not named in its token: %s", kit.CSS)
+	}
+	if len(kit.Files) != 1 {
+		t.Fatalf("the font file did not travel with the project: %+v", kit.Files)
+	}
+}
+
+// And when Google does not have it either, the film still authors — with the
+// generic stack, rather than a family `check` would refuse.
+func TestAFamilyNobodyCanSupplyFallsBackInsteadOfFailing(t *testing.T) {
+	kit := buildBrandKit(context.Background(), &trendlymodels.BrandDesignSystem{
+		Palette: []trendlymodels.DSColor{{Role: "primary", Hex: "#101010"}},
+		Fonts:   []trendlymodels.DSFont{{Role: "heading", Family: "Totally Made Up", Fallback: "serif"}},
+	})
+	if kit == nil {
+		t.Fatal("no kit")
+	}
+	if !strings.Contains(kit.CSS, "--brand-font-heading:serif") {
+		t.Fatalf("expected the generic stack alone: %s", kit.CSS)
+	}
+	if strings.Contains(kit.CSS, "@font-face") {
+		t.Fatalf("declared a face for a file it never got: %s", kit.CSS)
 	}
 }
