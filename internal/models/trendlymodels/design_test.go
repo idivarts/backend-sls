@@ -234,3 +234,57 @@ func TestPreviewLifecycleValuesAreDistinct(t *testing.T) {
 		t.Fatal("preview and author lifecycles have drifted apart; the app's status rules assume they match")
 	}
 }
+
+// chargedTokens is the only link between a charge made in the API and a
+// failure that happens minutes later in a TypeScript worker with no access to
+// the wallet. Lose the field and a failed render silently keeps the user's
+// tokens, which is the bug this exists to fix.
+func TestDesignRecordsWhatTheRenderWasChargedFor(t *testing.T) {
+	typ := reflect.TypeOf(Design{})
+	field, ok := typ.FieldByName("ChargedTokens")
+	if !ok {
+		t.Fatal("Design.ChargedTokens is gone; a worker-side render failure can no longer be refunded")
+	}
+	if got := strings.Split(field.Tag.Get("firestore"), ",")[0]; got != "chargedTokens" {
+		t.Fatalf(`Design.ChargedTokens must persist as "chargedTokens", got %q`, got)
+	}
+	// int64 to match RefundTokens/DeductTokens. An int would compile and then
+	// truncate on a 32-bit build.
+	if field.Type.Kind() != reflect.Int64 {
+		t.Fatalf("Design.ChargedTokens must be int64 to match the wallet, got %s", field.Type)
+	}
+}
+
+// ClaimBrandDesignRefund only ever hands the debt to ONE caller. These lock in
+// the conditions it checks, which are what stop it paying out when it should
+// not — the transaction itself needs a live Firestore and is covered on dev.
+func TestRefundIsOnlyOwedByAFailedRenderThatWasCharged(t *testing.T) {
+	cases := []struct {
+		name   string
+		design Design
+		owed   bool
+	}{
+		{"a failed render that was charged is owed", Design{RenderStatus: DesignRenderFailed, ChargedTokens: 1981}, true},
+		{"a failed render that was never charged owes nothing", Design{RenderStatus: DesignRenderFailed}, false},
+		// The money was spent on a film that exists. Refunding it would be a
+		// gift, not a correction.
+		{"a finished render is not refunded", Design{RenderStatus: DesignRenderDone, ChargedTokens: 1981}, false},
+		// Still running. Refunding now would pay for work about to succeed,
+		// and the worker would then deliver a film nobody paid for.
+		{"a render still in flight is not refunded", Design{RenderStatus: DesignRenderRendering, ChargedTokens: 1981}, false},
+		{"a queued render is not refunded", Design{RenderStatus: DesignRenderQueued, ChargedTokens: 1981}, false},
+		// Already claimed: the field is cleared when the debt is handed over,
+		// so zero means "settled", not "never charged".
+		{"an already-claimed failure owes nothing", Design{RenderStatus: DesignRenderFailed, ChargedTokens: 0}, false},
+		{"a negative charge is not a refund", Design{RenderStatus: DesignRenderFailed, ChargedTokens: -5}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			owed := tc.design.ChargedTokens > 0 && tc.design.RenderStatus == DesignRenderFailed
+			if owed != tc.owed {
+				t.Fatalf("owed = %v, want %v for status %q charged %d",
+					owed, tc.owed, tc.design.RenderStatus, tc.design.ChargedTokens)
+			}
+		})
+	}
+}
