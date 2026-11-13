@@ -49,3 +49,30 @@ func TestAnUnknownTypeIsNotRunnable(t *testing.T) {
 		t.Fatal("an unknown job type must be dropped, not guessed at")
 	}
 }
+
+// A v3 design author job has no contentId and no studioId — a v3 design is a
+// first-class object. The content/studio check is therefore per type, and if
+// anyone hoists it back out of the switch every one of these is dropped
+// silently: the job vanishes and the design sits at "writing" for ever.
+func TestADesignAuthorJobNeedsOnlyABrandAndADesign(t *testing.T) {
+	m := Message{Type: JobDesignAuthor, BrandID: "b", DesignID: "d"}
+	if !m.Target() {
+		t.Fatal("a design author job naming its brand and design is runnable")
+	}
+	if (Message{Type: JobDesignAuthor, BrandID: "b"}).Target() {
+		t.Fatal("without a designId there is nothing to write to")
+	}
+	if (Message{Type: JobDesignAuthor, DesignID: "d"}).Target() {
+		t.Fatal("without a brandId there is no scope")
+	}
+}
+
+// Guards the hoist directly: the other two types must still demand the pair.
+func TestTheContentStudioPairIsStillRequiredWhereItApplies(t *testing.T) {
+	if (Message{Type: JobDirectorPlan, BrandID: "b", RunID: "r"}).Target() {
+		t.Fatal("a plan still needs its content and studio")
+	}
+	if (Message{Type: JobSceneDesign, BrandID: "b", SceneID: "s"}).Target() {
+		t.Fatal("a scene design still needs its content and studio")
+	}
+}
