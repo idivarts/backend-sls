@@ -94,9 +94,20 @@ RUN fc-cache -f || true
 # HeyGen's installer is briefly unreachable, and the media step already
 # reports a missing CLI as a warning rather than a failure. The version is
 # echoed so the build log records what the image actually got.
-RUN curl -fsSL https://static.heygen.ai/cli/install.sh | bash || true
+# curl is not in node:22-bookworm-slim, and the installer needs bash — it uses
+# `set -o pipefail`, which dash refuses. The first attempt at this shipped a
+# green deploy with a dead media path because `curl: not found` was swallowed.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && curl -fsSL https://static.heygen.ai/cli/install.sh | bash \
+    && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.local/bin:${PATH}"
-RUN heygen --version || echo "heygen CLI not installed; media resolution will degrade to a warning"
+# Fatal on purpose. A render image whose media path is silently dead is worse
+# than a deploy that waits: the failure then surfaces six minutes and one
+# preview later, in a log nobody is watching. If HeyGen's installer is down,
+# this blocks the deploy — which is the right way round, because the
+# alternative shipped exactly that silent breakage once already.
+RUN heygen --version
 
 WORKDIR /app/services/render-worker
 ENTRYPOINT ["node", "dist/services/render-worker/src/cli.js"]
