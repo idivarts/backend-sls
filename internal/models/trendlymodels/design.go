@@ -79,6 +79,17 @@ const (
 	DesignPreviewFailed  = "failed"
 )
 
+// DesignScene is one clip of the film: a mounted composition with a place on
+// the timeline. Mirrors hfproject.Scene, which parses it.
+type DesignScene struct {
+	ID         string `json:"id" firestore:"id"`
+	Src        string `json:"src" firestore:"src"`
+	StartMs    int    `json:"startMs" firestore:"startMs"`
+	DurationMs int    `json:"durationMs" firestore:"durationMs"`
+	TrackIndex int    `json:"trackIndex" firestore:"trackIndex"`
+	TrackKind  string `json:"trackKind,omitempty" firestore:"trackKind,omitempty"`
+}
+
 // PreviewFrame is one still from the film, with where in it the frame is.
 //
 // TimeMs and not seconds: every other time on this document is milliseconds,
@@ -141,6 +152,16 @@ type Design struct {
 	// needs to know which of the two is in flight.
 	AuthorStatus string `json:"authorStatus,omitempty" firestore:"authorStatus,omitempty"`
 	AuthorError  string `json:"authorError,omitempty" firestore:"authorError,omitempty"`
+
+	// Scenes are the clips the root composition mounts, in timeline order,
+	// as parsed from index.html when the project was written.
+	//
+	// Stored so the APP can draw a timeline and a layer tree. The project
+	// itself is HTML in S3; without this the app would have to fetch and
+	// parse several documents to know what the film is made of, and would
+	// become a second implementation of that parsing — one free to disagree
+	// with the renderer's.
+	Scenes []DesignScene `json:"scenes,omitempty" firestore:"scenes,omitempty"`
 
 	// Brief is what the user asked for, in their own words, kept so the app
 	// can show it back to them.
@@ -600,10 +621,22 @@ func MarkBrandDesignAuthorFailed(ctx context.Context, brandID, designID, reason 
 // Both fields together: a projectPrefix without a durationMs is a renderable
 // design the wallet cannot price, and a durationMs without the prefix prices
 // a design with nothing to render.
-func SetBrandDesignProject(ctx context.Context, brandID, designID, prefix string, durationMs int) error {
+func SetBrandDesignProject(
+	ctx context.Context,
+	brandID, designID, prefix string,
+	durationMs int,
+	scenes []DesignScene,
+) error {
+	if scenes == nil {
+		// An explicit empty list, not a missing field: a rewrite that
+		// produced no scenes must CLEAR the previous project's, or the
+		// timeline keeps drawing clips from a film that no longer exists.
+		scenes = []DesignScene{}
+	}
 	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
 		{Path: "projectPrefix", Value: prefix},
 		{Path: "durationMs", Value: durationMs},
+		{Path: "scenes", Value: scenes},
 		{Path: "authorStatus", Value: DesignAuthorDone},
 		{Path: "authorError", Value: firestore.Delete},
 	})

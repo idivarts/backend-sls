@@ -223,7 +223,20 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 			"We wrote the design but could not save it. Please try again.")
 	}
 
-	return trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs)
+	// The scenes travel with the project so the app can draw a timeline of
+	// the film it just wrote, rather than only a status line about it.
+	scenes := make([]trendlymodels.DesignScene, 0, len(project.Scenes))
+	for _, s := range project.Scenes {
+		scenes = append(scenes, trendlymodels.DesignScene{
+			ID:         s.ID,
+			Src:        s.Src,
+			StartMs:    s.StartMs,
+			DurationMs: s.DurationMs,
+			TrackIndex: s.TrackIndex,
+			TrackKind:  s.TrackKind,
+		})
+	}
+	return trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes)
 }
 
 func firstContent(resp *openrouter.ChatResponse) string {

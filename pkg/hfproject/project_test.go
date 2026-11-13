@@ -117,3 +117,119 @@ func TestPrefixIsScopedToBrandAndDesign(t *testing.T) {
 		t.Fatalf("prefix must stay under design-projects/, got %q", got)
 	}
 }
+
+// The real index.html the model wrote on dev, which is what the timeline has
+// to be drawn from. Shortened only by dropping the variables block.
+const realIndex = `<html>
+  <body style="margin:0; background: #0F0B08;">
+    <div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1080" data-height="1920">
+      <div id="hook" data-composition-id="hook" data-composition-src="compositions/hook.html" data-start="0" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="benefits" data-composition-id="benefits" data-composition-src="compositions/benefits.html" data-start="3" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="outro" data-composition-id="outro" data-composition-src="compositions/outro.html" data-start="7" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+    </div>
+  </body>
+</html>`
+
+func TestParseScenesReadsTheRealProject(t *testing.T) {
+	scenes := parseScenes(realIndex)
+	if len(scenes) != 3 {
+		t.Fatalf("expected the 3 mounted scenes, got %d: %+v", len(scenes), scenes)
+	}
+	want := []Scene{
+		{ID: "hook", Src: "compositions/hook.html", StartMs: 0, DurationMs: 3000, TrackIndex: 1, TrackKind: "graphics"},
+		{ID: "benefits", Src: "compositions/benefits.html", StartMs: 3000, DurationMs: 4000, TrackIndex: 1, TrackKind: "graphics"},
+		{ID: "outro", Src: "compositions/outro.html", StartMs: 7000, DurationMs: 3000, TrackIndex: 1, TrackKind: "graphics"},
+	}
+	for i, w := range want {
+		if scenes[i] != w {
+			t.Fatalf("scene %d = %+v, want %+v", i, scenes[i], w)
+		}
+	}
+}
+
+// The root carries data-duration too, and it is the FILM's length. Counting it
+// as a scene would put a 10-second clip on the timeline next to the three
+// scenes that make it up.
+func TestParseScenesIgnoresTheRootComposition(t *testing.T) {
+	for _, s := range parseScenes(realIndex) {
+		if s.ID == "main" || s.DurationMs == 10000 {
+			t.Fatalf("the root composition was parsed as a scene: %+v", s)
+		}
+	}
+}
+
+// Attributes must come off the SAME element. Scanning the document for
+// data-start would pair one scene's start with another's duration, and the
+// error would look like a timeline bug rather than a parsing one.
+func TestParseScenesDoesNotMixAttributesBetweenElements(t *testing.T) {
+	index := `<div data-composition-id="a" data-composition-src="a.html" data-start="0" data-duration="2"></div>` +
+		`<div data-composition-id="b" data-composition-src="b.html" data-start="2" data-duration="5"></div>`
+	scenes := parseScenes(index)
+	if len(scenes) != 2 {
+		t.Fatalf("expected 2 scenes, got %d", len(scenes))
+	}
+	if scenes[0].DurationMs != 2000 || scenes[1].DurationMs != 5000 {
+		t.Fatalf("durations crossed over: %+v", scenes)
+	}
+}
+
+// Document order is not guaranteed to be timeline order, and a timeline that
+// runs backwards is worse than none.
+func TestParseScenesSortsByStart(t *testing.T) {
+	index := `<div data-composition-id="late" data-composition-src="l.html" data-start="7" data-duration="3"></div>` +
+		`<div data-composition-id="early" data-composition-src="e.html" data-start="0" data-duration="7"></div>`
+	scenes := parseScenes(index)
+	if scenes[0].ID != "early" || scenes[1].ID != "late" {
+		t.Fatalf("not in timeline order: %+v", scenes)
+	}
+}
+
+// Everything parsed here feeds a DRAWING, not the render and not the price. A
+// project with odd attributes must still render; the user just gets a less
+// precise picture.
+func TestParseScenesIsForgivingAboutMissingAttributes(t *testing.T) {
+	index := `<div data-composition-src="only-src.html"></div>`
+	scenes := parseScenes(index)
+	if len(scenes) != 1 {
+		t.Fatalf("a scene with only a src should still appear, got %+v", scenes)
+	}
+	if scenes[0].ID != "only-src.html" {
+		t.Fatalf("expected the src as the fallback handle, got %q", scenes[0].ID)
+	}
+	if scenes[0].StartMs != 0 || scenes[0].DurationMs != 0 {
+		t.Fatalf("missing times should read as 0, got %+v", scenes[0])
+	}
+}
+
+func TestParseScenesHandlesAProjectWithNoScenes(t *testing.T) {
+	if got := parseScenes(`<div data-composition-id="main" data-duration="5"></div>`); len(got) != 0 {
+		t.Fatalf("expected no scenes, got %+v", got)
+	}
+}
+
+// Hyperframes writes these times in SECONDS. Reading them as milliseconds
+// would make every clip a thousand times too long.
+func TestParseScenesConvertsSecondsToMilliseconds(t *testing.T) {
+	scenes := parseScenes(`<div data-composition-src="a.html" data-start="1.5" data-duration="0.25"></div>`)
+	if scenes[0].StartMs != 1500 || scenes[0].DurationMs != 250 {
+		t.Fatalf("fractional seconds mis-converted: %+v", scenes[0])
+	}
+}
+
+func TestBuildCarriesTheScenes(t *testing.T) {
+	p, err := Build([]File{
+		{Path: "index.html", Content: realIndex},
+		{Path: "compositions/hook.html", Content: "<div></div>"},
+		{Path: "compositions/benefits.html", Content: "<div></div>"},
+		{Path: "compositions/outro.html", Content: "<div></div>"},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if p.DurationMs != 10000 {
+		t.Fatalf("root duration = %d, want 10000", p.DurationMs)
+	}
+	if len(p.Scenes) != 3 {
+		t.Fatalf("Build dropped the scenes: %+v", p.Scenes)
+	}
+}
