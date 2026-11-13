@@ -126,9 +126,14 @@ async function materialiseAndGate(
             // Back to the bucket, so the render that follows this preview
             // reuses the same files rather than resolving — and paying —
             // for them a second time.
-            await uploadProjectFiles(job.projectPrefix, workDir, ["index.html", ...media.files]);
+            const n = await uploadProjectFiles(job.projectPrefix, workDir, ["index.html", ...media.files]);
+            console.log(`[media] uploaded ${n} file(s) back to ${job.projectPrefix}`);
         }
     } catch (err) {
+        // Logged as well as warned. The first version only warned, and a
+        // denied upload left the preview looking perfect while the stored
+        // project kept pointing at media that was never there.
+        console.log(`[media] FAILED: ${(err as Error).message}`);
         warnings.push(`media: ${(err as Error).message}`);
     }
 
