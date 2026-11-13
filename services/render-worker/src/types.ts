@@ -84,6 +84,15 @@ export interface RenderJob {
     designId?: string;
     /** For an hfdesign job: draft while iterating, delivery for the file. */
     quality?: "draft" | "looks" | "delivery";
+    /**
+     * What this design may spend resolving media, in HeyGen credits.
+     *
+     * Set by the backend from the org's standing, because the worker has no
+     * wallet and no way to ask. Written into the project as Hyperframes'
+     * own `.hyperframes/credit-limit.json`, so the CLI refuses an
+     * overspending call itself rather than us auditing afterwards.
+     */
+    creditCeiling?: number;
 }
 
 /** What the worker found in Firestore and is about to render. */

@@ -63,6 +63,13 @@ type RenderJob struct {
 	// Quality is the v3 cost lever: draft while someone iterates, delivery
 	// for the file they publish.
 	Quality string `json:"quality,omitempty"`
+	// CreditCeiling is what this design may spend resolving media, in
+	// HeyGen credits. The worker writes it into the project as
+	// Hyperframes' own `.hyperframes/credit-limit.json`, so the CLI itself
+	// refuses a call that would exceed it.
+	//
+	// Set here because the worker has no wallet and no way to ask for one.
+	CreditCeiling int `json:"creditCeiling,omitempty"`
 }
 
 type startRenderRequest struct {
@@ -349,16 +356,17 @@ func SubmitStudioRender(brandID, contentID, studioID string, force bool) error {
 // design that already has a renderUrl, exits successfully, and the design
 // sits on `queued` for ever while the user watches a spinner they paid for.
 // It is the same trap here, so it is wired the same way.
-func SubmitDesignV3Render(brandID, designID, quality string, force bool) error {
+func SubmitDesignV3Render(brandID, designID, quality string, force bool, creditCeiling int) error {
 	return dispatch(RenderJob{
 		BrandID: brandID,
 		// RevisionID carries the design id as well, so the worker's logging
 		// and the Batch job name keep their existing shape.
-		RevisionID: designID,
-		DesignID:   designID,
-		DocType:    "hfdesign",
-		Quality:    quality,
-		Force:      force,
+		RevisionID:    designID,
+		DesignID:      designID,
+		DocType:       "hfdesign",
+		Quality:       quality,
+		Force:         force,
+		CreditCeiling: creditCeiling,
 	})
 }
 
@@ -369,12 +377,13 @@ func SubmitDesignV3Render(brandID, designID, quality string, force bool) error {
 // different outputs (PNGs against an MP4), write different fields, and must
 // be able to be in flight at once — a user looking at a filmstrip and then
 // pressing Render should not have the preview cancel it.
-func SubmitDesignV3Preview(brandID, designID string) error {
+func SubmitDesignV3Preview(brandID, designID string, creditCeiling int) error {
 	return dispatch(RenderJob{
-		BrandID:    brandID,
-		RevisionID: designID,
-		DesignID:   designID,
-		DocType:    "hfpreview",
+		BrandID:       brandID,
+		RevisionID:    designID,
+		DesignID:      designID,
+		DocType:       "hfpreview",
+		CreditCeiling: creditCeiling,
 	})
 }
 
