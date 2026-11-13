@@ -149,6 +149,18 @@ export async function resolveProjectMedia(
     const result: MediaResolution = { found: declarations.length, resolved: 0, files: [], problems: [], changed: false };
     if (declarations.length === 0) return result;
 
+    // ── Say what is happening ────────────────────────────────────────────
+    // The first run of this resolved nothing and left no trace: problems go
+    // back to the caller as warnings on a document, and the worker log — the
+    // only place anyone looks when a preview misbehaves — said nothing at
+    // all. A paid step that can fail silently is a step nobody can debug.
+    console.log(
+        `[media] ${declarations.length} declaration(s): ` +
+            declarations.map((d) => `${d.type}`).join(", ") +
+            ` · credential ${opts.heygenApiKey ? "present" : "ABSENT"}` +
+            (typeof opts.creditCeiling === "number" ? ` · ceiling ${opts.creditCeiling}` : "")
+    );
+
     if (typeof opts.creditCeiling === "number") {
         await writeCreditLimit(projectDir, opts.creditCeiling);
     }
@@ -170,16 +182,21 @@ export async function resolveProjectMedia(
             const args = ["media-use", "resolve", "--type", d.type, "--intent", d.intent, "--project", projectDir, "--json"];
 
             if (d.entity) args.push("--entity", d.entity);
+            const startedAt = Date.now();
             const run = await runHyperframes(projectDir, args, { env, timeoutMs: RESOLVE_TIMEOUT_MS });
             if (run.code !== 0) {
-                result.problems.push(`${d.type} "${trim(d.intent)}": ${firstLine(run.stderr || run.stdout) || `exit ${run.code}`}`);
+                const why = firstLine(run.stderr || run.stdout) || `exit ${run.code}`;
+                console.log(`[media] ${d.type} FAILED after ${Date.now() - startedAt}ms: ${why}`);
+                result.problems.push(`${d.type} "${trim(d.intent)}": ${why}`);
                 continue;
             }
             rel = pathFromResolveJSON(run.stdout, projectDir);
             if (!rel) {
+                console.log(`[media] ${d.type} returned no path. stdout: ${trim(run.stdout.replace(/\s+/g, " "))}`);
                 result.problems.push(`${d.type} "${trim(d.intent)}": resolved but the reply named no file`);
                 continue;
             }
+            console.log(`[media] ${d.type} resolved to ${rel} in ${Date.now() - startedAt}ms`);
             resolvedFor.set(key, rel);
             result.files.push(rel);
         }
@@ -211,6 +228,7 @@ export async function resolveProjectMedia(
     if (edits.length === 0) return result;
     await writeFile(indexPath, applyEdits(original, edits), "utf8");
     result.changed = true;
+    console.log(`[media] rewrote index.html with ${resolvedFor.size} asset(s)`);
     return result;
 }
 
