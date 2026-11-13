@@ -1143,6 +1143,26 @@ resources:
                 - Effect: Allow
                   Action: ["s3:PutObject"]
                   Resource: "arn:aws:s3:::${self:service}-attachment-uploads/uploads/*"
+                # Design Studio v3 reads as well as writes. A Hyperframes
+                # project is a DIRECTORY — index.html, compositions/*.html,
+                # assets/ — so the worker lists the prefix and gets every
+                # object before it can render anything. Until v3 the worker
+                # only ever uploaded, which is why write-only was enough.
+                #
+                # ⚠️ ListBucket is granted on the BUCKET arn and GetObject on
+                # the OBJECT arn; they are different resources and an IAM
+                # policy that gets this wrong fails only at runtime. Both are
+                # scoped to design-projects/* so this does not become a
+                # general read of everything the brand has ever uploaded.
+                - Effect: Allow
+                  Action: ["s3:GetObject"]
+                  Resource: "arn:aws:s3:::${self:service}-attachment-uploads/design-projects/*"
+                - Effect: Allow
+                  Action: ["s3:ListBucket"]
+                  Resource: "arn:aws:s3:::${self:service}-attachment-uploads"
+                  Condition:
+                    StringLike:
+                      s3:prefix: ["design-projects/*"]
 
     # ── Batch (video) ─────────────────────────────────────────────────────
     # Spot first, on-demand second. Batch falls through to the second compute
