@@ -170,3 +170,21 @@ func TestDesignV3RenderTokenCost(t *testing.T) {
 		t.Fatalf("a negative duration must fall back like zero does")
 	}
 }
+
+// The brief is the only record of what the user asked for once the model's
+// output has replaced it. If the field loses its firestore tag it stops being
+// persisted, and the symptom is not an error — it is a "Rewrite with AI"
+// button over an empty box, which looks like the user never wrote a brief.
+func TestDesignPersistsTheBrief(t *testing.T) {
+	typ := reflect.TypeOf(Design{})
+	field, ok := typ.FieldByName("Brief")
+	if !ok {
+		t.Fatal("Design.Brief is gone; the app cannot show the user what this design was asked to be")
+	}
+	if got := strings.Split(field.Tag.Get("firestore"), ",")[0]; got != "brief" {
+		t.Fatalf(`Design.Brief must persist as "brief", got %q`, got)
+	}
+	if got := strings.Split(field.Tag.Get("json"), ",")[0]; got != "brief" {
+		t.Fatalf(`Design.Brief must serialize as "brief", got %q`, got)
+	}
+}
