@@ -31,6 +31,7 @@
  */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { chromium } from "playwright";
 import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
@@ -109,7 +110,37 @@ export function hyperframesEnv(opts: HyperframesEnvOptions = {}): NodeJS.Process
     if (process.env.PRODUCER_HEADLESS_SHELL_PATH) {
         env.PRODUCER_HEADLESS_SHELL_PATH = process.env.PRODUCER_HEADLESS_SHELL_PATH;
     }
+
+    // Tell the CLI where a browser is, or it will not find one on arm64.
+    //
+    // Hyperframes downloads chrome-headless-shell from chrome-for-testing,
+    // which publishes no linux-arm64 build — so on our Graviton worker it
+    // gives up with "Chrome Headless Shell is not available for Linux ARM64"
+    // and suggests apt-get installing chromium-browser. Their own Dockerfile
+    // sidesteps this by shipping Playwright's pinned arm64 headless shell.
+    //
+    // We already have exactly that: the image runs `playwright install
+    // chromium`, and the worker launches it for every v1/v2 render. So the
+    // browser is resolved from the Playwright package rather than installed
+    // a second time — one browser in the image, one version to reason about.
+    const browser = process.env.HYPERFRAMES_BROWSER_PATH ?? resolvePlaywrightChromium();
+    if (browser) env.HYPERFRAMES_BROWSER_PATH = browser;
+
     return env;
+}
+
+/**
+ * The Chromium that Playwright installed into this image, or undefined when
+ * it cannot be resolved — in which case the CLI is left to its own discovery
+ * and will say so clearly if it fails.
+ */
+function resolvePlaywrightChromium(): string | undefined {
+    try {
+        const path = chromium.executablePath();
+        return path && existsSync(path) ? path : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 export interface CliResult {
