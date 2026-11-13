@@ -219,15 +219,28 @@ func dispatch(job RenderJob) error {
 	// worker's container and nowhere else. A studio render IS a composition
 	// render with one more resolution step in front of it, so it takes the
 	// same lane for the same reason.
-	if job.DocType == "video" || job.DocType == "composition" ||
-		job.DocType == "ingest" || job.DocType == "frame" || job.DocType == "studio" {
-		return submitBatchJob(job, string(body))
+	// ⚠️ The test is "is this the IMAGE lane", not "is this one of the video
+	// kinds", and the inversion is deliberate.
+	//
+	// It used to be an allowlist of video kinds with the image Lambda as the
+	// fallthrough, which meant any docType nobody remembered to add landed in
+	// the CONSTRAINED lane by default: 512MB of /tmp, a Lambda timeout, and
+	// no ffmpeg worth the name. "hfdesign" did exactly that — it fell through
+	// to a queue the studio function does not even have a URL for, so every
+	// v3 render answered 502 `could not start the render` with nothing in the
+	// logs to say which lane it had tried.
+	//
+	// Defaulting the other way is strictly safer: a new kind goes to Fargate,
+	// which can run anything the image lane can and more. The only thing that
+	// belongs on the image Lambda is the thing it was sized for.
+	if job.DocType == "image" {
+		queueURL := os.Getenv("IMAGE_RENDER_QUEUE_URL")
+		if queueURL == "" {
+			return errNoQueue
+		}
+		return sqshandler.SendToQueue(queueURL, string(body), 0)
 	}
-	queueURL := os.Getenv("IMAGE_RENDER_QUEUE_URL")
-	if queueURL == "" {
-		return errNoQueue
-	}
-	return sqshandler.SendToQueue(queueURL, string(body), 0)
+	return submitBatchJob(job, string(body))
 }
 
 // submitBatchJob hands a video render to AWS Batch. Batch IS the queue here —
