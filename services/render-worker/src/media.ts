@@ -196,7 +196,14 @@ export async function resolveProjectMedia(
                 result.problems.push(`${d.type} "${trim(d.intent)}": resolved but the reply named no file`);
                 continue;
             }
-            console.log(`[media] ${d.type} resolved to ${rel} in ${Date.now() - startedAt}ms`);
+            // The whole envelope, trimmed. Which provider answered and what
+            // it cost are the two things nobody can see from outside, and
+            // the budget for this work is small enough that guessing from
+            // response times is not good enough.
+            console.log(
+                `[media] ${d.type} resolved to ${rel} in ${Date.now() - startedAt}ms · ` +
+                    trim(run.stdout.replace(/\s+/g, " "), 400)
+            );
             resolvedFor.set(key, rel);
             result.files.push(rel);
         }
@@ -236,6 +243,6 @@ function firstLine(s: string): string {
     return (s || "").split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "";
 }
 
-function trim(s: string): string {
-    return s.length > 60 ? s.slice(0, 57) + "…" : s;
+function trim(s: string, max = 60): string {
+    return s.length > max ? s.slice(0, max - 3) + "…" : s;
 }
