@@ -240,7 +240,16 @@ func brandPromptBlock(ds *trendlymodels.BrandDesignSystem, vars []string, logoPa
 	var b strings.Builder
 	b.WriteString("\n\nTHIS BRAND'S KIT — the film must look like it belongs to this brand.\n")
 	b.WriteString("A <style> block defining these CSS variables is already in the document's head.\n")
-	b.WriteString("Use them with var(). Do not invent colours or font families that are not here.\n\n")
+	b.WriteString("Use them with var(). Do not invent colours or font families that are not here.\n")
+	// `check` enforces WCAG AA and refuses the project below it. A brand
+	// palette is chosen for a logo on paper, not for text on a dark frame,
+	// so a legible pairing has to be asked for or the gate fails with a
+	// contrast ratio that names neither the colour nor the element.
+	b.WriteString("Every pairing must clear WCAG AA: at least 3:1 for display type and\n")
+	b.WriteString("UI, 4.5:1 for body copy. The gate refuses the film below that. Where a\n")
+	b.WriteString("brand colour would not clear it against the ground, use the text token\n")
+	b.WriteString("for the words and keep the brand colour for an accent that carries no\n")
+	b.WriteString("meaning on its own.\n\n")
 	for _, v := range vars {
 		b.WriteString("  " + v + "\n")
 	}
