@@ -104,15 +104,28 @@ func withScripts(indexHTML, runtimeURL, gsapURL string) string {
 	if !gsapLoadedRe.MatchString(indexHTML) {
 		tags += "\n    " + fmt.Sprintf(`<script src=%q></script>`, gsapURL)
 	}
-	if loc := headOpenRe.FindStringIndex(indexHTML); loc != nil {
-		return indexHTML[:loc[1]] + "\n    " + tags + indexHTML[loc[1]:]
+	return InjectIntoHead(indexHTML, tags)
+}
+
+// InjectIntoHead puts a snippet immediately after <head>.
+//
+// Falling back to <body>, and failing both, to the very top of the document —
+// a model's answer is not guaranteed to have either, and a snippet that lands
+// nowhere is worse than one that lands early. Early is always safe for the
+// things that go through here: they define what the rest of the document
+// uses, so nothing can want them later.
+//
+// Exported because brand tokens take exactly the same route as the player's
+// script tags, and two implementations of "put this at the top of the head"
+// would be two chances to put it in the wrong place.
+func InjectIntoHead(html, snippet string) string {
+	if loc := headOpenRe.FindStringIndex(html); loc != nil {
+		return html[:loc[1]] + "\n    " + snippet + html[loc[1]:]
 	}
-	if loc := bodyOpenRe.FindStringIndex(indexHTML); loc != nil {
-		return indexHTML[:loc[1]] + "\n    " + tags + indexHTML[loc[1]:]
+	if loc := bodyOpenRe.FindStringIndex(html); loc != nil {
+		return html[:loc[1]] + "\n    " + snippet + html[loc[1]:]
 	}
-	// No head and no body. Prepending still puts both ahead of everything,
-	// which is all that is required.
-	return tags + "\n" + indexHTML
+	return snippet + "\n" + html
 }
 
 // bridgeJS lets the app that embeds this page drive the film.

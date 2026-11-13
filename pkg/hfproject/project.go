@@ -359,6 +359,25 @@ func contentTypeFor(p string) string {
 		return "application/json"
 	case ".svg":
 		return "image/svg+xml"
+	// A brand's logo and its fonts travel with the project (see the design
+	// package's brandkit.go). CloudFront serves what we set here, and a
+	// woff2 served as octet-stream is a font the browser declines to use.
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
+	case ".woff2":
+		return "font/woff2"
+	case ".woff":
+		return "font/woff"
+	case ".ttf":
+		return "font/ttf"
+	case ".otf":
+		return "font/otf"
 	default:
 		return "application/octet-stream"
 	}

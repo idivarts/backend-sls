@@ -185,13 +185,24 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 			"Writing designs is not available on this plan.")
 	}
 
+	// The brand kit, before the model call, because it changes the prompt.
+	// A brand with no design system gets nil and everything below behaves
+	// exactly as it did before this existed. A failed asset fetch is not an
+	// authoring failure: the film is still worth making without the logo.
+	var kit *brandKit
+	if ds, dserr := trendlymodels.GetDesignSystem(ctx, brandID); dserr == nil {
+		kit = buildBrandKit(ctx, ds)
+	} else {
+		log.Printf("design author: could not read the design system for %s: %v", brandID, dserr)
+	}
+
 	genCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	resp, err := openrouter.ChatCompletion(genCtx, openrouter.ChatRequest{
 		Model: model,
 		Messages: []openrouter.Message{
-			{Role: "system", Content: hyperframesAuthoringSystemPrompt(d)},
+			{Role: "system", Content: hyperframesAuthoringSystemPrompt(d, kit)},
 			{Role: "user", Content: msg.Brief},
 		},
 	})
@@ -235,7 +246,16 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, perr.Error())
 	}
 
-	project, berr := hfproject.Build([]hfproject.File{{Path: "index.html", Content: indexHTML}})
+	// The brand's tokens go in whatever the model did, and its assets travel
+	// with the project so a render needs no network. Both are no-ops for a
+	// brand with no design system.
+	files := []hfproject.File{{Path: "index.html", Content: indexHTML}}
+	if kit != nil {
+		files[0].Content = hfproject.InjectIntoHead(indexHTML, kit.CSS)
+		files = append(files, kit.Files...)
+	}
+
+	project, berr := hfproject.Build(files)
 	if berr != nil {
 		// The validator's messages are already written to be read by a
 		// person as well as a model, so they are surfaced rather than
@@ -355,15 +375,19 @@ func parseAuthoredIndex(raw string) (string, error) {
 //
 // The contract itself lives in pkg/hfproject so the chat tool and this job
 // cannot drift apart. The only thing added here is what differs per design.
-func hyperframesAuthoringSystemPrompt(d *trendlymodels.Design) string {
+func hyperframesAuthoringSystemPrompt(d *trendlymodels.Design, kit *brandKit) string {
+	brand := ""
+	if kit != nil {
+		brand = kit.Prompt
+	}
 	return fmt.Sprintf(`You write Hyperframes projects for a social video tool.
 
 %s
 
 THIS FILM'S CANVAS: %dx%d at %d fps. Use exactly these numbers for data-width
-and data-height on the root and on every scene.
+and data-height on the root and on every scene.%s
 
 ANSWER WITH THE COMPLETE index.html AND NOTHING ELSE — no JSON, no code
 fence, no explanation. Start at <html and end at </html>.`,
-		hfproject.AuthoringContract, d.Format.Width, d.Format.Height, d.Format.FPS)
+		hfproject.AuthoringContract, d.Format.Width, d.Format.Height, d.Format.FPS, brand)
 }
