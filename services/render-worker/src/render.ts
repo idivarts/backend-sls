@@ -510,6 +510,12 @@ async function runHyperframesDesignJob(job: RenderJob): Promise<void> {
     }
 
     const startedAt = Date.now();
+    // ⚠️ The catch must not overwrite a reason onCheckFailed already wrote.
+    // That hook records the design's REAL problem and then the operation
+    // throws, so the catch used to replace it with "Something went wrong
+    // while rendering this design" — handing the user the useless half of a
+    // message we already had, for the one failure they can act on.
+    let reasonWritten = false;
     try {
         const design = await getDesignV3(job.brandId, designId);
         if (!design) throw new Error(`design ${designId} not found`);
@@ -535,7 +541,10 @@ async function runHyperframesDesignJob(job: RenderJob): Promise<void> {
                     onProgress: (f) => setDesignV3Progress(job.brandId, designId, f),
                     // Written before the throw so the user sees the design's
                     // actual problem rather than a generic render failure.
-                    onCheckFailed: (problem) => markDesignV3Failed(job.brandId, designId, problem),
+                    onCheckFailed: async (problem) => {
+                        reasonWritten = true;
+                        await markDesignV3Failed(job.brandId, designId, problem);
+                    },
                 }
             ),
             designId
@@ -566,7 +575,9 @@ async function runHyperframesDesignJob(job: RenderJob): Promise<void> {
             revisionId: designId,
             reason: err instanceof Error ? err.message : String(err),
         });
-        await markDesignV3Failed(job.brandId, designId, userFacing(err)).catch(() => undefined);
+        if (!reasonWritten) {
+            await markDesignV3Failed(job.brandId, designId, userFacing(err)).catch(() => undefined);
+        }
         throw err;
     }
 }
@@ -592,6 +603,8 @@ async function runHyperframesPreviewJob(job: RenderJob): Promise<void> {
     }
 
     const startedAt = Date.now();
+    // Same rule as the render job: a check failure already wrote the reason.
+    let reasonWritten = false;
     try {
         const design = await getDesignV3(job.brandId, designId);
         if (!design) throw new Error(`design ${designId} not found`);
@@ -609,8 +622,10 @@ async function runHyperframesPreviewJob(job: RenderJob): Promise<void> {
                     // it is the same `check` the render runs, so a preview
                     // that fails here tells the user what the render would
                     // have told them AFTER taking their tokens.
-                    onCheckFailed: (problem) =>
-                        markDesignV3PreviewFailed(job.brandId, designId, problem),
+                    onCheckFailed: async (problem) => {
+                        reasonWritten = true;
+                        await markDesignV3PreviewFailed(job.brandId, designId, problem);
+                    },
                 }
             ),
             designId
@@ -635,7 +650,9 @@ async function runHyperframesPreviewJob(job: RenderJob): Promise<void> {
             revisionId: designId,
             reason: err instanceof Error ? err.message : String(err),
         });
-        await markDesignV3PreviewFailed(job.brandId, designId, userFacing(err)).catch(() => undefined);
+        if (!reasonWritten) {
+            await markDesignV3PreviewFailed(job.brandId, designId, userFacing(err)).catch(() => undefined);
+        }
         throw err;
     }
 }
