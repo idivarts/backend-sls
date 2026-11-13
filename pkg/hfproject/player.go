@@ -152,22 +152,90 @@ const bridgeJS = `
   var el = document.querySelector("hyperframes-player");
   if (!el || window.parent === window) return;
   var origin = null;
+  var RING = "__trendly_selection_ring";
 
-  function post(type) {
-    try {
-      window.parent.postMessage({
-        source: "trendly-player",
-        type: type,
-        timeMs: Math.round((el.currentTime || 0) * 1000),
-        durationMs: Math.round((el.duration || 0) * 1000),
-        paused: !!el.paused
-      }, origin || "*");
-    } catch (e) {}
+  function post(type, extra) {
+    var msg = {
+      source: "trendly-player",
+      type: type,
+      timeMs: Math.round((el.currentTime || 0) * 1000),
+      durationMs: Math.round((el.duration || 0) * 1000),
+      paused: !!el.paused
+    };
+    if (extra) { for (var k in extra) { msg[k] = extra[k]; } }
+    try { window.parent.postMessage(msg, origin || "*"); } catch (e) {}
   }
 
-  el.addEventListener("ready", function () { post("ready"); });
+  // The composition is a nested iframe on the same origin as this page, so
+  // its document is reachable. Wrapped because a cross-origin or not-yet-
+  // loaded frame throws rather than returning null.
+  function compositionDoc() {
+    try {
+      var f = el.shadowRoot ? el.shadowRoot.querySelector("iframe") : null;
+      return f && f.contentDocument;
+    } catch (e) { return null; }
+  }
+
+  // ── What the user clicked ───────────────────────────────────────────────
+  // Walking UP from the event target, because a click lands on whatever is
+  // topmost — a text node's span, a glyph, a background layer — and what the
+  // app can act on is the nearest element with an id. Our authoring contract
+  // gives every addressable element one; Hyperframes' own data-hf-id is a
+  // Studio attribute our films do not carry.
+  function describe(node) {
+    if (!node || !node.closest) return null;
+    var target = node.closest("[id]");
+    if (!target || target.id === RING) return null;
+    var scene = target.closest("[data-scene]");
+    var r = target.getBoundingClientRect();
+    return {
+      elementId: target.id,
+      tag: target.tagName.toLowerCase(),
+      sceneId: scene ? scene.getAttribute("data-scene") : "",
+      text: (target.textContent || "").replace(/\s+/g, " ").trim().slice(0, 240),
+      box: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }
+    };
+  }
+
+  // Capture phase, so a composition that stops propagation on its own
+  // handlers cannot swallow the selection.
+  function attachPicker() {
+    var d = compositionDoc();
+    if (!d || d.__trendlyPicker) return;
+    d.__trendlyPicker = true;
+    d.addEventListener("click", function (ev) {
+      var info = describe(ev.target);
+      post("select", info || { elementId: "", sceneId: "", tag: "", text: "" });
+    }, true);
+  }
+
+  // The ring lives in the composition document and is created at runtime, so
+  // it is in the player only. index.html is what the renderer opens and it
+  // never sees this.
+  function highlight(id) {
+    var d = compositionDoc();
+    if (!d || !d.body) return;
+    var prev = d.getElementById(RING);
+    if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+    if (!id) return;
+    var t = d.getElementById(id);
+    if (!t) return;
+    var r = t.getBoundingClientRect();
+    var ring = d.createElement("div");
+    ring.id = RING;
+    ring.style.cssText = "position:fixed;pointer-events:none;z-index:2147483647;" +
+      "border:2px solid #4C8DFF;border-radius:4px;box-shadow:0 0 0 2px rgba(76,141,255,0.25);" +
+      "left:" + r.left + "px;top:" + r.top + "px;width:" + r.width + "px;height:" + r.height + "px;";
+    d.body.appendChild(ring);
+  }
+
+  el.addEventListener("ready", function () { post("ready"); attachPicker(); });
   el.addEventListener("durationchange", function () { post("ready"); });
   el.addEventListener("timeupdate", function () { post("time"); });
+  // The composition can mount after "ready" on a reload, so try again when
+  // the frame loads rather than only once.
+  window.addEventListener("load", attachPicker);
+  setTimeout(attachPicker, 1200);
 
   window.addEventListener("message", function (e) {
     if (e.source !== window.parent) return;
@@ -181,10 +249,12 @@ const bridgeJS = `
         el.play();
       } else if (d.type === "pause" && typeof el.pause === "function") {
         el.pause();
+      } else if (d.type === "highlight") {
+        attachPicker();
+        highlight(d.elementId || "");
+        return;
       }
     } catch (err) {}
-    // Answer every command, "hello" included: it is how the app learns the
-    // duration and that the player is listening at all.
     post(d.type === "hello" ? "ready" : "time");
   });
 })();
