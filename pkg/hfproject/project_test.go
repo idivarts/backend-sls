@@ -32,12 +32,10 @@ func TestBuildReadsTheROOTDurationNotASceneDuration(t *testing.T) {
 	root := File{Path: "index.html", Content: `
 <html><body>
   <div id="root" data-composition-id="main" data-start="0" data-duration="20" data-width="1080" data-height="1920">
-    <div id="hook" data-composition-id="hook" data-composition-src="compositions/hook.html"
-         data-start="0" data-duration="3" data-width="1080" data-height="1920"></div>
+    <section id="hook" class="clip" data-scene="hook" data-start="0" data-duration="3"></section>
   </div>
 </body></html>`}
-	scene := File{Path: "compositions/hook.html", Content: "<template></template>"}
-	p, err := Build([]File{root, scene})
+	p, err := Build([]File{root})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -56,20 +54,32 @@ func TestBuildRejectsAMissingDuration(t *testing.T) {
 // A mounted scene that is not in the project does not fail in the CLI — it
 // waits 45 seconds and renders static frames, which reads as a rendering
 // problem rather than a missing file.
-func TestBuildRejectsAMountedSceneThatIsNotThere(t *testing.T) {
-	_, err := Build([]File{idx(`<div data-composition-src="compositions/missing.html"></div>`)})
-	if err == nil || !strings.Contains(err.Error(), "compositions/missing.html") {
-		t.Fatalf("expected a complaint naming the missing scene, got %v", err)
-	}
-}
-
-func TestBuildAcceptsAMountedSceneThatIsThere(t *testing.T) {
+// A mounted sub-composition is refused WHETHER OR NOT the file is there. It
+// passes `check`, renders without a warning, and produces a film of unstyled
+// text — every signal says the design is fine. Failing at authoring, where the
+// message reaches the model, costs nothing; failing after a charged render
+// costs the user ~2000 tokens and looks like the product is broken.
+func TestBuildRefusesAMountedSceneEvenWhenTheFileExists(t *testing.T) {
 	_, err := Build([]File{
 		idx(`<div data-composition-src="compositions/hook.html"></div>`),
 		{Path: "compositions/hook.html", Content: "<template></template>"},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("a mounted sub-composition was accepted; it cannot render here")
+	}
+	// The message is read by a model whose next turn is the fix, so it has to
+	// name both the offending file and the shape to use instead.
+	for _, want := range []string{"compositions/hook.html", "data-scene", "index.html"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("the refusal does not mention %q: %v", want, err)
+		}
+	}
+}
+
+func TestBuildRefusesAMountedSceneThatIsNotThere(t *testing.T) {
+	_, err := Build([]File{idx(`<div data-composition-src="compositions/missing.html"></div>`)})
+	if err == nil || !strings.Contains(err.Error(), "compositions/missing.html") {
+		t.Fatalf("expected a complaint naming the scene, got %v", err)
 	}
 }
 
@@ -216,13 +226,22 @@ func TestParseScenesConvertsSecondsToMilliseconds(t *testing.T) {
 	}
 }
 
+// The single-document shape the contract now asks for: one file, scenes as
+// timed sections.
+const singleDocIndex = `<html>
+  <head><style>.scene{position:absolute;inset:0}</style></head>
+  <body style="margin:0">
+    <div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1080" data-height="1920">
+      <section id="hook" class="scene clip" data-scene="hook" data-start="0" data-duration="3"></section>
+      <section id="benefits" class="scene clip" data-scene="benefits" data-start="3" data-duration="4"></section>
+      <section id="outro" class="scene clip" data-scene="outro" data-start="7" data-duration="3"></section>
+    </div>
+    <script>window.__timelines["main"] = gsap.timeline({ paused: true });</script>
+  </body>
+</html>`
+
 func TestBuildCarriesTheScenes(t *testing.T) {
-	p, err := Build([]File{
-		{Path: "index.html", Content: realIndex},
-		{Path: "compositions/hook.html", Content: "<div></div>"},
-		{Path: "compositions/benefits.html", Content: "<div></div>"},
-		{Path: "compositions/outro.html", Content: "<div></div>"},
-	})
+	p, err := Build([]File{{Path: "index.html", Content: singleDocIndex}})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -231,5 +250,65 @@ func TestBuildCarriesTheScenes(t *testing.T) {
 	}
 	if len(p.Scenes) != 3 {
 		t.Fatalf("Build dropped the scenes: %+v", p.Scenes)
+	}
+}
+
+func TestParseScenesReadsTheSingleDocumentShape(t *testing.T) {
+	scenes := parseScenes(singleDocIndex)
+	if len(scenes) != 3 {
+		t.Fatalf("expected 3 scenes, got %d: %+v", len(scenes), scenes)
+	}
+	want := []Scene{
+		{ID: "hook", StartMs: 0, DurationMs: 3000},
+		{ID: "benefits", StartMs: 3000, DurationMs: 4000},
+		{ID: "outro", StartMs: 7000, DurationMs: 3000},
+	}
+	for i, w := range want {
+		if scenes[i].ID != w.ID || scenes[i].StartMs != w.StartMs || scenes[i].DurationMs != w.DurationMs {
+			t.Fatalf("scene %d = %+v, want %+v", i, scenes[i], w)
+		}
+	}
+}
+
+// The ROOT carries data-duration too, and it is the FILM's length. It has no
+// data-scene, which is what keeps it off the timeline — a 10-second clip beside
+// the three scenes that make it up would be nonsense.
+func TestParseScenesIgnoresTheRootInTheSingleDocumentShape(t *testing.T) {
+	for _, s := range parseScenes(singleDocIndex) {
+		if s.ID == "main" || s.DurationMs == 10000 {
+			t.Fatalf("the root was parsed as a scene: %+v", s)
+		}
+	}
+}
+
+// A design authored before the contract moved to one document still has
+// mounted sub-compositions. It can no longer render, but its timeline is
+// still worth drawing rather than silently emptying.
+func TestParseScenesStillReadsLegacyMountedProjects(t *testing.T) {
+	scenes := parseScenes(realIndex)
+	if len(scenes) != 3 {
+		t.Fatalf("legacy project lost its scenes: %+v", scenes)
+	}
+	if scenes[0].ID != "hook" || scenes[0].Src != "compositions/hook.html" {
+		t.Fatalf("legacy scene mis-parsed: %+v", scenes[0])
+	}
+}
+
+// The current shape wins when both are present, so a half-migrated project
+// does not draw every scene twice.
+func TestParseScenesPrefersTheCurrentShapeOverTheLegacyOne(t *testing.T) {
+	mixed := `<div data-scene="a" data-start="0" data-duration="2"></div>` +
+		`<div data-composition-id="b" data-composition-src="b.html" data-start="2" data-duration="2"></div>`
+	scenes := parseScenes(mixed)
+	if len(scenes) != 1 || scenes[0].ID != "a" {
+		t.Fatalf("expected only the data-scene element, got %+v", scenes)
+	}
+}
+
+// A section carrying times but no data-scene is a timed element, not a scene.
+// Counting it would put every animated card on the timeline as its own clip.
+func TestParseScenesNeedsTheSceneMarker(t *testing.T) {
+	if got := parseScenes(`<div class="clip" data-start="0" data-duration="2"></div>`); len(got) != 0 {
+		t.Fatalf("a clip without data-scene became a scene: %+v", got)
 	}
 }

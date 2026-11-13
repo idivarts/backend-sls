@@ -74,12 +74,22 @@ type Project struct {
 var (
 	rootDurationRe = regexp.MustCompile(`data-duration\s*=\s*["']([0-9.]+)["']`)
 	compositionSrc = regexp.MustCompile(`data-composition-src\s*=\s*["']([^"']+)["']`)
-	// A whole opening tag that mounts a scene. Matched as a unit so the
+	// A whole opening tag that declares a scene. Matched as a unit so the
 	// attributes read off it belong to THAT element — scanning the document
 	// for `data-start` instead would happily pair one scene's start with
 	// another's duration.
-	sceneTagRe = regexp.MustCompile(`<[a-zA-Z][^>]*\sdata-composition-src\s*=\s*["'][^"']+["'][^>]*>`)
-	attrRe     = func(name string) *regexp.Regexp {
+	//
+	// Two shapes, because both exist in the wild:
+	//   data-scene="…"            the single-document form the contract asks
+	//                             for now, and the only one that renders
+	//   data-composition-src="…"  the old mounted-sub-composition form, kept
+	//                             so a design authored before 2026-11-13
+	//                             still draws its timeline rather than
+	//                             silently losing it
+	sceneTagRe  = regexp.MustCompile(`<[a-zA-Z][^>]*\sdata-scene\s*=\s*["'][^"']+["'][^>]*>`)
+	legacyTagRe = regexp.MustCompile(`<[a-zA-Z][^>]*\sdata-composition-src\s*=\s*["'][^"']+["'][^>]*>`)
+	sceneAttrRe = attrRe(`data-scene`)
+	attrRe      = func(name string) *regexp.Regexp {
 		return regexp.MustCompile(name + `\s*=\s*["']([^"']*)["']`)
 	}
 	sceneIDRe     = attrRe(`data-composition-id`)
@@ -138,17 +148,26 @@ func Build(files []File) (*Project, error) {
 		return nil, fmt.Errorf("the project has no index.html; that is the root composition the renderer enters through")
 	}
 
-	// Every mounted scene must exist. The CLI's own failure for a missing
-	// scene is a 45-second wait and then static frames, which reads as a
-	// rendering problem rather than a missing file.
-	for _, m := range compositionSrc.FindAllStringSubmatch(index, -1) {
-		src, err := cleanPath(m[1])
-		if err != nil {
-			return nil, fmt.Errorf("index.html mounts %q, which is not a usable path: %w", m[1], err)
-		}
-		if !seen[src] {
-			return nil, fmt.Errorf("index.html mounts %q but the project does not include that file", src)
-		}
+	// ⚠️ A MOUNTED SUB-COMPOSITION IS REFUSED, not merely discouraged.
+	//
+	// It passes `check`, renders without a warning, and produces a film of
+	// unstyled text — the single most expensive failure this project has had,
+	// because every signal says the design is fine. Measured against the same
+	// project in the same image: `play` and `snapshot` are correct and
+	// `render` is not, because render is forced into screenshot capture
+	// inside Docker with no GPU and sub-composition mounting does not survive
+	// that path. A single-document project renders correctly there.
+	//
+	// So it fails HERE, at authoring, where the message reaches the model and
+	// costs nothing, rather than after a charged render. The wording is aimed
+	// at the model: this error comes back as a tool result and the next turn
+	// is its attempt to fix it.
+	if m := compositionSrc.FindStringSubmatch(index); m != nil {
+		return nil, fmt.Errorf(
+			"index.html mounts %q with data-composition-src. Mounted sub-compositions do not render here: "+
+				"put every scene in index.html as a <section class=\"clip\" data-scene=\"…\" data-start=\"…\" "+
+				"data-duration=\"…\">, with all the styles in one <style> in <head>, and write no files under "+
+				"compositions/", m[1])
 	}
 
 	durationMs, err := rootDurationMs(index)
@@ -168,20 +187,32 @@ func Build(files []File) (*Project, error) {
 // project if a mounted file is absent, which is the failure that matters.
 func parseScenes(index string) []Scene {
 	tags := sceneTagRe.FindAllString(index, -1)
+	legacy := false
+	if len(tags) == 0 {
+		// Nothing in the current shape. A design written before the contract
+		// moved to one document still has mounted sub-compositions, and its
+		// timeline is worth drawing even though it can no longer render.
+		tags = legacyTagRe.FindAllString(index, -1)
+		legacy = true
+	}
 	scenes := make([]Scene, 0, len(tags))
 
 	for _, tag := range tags {
+		id := first(sceneAttrRe, tag)
 		src := first(sceneSrcRe, tag)
-		if src == "" {
-			continue
-		}
-		id := first(sceneIDRe, tag)
-		if id == "" {
-			// Hyperframes keys a composition by data-composition-id; the
-			// element id is the next best handle, and the src always exists.
-			if id = first(sceneFallback, tag); id == "" {
-				id = src
+		if legacy {
+			if src == "" {
+				continue
 			}
+			if id = first(sceneIDRe, tag); id == "" {
+				// Hyperframes keys a composition by data-composition-id; the
+				// element id is the next best handle, and src always exists.
+				if id = first(sceneFallback, tag); id == "" {
+					id = src
+				}
+			}
+		} else if id == "" {
+			continue
 		}
 		scenes = append(scenes, Scene{
 			ID:         id,
