@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { hyperframesEnv, listProjectFiles, patchGsapTag, vendorGsap } from "./hyperframes";
+import { hyperframesEnv, listProjectFiles, parseSnapshotJson, patchGsapTag, vendorGsap } from "./hyperframes";
 
 async function project(indexHtml: string): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), "hf-test-"));
@@ -267,4 +267,50 @@ test("vendorGsap patches every composition, not just index.html", async () => {
     // And the file it points at is actually there.
     const files = await listProjectFiles(dir);
     assert.ok(files.includes(LOCAL_GSAP), files.join(","));
+});
+
+test("snapshot frames are parsed, ordered by time, and converted to ms", () => {
+    // Deliberately out of time order: the CLI's document order is not
+    // guaranteed to be time order, and a filmstrip is only legible in time
+    // order.
+    const stdout = [
+        "Capturing 3 frames...",
+        JSON.stringify({
+            ok: true,
+            outputDir: "/tmp/x/.preview",
+            frames: [
+                { path: ".preview/frame-02.png", time: 5, role: "mid" },
+                { path: ".preview/frame-00.png", time: 0, role: "start" },
+                { path: ".preview/frame-03.png", time: 9.95, role: "end" },
+            ],
+        }),
+        "Wrote 3 PNGs.",
+    ].join("\n");
+
+    const frames = parseSnapshotJson(stdout);
+    assert.equal(frames.length, 3);
+    assert.deepEqual(frames.map((f) => f.timeMs), [0, 5000, 9950]);
+    assert.equal(frames[0].role, "start");
+});
+
+test("a snapshot reply with no frames is empty rather than a bad filmstrip", () => {
+    assert.deepEqual(parseSnapshotJson('{"ok":true,"frames":[]}'), []);
+    assert.deepEqual(parseSnapshotJson("no json here at all"), []);
+    assert.deepEqual(parseSnapshotJson('{"ok":true}'), []);
+});
+
+test("snapshot frames without a usable path are dropped, not uploaded as blanks", () => {
+    const frames = parseSnapshotJson(
+        '{"frames":[{"path":"","time":1},{"time":2},{"path":"ok.png","time":3}]}'
+    );
+    assert.equal(frames.length, 1);
+    assert.equal(frames[0].path, "ok.png");
+});
+
+// A missing or non-numeric time must not become NaN: NaN sorts unpredictably
+// and would scatter the filmstrip.
+test("a frame with no time is placed at zero rather than NaN", () => {
+    const frames = parseSnapshotJson('{"frames":[{"path":"b.png","time":"x"},{"path":"a.png","time":1}]}');
+    assert.deepEqual(frames.map((f) => f.timeMs), [0, 1000]);
+    assert.ok(frames.every((f) => Number.isFinite(f.timeMs)));
 });

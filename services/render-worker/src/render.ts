@@ -31,6 +31,9 @@ import {
     getDesignV3,
     markDesignV3Failed,
     markDesignV3Started,
+    markDesignV3PreviewFailed,
+    setDesignV3PreviewFrames,
+    setDesignV3PreviewProgress,
     setDesignV3Progress,
     setDesignV3Result,
     getComposition,
@@ -50,7 +53,7 @@ import {
 } from "./firestore";
 import { renderFailed, renderSucceeded } from "./metrics";
 import { makeThumbnail } from "./thumbnail";
-import { renderDesignV3 } from "./design-v3";
+import { previewDesignV3, renderDesignV3 } from "./design-v3";
 import type { RenderJob, RenderTarget } from "./types";
 import { compositionFromDesign, measureComposition } from "../../../shared-libs/design/composition-runtime";
 import {
@@ -132,6 +135,10 @@ export async function runJob(job: RenderJob): Promise<void> {
     // error handler itself would throw and the real reason would be lost.
     if (job.docType === "hfdesign") {
         await runHyperframesDesignJob(job);
+        return;
+    }
+    if (job.docType === "hfpreview") {
+        await runHyperframesPreviewJob(job);
         return;
     }
     try {
@@ -557,6 +564,75 @@ async function runHyperframesDesignJob(job: RenderJob): Promise<void> {
             reason: err instanceof Error ? err.message : String(err),
         });
         await markDesignV3Failed(job.brandId, designId, userFacing(err)).catch(() => undefined);
+        throw err;
+    }
+}
+
+/**
+ * Still frames across a v3 design, so the user can see it before paying to
+ * render it.
+ *
+ * Deliberately a sibling of runHyperframesDesignJob rather than a flag on it.
+ * The two write different fields and must be allowed to overlap: someone who
+ * looks at a filmstrip and then presses Render should not have the preview
+ * they are still reading cancel the render, or the other way round.
+ *
+ * It does NOT check for an existing filmstrip the way the render checks for an
+ * existing file. A preview is asked for precisely because the design changed,
+ * and re-capturing six frames is cheap — the render's skip exists to avoid
+ * charging twice, and this charges nothing.
+ */
+async function runHyperframesPreviewJob(job: RenderJob): Promise<void> {
+    const designId = job.designId ?? job.revisionId;
+    if (!job.brandId || !designId) {
+        throw new Error("hfpreview job needs brandId and designId");
+    }
+
+    const startedAt = Date.now();
+    try {
+        const design = await getDesignV3(job.brandId, designId);
+        if (!design) throw new Error(`design ${designId} not found`);
+
+        const result = await withJobTimeout(
+            previewDesignV3(
+                {
+                    brandId: job.brandId,
+                    designId,
+                    projectPrefix: design.projectPrefix,
+                },
+                {
+                    onProgress: (f) => setDesignV3PreviewProgress(job.brandId, designId, f),
+                    // The design's real problem, not a generic failure — and
+                    // it is the same `check` the render runs, so a preview
+                    // that fails here tells the user what the render would
+                    // have told them AFTER taking their tokens.
+                    onCheckFailed: (problem) =>
+                        markDesignV3PreviewFailed(job.brandId, designId, problem),
+                }
+            ),
+            designId
+        );
+
+        await setDesignV3PreviewFrames(job.brandId, designId, result.frames);
+        renderSucceeded({
+            docType: "hfpreview",
+            durationMs: Date.now() - startedAt,
+            revisionId: designId,
+            outputs: result.frames.length,
+            bytes: 0,
+        });
+        console.log(
+            `[render] hfpreview ${designId} captured ${result.frames.length} frames in ${Date.now() - startedAt}ms`
+        );
+    } catch (err) {
+        console.error(`[render] hfpreview ${designId} failed:`, err);
+        renderFailed({
+            docType: "hfpreview",
+            durationMs: Date.now() - startedAt,
+            revisionId: designId,
+            reason: err instanceof Error ? err.message : String(err),
+        });
+        await markDesignV3PreviewFailed(job.brandId, designId, userFacing(err)).catch(() => undefined);
         throw err;
     }
 }

@@ -23,7 +23,13 @@ import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkProject, listProjectFiles, renderProject, vendorGsap } from "./hyperframes";
+import {
+    checkProject,
+    listProjectFiles,
+    renderProject,
+    snapshotProject,
+    vendorGsap,
+} from "./hyperframes";
 import { downloadPrefix, upload } from "./s3";
 
 export interface DesignV3Job {
@@ -61,6 +67,47 @@ export interface DesignV3Result {
  */
 const MIN_PROJECT_FILES = 1;
 
+/**
+ * Everything both the render and the preview need before they diverge:
+ * the project on disk, GSAP vendored into it, and `check` passed.
+ *
+ * Shared deliberately rather than copied. A preview the user approves has to
+ * have come through the SAME gate as the render that follows it — if the
+ * preview skipped `check`, it could show a film that then refuses to render,
+ * which is worse than no preview at all.
+ */
+async function materialiseAndGate(
+    job: DesignV3Job,
+    workDir: string,
+    hooks: DesignV3Hooks
+): Promise<string[]> {
+    const fileCount = await downloadPrefix(job.projectPrefix, workDir);
+    if (fileCount < MIN_PROJECT_FILES) {
+        throw new Error(`no project files found under ${job.projectPrefix}`);
+    }
+
+    const files = await listProjectFiles(workDir);
+    if (!files.includes("index.html")) {
+        // Hyperframes renders the project directory, whose root composition
+        // is index.html. Without it the CLI has nothing to enter through,
+        // and its own error is considerably less clear than this one.
+        throw new Error(`project at ${job.projectPrefix} has no index.html (found: ${files.slice(0, 5).join(", ")})`);
+    }
+
+    // Before the gate, not after: a project carrying a CDN script tag
+    // would otherwise pass `check` on a machine with network and fail on
+    // one without, which is the worst kind of intermittent.
+    await vendorGsap(workDir);
+
+    const outcome = await checkProject(workDir);
+    if (!outcome.ok) {
+        const problem = outcome.problem ?? "This design has a problem that would stop it rendering.";
+        await hooks.onCheckFailed?.(problem);
+        throw new Error(`check failed: ${problem}`);
+    }
+    return outcome.warnings.map((w) => w.message);
+}
+
 export async function renderDesignV3(
     job: DesignV3Job,
     hooks: DesignV3Hooks = {}
@@ -70,30 +117,7 @@ export async function renderDesignV3(
 
     const workDir = await mkdtemp(join(tmpdir(), `hf-${job.designId}-`));
     try {
-        const fileCount = await downloadPrefix(job.projectPrefix, workDir);
-        if (fileCount < MIN_PROJECT_FILES) {
-            throw new Error(`no project files found under ${job.projectPrefix}`);
-        }
-
-        const files = await listProjectFiles(workDir);
-        if (!files.includes("index.html")) {
-            // Hyperframes renders the project directory, whose root composition
-            // is index.html. Without it the CLI has nothing to enter through,
-            // and its own error is considerably less clear than this one.
-            throw new Error(`project at ${job.projectPrefix} has no index.html (found: ${files.slice(0, 5).join(", ")})`);
-        }
-
-        // Before the gate, not after: a project carrying a CDN script tag
-        // would otherwise pass `check` on a machine with network and fail on
-        // one without, which is the worst kind of intermittent.
-        await vendorGsap(workDir);
-
-        const outcome = await checkProject(workDir);
-        if (!outcome.ok) {
-            const problem = outcome.problem ?? "This design has a problem that would stop it rendering.";
-            await hooks.onCheckFailed?.(problem);
-            throw new Error(`check failed: ${problem}`);
-        }
+        const warnings = await materialiseAndGate(job, workDir, hooks);
 
         await hooks.onProgress?.(0.1);
 
@@ -105,14 +129,61 @@ export async function renderDesignV3(
         const mp4 = await readFile(outputPath);
         const url = await upload(mp4, "mp4", "video/mp4");
 
-        return {
-            url,
-            bytes: mp4.byteLength,
-            warnings: outcome.warnings.map((w) => w.message),
-        };
+        return { url, bytes: mp4.byteLength, warnings };
     } finally {
         // Batch tasks exit anyway, but a warm Lambda keeps /tmp between
         // invocations and a project with media in it is not small.
+        await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+}
+
+export interface DesignV3PreviewFrame {
+    url: string;
+    timeMs: number;
+}
+
+export interface DesignV3PreviewResult {
+    frames: DesignV3PreviewFrame[];
+    warnings: string[];
+}
+
+/**
+ * Still frames across the film, so the user can see it before paying to
+ * render it.
+ *
+ * This is the whole point of the phase it belongs to: the Hyperframes loop
+ * puts snapshots before the render and says "passing checks alone is not a
+ * reason to render". Without it the first time anyone sees their design is
+ * after the tokens are gone.
+ */
+export async function previewDesignV3(
+    job: DesignV3Job & { frames?: number },
+    hooks: DesignV3Hooks = {}
+): Promise<DesignV3PreviewResult> {
+    if (!job.brandId || !job.designId) throw new Error("previewDesignV3: brandId and designId are required");
+    if (!job.projectPrefix) throw new Error("previewDesignV3: the design has nothing to preview");
+
+    const workDir = await mkdtemp(join(tmpdir(), `hfp-${job.designId}-`));
+    try {
+        const warnings = await materialiseAndGate(job, workDir, hooks);
+
+        await hooks.onProgress?.(0.2);
+
+        const shots = await snapshotProject(workDir, join(workDir, ".preview"), {
+            frames: job.frames ?? 6,
+        });
+
+        // Uploaded one at a time, in order. A filmstrip is read left to right,
+        // and Promise.all would return them in whatever order they finished.
+        const frames: DesignV3PreviewFrame[] = [];
+        for (const shot of shots) {
+            const png = await readFile(shot.path);
+            frames.push({ url: await upload(png, "png", "image/png"), timeMs: shot.timeMs });
+            await hooks.onProgress?.(0.2 + (0.8 * frames.length) / shots.length);
+        }
+
+        return { frames, warnings };
+    } finally {
         await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
     }
 }
