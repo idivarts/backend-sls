@@ -84,6 +84,35 @@ func AuthorDesign(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "authoring is not available right now"})
 		return
 	}
+
+	// Gated HERE, in the request, because this is the last place that can tell
+	// the user anything: once the message is on the queue the only surface
+	// left is an authorError on the document, which reads as a fault rather
+	// than a wall.
+	//
+	// This was missing. The handler discarded `locked` from PickModelFor and
+	// never looked at the wallet, so a brand whose plan unlocks no design
+	// model — and a brand with an empty wallet — both queued a frontier-model
+	// call that the org then paid for. The two reasons stay distinct because
+	// they send the user to different places: a spent wallet wants a top-up,
+	// a locked plan wants a tier.
+	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+	if trendlymodels.TokensExhausted(orgID) {
+		c.JSON(http.StatusPaymentRequired, gin.H{
+			"error":   "upgrade_required",
+			"reason":  "tokens_exhausted",
+			"feature": "design_author",
+		})
+		return
+	}
+	if model, locked := ai.PickModelFor(ctx, brandID, openrouter.TaskDesign); locked || model == "" {
+		c.JSON(http.StatusPaymentRequired, gin.H{
+			"error":   "upgrade_required",
+			"reason":  "plan_locked",
+			"feature": "design_author",
+		})
+		return
+	}
 	// The brief is stored with the status, not just carried on the queue
 	// message, so the app can show the user what this design was asked to be
 	// when they come back to it.
@@ -141,7 +170,14 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		return err
 	}
 
-	model, _ := ai.PickModelFor(ctx, brandID, openrouter.TaskDesign)
+	// The request already gated this, so a lock here means the plan changed
+	// between the enqueue and the run. Failing with a sentence beats calling a
+	// model the plan does not allow and billing the org for it.
+	model, locked := ai.PickModelFor(ctx, brandID, openrouter.TaskDesign)
+	if locked || model == "" {
+		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
+			"Writing designs is not available on this plan.")
+	}
 
 	genCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
