@@ -199,8 +199,33 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	ai.MeterBrandUsage(brandID, resp.Usage)
 
 	raw := firstContent(resp)
+
+	// A truncated answer is NOT a bad answer, and must not be reported as
+	// one. The model ran out of room mid-JSON, so the project is unparseable
+	// for a reason the user can act on — a shorter film — rather than
+	// anything wrong with what they asked for. Without this it surfaced as
+	// "The model's answer could not be read as a project", which sends them
+	// to rewrite a brief that was never the problem.
+	if finishReason(resp) == "length" {
+		log.Printf("design author truncated for %s/%s: %d completion tokens, %d chars",
+			brandID, designID, completionTokens(resp), len(raw))
+		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
+			"This design was too long to write in one go. Try a shorter film, or fewer scenes.")
+	}
+
 	parsed, perr := parseAuthoredProject(raw)
 	if perr != nil {
+		// The raw answer is the ONLY evidence of why this failed, and it is
+		// gone the moment this returns. A head and a tail rather than the
+		// whole thing: the tail is where a truncation shows, the head is
+		// where a refusal or a stray preamble does, and the middle is HTML
+		// nobody needs in a log line.
+		log.Printf("design author parse failed for %s/%s (%d chars, finish=%q): head=%q tail=%q",
+			brandID, designID, len(raw), finishReason(resp), snippet(raw, 240), tailSnippet(raw, 240))
+		mysentry.Capture(perr, map[string]string{
+			"op": "design.author.parse", "brandId": brandID, "designId": designID,
+			"finishReason": finishReason(resp), "chars": fmt.Sprint(len(raw)),
+		})
 		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, perr.Error())
 	}
 
@@ -237,6 +262,35 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		})
 	}
 	return trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes)
+}
+
+// finishReason says how the model stopped. "length" means it ran out of room.
+func finishReason(resp *openrouter.ChatResponse) string {
+	if resp == nil || len(resp.Choices) == 0 {
+		return ""
+	}
+	return resp.Choices[0].FinishReason
+}
+
+func completionTokens(resp *openrouter.ChatResponse) int {
+	if resp == nil || resp.Usage == nil {
+		return 0
+	}
+	return resp.Usage.CompletionTokens
+}
+
+func snippet(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
+}
+
+func tailSnippet(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[len(s)-n:]
 }
 
 func firstContent(resp *openrouter.ChatResponse) string {
