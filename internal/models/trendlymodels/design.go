@@ -62,6 +62,14 @@ import (
 // design_test.go asserts the field's absence so this cannot happen quietly.
 const designsSubcollection = "designs"
 
+// Authoring lifecycle values, mirrored in the app.
+const (
+	DesignAuthorQueued  = "queued"
+	DesignAuthorWriting = "writing"
+	DesignAuthorDone    = "done"
+	DesignAuthorFailed  = "failed"
+)
+
 // The render lifecycle strings are the ones content_design.go already owns
 // (DesignRenderQueued / Rendering / Done / Failed), mirrored in shared-libs
 // design.ts. They are reused rather than redeclared so v2 and v3 can never
@@ -106,6 +114,15 @@ type Design struct {
 	// a design a phone is expected to edit, which is why it is a flat map here
 	// rather than buried in the project files.
 	Variables map[string]any `json:"variables,omitempty" firestore:"variables,omitempty"`
+
+	// Authoring state, written by the async design_author job.
+	//
+	// Separate from the render lifecycle because they are different things
+	// happening at different times: a design can be re-authored while its
+	// last render is still the current file, and a user watching "writing"
+	// needs to know which of the two is in flight.
+	AuthorStatus string `json:"authorStatus,omitempty" firestore:"authorStatus,omitempty"`
+	AuthorError  string `json:"authorError,omitempty" firestore:"authorError,omitempty"`
 
 	// Render state. Progress and failure live on the document rather than in
 	// the request, so a render survives a page reload or a locked phone — the
@@ -351,4 +368,40 @@ func DeleteBrandDesign(ctx context.Context, brandID, designID string) error {
 		return fmt.Errorf("DeleteBrandDesign: %w", err)
 	}
 	return nil
+}
+
+// MarkBrandDesignAuthoring moves a design into the authoring lifecycle and
+// clears the previous attempt's error, so a retry does not show the old
+// failure beside a job that is working.
+func MarkBrandDesignAuthoring(ctx context.Context, brandID, designID, status string) error {
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "authorStatus", Value: status},
+		{Path: "authorError", Value: firestore.Delete},
+	})
+}
+
+// MarkBrandDesignAuthorFailed records a failure with a reason the app can
+// show. `reason` is read by the user verbatim, so it must be a sentence.
+func MarkBrandDesignAuthorFailed(ctx context.Context, brandID, designID, reason string) error {
+	if reason == "" {
+		reason = "Writing this design did not work. Please try again."
+	}
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "authorStatus", Value: DesignAuthorFailed},
+		{Path: "authorError", Value: reason},
+	})
+}
+
+// SetBrandDesignProject records a freshly authored project.
+//
+// Both fields together: a projectPrefix without a durationMs is a renderable
+// design the wallet cannot price, and a durationMs without the prefix prices
+// a design with nothing to render.
+func SetBrandDesignProject(ctx context.Context, brandID, designID, prefix string, durationMs int) error {
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "projectPrefix", Value: prefix},
+		{Path: "durationMs", Value: durationMs},
+		{Path: "authorStatus", Value: DesignAuthorDone},
+		{Path: "authorError", Value: firestore.Delete},
+	})
 }

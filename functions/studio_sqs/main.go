@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/idivarts/backend-sls/internal/studiojobs"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/design"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/studio"
 	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
@@ -15,7 +16,8 @@ import (
 // handler is the worker for Design Studio work that cannot fit in an HTTP
 // request.
 //
-// Two jobs: the director's plan, and a scene's design. API Gateway's integration
+// Three jobs: the director's plan, a scene's design, and a v3 design's whole
+// project. API Gateway's integration
 // timeout is 29 seconds and is not configurable, while a plan is one or two
 // calls to a frontier reasoning model emitting a whole storyboard as JSON — it
 // returned 504 at 30s against the deployed dev stack, cold and warm, with
@@ -71,6 +73,17 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 					"brandId":  msg.BrandID,
 					"studioId": msg.StudioID,
 					"sceneId":  msg.SceneID,
+				})
+			}
+		case studiojobs.JobDesignAuthor:
+			if err := design.ExecuteDesignAuthorJob(ctx, msg); err != nil {
+				log.Printf("studio_sqs: design author failed for %s/%s: %v",
+					msg.BrandID, msg.DesignID, err)
+				mysentry.Capture(err, map[string]string{
+					"lambda":   "studio_sqs",
+					"op":       "design_author",
+					"brandId":  msg.BrandID,
+					"designId": msg.DesignID,
 				})
 			}
 		default:

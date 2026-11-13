@@ -57,6 +57,15 @@ const (
 	// No synchronous HTTP path can hold this work. The queue's worker has 900
 	// seconds, which is an order of magnitude more than a design needs.
 	JobSceneDesign JobType = "scene_design"
+
+	// JobDesignAuthor writes a whole Design Studio v3 project: index.html and
+	// one file per scene, as a Hyperframes project.
+	//
+	// Here for the same measured reason as the two above, only more so. A
+	// scene design is one HTML document and took 25-40s; a v3 project is
+	// several, and the first attempt against the 30s HTTP route returned 504
+	// with nothing written. The queue's worker has 900 seconds.
+	JobDesignAuthor JobType = "design_author"
 )
 
 // Message is the payload shape. BrandID, ContentID and StudioID are always
@@ -71,6 +80,16 @@ type Message struct {
 	StudioID  string  `json:"studioId"`
 	RunID     string  `json:"runId,omitempty"`
 	SceneID   string  `json:"sceneId,omitempty"`
+
+	// DesignID targets a Design Studio v3 design at
+	// brands/{brandId}/designs/{designId}.
+	//
+	// ⚠️ A v3 design has NO contentId and NO studioId — that is the whole
+	// point of v3 — so Target() cannot require them for this type. See the
+	// note there.
+	DesignID string `json:"designId,omitempty"`
+	// Brief is what the user asked for, in their words.
+	Brief string `json:"brief,omitempty"`
 }
 
 // Target reports whether the message names everything its type needs.
@@ -79,14 +98,25 @@ type Message struct {
 // message, which would have silently dropped every scene design: a regenerate
 // of a hand-built scene has no run at all.
 func (m Message) Target() bool {
-	if m.BrandID == "" || m.ContentID == "" || m.StudioID == "" {
+	if m.BrandID == "" {
 		return false
 	}
+	// ⚠️ The content/studio pair is checked PER TYPE, not up front.
+	//
+	// It used to be required for every message, which was already once the
+	// cause of this comment: the first version required RunID for all of
+	// them and would have dropped every scene design. A v3 design author job
+	// has neither a contentId nor a studioId — a v3 design is a first-class
+	// object — so hoisting that check back out would silently drop every one
+	// of them, with the job vanishing into the queue and the design sitting
+	// at "writing" for ever.
 	switch m.Type {
 	case JobDirectorPlan:
-		return m.RunID != ""
+		return m.ContentID != "" && m.StudioID != "" && m.RunID != ""
 	case JobSceneDesign:
-		return m.SceneID != ""
+		return m.ContentID != "" && m.StudioID != "" && m.SceneID != ""
+	case JobDesignAuthor:
+		return m.DesignID != ""
 	default:
 		return false
 	}

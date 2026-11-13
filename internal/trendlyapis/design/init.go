@@ -44,4 +44,11 @@ func RegisterRoutes(engine *gin.Engine) {
 	// what the render produced — the result arrives on the document, which is
 	// what lets a render survive a page reload.
 	g.POST(base+"/:designId/render", RenderDesign)
+
+	// Authoring is a 202, not a 200 with the result. Writing a project is a
+	// frontier model emitting several HTML documents and does not fit in API
+	// Gateway's 29-second ceiling — the first attempt at doing it inline
+	// returned 504 with nothing stored. The job runs on the studio queue and
+	// reports on the design document, which the app already watches.
+	g.POST(base+"/:designId/author", AuthorDesign)
 }
