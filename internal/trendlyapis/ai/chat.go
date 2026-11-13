@@ -510,6 +510,11 @@ func toolsForModule(module string) []openrouter.Tool {
 	// The AI-Studio HTML design editor + audio generation live on the content module.
 	if moduleHasStudio(module) {
 		tools = append(tools, designServerTools()...)
+		// Design Studio v3 authoring, offered alongside v2 rather than in
+		// place of it. Both are live until Phase 6, and the model picks by
+		// which it was given: write_hyperframes_project takes a designId,
+		// generate_design works on the content's own design revision.
+		tools = append(tools, hyperframesServerTools()...)
 		tools = append(tools, audioServerTools()...)
 		// The timeline. `get_footage` could already say which part of a take
 		// was the good part and then do nothing about it; these two let the
