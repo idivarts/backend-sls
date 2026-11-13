@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { applyEdits, findElements, removeAttribute, setAttribute } from "./html-edit";
-import { pathFromResolveJSON, readDeclarations } from "./media";
+import { captionSpans, pathFromResolveJSON, readDeclarations, wordsFromTranscribeJSON } from "./media";
 
 /**
  * The whole point of parsing rather than matching: a film's document carries
@@ -129,5 +129,48 @@ describe("pathFromResolveJSON", () => {
     it("reports nothing rather than guessing", () => {
         assert.equal(pathFromResolveJSON("not json", "/tmp/p"), null);
         assert.equal(pathFromResolveJSON(`{"ok":true}`, "/tmp/p"), null);
+    });
+});
+
+describe("captions", () => {
+    it("reads words from the transcribe envelope, wherever they sit", () => {
+        assert.equal(wordsFromTranscribeJSON(`[{"text":"Hi","start":0,"end":0.4}]`).length, 1);
+        assert.equal(wordsFromTranscribeJSON(`{"words":[{"text":"Hi","start":0,"end":0.4}]}`).length, 1);
+        assert.equal(wordsFromTranscribeJSON(`{"result":{"words":[{"text":"Hi","start":0,"end":0.4}]}}`).length, 1);
+    });
+
+    it("returns nothing rather than guessing", () => {
+        assert.deepEqual(wordsFromTranscribeJSON("not json"), []);
+        assert.deepEqual(wordsFromTranscribeJSON(`{"ok":true}`), []);
+        // A malformed word is dropped, not coerced into a span at time NaN.
+        assert.deepEqual(wordsFromTranscribeJSON(`{"words":[{"text":"Hi"}]}`), []);
+    });
+
+    // The runtime already times any .clip with data-start/data-duration —
+    // that is how every scene in these films works — so a caption needs no
+    // component and no script of its own.
+    it("writes one timed span per word", () => {
+        const out = captionSpans([
+            { text: "Hit", start: 0, end: 0.4 },
+            { text: "the", start: 0.4, end: 0.55 },
+        ]);
+        assert.match(out, /<span class="clip" data-start="0\.00" data-duration="0\.40">Hit<\/span>/);
+        assert.match(out, /<span class="clip" data-start="0\.40" data-duration="0\.15">the<\/span>/);
+    });
+
+    // A transcript starts at zero; a voiceover four seconds into the film
+    // does not.
+    it("shifts the transcript onto the film's clock", () => {
+        const out = captionSpans([{ text: "Hi", start: 0, end: 0.5 }], 4);
+        assert.match(out, /data-start="4\.00"/);
+    });
+
+    it("gives a zero-width word something to be seen in", () => {
+        const out = captionSpans([{ text: "x", start: 1, end: 1 }]);
+        assert.match(out, /data-duration="0\.08"/);
+    });
+
+    it("escapes a word so it cannot become markup", () => {
+        assert.ok(captionSpans([{ text: "<b>", start: 0, end: 1 }]).includes("&lt;b&gt;"));
     });
 });
