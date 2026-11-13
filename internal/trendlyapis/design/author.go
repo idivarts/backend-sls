@@ -25,7 +25,6 @@ package design
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -138,13 +137,20 @@ func AuthorDesign(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"status": trendlymodels.DesignAuthorQueued})
 }
 
-// authoredProject is what the model is asked to return.
-type authoredProject struct {
-	Files []struct {
-		Path    string `json:"path"`
-		Content string `json:"content"`
-	} `json:"files"`
-}
+// The model returns the HTML itself, not JSON carrying the HTML.
+//
+// ── Why the JSON wrapper went ─────────────────────────────────────────────
+// It asked the model to escape 9 KB of HTML, CSS and JavaScript into a JSON
+// string, and one bad escape destroys the whole answer. That is exactly how
+// it failed on dev: finish_reason "stop", the braces balanced, the shape
+// right — and json.Unmarshal refused it, because somewhere in the middle was
+// a backslash that is legal in a CSS content property or a JS regex and
+// illegal in JSON. The user saw "The model's answer could not be read as a
+// project" and had no way to act on it.
+//
+// A project is ONE file now (see hfproject.AuthoringContract), so the array
+// was carrying nothing anyway. Asking for the document itself removes the
+// escaping, removes the wrapper's tokens, and removes the failure mode.
 
 // ExecuteDesignAuthorJob is the worker side. Called from studio_sqs.
 func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
@@ -213,7 +219,7 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 			"This design was too long to write in one go. Try a shorter film, or fewer scenes.")
 	}
 
-	parsed, perr := parseAuthoredProject(raw)
+	indexHTML, perr := parseAuthoredIndex(raw)
 	if perr != nil {
 		// The raw answer is the ONLY evidence of why this failed, and it is
 		// gone the moment this returns. A head and a tail rather than the
@@ -229,11 +235,7 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, perr.Error())
 	}
 
-	files := make([]hfproject.File, 0, len(parsed.Files))
-	for _, f := range parsed.Files {
-		files = append(files, hfproject.File{Path: f.Path, Content: f.Content})
-	}
-	project, berr := hfproject.Build(files)
+	project, berr := hfproject.Build([]hfproject.File{{Path: "index.html", Content: indexHTML}})
 	if berr != nil {
 		// The validator's messages are already written to be read by a
 		// person as well as a model, so they are surfaced rather than
@@ -300,16 +302,19 @@ func firstContent(resp *openrouter.ChatResponse) string {
 	return resp.Choices[0].Message.Content
 }
 
-// parseAuthoredProject pulls the JSON out of the model's answer.
+// parseAuthoredIndex pulls the HTML document out of the model's answer.
 //
-// Models fence JSON in ```json blocks and add a sentence before it however
+// Models fence code in ```html blocks and add a sentence before it however
 // firmly they are told not to, so the fence is stripped rather than treated
 // as a failure — refusing a correct project over its wrapper would waste a
 // frontier-model call and tell the user their design was bad.
-func parseAuthoredProject(raw string) (*authoredProject, error) {
+//
+// It takes from the first "<" to the last ">", which drops a preamble and a
+// sign-off without needing to understand either.
+func parseAuthoredIndex(raw string) (string, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
-		return nil, fmt.Errorf("The model returned nothing.")
+		return "", fmt.Errorf("The model returned nothing.")
 	}
 	if i := strings.Index(s, "```"); i >= 0 {
 		rest := s[i+3:]
@@ -321,18 +326,19 @@ func parseAuthoredProject(raw string) (*authoredProject, error) {
 		}
 		s = strings.TrimSpace(rest)
 	}
-	start, end := strings.Index(s, "{"), strings.LastIndex(s, "}")
+	start, end := strings.Index(s, "<"), strings.LastIndex(s, ">")
 	if start < 0 || end <= start {
-		return nil, fmt.Errorf("The model's answer was not a project.")
+		return "", fmt.Errorf("The model's answer was not an HTML document.")
 	}
-	var p authoredProject
-	if err := json.Unmarshal([]byte(s[start:end+1]), &p); err != nil {
-		return nil, fmt.Errorf("The model's answer could not be read as a project.")
+	s = strings.TrimSpace(s[start : end+1])
+
+	// A cheap shape check so the real validator's errors are about the film
+	// rather than about having been handed prose that happened to contain a
+	// bracket.
+	if !strings.Contains(s, "data-composition-id") {
+		return "", fmt.Errorf("The model's answer has no root composition.")
 	}
-	if len(p.Files) == 0 {
-		return nil, fmt.Errorf("The model returned no files.")
-	}
-	return &p, nil
+	return s, nil
 }
 
 // hyperframesAuthoringSystemPrompt is the contract plus this design's canvas
@@ -348,11 +354,7 @@ func hyperframesAuthoringSystemPrompt(d *trendlymodels.Design) string {
 THIS FILM'S CANVAS: %dx%d at %d fps. Use exactly these numbers for data-width
 and data-height on the root and on every scene.
 
-ANSWER WITH JSON AND NOTHING ELSE, in this shape:
-
-{"files":[{"path":"index.html","content":"…"},{"path":"compositions/hook.html","content":"…"}]}
-
-Every file the project needs must be in that array, including index.html.
-Paths are relative, with forward slashes. Do not wrap the JSON in prose.`,
+ANSWER WITH THE COMPLETE index.html AND NOTHING ELSE — no JSON, no code
+fence, no explanation. Start at <html and end at </html>.`,
 		hfproject.AuthoringContract, d.Format.Width, d.Format.Height, d.Format.FPS)
 }

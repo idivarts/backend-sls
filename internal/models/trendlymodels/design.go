@@ -188,6 +188,12 @@ type Design struct {
 	PreviewFrames   []PreviewFrame `json:"previewFrames,omitempty" firestore:"previewFrames,omitempty"`
 	PreviewedAt     int64          `json:"previewedAt,omitempty" firestore:"previewedAt,omitempty"`
 
+	// Score is the judged quality of the film, as the shared rubric produces
+	// it. Written by the scorer, read by the app; opaque here on purpose, so
+	// this package does not depend on the AI package that owns the shape.
+	Score    map[string]any `json:"score,omitempty" firestore:"score,omitempty"`
+	ScoredAt int64          `json:"scoredAt,omitempty" firestore:"scoredAt,omitempty"`
+
 	// Render state. Progress and failure live on the document rather than in
 	// the request, so a render survives a page reload or a locked phone — the
 	// worker keeps going and the app re-reads this.
@@ -640,4 +646,28 @@ func SetBrandDesignProject(
 		{Path: "authorStatus", Value: DesignAuthorDone},
 		{Path: "authorError", Value: firestore.Delete},
 	})
+}
+
+// SetBrandDesignScore stores the judged quality of a design.
+//
+// Takes an already-encoded map rather than a struct: Firestore ignores `json:`
+// tags and would otherwise store Go field names, and the score's own
+// FirestoreMap is what produces the shape the app reads. Keeping the encoding
+// at the caller also stops this package having to import the AI package, which
+// imports this one.
+func SetBrandDesignScore(ctx context.Context, brandID, designID string, doc map[string]any) error {
+	if brandID == "" || designID == "" {
+		return fmt.Errorf("SetBrandDesignScore: empty brandID or designID")
+	}
+	// Direct, like the progress writers: a score is a judgement ABOUT the
+	// design, not an edit of it, and bumping updatedAt would reorder the list
+	// someone is reading.
+	_, err := designDoc(brandID, designID).Update(ctx, []firestore.Update{
+		{Path: "score", Value: doc},
+		{Path: "scoredAt", Value: nowMs()},
+	})
+	if err != nil {
+		return fmt.Errorf("SetBrandDesignScore: %w", err)
+	}
+	return nil
 }

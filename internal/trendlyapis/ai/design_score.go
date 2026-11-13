@@ -260,6 +260,15 @@ func ScoreDesign(ctx context.Context, brandID, contentID, model string) (*Virali
 			truncate(strings.TrimSpace(firstChoiceText(resp)), 120))
 	}
 
+	return assembleDesignScore(verdicts, problems, model, saw), usage, nil
+}
+
+// assembleDesignScore turns the judge's verdicts into a score.
+//
+// Shared by the v2 scorer above and the v3 one, so the two cannot drift: a
+// design scored through one path and the same design scored through the other
+// must land on the same number, or the band shown in the app means nothing.
+func assembleDesignScore(verdicts []judgeVerdict, problems []ScriptProblem, model string, saw bool) *ViralityScore {
 	byID := map[string]judgeVerdict{}
 	for _, v := range verdicts {
 		byID[v.ID] = v
@@ -313,5 +322,5 @@ func ScoreDesign(ctx context.Context, brandID, contentID, model string) (*Virali
 	if !saw {
 		score.JudgeModel = model + " (copy only — the design was not rendered)"
 	}
-	return score, usage, nil
+	return score
 }

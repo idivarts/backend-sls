@@ -45,6 +45,10 @@ func RegisterRoutes(engine *gin.Engine) {
 	// because "passing checks alone is not a reason to render".
 	g.POST(base+"/:designId/preview", PreviewDesign)
 
+	// Scoring is a frontier vision call over the preview's frames, so it is
+	// its own POST rather than something previewing does for free.
+	g.POST(base+"/:designId/score", ScoreDesign)
+
 	// Rendering is a POST because it spends money: it charges the wallet and
 	// queues real compute. The response says what state the design is in, not
 	// what the render produced — the result arrives on the document, which is

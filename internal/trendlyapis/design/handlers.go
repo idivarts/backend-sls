@@ -8,8 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/ai"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
 	"github.com/idivarts/backend-sls/pkg/mysentry"
+	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
 // guard checks the caller may work on this brand's designs and returns the
@@ -393,4 +395,60 @@ func PreviewDesign(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{"status": trendlymodels.DesignPreviewQueued})
+}
+
+// ScoreDesign judges the film and stores the verdict on the design.
+// POST /api/design/brands/:brandId/designs/:designId/score
+//
+// ── Why this is a separate call and not part of previewing ────────────────
+// The preview is free and runs in the TypeScript worker; the judge is a
+// frontier vision call that costs money and lives in Go. Folding one into the
+// other would make the free thing quietly expensive, and the user asked for a
+// look, not an opinion.
+//
+// It uses TaskDesign rather than a task of its own, deliberately: the
+// Firestore ai_config registry REPLACES the built-in model list, so a new
+// TaskType with no key there hard-locks every plan as "upgrade your plan".
+// The v2 design judge made the same choice for the same reason.
+func ScoreDesign(c *gin.Context) {
+	brandID, designID, ok := guard(c, true)
+	if !ok {
+		return
+	}
+	ctx := c.Request.Context()
+
+	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+	if trendlymodels.TokensExhausted(orgID) {
+		c.JSON(http.StatusPaymentRequired, gin.H{
+			"error": "upgrade_required", "reason": "tokens_exhausted", "feature": "design_score",
+		})
+		return
+	}
+	model, locked := ai.PickModelFor(ctx, brandID, openrouter.TaskDesign)
+	if locked || model == "" {
+		c.JSON(http.StatusPaymentRequired, gin.H{
+			"error": "upgrade_required", "reason": "plan_locked", "feature": "design_score",
+		})
+		return
+	}
+
+	score, usage, err := ai.ScoreDesignV3(ctx, brandID, designID, model)
+	// Metered whether or not the judge answered usefully: the tokens were
+	// spent either way, and a meter that only counts successes under-reports
+	// exactly when something is going wrong.
+	ai.MeterBrandUsage(brandID, usage)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Persisted through FirestoreMap, never the struct: Firestore ignores
+	// `json:` tags and would store the Go field names.
+	if doc, derr := score.FirestoreMap(); derr != nil {
+		log.Printf("design score encode %s/%s: %v", brandID, designID, derr)
+	} else if derr := trendlymodels.SetBrandDesignScore(ctx, brandID, designID, doc); derr != nil {
+		log.Printf("design score persist %s/%s: %v", brandID, designID, derr)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"score": score})
 }
