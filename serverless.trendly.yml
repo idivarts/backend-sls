@@ -1155,8 +1155,17 @@ resources:
                 # policy that gets this wrong fails only at runtime. Both are
                 # scoped to design-projects/* so this does not become a
                 # general read of everything the brand has ever uploaded.
+                #
+                # PutObject on the same prefix, because Phase 9a resolves
+                # media INTO the project: the files media-use fetches, and
+                # the rewritten index.html that references them, go back so
+                # the render after a preview reuses them instead of paying
+                # for them again. Without it the upload was denied, the
+                # preview still looked right — it renders from the worker's
+                # own copy — and the stored project silently kept pointing
+                # at media that was never uploaded.
                 - Effect: Allow
-                  Action: ["s3:GetObject"]
+                  Action: ["s3:GetObject", "s3:PutObject"]
                   Resource: "arn:aws:s3:::${self:service}-attachment-uploads/design-projects/*"
                 - Effect: Allow
                   Action: ["s3:ListBucket"]
