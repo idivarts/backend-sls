@@ -417,3 +417,28 @@ func TestAFamilyNobodyCanSupplyFallsBackInsteadOfFailing(t *testing.T) {
 		t.Fatalf("declared a face for a file it never got: %s", kit.CSS)
 	}
 }
+
+// Measured on dev: told the tokens existed, the model wrote its own :root
+// further down redefining --brand-font-heading to a face the brand has never
+// heard of. Same specificity, later in the cascade, so it won — and the kit
+// looked correctly applied in the source while the film was off-brand.
+func TestTheBrandTokensWinTheCascade(t *testing.T) {
+	kit := buildBrandKit(context.Background(), &trendlymodels.BrandDesignSystem{
+		Palette: []trendlymodels.DSColor{{Role: "primary", Hex: "#E4B34F"}},
+		Fonts:   []trendlymodels.DSFont{{Role: "heading", Family: "Inter", Fallback: "sans-serif"}},
+	})
+	if kit == nil {
+		t.Fatal("no kit")
+	}
+	for _, want := range []string{"--brand-primary:#E4B34F !important", "--brand-font-heading:sans-serif !important"} {
+		if !strings.Contains(kit.CSS, want) {
+			t.Fatalf("a brand token can be overridden: %s", kit.CSS)
+		}
+	}
+	// The @font-face rules are not declarations in a ruleset and must not
+	// have picked up the marker.
+	if strings.Contains(kit.CSS, "@font-face") && strings.Contains(kit.CSS, "src:url('assets") &&
+		strings.Contains(kit.CSS, "block !important") {
+		t.Fatalf("!important leaked into a @font-face: %s", kit.CSS)
+	}
+}

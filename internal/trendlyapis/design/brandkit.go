@@ -207,9 +207,23 @@ func buildBrandKit(ctx context.Context, ds *trendlymodels.BrandDesignSystem) *br
 		return nil
 	}
 
+	// ── Why these declarations are !important ────────────────────────────
+	// Measured on dev: told the tokens existed, the model wrote its OWN
+	// :root further down the document redefining --brand-font-heading to
+	// 'Noto Sans'. Same specificity, later in the cascade, so it won — and
+	// the film came out in a face the brand has never heard of, from a kit
+	// that looked correctly applied in the source.
+	//
+	// Order cannot fix this: the model's styles can land anywhere. These
+	// are the BRAND's tokens, and a scene that wants a different colour
+	// should use its own property or a literal, not redefine the brand.
 	css := strings.Join(faces, "")
 	if len(vars) > 0 {
-		css += ":root{" + strings.Join(vars, ";") + "}"
+		decls := make([]string, 0, len(vars))
+		for _, v := range vars {
+			decls = append(decls, v+" !important")
+		}
+		css += ":root{" + strings.Join(decls, ";") + "}"
 	}
 
 	return &brandKit{
