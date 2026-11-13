@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -38,6 +39,26 @@ type File struct {
 	Content string
 }
 
+// Scene is one clip the root composition mounts: a piece of the film with a
+// place on the timeline.
+//
+// Extracted here, at authoring time, because the APP needs it and nothing else
+// can give it. The project lives in S3 as HTML; the app would otherwise have
+// to fetch and parse several documents just to draw a timeline, and would then
+// be a second implementation of this parsing that could disagree with the
+// renderer's.
+type Scene struct {
+	ID         string `json:"id" firestore:"id"`
+	Src        string `json:"src" firestore:"src"`
+	StartMs    int    `json:"startMs" firestore:"startMs"`
+	DurationMs int    `json:"durationMs" firestore:"durationMs"`
+	// TrackIndex and TrackKind are Hyperframes' own layout of the timeline —
+	// which row a clip sits on and what it carries. Passed through rather
+	// than interpreted, so the app draws what the renderer will render.
+	TrackIndex int    `json:"trackIndex" firestore:"trackIndex"`
+	TrackKind  string `json:"trackKind,omitempty" firestore:"trackKind,omitempty"`
+}
+
 // Project is a complete, uploadable project.
 type Project struct {
 	Files []File
@@ -46,11 +67,28 @@ type Project struct {
 	// project — a charge that can only be computed after the render has
 	// started is not a gate.
 	DurationMs int
+	// Scenes are the clips the root mounts, in timeline order.
+	Scenes []Scene
 }
 
 var (
 	rootDurationRe = regexp.MustCompile(`data-duration\s*=\s*["']([0-9.]+)["']`)
 	compositionSrc = regexp.MustCompile(`data-composition-src\s*=\s*["']([^"']+)["']`)
+	// A whole opening tag that mounts a scene. Matched as a unit so the
+	// attributes read off it belong to THAT element — scanning the document
+	// for `data-start` instead would happily pair one scene's start with
+	// another's duration.
+	sceneTagRe = regexp.MustCompile(`<[a-zA-Z][^>]*\sdata-composition-src\s*=\s*["'][^"']+["'][^>]*>`)
+	attrRe     = func(name string) *regexp.Regexp {
+		return regexp.MustCompile(name + `\s*=\s*["']([^"']*)["']`)
+	}
+	sceneIDRe     = attrRe(`data-composition-id`)
+	sceneSrcRe    = attrRe(`data-composition-src`)
+	sceneStartRe  = attrRe(`data-start`)
+	sceneDurRe    = attrRe(`data-duration`)
+	sceneTrackRe  = attrRe(`data-track-index`)
+	sceneKindRe   = attrRe(`data-track-kind`)
+	sceneFallback = attrRe(`id`)
 )
 
 // MaxFiles and MaxBytes bound what one authoring turn may write. A model that
@@ -118,7 +156,78 @@ func Build(files []File) (*Project, error) {
 		return nil, err
 	}
 
-	return &Project{Files: files, DurationMs: durationMs}, nil
+	return &Project{Files: files, DurationMs: durationMs, Scenes: parseScenes(index)}, nil
+}
+
+// parseScenes reads the clips the root composition mounts.
+//
+// Deliberately forgiving: a project that renders but whose scene attributes
+// are odd must still render. Everything here feeds a TIMELINE DRAWING, not the
+// render and not the price, so a missing attribute costs the user a less
+// precise picture rather than their film. Build has already refused the
+// project if a mounted file is absent, which is the failure that matters.
+func parseScenes(index string) []Scene {
+	tags := sceneTagRe.FindAllString(index, -1)
+	scenes := make([]Scene, 0, len(tags))
+
+	for _, tag := range tags {
+		src := first(sceneSrcRe, tag)
+		if src == "" {
+			continue
+		}
+		id := first(sceneIDRe, tag)
+		if id == "" {
+			// Hyperframes keys a composition by data-composition-id; the
+			// element id is the next best handle, and the src always exists.
+			if id = first(sceneFallback, tag); id == "" {
+				id = src
+			}
+		}
+		scenes = append(scenes, Scene{
+			ID:         id,
+			Src:        src,
+			StartMs:    secondsToMs(first(sceneStartRe, tag)),
+			DurationMs: secondsToMs(first(sceneDurRe, tag)),
+			TrackIndex: atoiOr(first(sceneTrackRe, tag), 0),
+			TrackKind:  first(sceneKindRe, tag),
+		})
+	}
+
+	// Timeline order, not document order. They usually agree, but a project
+	// that mounts its scenes out of order would otherwise draw a timeline
+	// that runs backwards.
+	sort.SliceStable(scenes, func(i, j int) bool { return scenes[i].StartMs < scenes[j].StartMs })
+	return scenes
+}
+
+func first(re *regexp.Regexp, s string) string {
+	if m := re.FindStringSubmatch(s); m != nil {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
+}
+
+// secondsToMs converts a data-* time, which Hyperframes writes in SECONDS.
+// Milliseconds everywhere on our side, because every other time on a design
+// document is milliseconds and a mixed unit is how a timeline ends up with
+// clips a thousand times too long.
+func secondsToMs(v string) int {
+	if v == "" {
+		return 0
+	}
+	seconds, err := strconv.ParseFloat(v, 64)
+	if err != nil || seconds < 0 {
+		return 0
+	}
+	return int(seconds * 1000)
+}
+
+func atoiOr(v string, fallback int) int {
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return n
 }
 
 // rootDurationMs reads the film's length off the root composition.
