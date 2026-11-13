@@ -30,8 +30,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -52,6 +55,36 @@ const maxAssetBytes = 512 << 10
 // whose font host is slow should get a film with a fallback face, not an
 // authoring run that times out and charges them for nothing.
 const assetFetchTimeout = 8 * time.Second
+
+// maxKitBytes bounds what the WHOLE kit may add to a project.
+//
+// hfproject.Build refuses a project over 4 MiB in total, and it refuses it
+// AFTER the model has been called and charged. A brand with six font files
+// could walk a design into that failure with a message about a limit they
+// never set. So the kit stops adding assets at its own, smaller budget and
+// the film goes out with the fonts that fit.
+const maxKitBytes = 1 << 20
+
+// hexRe is what may reach a stylesheet as a colour.
+//
+// The design system is written client-side straight to Firestore, so nothing
+// has validated these values before they get here. Interpolated unchecked
+// into a <style> block, a value like `red}</style><script>…` escapes the
+// element — and the document it escapes into is published to a CDN origin
+// shared by every brand's projects. Three, four, six or eight hex digits
+// covers #RGB through #RRGGBBAA; anything else is not a colour.
+var hexRe = regexp.MustCompile(`^#?[0-9A-Fa-f]{3,8}$`)
+
+// familyRe is the same argument for a font family: letters, digits, spaces
+// and hyphens are a typeface name, and a quote or a brace is an escape.
+var familyRe = regexp.MustCompile(`^[A-Za-z0-9 \-]{1,64}$`)
+
+// weightRe keeps font-weight to what CSS accepts there.
+var weightRe = regexp.MustCompile(`^([1-9]00|normal|bold|lighter|bolder)$`)
+
+// fallbackRe allows a short generic stack — "sans-serif", "Georgia, serif" —
+// and nothing with a brace, a quote or a semicolon in it.
+var fallbackRe = regexp.MustCompile(`^[A-Za-z0-9 \-,]{1,64}$`)
 
 // brandKit is what a brand's design system becomes, in project terms.
 type brandKit struct {
@@ -82,7 +115,7 @@ func buildBrandKit(ctx context.Context, ds *trendlymodels.BrandDesignSystem) *br
 	// entry with no role is still reachable rather than silently dropped.
 	roleSeen := map[string]bool{}
 	for i, c := range ds.Palette {
-		hex := strings.TrimSpace(c.Hex)
+		hex := safeHex(c.Hex)
 		if hex == "" {
 			continue
 		}
@@ -99,23 +132,36 @@ func buildBrandKit(ctx context.Context, ds *trendlymodels.BrandDesignSystem) *br
 	// why Inter works today — but a custom URL resolves nowhere, and the
 	// film silently falls back to a system face. So a font with a URL is
 	// fetched and given a real @font-face against a local file.
+	budget := maxKitBytes
 	for _, f := range ds.Fonts {
-		role, family := sanitiseToken(f.Role), strings.TrimSpace(f.Family)
+		role, family := sanitiseToken(f.Role), safeFamily(f.Family)
 		if role == "" || family == "" {
 			continue
 		}
 		stack := fmt.Sprintf("'%s',%s", family, fallbackOr(f.Fallback))
 		vars = append(vars, fmt.Sprintf("--brand-font-%s:%s", role, stack))
 
-		if url := strings.TrimSpace(f.URL); url != "" {
-			name := fmt.Sprintf("assets/fonts/%s%s", slug(family), fontExt(url))
-			if body, ok := fetchAsset(ctx, url); ok && !hasFile(files, name) {
-				files = append(files, hfproject.File{Path: name, Content: string(body)})
-				faces = append(faces, fmt.Sprintf(
-					"@font-face{font-family:'%s';src:url('%s');font-display:block;%s}",
-					family, name, weightDecl(f.Weight)))
-			}
+		src := strings.TrimSpace(f.URL)
+		if src == "" {
+			continue
 		}
+		weight := safeWeight(f.Weight)
+		// The WEIGHT is part of the name. Keyed on the family alone, a brand
+		// using one family at two weights wrote one file and dropped the
+		// other, and every weight then rendered from whichever face won.
+		name := fmt.Sprintf("assets/fonts/%s-%s%s", slug(family), weightSlug(weight), fontExt(src))
+		if hasFile(files, name) {
+			continue
+		}
+		body, ok := fetchAsset(ctx, src)
+		if !ok || len(body) > budget {
+			continue
+		}
+		budget -= len(body)
+		files = append(files, hfproject.File{Path: name, Content: string(body)})
+		faces = append(faces, fmt.Sprintf(
+			"@font-face{font-family:'%s';src:url('%s');font-display:block;%s}",
+			family, name, weightDecl(weight)))
 	}
 
 	// ── Logo ──────────────────────────────────────────────────────────────
@@ -126,7 +172,7 @@ func buildBrandKit(ctx context.Context, ds *trendlymodels.BrandDesignSystem) *br
 	logoPath := ""
 	if u := pickLogo(ds.Logos); u != "" {
 		name := "assets/brand-logo" + imageExt(u)
-		if body, ok := fetchAsset(ctx, u); ok {
+		if body, ok := fetchAsset(ctx, u); ok && len(body) <= budget {
 			files = append(files, hfproject.File{Path: name, Content: string(body)})
 			logoPath = name
 			vars = append(vars, fmt.Sprintf("--brand-logo:url('%s')", name))
@@ -211,22 +257,78 @@ func brandPromptBlock(ds *trendlymodels.BrandDesignSystem, vars []string, logoPa
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
+// assetClient re-checks the destination on every redirect.
+//
+// Checking only the URL we were given is not enough: a public host is free
+// to answer with a 302 to 169.254.169.254, and the client would follow it.
+var assetClient = &http.Client{
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return fmt.Errorf("too many redirects")
+		}
+		if !assetURLAllowed(req.URL.String()) {
+			return fmt.Errorf("redirect to a non-public address")
+		}
+		return nil
+	},
+}
+
+// assetURLAllowed is publicHTTPS, behind a variable so the tests can serve
+// an asset from a loopback httptest server — which the real guard refuses,
+// and should. Nothing else reassigns it.
+var assetURLAllowed = publicHTTPS
+
+// publicHTTPS says whether a URL is one this Lambda may fetch.
+//
+// ── Why this is not just a scheme check ───────────────────────────────────
+// The URL comes from a design-system document the brand writes itself, and
+// this runs inside a Lambda with an execution role. Fetching whatever it is
+// handed makes the authoring job a proxy into our own network: the metadata
+// address, anything in the VPC, a localhost control port. Worse, the body is
+// then written into the project and published to a public CDN, so the reply
+// is readable by anyone with the design's link.
+//
+// So: https only, and the host must resolve to addresses that are ALL public
+// unicast. Every resolved address is checked, because a hostname under the
+// caller's control can answer with one public and one private address.
+func publicHTTPS(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" {
+		return false
+	}
+	ips, err := net.LookupIP(u.Hostname())
+	if err != nil || len(ips) == 0 {
+		return false
+	}
+	for _, ip := range ips {
+		if !ip.IsGlobalUnicast() ||
+			ip.IsPrivate() ||
+			ip.IsLoopback() ||
+			ip.IsLinkLocalUnicast() ||
+			ip.IsLinkLocalMulticast() ||
+			ip.IsInterfaceLocalMulticast() {
+			return false
+		}
+	}
+	return true
+}
+
 // fetchAsset gets the bytes, or reports that it could not.
 //
 // Every failure is non-fatal by design: the film is still worth making
 // without the logo. The caller simply omits what did not arrive.
-func fetchAsset(ctx context.Context, url string) ([]byte, bool) {
-	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
+func fetchAsset(ctx context.Context, raw string) ([]byte, bool) {
+	if !assetURLAllowed(raw) {
 		return nil, false
 	}
 	ctx, cancel := context.WithTimeout(ctx, assetFetchTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
 	if err != nil {
 		return nil, false
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := assetClient.Do(req)
 	if err != nil {
 		return nil, false
 	}
@@ -285,14 +387,49 @@ func slug(s string) string {
 }
 
 func fallbackOr(fb string) string {
-	if f := strings.TrimSpace(fb); f != "" {
+	if f := strings.TrimSpace(fb); fallbackRe.MatchString(f) {
 		return f
 	}
 	return "sans-serif"
 }
 
+// safeHex returns the colour, or "" if the value is not one.
+func safeHex(h string) string {
+	h = strings.TrimSpace(h)
+	if !hexRe.MatchString(h) {
+		return ""
+	}
+	if !strings.HasPrefix(h, "#") {
+		h = "#" + h
+	}
+	return h
+}
+
+func safeFamily(f string) string {
+	f = strings.TrimSpace(f)
+	if !familyRe.MatchString(f) {
+		return ""
+	}
+	return f
+}
+
+func safeWeight(w string) string {
+	w = strings.ToLower(strings.TrimSpace(w))
+	if !weightRe.MatchString(w) {
+		return ""
+	}
+	return w
+}
+
+func weightSlug(w string) string {
+	if w == "" {
+		return "regular"
+	}
+	return w
+}
+
 func weightDecl(w string) string {
-	if w = strings.TrimSpace(w); w != "" {
+	if w != "" {
 		return "font-weight:" + w + ";"
 	}
 	return ""
