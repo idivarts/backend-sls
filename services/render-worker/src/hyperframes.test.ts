@@ -111,3 +111,41 @@ test("an ffmpeg path that exists is passed through", () => {
     const env = hyperframesEnv({ ffmpegPath: real });
     assert.equal(env.HYPERFRAMES_FFMPEG_PATH, real);
 });
+
+test("the CLI is told where a browser is", () => {
+    // Hyperframes downloads chrome-headless-shell from chrome-for-testing,
+    // which publishes no linux-arm64 build. On our Graviton worker it gives
+    // up with "Chrome Headless Shell is not available for Linux ARM64" and
+    // suggests apt-get. The image already has Playwright's Chromium, so the
+    // only thing missing was telling the CLI about it — and nothing in a
+    // unit test would have caught that, so this at least locks in that the
+    // variable is populated wherever a browser can be resolved.
+    const env = hyperframesEnv();
+    const resolvable = (() => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { chromium } = require("playwright");
+            const p = chromium.executablePath();
+            return !!p && require("node:fs").existsSync(p);
+        } catch {
+            return false;
+        }
+    })();
+    if (resolvable) {
+        assert.ok(env.HYPERFRAMES_BROWSER_PATH, "a resolvable Chromium must be passed to the CLI");
+    } else {
+        assert.equal(env.HYPERFRAMES_BROWSER_PATH, undefined,
+            "an unresolvable browser must be left unset, not pointed at a missing path");
+    }
+});
+
+test("an explicit browser path wins over discovery", () => {
+    const prev = process.env.HYPERFRAMES_BROWSER_PATH;
+    process.env.HYPERFRAMES_BROWSER_PATH = "/explicit/chrome";
+    try {
+        assert.equal(hyperframesEnv().HYPERFRAMES_BROWSER_PATH, "/explicit/chrome");
+    } finally {
+        if (prev === undefined) delete process.env.HYPERFRAMES_BROWSER_PATH;
+        else process.env.HYPERFRAMES_BROWSER_PATH = prev;
+    }
+});
