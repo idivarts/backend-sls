@@ -536,6 +536,7 @@ async function runHyperframesDesignJob(job: RenderJob): Promise<void> {
                     projectPrefix: design.projectPrefix,
                     quality: job.quality,
                     force: job.force,
+                    creditCeiling: job.creditCeiling,
                 },
                 {
                     onProgress: (f) => setDesignV3Progress(job.brandId, designId, f),
@@ -615,6 +616,7 @@ async function runHyperframesPreviewJob(job: RenderJob): Promise<void> {
                     brandId: job.brandId,
                     designId,
                     projectPrefix: design.projectPrefix,
+                    creditCeiling: job.creditCeiling,
                 },
                 {
                     onProgress: (f) => setDesignV3PreviewProgress(job.brandId, designId, f),

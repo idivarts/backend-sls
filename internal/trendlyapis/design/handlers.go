@@ -291,7 +291,7 @@ func RenderDesign(c *gin.Context) {
 		return
 	}
 
-	if err := rendering.SubmitDesignV3Render(brandID, designID, req.Quality, req.Force); err != nil {
+	if err := rendering.SubmitDesignV3Render(brandID, designID, req.Quality, req.Force, MediaCreditCeiling(orgID)); err != nil {
 		// Logged and reported, because the user-facing sentence is
 		// deliberately vague and this would otherwise be the only record of
 		// why a render refused. Every studio render on dev once answered a
@@ -382,7 +382,11 @@ func PreviewDesign(c *gin.Context) {
 		return
 	}
 
-	if err := rendering.SubmitDesignV3Preview(brandID, designID); err != nil {
+	// The media ceiling travels with the job, because the worker has no
+	// wallet. A free preview can still resolve media — that is the point of
+	// resolving before the gate — so it needs the same cap the render has.
+	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+	if err := rendering.SubmitDesignV3Preview(brandID, designID, MediaCreditCeiling(orgID)); err != nil {
 		log.Printf("design preview dispatch failed for %s/%s: %v", brandID, designID, err)
 		mysentry.Capture(err, map[string]string{"op": "design.preview.dispatch", "brandId": brandID, "designId": designID})
 		// No refund to make — nothing was charged — but the document must not
