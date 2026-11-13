@@ -1,6 +1,7 @@
 package design
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -194,10 +195,47 @@ func RenderDesign(c *gin.Context) {
 	}
 
 	tokens := trendlymodels.DesignV3RenderTokenCost(d.DurationMs)
+	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+
+	// ── Repay the last failure BEFORE charging for this attempt ───────────
+	//
+	// A render that dies in the WORKER was charged in the API minutes
+	// earlier, and the worker — TypeScript, no access to the wallet — cannot
+	// give it back. So the debt is settled here, on the retry, which is the
+	// next moment the Go side touches this design.
+	//
+	// Before the gate and before the charge, deliberately. A user whose
+	// render failed may be out of tokens BECAUSE of that failed render;
+	// refusing them at the gate while still holding their refund would be the
+	// worst possible order. Repaying first can be the very thing that lets
+	// the retry through.
+	//
+	// The claim is transactional (see ClaimBrandDesignRefund): two retries
+	// racing cannot both be handed the same debt. Whatever it hands back MUST
+	// be refunded — dropping it loses the user their tokens for good.
+	var refundedTokens int64
+	if refunded, cerr := trendlymodels.ClaimBrandDesignRefund(ctx, brandID, designID); cerr != nil {
+		// Not fatal to the render. Logged loudly because the debt is still
+		// recorded on the design and the next retry will claim it again.
+		log.Printf("design refund claim failed for %s/%s: %v", brandID, designID, cerr)
+		mysentry.Capture(cerr, map[string]string{"op": "design.render.refundClaim", "brandId": brandID, "designId": designID})
+	} else if refunded > 0 {
+		if _, rerr := trendlymodels.RefundTokens(orgID, refunded); rerr != nil {
+			// The claim already cleared the field, so this is the one path
+			// that can genuinely lose tokens. It has to be visible.
+			log.Printf("design refund PAYOUT FAILED for %s/%s, %d tokens owed: %v", brandID, designID, refunded, rerr)
+			mysentry.Capture(rerr, map[string]string{
+				"op": "design.render.refundPayout", "brandId": brandID,
+				"designId": designID, "tokens": fmt.Sprint(refunded),
+			})
+		} else {
+			refundedTokens = refunded
+			log.Printf("design %s/%s: refunded %d tokens for the previous failed render", brandID, designID, refunded)
+		}
+	}
 
 	// Gated on the wallet before any work is queued. Refusing here is honest,
 	// and the app can say what it would have cost.
-	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
 	if trendlymodels.TokensExhausted(orgID) {
 		c.JSON(http.StatusPaymentRequired, gin.H{
 			"error":   "upgrade_required",
@@ -211,6 +249,15 @@ func RenderDesign(c *gin.Context) {
 	if orgID != "" && tokens > 0 {
 		if _, derr := trendlymodels.DeductTokens(orgID, tokens); derr == nil {
 			charged = true
+			// Recorded on the design, because this is the only thing that
+			// will still know the amount when the worker fails in a few
+			// minutes' time. Best-effort: a render is not worth refusing
+			// over the bookkeeping, but a failure here means a later worker
+			// failure goes unrefunded, so it is logged.
+			if serr := trendlymodels.SetBrandDesignChargedTokens(ctx, brandID, designID, int64(tokens)); serr != nil {
+				log.Printf("design %s/%s: could not record the %d-token charge: %v", brandID, designID, tokens, serr)
+				mysentry.Capture(serr, map[string]string{"op": "design.render.recordCharge", "brandId": brandID, "designId": designID})
+			}
 		}
 	}
 
@@ -221,8 +268,16 @@ func RenderDesign(c *gin.Context) {
 	// exactly what happened the first time a v3 render was fired on dev, when
 	// dispatch refused and the wallet went to -2229 for nothing.
 	refund := func() {
-		if charged {
-			_, _ = trendlymodels.RefundTokens(orgID, tokens)
+		if !charged {
+			return
+		}
+		_, _ = trendlymodels.RefundTokens(orgID, tokens)
+		// And clear the debt we just recorded. Without this the charge is
+		// repaid here AND claimed again by the next retry — paying the user
+		// twice for one failed render, which is the mirror of the bug this
+		// whole change exists to fix.
+		if cerr := trendlymodels.SetBrandDesignChargedTokens(ctx, brandID, designID, 0); cerr != nil {
+			log.Printf("design %s/%s: refunded in-request but could not clear the debt: %v", brandID, designID, cerr)
 		}
 	}
 
@@ -253,7 +308,15 @@ func RenderDesign(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "queued", "cost": tokens})
+	// `refunded` is reported so the app can SAY it. A user retrying a render
+	// that failed watched their balance drop for nothing; telling them it
+	// came back is the difference between a refund and a silent correction
+	// they never learn about.
+	resp := gin.H{"status": "queued", "cost": tokens}
+	if refundedTokens > 0 {
+		resp["refunded"] = refundedTokens
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // PreviewDesign captures still frames across the film so the user can see it

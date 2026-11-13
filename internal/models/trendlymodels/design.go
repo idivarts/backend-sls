@@ -173,9 +173,24 @@ type Design struct {
 	RenderStatus   string  `json:"renderStatus,omitempty" firestore:"renderStatus,omitempty"`
 	RenderProgress float64 `json:"renderProgress,omitempty" firestore:"renderProgress,omitempty"`
 	RenderError    string  `json:"renderError,omitempty" firestore:"renderError,omitempty"`
-	RenderURL      string  `json:"renderUrl,omitempty" firestore:"renderUrl,omitempty"`
-	PosterURL      string  `json:"posterUrl,omitempty" firestore:"posterUrl,omitempty"`
-	RenderedAt     int64   `json:"renderedAt,omitempty" firestore:"renderedAt,omitempty"`
+
+	// ChargedTokens is what the wallet paid for the render currently recorded
+	// here, and it is the ONLY record of that debt.
+	//
+	// The charge happens in the API before the work is queued, so the wallet
+	// cannot be raced. The failure happens in the worker, minutes later, in a
+	// TypeScript process with no access to the Go wallet code. Without this
+	// field there is nothing linking the two: a render that dies in the worker
+	// has taken the user's tokens and left no trace of how many. That is not
+	// hypothetical — a GSAP bug of ours burned 1981 tokens on dev and produced
+	// nothing.
+	//
+	// It is cleared by ClaimBrandDesignRefund when the debt is repaid, so a
+	// non-zero value here means "owed", not "was once charged".
+	ChargedTokens int64  `json:"chargedTokens,omitempty" firestore:"chargedTokens,omitempty"`
+	RenderURL     string `json:"renderUrl,omitempty" firestore:"renderUrl,omitempty"`
+	PosterURL     string `json:"posterUrl,omitempty" firestore:"posterUrl,omitempty"`
+	RenderedAt    int64  `json:"renderedAt,omitempty" firestore:"renderedAt,omitempty"`
 
 	CreatedAt int64 `json:"createdAt,omitempty" firestore:"createdAt,omitempty"`
 	UpdatedAt int64 `json:"updatedAt,omitempty" firestore:"updatedAt,omitempty"`
@@ -349,6 +364,72 @@ func MarkBrandDesignRenderQueued(ctx context.Context, brandID, designID string) 
 		{Path: "renderProgress", Value: 0},
 		{Path: "renderError", Value: firestore.Delete},
 	})
+}
+
+// SetBrandDesignChargedTokens records what the wallet just paid for this
+// render, so a failure in the worker can be repaid later.
+//
+// Bypasses UpdateBrandDesign for the same reason the progress writer does:
+// this is render bookkeeping, not an edit, and it must not reorder the list
+// someone is reading.
+func SetBrandDesignChargedTokens(ctx context.Context, brandID, designID string, tokens int64) error {
+	if brandID == "" || designID == "" {
+		return fmt.Errorf("SetBrandDesignChargedTokens: empty brandID or designID")
+	}
+	_, err := designDoc(brandID, designID).Update(ctx, []firestore.Update{
+		{Path: "chargedTokens", Value: tokens},
+	})
+	if err != nil {
+		return fmt.Errorf("SetBrandDesignChargedTokens: %w", err)
+	}
+	return nil
+}
+
+// ClaimBrandDesignRefund takes ownership of a failed render's unpaid debt,
+// returning how many tokens the caller must now give back.
+//
+// ⚠️ THE CLEAR AND THE READ ARE ONE TRANSACTION, and that is the whole point.
+// The obvious version — read chargedTokens, refund, then clear — double-pays
+// whenever two retries overlap, which is exactly what an impatient user does
+// to a design that just failed. Here the transaction hands the debt to ONE
+// caller: the second gets 0 and refunds nothing.
+//
+// So a caller must refund precisely what it is handed. Dropping the value on
+// the floor loses the user their tokens for good, because the record is gone.
+//
+// Returns 0 when the design is missing, has no debt, or is not in a failed
+// state — a render still in flight has not failed yet, and refunding it would
+// pay for work that is about to succeed.
+func ClaimBrandDesignRefund(ctx context.Context, brandID, designID string) (int64, error) {
+	if brandID == "" || designID == "" {
+		return 0, nil
+	}
+	ref := designDoc(brandID, designID)
+	var owed int64
+
+	err := firestoredb.Client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		owed = 0
+		snap, err := tx.Get(ref)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				return nil
+			}
+			return err
+		}
+		var d Design
+		if err := snap.DataTo(&d); err != nil {
+			return err
+		}
+		if d.ChargedTokens <= 0 || d.RenderStatus != DesignRenderFailed {
+			return nil
+		}
+		owed = d.ChargedTokens
+		return tx.Update(ref, []firestore.Update{{Path: "chargedTokens", Value: firestore.Delete}})
+	})
+	if err != nil {
+		return 0, fmt.Errorf("ClaimBrandDesignRefund: %w", err)
+	}
+	return owed, nil
 }
 
 // MarkBrandDesignPreviewQueued starts a preview run.
