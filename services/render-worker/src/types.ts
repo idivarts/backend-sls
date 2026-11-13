@@ -12,7 +12,8 @@ export type RenderDocType =
     | "ingest"
     | "frame"
     | "studio"
-    | "hfdesign";
+    | "hfdesign"
+    | "hfpreview";
 
 /** The unit of work: render one revision into publishable media. */
 export interface RenderJob {

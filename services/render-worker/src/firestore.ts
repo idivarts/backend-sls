@@ -626,3 +626,56 @@ export async function setDesignV3Result(
         { merge: true }
     );
 }
+
+/**
+ * Preview state, written by the hfpreview job.
+ *
+ * Separate fields from the render's, because the two run independently and a
+ * shared `status` would mean one clobbering the other's — a user watching a
+ * filmstrip appear while a render runs needs both to be true at once.
+ */
+export async function setDesignV3PreviewProgress(
+    brandId: string,
+    designId: string,
+    fraction: number
+): Promise<void> {
+    const clamped = Math.min(Math.max(fraction, 0), 1);
+    await designRef(brandId, designId).set(
+        { previewStatus: "running", previewProgress: clamped },
+        { merge: true }
+    );
+}
+
+export async function setDesignV3PreviewFrames(
+    brandId: string,
+    designId: string,
+    frames: { url: string; timeMs: number }[]
+): Promise<void> {
+    if (frames.length === 0) {
+        // Marking an empty filmstrip "done" would read to the user as "your
+        // design is blank" rather than "we could not capture it".
+        await markDesignV3PreviewFailed(brandId, designId, "We could not capture any frames from this design.");
+        return;
+    }
+    await designRef(brandId, designId).set(
+        {
+            previewStatus: "done",
+            previewProgress: 1,
+            previewFrames: frames,
+            previewedAt: Date.now(),
+            previewError: FieldValue.delete(),
+        },
+        { merge: true }
+    );
+}
+
+export async function markDesignV3PreviewFailed(
+    brandId: string,
+    designId: string,
+    reason: string
+): Promise<void> {
+    await designRef(brandId, designId).set(
+        { previewStatus: "failed", previewError: reason },
+        { merge: true }
+    );
+}

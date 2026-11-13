@@ -255,3 +255,79 @@ func RenderDesign(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"status": "queued", "cost": tokens})
 }
+
+// PreviewDesign captures still frames across the film so the user can see it
+// before paying to render it.
+// POST /api/design/brands/:brandId/designs/:designId/preview
+//
+// ── Why this charges nothing ───────────────────────────────────────────────
+// It is the answer to "a user can see and approve before a single token is
+// spent on rendering". A preview that cost tokens would not be that answer:
+// the user would be paying to find out whether it is worth paying, and the
+// one thing they cannot do is judge a design they have not seen.
+//
+// It is not free to US — it runs the same Fargate task, seeking six frames
+// instead of three hundred — so it is rate-limited by the in-flight check
+// below rather than by a price. If the compute turns out to matter, the lever
+// is the frame count, not a charge.
+//
+// ⚠️ Phase-1 token values are provisional (see organization.go PlanLimitsMap),
+// and so is this zero. It is a deliberate product decision, not an oversight.
+func PreviewDesign(c *gin.Context) {
+	brandID, designID, ok := guard(c, true)
+	if !ok {
+		return
+	}
+
+	ctx := c.Request.Context()
+	d, err := trendlymodels.GetBrandDesign(ctx, brandID, designID)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not read the design"})
+		return
+	}
+	if d == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no such design"})
+		return
+	}
+
+	if d.ProjectPrefix == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "not_previewable",
+			"message": "This design has nothing in it yet.",
+		})
+		return
+	}
+
+	// Already running: answer with the job rather than starting a second one.
+	// Two previews of the same design would each overwrite the other's frames,
+	// and the filmstrip the user ends up reading would be a mix of the two.
+	if d.PreviewStatus == trendlymodels.DesignPreviewQueued ||
+		d.PreviewStatus == trendlymodels.DesignPreviewRunning {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  d.PreviewStatus,
+			"message": "This is already being previewed.",
+		})
+		return
+	}
+
+	// Queued BEFORE dispatch, so the app shows the job the instant this
+	// returns rather than sitting on a stale filmstrip until a worker starts.
+	if err := trendlymodels.MarkBrandDesignPreviewQueued(ctx, brandID, designID); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not queue the preview"})
+		return
+	}
+
+	if err := rendering.SubmitDesignV3Preview(brandID, designID); err != nil {
+		log.Printf("design preview dispatch failed for %s/%s: %v", brandID, designID, err)
+		mysentry.Capture(err, map[string]string{"op": "design.preview.dispatch", "brandId": brandID, "designId": designID})
+		// No refund to make — nothing was charged — but the document must not
+		// be left at "queued" for a job that will never run, or the spinner
+		// never resolves and reads as slowness rather than breakage.
+		_ = trendlymodels.MarkBrandDesignPreviewFailed(ctx, brandID, designID,
+			"We couldn't start the preview. Please try again.")
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not start the preview"})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"status": trendlymodels.DesignPreviewQueued})
+}

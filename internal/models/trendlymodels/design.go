@@ -70,6 +70,24 @@ const (
 	DesignAuthorFailed  = "failed"
 )
 
+// Preview lifecycle values. The same four words as the other two lifecycles,
+// so the app's status rules read the same way whichever is in flight.
+const (
+	DesignPreviewQueued  = "queued"
+	DesignPreviewRunning = "running"
+	DesignPreviewDone    = "done"
+	DesignPreviewFailed  = "failed"
+)
+
+// PreviewFrame is one still from the film, with where in it the frame is.
+//
+// TimeMs and not seconds: every other time on this document is milliseconds,
+// and a filmstrip in a mixed unit sorts into the wrong order.
+type PreviewFrame struct {
+	URL    string `json:"url" firestore:"url"`
+	TimeMs int    `json:"timeMs" firestore:"timeMs"`
+}
+
 // The render lifecycle strings are the ones content_design.go already owns
 // (DesignRenderQueued / Rendering / Done / Failed), mirrored in shared-libs
 // design.ts. They are reused rather than redeclared so v2 and v3 can never
@@ -133,6 +151,21 @@ type Design struct {
 	// brief is also the only record of the user's intent once the model's
 	// output has replaced it, which is what makes a revision possible at all.
 	Brief string `json:"brief,omitempty" firestore:"brief,omitempty"`
+
+	// Preview state: still frames across the film, so the user can SEE their
+	// design before paying to render it.
+	//
+	// Separate from the render lifecycle on purpose. A preview is cheap and
+	// repeatable, a render is neither, and the whole point of this pair is
+	// that one comes before the other: Hyperframes' own loop snapshots at
+	// step 3 and renders at step 5, because "passing checks alone is not a
+	// reason to render". Without this the first time anyone sees their film is
+	// after the tokens are gone.
+	PreviewStatus   string         `json:"previewStatus,omitempty" firestore:"previewStatus,omitempty"`
+	PreviewProgress float64        `json:"previewProgress,omitempty" firestore:"previewProgress,omitempty"`
+	PreviewError    string         `json:"previewError,omitempty" firestore:"previewError,omitempty"`
+	PreviewFrames   []PreviewFrame `json:"previewFrames,omitempty" firestore:"previewFrames,omitempty"`
+	PreviewedAt     int64          `json:"previewedAt,omitempty" firestore:"previewedAt,omitempty"`
 
 	// Render state. Progress and failure live on the document rather than in
 	// the request, so a render survives a page reload or a locked phone — the
@@ -315,6 +348,70 @@ func MarkBrandDesignRenderQueued(ctx context.Context, brandID, designID string) 
 		{Path: "renderStatus", Value: DesignRenderQueued},
 		{Path: "renderProgress", Value: 0},
 		{Path: "renderError", Value: firestore.Delete},
+	})
+}
+
+// MarkBrandDesignPreviewQueued starts a preview run.
+//
+// The old frames are cleared with it. A filmstrip left over from the previous
+// version of the design, sitting next to a spinner, is the user approving
+// something that is no longer what would render.
+func MarkBrandDesignPreviewQueued(ctx context.Context, brandID, designID string) error {
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "previewStatus", Value: DesignPreviewQueued},
+		{Path: "previewProgress", Value: 0},
+		{Path: "previewError", Value: firestore.Delete},
+		{Path: "previewFrames", Value: firestore.Delete},
+	})
+}
+
+// SetBrandDesignPreviewProgress is the worker ticking as frames are captured.
+// Like the render's, it bypasses UpdateBrandDesign so a preview in flight does
+// not keep rewriting updatedAt and reordering the list someone is reading.
+func SetBrandDesignPreviewProgress(ctx context.Context, brandID, designID string, fraction float64) error {
+	if brandID == "" || designID == "" {
+		return fmt.Errorf("SetBrandDesignPreviewProgress: empty brandID or designID")
+	}
+	if fraction < 0 {
+		fraction = 0
+	}
+	if fraction > 1 {
+		fraction = 1
+	}
+	_, err := designDoc(brandID, designID).Update(ctx, []firestore.Update{
+		{Path: "previewStatus", Value: DesignPreviewRunning},
+		{Path: "previewProgress", Value: fraction},
+	})
+	if err != nil {
+		return fmt.Errorf("SetBrandDesignPreviewProgress: %w", err)
+	}
+	return nil
+}
+
+// SetBrandDesignPreviewFrames records a finished filmstrip.
+func SetBrandDesignPreviewFrames(ctx context.Context, brandID, designID string, frames []PreviewFrame) error {
+	if len(frames) == 0 {
+		// An empty filmstrip marked done would read as "your design is blank".
+		return MarkBrandDesignPreviewFailed(ctx, brandID, designID,
+			"We could not capture any frames from this design.")
+	}
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "previewStatus", Value: DesignPreviewDone},
+		{Path: "previewProgress", Value: 1},
+		{Path: "previewFrames", Value: frames},
+		{Path: "previewError", Value: firestore.Delete},
+		{Path: "previewedAt", Value: nowMs()},
+	})
+}
+
+// MarkBrandDesignPreviewFailed records a failure with a sentence the user reads.
+func MarkBrandDesignPreviewFailed(ctx context.Context, brandID, designID, reason string) error {
+	if reason == "" {
+		reason = "We could not preview this design. Please try again."
+	}
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "previewStatus", Value: DesignPreviewFailed},
+		{Path: "previewError", Value: reason},
 	})
 }
 

@@ -39,6 +39,12 @@ func RegisterRoutes(engine *gin.Engine) {
 	g.GET(base, ListDesigns)
 	g.GET(base+"/:designId", GetDesign)
 
+	// Preview comes BEFORE render, and charges nothing. It captures stills
+	// across the film so the user can approve what they are about to pay for
+	// — Hyperframes' own loop snapshots at step 3 and renders at step 5
+	// because "passing checks alone is not a reason to render".
+	g.POST(base+"/:designId/preview", PreviewDesign)
+
 	// Rendering is a POST because it spends money: it charges the wallet and
 	// queues real compute. The response says what state the design is in, not
 	// what the render produced — the result arrives on the document, which is

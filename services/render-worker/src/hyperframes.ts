@@ -33,7 +33,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chromium } from "playwright";
 import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 /**
  * Where the vendored GSAP sits. Copied in by the Dockerfile.
@@ -421,6 +421,101 @@ export async function renderProject(
     }
 
     return { outputPath, referenceBackground, stdout: res.stdout };
+}
+
+export interface SnapshotFrame {
+    /** Absolute path of the PNG on disk. */
+    path: string;
+    /** Where in the film this frame is, in milliseconds. */
+    timeMs: number;
+    /** The CLI's own word for what this frame is, when it gives one. */
+    role?: string;
+}
+
+/**
+ * Still frames across the film, for a preview the user approves BEFORE paying
+ * to render.
+ *
+ * ── Why stills and not a video ─────────────────────────────────────────────
+ * The Hyperframes skill's own loop puts `snapshot` at step 3 and render at
+ * step 5, and says of the snapshots: "that is how you see the video". Seeking
+ * six frames costs a fraction of seeking three hundred, which is what makes it
+ * honest to show this before charging anything.
+ *
+ * It is deliberately NOT their scrubbing player. That would be a truer
+ * preview, and it is where this should end up, but it needs the project
+ * serving its own runtime and a WebView on native that nothing here has
+ * tested. Stills reuse the render path exactly — same download, same GSAP
+ * vendoring, same `check` — so a frame the user approves was produced by the
+ * same machinery that will render it.
+ */
+export async function snapshotProject(
+    projectDir: string,
+    outputDir: string,
+    opts: { frames?: number; timeoutMs?: number } = {}
+): Promise<SnapshotFrame[]> {
+    const frames = Math.min(Math.max(opts.frames ?? 6, 1), 24);
+    const res = await runHyperframes(
+        projectDir,
+        ["snapshot", "--frames", String(frames), "--output", outputDir, "--json"],
+        { timeoutMs: opts.timeoutMs ?? 5 * 60_000 }
+    );
+
+    if (res.code !== 0) {
+        const detail = (res.stderr || res.stdout).trim().slice(-600);
+        throw new Error(`hyperframes snapshot failed (exit ${res.code}): ${detail}`);
+    }
+
+    const parsed = parseSnapshotJson(res.stdout);
+    if (parsed.length === 0) {
+        // Exited 0 with nothing to show. Treated as a failure rather than an
+        // empty filmstrip, which the user would read as "my design is blank".
+        throw new Error("hyperframes snapshot produced no frames");
+    }
+    // Resolve against the project dir, since the CLI reports paths relative to
+    // where it ran.
+    return parsed.map((f) => ({ ...f, path: isAbsolute(f.path) ? f.path : join(projectDir, f.path) }));
+}
+
+/**
+ * Pull the frame list out of `snapshot --json`.
+ *
+ * Exported for tests. The CLI prints human lines around its JSON, so the
+ * object is located rather than assumed to be the whole of stdout — the same
+ * lesson `checkProject` learned when brace-slicing stdout went wrong.
+ */
+export function parseSnapshotJson(stdout: string): SnapshotFrame[] {
+    const start = stdout.indexOf("{");
+    const end = stdout.lastIndexOf("}");
+    if (start < 0 || end <= start) return [];
+
+    let doc: unknown;
+    try {
+        doc = JSON.parse(stdout.slice(start, end + 1));
+    } catch {
+        return [];
+    }
+    const list = (doc as { frames?: unknown }).frames;
+    if (!Array.isArray(list)) return [];
+
+    const out: SnapshotFrame[] = [];
+    for (const item of list) {
+        if (!item || typeof item !== "object") continue;
+        const f = item as Record<string, unknown>;
+        if (typeof f.path !== "string" || !f.path) continue;
+        // `time` is seconds in their JSON. Milliseconds here, because every
+        // other time on a design document is milliseconds and a mixed unit is
+        // how a filmstrip ends up in the wrong order.
+        const seconds = typeof f.time === "number" && Number.isFinite(f.time) ? f.time : 0;
+        out.push({
+            path: f.path,
+            timeMs: Math.max(0, Math.round(seconds * 1000)),
+            role: typeof f.role === "string" ? f.role : undefined,
+        });
+    }
+    // Document order is not guaranteed to be time order, and a filmstrip is
+    // only legible in time order.
+    return out.sort((a, b) => a.timeMs - b.timeMs);
 }
 
 /**

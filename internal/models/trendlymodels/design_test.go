@@ -188,3 +188,49 @@ func TestDesignPersistsTheBrief(t *testing.T) {
 		t.Fatalf(`Design.Brief must serialize as "brief", got %q`, got)
 	}
 }
+
+// The preview and render lifecycles must stay on separate fields. They run
+// independently — someone can be looking at a filmstrip while a render goes —
+// and a shared status would mean one silently clobbering the other's.
+func TestPreviewAndRenderStateDoNotShareFields(t *testing.T) {
+	typ := reflect.TypeOf(Design{})
+	seen := map[string]string{}
+	for i := 0; i < typ.NumField(); i++ {
+		f := typ.Field(i)
+		tag := strings.Split(f.Tag.Get("firestore"), ",")[0]
+		if tag == "" || tag == "-" {
+			continue
+		}
+		if prev, dup := seen[tag]; dup {
+			t.Fatalf("firestore field %q is written by both %s and %s", tag, prev, f.Name)
+		}
+		seen[tag] = f.Name
+	}
+	for _, required := range []string{"previewStatus", "previewFrames", "renderStatus", "renderUrl"} {
+		if _, ok := seen[required]; !ok {
+			t.Fatalf("Design lost the %q field; the app reads it to decide what the user has seen", required)
+		}
+	}
+}
+
+// A preview that captured nothing must not be marked done. "done" with no
+// frames renders as an empty filmstrip, which the user reads as "my design is
+// blank" rather than "we could not capture it".
+func TestPreviewLifecycleValuesAreDistinct(t *testing.T) {
+	all := []string{DesignPreviewQueued, DesignPreviewRunning, DesignPreviewDone, DesignPreviewFailed}
+	seen := map[string]bool{}
+	for _, v := range all {
+		if v == "" {
+			t.Fatal("a preview lifecycle value is empty, which reads as 'never previewed'")
+		}
+		if seen[v] {
+			t.Fatalf("preview lifecycle value %q is used twice; the app cannot tell the states apart", v)
+		}
+		seen[v] = true
+	}
+	// Shares its words with the other two lifecycles on purpose, so the app's
+	// status rules read the same way whichever is in flight.
+	if DesignPreviewQueued != DesignAuthorQueued || DesignPreviewDone != DesignAuthorDone {
+		t.Fatal("preview and author lifecycles have drifted apart; the app's status rules assume they match")
+	}
+}

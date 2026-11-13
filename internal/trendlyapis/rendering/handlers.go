@@ -362,6 +362,22 @@ func SubmitDesignV3Render(brandID, designID, quality string, force bool) error {
 	})
 }
 
+// SubmitDesignV3Preview asks the worker for still frames across the film, so
+// the user can see it before paying to render it.
+//
+// A separate docType rather than a flag on the render job: the two have
+// different outputs (PNGs against an MP4), write different fields, and must
+// be able to be in flight at once — a user looking at a filmstrip and then
+// pressing Render should not have the preview cancel it.
+func SubmitDesignV3Preview(brandID, designID string) error {
+	return dispatch(RenderJob{
+		BrandID:    brandID,
+		RevisionID: designID,
+		DesignID:   designID,
+		DocType:    "hfpreview",
+	})
+}
+
 // SubmitFrameExtract asks the worker to cut one frame out of a video and file
 // it as its own piece of media.
 //
