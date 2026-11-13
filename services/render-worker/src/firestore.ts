@@ -563,6 +563,8 @@ export interface DesignV3ForRender {
     renderStatus?: string;
     renderUrl?: string;
     format?: { width?: number; height?: number; fps?: number };
+    /** The post this design is linked to, when it is linked to one. */
+    contentId?: string;
 }
 
 export async function getDesignV3(brandId: string, designId: string): Promise<DesignV3ForRender | null> {
@@ -574,6 +576,7 @@ export async function getDesignV3(brandId: string, designId: string): Promise<De
         renderStatus: typeof d.renderStatus === "string" ? d.renderStatus : undefined,
         renderUrl: typeof d.renderUrl === "string" ? d.renderUrl : undefined,
         format: typeof d.format === "object" && d.format ? d.format : undefined,
+        contentId: typeof d.contentId === "string" ? d.contentId : undefined,
     };
 }
 
@@ -611,8 +614,15 @@ export async function setDesignV3Result(
     brandId: string,
     designId: string,
     url: string,
-    posterUrl?: string
+    posterUrl?: string,
+    /** Set when the design is linked to a post: the film lands on it. */
+    contentId?: string
 ): Promise<void> {
+    // Design first, content second. `renderUrl` on the design is what the app
+    // reads as "this film has been exported", and `attachments` on the content
+    // is what actually publishes. Writing the design first means a crash
+    // between the two leaves a film marked rendered but unattached — visible
+    // and retryable — rather than a post carrying a video nothing points at.
     await designRef(brandId, designId).set(
         {
             renderStatus: RenderStatus.Done,
@@ -621,6 +631,26 @@ export async function setDesignV3Result(
             ...(posterUrl ? { posterUrl } : {}),
             renderedAt: Date.now(),
             renderError: FieldValue.delete(),
+            updatedAt: Date.now(),
+        },
+        { merge: true }
+    );
+
+    if (!contentId) return;
+
+    // The same attachment shape v2 writes, because the publish pipeline reads
+    // it and knows nothing about which studio produced the file.
+    //
+    // designRef is deliberately NOT written. It points at a v2 revision, and
+    // claiming one exists for a v3 film would leave the content pointing at a
+    // document that was never created. designV3Ref says where it really came
+    // from, and `attachments` is what publishes either way.
+    await contentRef(brandId, contentId).set(
+        {
+            attachments: [
+                { type: "video", playUrl: url, ...(posterUrl ? { thumbUrl: posterUrl } : {}) },
+            ],
+            designV3Ref: { designId, renderUrl: url, renderedAt: Date.now() },
             updatedAt: Date.now(),
         },
         { merge: true }
