@@ -176,6 +176,9 @@ export async function resolveProjectMedia(
     // Element id → the voiceover file resolved for it, so a caption track
     // can find the audio it is meant to follow.
     const voiceFor = new Map<string, string>();
+    // Declarations that could not be resolved, keyed the same way, so their
+    // elements can be taken out rather than left pointing at nothing.
+    const failed = new Set<string>();
 
     for (const d of declarations) {
         const key = `${d.type}\u0000${d.intent}\u0000${d.entity ?? ""}`;
@@ -191,12 +194,14 @@ export async function resolveProjectMedia(
                 const why = firstLine(run.stderr || run.stdout) || `exit ${run.code}`;
                 console.log(`[media] ${d.type} FAILED after ${Date.now() - startedAt}ms: ${why}`);
                 result.problems.push(`${d.type} "${trim(d.intent)}": ${why}`);
+                failed.add(key);
                 continue;
             }
             rel = pathFromResolveJSON(run.stdout, projectDir);
             if (!rel) {
                 console.log(`[media] ${d.type} returned no path. stdout: ${trim(run.stdout.replace(/\s+/g, " "))}`);
                 result.problems.push(`${d.type} "${trim(d.intent)}": resolved but the reply named no file`);
+                failed.add(key);
                 continue;
             }
             // The whole envelope, trimmed. Which provider answered and what
@@ -214,7 +219,7 @@ export async function resolveProjectMedia(
         result.resolved++;
     }
 
-    if (resolvedFor.size === 0) return result;
+    if (resolvedFor.size === 0 && failed.size === 0) return result;
 
     // Re-find the elements against the ORIGINAL source, now that every path
     // is known, so all the offsets come from one parse.
@@ -223,8 +228,24 @@ export async function resolveProjectMedia(
         const type = (el.attrs["data-media"] || "").trim().toLowerCase();
         const intent = (el.attrs["data-media-intent"] || "").trim();
         const entity = (el.attrs["data-media-entity"] || "").trim();
-        const rel = resolvedFor.get(`${type}\u0000${intent}\u0000${entity}`);
-        if (!rel) continue;
+        const key = `${type}\u0000${intent}\u0000${entity}`;
+        const rel = resolvedFor.get(key);
+        if (!rel) {
+            // ── A declaration nobody could serve takes its element with it ──
+            // Left in place, an <audio data-media="voice"> that did not
+            // resolve is an audio element with no src, and the gate refuses
+            // the whole film over it: one unavailable provider and nothing
+            // previews. Found on dev when voice turned out to need the
+            // OAuth path rather than an API key, and a reel that was
+            // otherwise complete — photograph, music, captions markup —
+            // could not be seen at all.
+            //
+            // So the element goes. A film missing its soundtrack is a film;
+            // a film that refuses to render is not. The problem is already
+            // on the warnings list, so nothing is hidden by this.
+            if (failed.has(key)) edits.push({ start: el.start, end: el.end, text: "" });
+            continue;
+        }
 
         edits.push(setAttribute(el, "src", rel));
         // The declaration has been honoured; leaving it would have the next
@@ -245,6 +266,11 @@ export async function resolveProjectMedia(
         const forId = (el.attrs["data-captions"] || "").trim();
         const voicePath = voiceFor.get(forId);
         if (!voicePath) {
+            // The attribute goes even though the captions cannot be made:
+            // left in place it is a promise to a later run that the audio
+            // exists, and the container is already empty.
+            const drop = removeAttribute(el, "data-captions", original);
+            if (drop) edits.push(drop);
             result.problems.push(`captions for "${forId}": that voiceover did not resolve`);
             continue;
         }
