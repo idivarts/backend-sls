@@ -541,7 +541,10 @@ async function runHyperframesDesignJob(job: RenderJob): Promise<void> {
             designId
         );
 
-        await setDesignV3Result(job.brandId, designId, result.url);
+        // The content id comes off the DESIGN, never off the job: a job is a
+        // request to render, and the link between a design and a post can
+        // change between queuing one and running it.
+        await setDesignV3Result(job.brandId, designId, result.url, undefined, design.contentId);
         // Same namespace and dimensions as every other render, so the cost
         // meter and the failure alarm cover v3 without a second dashboard.
         renderSucceeded({
