@@ -111,6 +111,12 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 	case toolGenerateDesign:
 		r, err := runGenerateDesign(ctx, brandID, contextID, arguments)
 		return r, false, err
+	case toolWriteHyperframesProject:
+		// v3 authoring. Takes a designId rather than the chat's contextID: a
+		// design is a first-class object now, and the one being written is
+		// not necessarily the one this conversation is about.
+		r, err := runWriteHyperframesProject(ctx, brandID, arguments)
+		return r, false, err
 	case toolApplyDesignEdits:
 		r, err := runApplyDesignEdits(ctx, brandID, contextID, arguments)
 		return r, false, err

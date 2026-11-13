@@ -90,6 +90,20 @@ type Spec struct {
 	// always lived under `audio/` and the apps play those URLs directly.
 	Prefix string
 
+	// ExactKey stores the object at this key verbatim, skipping the generated
+	// one. Needed only for a file whose PATH IS PART OF ITS MEANING.
+	//
+	// The generated key exists so two people uploading "video.mp4" cannot
+	// collide, which is right for media. A Design Studio v3 project is not
+	// media: it is a directory the Hyperframes CLI reads, where
+	// `compositions/hook.html` is mounted by that exact relative path from
+	// index.html. Rename it and the film loses a scene.
+	//
+	// Callers own uniqueness when they set this. The design's own id is in
+	// the prefix, so two designs cannot collide, and re-authoring a design
+	// deliberately overwrites its own files.
+	ExactKey string
+
 	// NoLibrary stores the bytes without filing a library row. The ONE
 	// legitimate use is a file that is not the brand's media at all: a
 	// contract PDF, a chat attachment. Everything else files a row, because
@@ -151,7 +165,10 @@ func PresignUpload(ctx context.Context, sp Spec) (*Presigned, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := buildKey(orDefault(sp.Prefix, prefix), sp.Filename)
+	key := sp.ExactKey
+	if key == "" {
+		key = buildKey(orDefault(sp.Prefix, prefix), sp.Filename)
+	}
 	url := cdn + "/" + key
 
 	req, _ := mys3.Client.PutObjectRequest(&s3.PutObjectInput{
@@ -251,7 +268,10 @@ func Put(ctx context.Context, sp Spec, data []byte) (*Stored, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := buildKey(orDefault(sp.Prefix, prefix), sp.Filename)
+	key := sp.ExactKey
+	if key == "" {
+		key = buildKey(orDefault(sp.Prefix, prefix), sp.Filename)
+	}
 	contentType := orDefault(sp.ContentType, mimeFromFilename(sp.Filename))
 
 	if _, err := mys3.Client.PutObject(&s3.PutObjectInput{
