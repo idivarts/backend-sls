@@ -194,3 +194,12 @@ func TestTheSelectionRingIsNeverPartOfTheProject(t *testing.T) {
 		t.Fatal("the ring can be selected")
 	}
 }
+
+// Without this the composition iframe is pointer-events:none, every click on
+// the film reaches the player's controls instead, and selection cannot work
+// at all — measured on dev, where clicking a headline only toggled playback.
+func TestThePlayerLetsClicksReachTheFilm(t *testing.T) {
+	if !strings.Contains(playerPage("https://cdn/player.js"), "interactive") {
+		t.Fatal("the composition is not clickable, so nothing can be selected")
+	}
+}

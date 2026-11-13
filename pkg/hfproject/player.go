@@ -263,6 +263,19 @@ const bridgeJS = `
 // playerPage is the page the app embeds. Deliberately bare: it is shown inside
 // an iframe that already has a frame around it, so any chrome here would be a
 // second one.
+//
+// ── `interactive` is what makes selection possible ───────────────────────
+// The player's composition iframe is `pointer-events: none` by default, so a
+// click on the film reaches the player's own controls and toggles playback —
+// which is what happened the first time selection was tried on dev: the
+// headline could not be clicked, only played. Their stylesheet has an opt-in
+// for it, `:host([interactive])`, described as being for "an interactive
+// composition (e.g. a live slideshow/app with playable media or controls)".
+// A composition the user is editing is exactly that.
+//
+// `controls` stays: the controls layer has its own pointer-events and sits
+// above the composition, so the transport still works and the film below it
+// becomes clickable.
 func playerPage(playerURL string) string {
 	return `<!doctype html>
 <html lang="en">
@@ -276,7 +289,7 @@ func playerPage(playerURL string) string {
     </style>
   </head>
   <body>
-    <hyperframes-player src="preview.html" controls muted></hyperframes-player>
+    <hyperframes-player src="preview.html" controls muted interactive></hyperframes-player>
     <script src="` + playerURL + `"></script>
     <script>` + bridgeJS + `</script>
   </body>
