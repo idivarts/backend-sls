@@ -55,6 +55,14 @@ type RenderJob struct {
 	// its scenes, converts them into a composition and renders that, so
 	// `revisionId` carries the studio id for the status writers.
 	StudioID string `json:"studioId,omitempty"`
+	// DesignID targets a Design Studio v3 design at
+	// brands/{brandId}/designs/{designId}. There is no contentId: a v3 design
+	// is a first-class object, and the worker dispatches this docType before
+	// anything that assumes a content-scoped path.
+	DesignID string `json:"designId,omitempty"`
+	// Quality is the v3 cost lever: draft while someone iterates, delivery
+	// for the file they publish.
+	Quality string `json:"quality,omitempty"`
 }
 
 type startRenderRequest struct {
@@ -316,6 +324,27 @@ func SubmitStudioRender(brandID, contentID, studioID string, force bool) error {
 		RevisionID: studioID,
 		StudioID:   studioID,
 		DocType:    "studio",
+		Force:      force,
+	})
+}
+
+// SubmitDesignV3Render hands a Design Studio v3 design to the worker.
+//
+// ⚠️ `force` travels, and the comment above SubmitStudioRender explains what
+// happens when it does not: the handler honours force for its own gates and
+// charges the wallet, the job goes out with Force false, the worker skips a
+// design that already has a renderUrl, exits successfully, and the design
+// sits on `queued` for ever while the user watches a spinner they paid for.
+// It is the same trap here, so it is wired the same way.
+func SubmitDesignV3Render(brandID, designID, quality string, force bool) error {
+	return dispatch(RenderJob{
+		BrandID: brandID,
+		// RevisionID carries the design id as well, so the worker's logging
+		// and the Batch job name keep their existing shape.
+		RevisionID: designID,
+		DesignID:   designID,
+		DocType:    "hfdesign",
+		Quality:    quality,
 		Force:      force,
 	})
 }

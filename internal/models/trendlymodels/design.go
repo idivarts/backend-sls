@@ -90,6 +90,13 @@ type Design struct {
 	ManagerID string       `json:"managerId,omitempty" firestore:"managerId,omitempty"`
 	Format    DesignFormat `json:"format" firestore:"format"`
 
+	// DurationMs is the film's length, read off the root composition's
+	// data-duration when the project is written. It is here rather than
+	// derived at render time because the WALLET needs it before the worker
+	// ever opens the project — a charge that can only be computed after the
+	// render has started is not a gate.
+	DurationMs int `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
+
 	// ProjectPrefix is the S3 key prefix holding the Hyperframes project
 	// directory. Empty until the director has written one.
 	ProjectPrefix string `json:"projectPrefix,omitempty" firestore:"projectPrefix,omitempty"`

@@ -201,3 +201,27 @@ func GenerativeVideoTokenCost(model *MediaModel, durationSecs int) int64 {
 	}
 	return TokensForCost(usd * renderCostMarkupX)
 }
+
+// DesignV3RenderTokenCost prices a Design Studio v3 render.
+//
+// Deliberately the SAME curve as a one-clip video, not a new one. v3 produces
+// one MP4 from one project, which is the shape that curve already prices, and
+// a second pricing model would be a second place for the markup, the floor
+// and the token conversion to drift apart.
+//
+// ⚠️ The curve itself is due a re-base. It was fitted to the v2 renderer, and
+// Phase 0 measured v3 at 12-14s for a 12s reel against a v2 CloudWatch
+// average of 91s (studio) and 99s (video). We are currently charging v3 as if
+// it cost what v2 cost. That is safe — it over-charges us, never the user
+// — but it should be re-fitted once there are real v3 numbers in CloudWatch,
+// which Phase 1b now emits under the "hfdesign" DocType dimension.
+func DesignV3RenderTokenCost(durationMs int) int64 {
+	if durationMs <= 0 {
+		// A design whose length we do not know yet. Priced as a short film
+		// rather than as free: a zero charge would let an unmeasured project
+		// render for nothing, and the floor in RenderTokenCost already stops
+		// this being punitive.
+		durationMs = 10_000
+	}
+	return RenderTokenCost("video", 1, durationMs)
+}
