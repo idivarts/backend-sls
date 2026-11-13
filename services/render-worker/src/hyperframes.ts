@@ -259,9 +259,30 @@ export function patchGsapTag(html: string, relPath: string): string {
     // In order of preference, so the tag lands before the code that uses it.
     if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `  ${tag}\n</head>`);
     if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => `${m}\n  ${tag}`);
-    // No head and no body — a bare composition fragment. Prepending still puts
-    // GSAP ahead of the inline timeline, which is all that is required.
-    return `${tag}\n${html}`;
+
+    // ⚠️ A BARE <template> FRAGMENT IS LEFT ALONE, ON PURPOSE.
+    //
+    // A scene file is `<template>…</template>`, and the authoring contract
+    // states that in a scene "styles and scripts outside it are DROPPED". So
+    // a tag prepended here never runs. It does, however, make the CLI's own
+    // `check` stop complaining — it scans the file's text and sees a gsap
+    // script — and that is far worse than doing nothing:
+    //
+    //   before: `check` failed loudly, "Composition uses GSAP but no GSAP
+    //           script is loaded", and nothing was rendered or charged.
+    //   after:  `check` passed, `render` ran, the user was charged, and the
+    //           film came out unstyled and static because the composition
+    //           scripts still threw.
+    //
+    // Proved by rendering the same project three ways in the image: pristine
+    // → render BLOCKS with sub_timeline_script_failure; prepended outside the
+    // template → renders garbage; inside the template → renders the same
+    // garbage, because a cloned template's scripts do not execute either.
+    //
+    // Getting GSAP into a composition's own context is a real fix and not
+    // this function's to make. Until then the honest behaviour is to leave
+    // the file untouched and let the gate refuse the project.
+    return html;
 }
 
 export interface CheckFinding {

@@ -243,9 +243,19 @@ test("injection falls back to body when there is no head", () => {
     assert.ok(out.indexOf(LOCAL_GSAP) < out.indexOf("gsap.timeline"));
 });
 
-test("injection falls back to prepending for a bare fragment", () => {
-    const out = patchGsapTag("<div></div><script>gsap.to(x)</script>", "compositions/frag.html");
-    assert.ok(out.startsWith(`<script src="../${LOCAL_GSAP}"></script>`), out);
+// A scene file is a bare <template>, and the contract says scripts outside it
+// are DROPPED. Prepending one therefore never runs — but it DOES make `check`
+// stop complaining, because check scans the file's text. That turned a loud,
+// correct refusal into a silent broken render the user paid for, so the file
+// is now left alone and the gate is allowed to refuse it.
+test("a bare template fragment is left alone, so the gate can still refuse it", () => {
+    const html = "<template>\n  <div></div>\n  <script>gsap.to(x)</script>\n</template>";
+    assert.equal(patchGsapTag(html, "compositions/frag.html"), html);
+});
+
+test("a fragment with no template is also left alone rather than half-patched", () => {
+    const html = "<div></div><script>gsap.to(x)</script>";
+    assert.equal(patchGsapTag(html, "compositions/frag.html"), html);
 });
 
 // The end-to-end shape: vendorGsap must reach every document, which is what
