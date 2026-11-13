@@ -1292,6 +1292,13 @@ resources:
               Value: ${env:FIREBASE_SERVICE_ACCOUNT_JSON, ''}
             - Name: RENDER_SCALE
               Value: ${env:RENDER_SCALE, '1'}
+            # Media resolution runs HERE, on Batch, not in a Lambda — so
+            # provider.environment does not reach it. Adding the key only
+            # there left the worker with no credential and `media-use`
+            # failing instantly, which is the same silently-no-op shape the
+            # SOCIAL_SYNC_QUEUE_URL comment above warns about.
+            - Name: HEYGEN_API_KEY
+              Value: ${env:HEYGEN_API_KEY, ''}
 
     # --------------------------------------------------------------------------------------
     # ------------- Scheduled content publishing (delayed_sqs via Step Functions) ----------

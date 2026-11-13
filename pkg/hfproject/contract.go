@@ -113,7 +113,11 @@ declare it and it is resolved into the project before the film is checked:
   <img id="hero-shot" class="clip" data-start="0" data-duration="3"
        data-media="image" data-media-intent="cold brew poured over ice, warm late-afternoon light" />
 
-  <audio data-media="bgm" data-media-intent="upbeat lo-fi, no vocals, 90bpm"></audio>
+  <audio id="score" data-media="bgm" data-media-intent="upbeat lo-fi, no vocals, 90bpm"></audio>
+
+EVERY media element needs its own id. The renderer discovers media by id and
+refuses a film without one: "<audio> has data-start but no id attribute ...
+this audio will be SILENT in renders".
 
 data-media is one of: image, icon, logo, bgm, sfx, voice.
 data-media-intent is what it should be, in plain words — the more specific,
