@@ -115,6 +115,68 @@ func withScripts(indexHTML, runtimeURL, gsapURL string) string {
 	return tags + "\n" + indexHTML
 }
 
+// bridgeJS lets the app that embeds this page drive the film.
+//
+// ── Why a bridge of our own ───────────────────────────────────────────────
+// <hyperframes-player> has seek/play/pause as METHODS, and the app is on a
+// different origin from this page, so it cannot reach them. The element does
+// listen for postMessage, but `_handleRuntimeMessage` checks the sender is
+// the composition iframe's contentWindow — a message from the parent is
+// dropped. There is no parent-facing protocol to use, so this adds the
+// smallest one that does the job.
+//
+// ── What crosses, and in which direction ──────────────────────────────────
+// In: seek / play / pause, accepted only from window.parent — the frame that
+// embedded us, which could already drive playback through the controls.
+// Out: the playhead, so the app's timeline follows the film rather than
+// guessing at it. Position and duration only; nothing about the design.
+//
+// The first reply goes to "*" because the embedder's origin is not known
+// until it speaks. It carries a time and a duration, which is why that is
+// acceptable; everything after a command goes back to that command's origin.
+const bridgeJS = `
+(function () {
+  var el = document.querySelector("hyperframes-player");
+  if (!el || window.parent === window) return;
+  var origin = null;
+
+  function post(type) {
+    try {
+      window.parent.postMessage({
+        source: "trendly-player",
+        type: type,
+        timeMs: Math.round((el.currentTime || 0) * 1000),
+        durationMs: Math.round((el.duration || 0) * 1000),
+        paused: !!el.paused
+      }, origin || "*");
+    } catch (e) {}
+  }
+
+  el.addEventListener("ready", function () { post("ready"); });
+  el.addEventListener("durationchange", function () { post("ready"); });
+  el.addEventListener("timeupdate", function () { post("time"); });
+
+  window.addEventListener("message", function (e) {
+    if (e.source !== window.parent) return;
+    var d = e.data;
+    if (!d || d.source !== "trendly-studio") return;
+    origin = e.origin;
+    try {
+      if (d.type === "seek" && typeof el.seek === "function") {
+        el.seek(Math.max(0, (d.timeMs || 0) / 1000));
+      } else if (d.type === "play" && typeof el.play === "function") {
+        el.play();
+      } else if (d.type === "pause" && typeof el.pause === "function") {
+        el.pause();
+      }
+    } catch (err) {}
+    // Answer every command, "hello" included: it is how the app learns the
+    // duration and that the player is listening at all.
+    post(d.type === "hello" ? "ready" : "time");
+  });
+})();
+`
+
 // playerPage is the page the app embeds. Deliberately bare: it is shown inside
 // an iframe that already has a frame around it, so any chrome here would be a
 // second one.
@@ -133,6 +195,7 @@ func playerPage(playerURL string) string {
   <body>
     <hyperframes-player src="preview.html" controls muted></hyperframes-player>
     <script src="` + playerURL + `"></script>
+    <script>` + bridgeJS + `</script>
   </body>
 </html>
 `

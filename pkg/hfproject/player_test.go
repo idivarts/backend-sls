@@ -124,3 +124,38 @@ func TestVendoredGsapMatchesTheRenderWorkersCopy(t *testing.T) {
 		t.Fatalf("the player's GSAP (%d bytes) is not the renderer's (%d bytes)", len(gsapJS), len(theirs))
 	}
 }
+
+// The app and the player are on different origins, so the app can only drive
+// the film through this. Each assertion is a way the bridge has failed before
+// it reaches a browser.
+func TestPlayerPageCarriesTheBridge(t *testing.T) {
+	page := playerPage("https://cdn/player.js")
+
+	// The player must be defined before the bridge queries for it.
+	if strings.Index(page, "player.js") > strings.Index(page, "querySelector") {
+		t.Fatal("the bridge runs before the player script that defines the element")
+	}
+	for _, want := range []string{
+		`d.type === "seek"`, // the command this exists for
+		`d.type === "play"`,
+		`d.type === "pause"`,
+		`"timeupdate"`, // and the playhead coming back
+		`source: "trendly-player"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("the bridge is missing %s", want)
+		}
+	}
+}
+
+// Anything may embed a published player page. Commands are taken only from
+// the frame that embedded it, and only when they carry our own marker.
+func TestBridgeOnlyObeysItsEmbedder(t *testing.T) {
+	page := playerPage("https://cdn/player.js")
+	if !strings.Contains(page, "if (e.source !== window.parent) return;") {
+		t.Fatal("the bridge accepts commands from senders other than its embedder")
+	}
+	if !strings.Contains(page, `d.source !== "trendly-studio"`) {
+		t.Fatal("the bridge does not check the sender's marker")
+	}
+}
