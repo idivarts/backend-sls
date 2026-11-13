@@ -115,6 +115,21 @@ declare it and it is resolved into the project before the film is checked:
 
   <audio id="score" data-media="bgm" data-media-intent="upbeat lo-fi, no vocals, 90bpm"></audio>
 
+VOICEOVER AND CAPTIONS. A voiceover is media like any other, and its intent
+is the words to be spoken:
+
+  <audio id="vo" data-media="voice" data-media-intent="Hit the 2 PM wall? Not any more."></audio>
+
+For word-synced captions against it, add an empty container pointing at that
+audio by id. It is filled with one timed span per word, from a real
+transcript of the audio that was generated:
+
+  <div id="captions" class="caption-track" data-captions="vo" data-start="0" data-duration="9"></div>
+
+Style .caption-track and its spans yourself, from the brand tokens. Give the
+container a sensible place on the frame; the words inherit whatever you set.
+Ask for captions only when the film has a voiceover.
+
 EVERY media element needs its own id. The renderer discovers media by id and
 refuses a film without one: "<audio> has data-start but no id attribute ...
 this audio will be SILENT in renders".

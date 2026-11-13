@@ -173,6 +173,9 @@ export async function resolveProjectMedia(
     // declarations we already looked at meaningless.
     const edits: Edit[] = [];
     const resolvedFor = new Map<string, string>();
+    // Element id → the voiceover file resolved for it, so a caption track
+    // can find the audio it is meant to follow.
+    const voiceFor = new Map<string, string>();
 
     for (const d of declarations) {
         const key = `${d.type}\u0000${d.intent}\u0000${d.entity ?? ""}`;
@@ -207,6 +210,7 @@ export async function resolveProjectMedia(
             resolvedFor.set(key, rel);
             result.files.push(rel);
         }
+        if (d.type === "voice" && d.elementId) voiceFor.set(d.elementId, rel);
         result.resolved++;
     }
 
@@ -232,6 +236,40 @@ export async function resolveProjectMedia(
         edits.push(setAttribute(el, "data-media-resolved", rel));
     }
 
+    // ── Captions ─────────────────────────────────────────────────────────
+    // A container carrying data-captions="<audio id>" asks for a word-synced
+    // track against that voiceover. Done here, in the same pass, because the
+    // audio only exists now — and written as timed spans the runtime already
+    // knows how to show, so there is no new dependency and no custom script.
+    for (const el of findElements(original, (e) => typeof e.attrs["data-captions"] === "string")) {
+        const forId = (el.attrs["data-captions"] || "").trim();
+        const voicePath = voiceFor.get(forId);
+        if (!voicePath) {
+            result.problems.push(`captions for "${forId}": that voiceover did not resolve`);
+            continue;
+        }
+        const started = Date.now();
+        const run = await runHyperframes(
+            projectDir,
+            ["transcribe", voicePath, "--dir", projectDir, "--json", "--optional"],
+            { env, timeoutMs: RESOLVE_TIMEOUT_MS }
+        );
+        const words = run.code === 0 ? wordsFromTranscribeJSON(run.stdout) : [];
+        if (words.length === 0) {
+            const why = firstLine(run.stderr || run.stdout) || `no words (exit ${run.code})`;
+            console.log(`[media] captions for ${forId} produced nothing after ${Date.now() - started}ms: ${why}`);
+            result.problems.push(`captions for "${forId}": ${why}`);
+            continue;
+        }
+        const offset = Number(el.attrs["data-start"] ?? "0") || 0;
+        // The container's own children are replaced: whatever placeholder
+        // the model put there was a stand-in for exactly this.
+        edits.push({ start: el.tagEnd, end: el.end - closingTagLength(el), text: captionSpans(words, offset) });
+        const e = removeAttribute(el, "data-captions", original);
+        if (e) edits.push(e);
+        console.log(`[media] captions for ${forId}: ${words.length} words in ${Date.now() - started}ms`);
+    }
+
     if (edits.length === 0) return result;
     await writeFile(indexPath, applyEdits(original, edits), "utf8");
     result.changed = true;
@@ -245,4 +283,89 @@ function firstLine(s: string): string {
 
 function trim(s: string, max = 60): string {
     return s.length > max ? s.slice(0, max - 3) + "…" : s;
+}
+
+/** One word of a transcript, as `hyperframes transcribe --json` reports it. */
+export interface TranscriptWord {
+    text: string;
+    start: number;
+    end: number;
+}
+
+/**
+ * The words out of a transcribe envelope.
+ *
+ * Tolerant of where the array sits, for the same reason pathFromResolveJSON
+ * is: the shape is not documented as stable, and a caption track is not
+ * worth failing a film over.
+ */
+export function wordsFromTranscribeJSON(stdout: string): TranscriptWord[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(stdout.trim().split("\n").filter(Boolean).pop() ?? "");
+    } catch {
+        return [];
+    }
+    const obj = parsed as Record<string, unknown>;
+    const candidates = [parsed, obj?.words, obj?.transcript, (obj?.result as Record<string, unknown>)?.words];
+    for (const c of candidates) {
+        if (!Array.isArray(c)) continue;
+        const words = c
+            .map((w) => w as Record<string, unknown>)
+            .filter((w) => typeof w?.text === "string" && typeof w?.start === "number" && typeof w?.end === "number")
+            .map((w) => ({ text: String(w.text), start: Number(w.start), end: Number(w.end) }));
+        if (words.length > 0) return words;
+    }
+    return [];
+}
+
+/**
+ * The markup for a word-synced caption track.
+ *
+ * ── Why our own spans and not a registry caption component ────────────────
+ * Hyperframes ships fifteen caption components, and they are good. They are
+ * also styled their way, installed with `hyperframes add`, and configured
+ * through an API we would have to pin a version against. Our films already
+ * style text from the brand kit, and the runtime ALREADY times any element
+ * carrying `.clip` with data-start and data-duration — that is how every
+ * scene in these films works.
+ *
+ * So a caption is one span per word, timed by the same mechanism as
+ * everything else in the document. No new dependency, no custom script, and
+ * the words inherit the brand's font and colour like the rest of the film.
+ *
+ * `offsetS` shifts the transcript onto the film's clock: a voiceover that
+ * starts four seconds in has a transcript that starts at zero.
+ */
+export function captionSpans(words: TranscriptWord[], offsetS = 0): string {
+    return words
+        .map((w) => {
+            const start = Math.max(0, w.start + offsetS);
+            // A word the transcriber gave no width to would be timed to
+            // vanish on the frame it appears, which reads as a flicker.
+            const duration = Math.max(0.08, w.end - w.start);
+            return (
+                `<span class="clip" data-start="${start.toFixed(2)}" ` +
+                `data-duration="${duration.toFixed(2)}">${escapeText(w.text)}</span>`
+            );
+        })
+        .join(" ");
+}
+
+function escapeText(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+
+/**
+ * How many characters the element's closing tag takes.
+ *
+ * `end` covers the whole element, so replacing its children means stopping
+ * short of `</tag>`. A void element has no closing tag and no children to
+ * replace, which is why this returns zero for one.
+ */
+function closingTagLength(el: { tagName: string; start: number; end: number; tagEnd: number }): number {
+    const close = `</${el.tagName}>`.length;
+    // A self-closed or void element: the start tag IS the element.
+    return el.end - el.tagEnd >= close ? close : 0;
 }
