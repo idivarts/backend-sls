@@ -163,6 +163,11 @@ type Design struct {
 	// with the renderer's.
 	Scenes []DesignScene `json:"scenes,omitempty" firestore:"scenes,omitempty"`
 
+	// PreviewURL is a page that PLAYS this design live, before any render:
+	// Hyperframes' own player over the project's own HTML. Written when the
+	// project is written, because it is a function of the project.
+	PreviewURL string `json:"previewUrl,omitempty" firestore:"previewUrl,omitempty"`
+
 	// Brief is what the user asked for, in their own words, kept so the app
 	// can show it back to them.
 	//
@@ -632,6 +637,7 @@ func SetBrandDesignProject(
 	brandID, designID, prefix string,
 	durationMs int,
 	scenes []DesignScene,
+	previewURL string,
 ) error {
 	if scenes == nil {
 		// An explicit empty list, not a missing field: a rewrite that
@@ -639,10 +645,17 @@ func SetBrandDesignProject(
 		// timeline keeps drawing clips from a film that no longer exists.
 		scenes = []DesignScene{}
 	}
+	// An empty previewUrl CLEARS the old one: a rewrite whose player could
+	// not be written must not leave the app playing the previous film.
+	var preview any = previewURL
+	if previewURL == "" {
+		preview = firestore.Delete
+	}
 	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
 		{Path: "projectPrefix", Value: prefix},
 		{Path: "durationMs", Value: durationMs},
 		{Path: "scenes", Value: scenes},
+		{Path: "previewUrl", Value: preview},
 		{Path: "authorStatus", Value: DesignAuthorDone},
 		{Path: "authorError", Value: firestore.Delete},
 	})
