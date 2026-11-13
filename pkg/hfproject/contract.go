@@ -104,4 +104,23 @@ RULES — each is enforced, and breaking one fails the render:
 12. Something must keep moving: a stretch over 3s with nothing changing fails the check. Mark a deliberate pause data-hold.
 13. Keep content inside the middle 90% of the canvas and text inside the middle 80%. Phones crop the edges.
 14. Scenes that are not on screen must not be visible: give every scene opacity:0 in CSS and let the timeline bring it in and take it out. Two scenes drawn at once is the most common way a film comes out unreadable.
-15. Do not tween a property the browser snaps to whole pixels during layout — letterSpacing, width, height, margin, padding. check rejects them. Animate transform, opacity, scale, x and y instead.`
+15. Do not tween a property the browser snaps to whole pixels during layout — letterSpacing, width, height, margin, padding. check rejects them. Animate transform, opacity, scale, x and y instead.
+MEDIA — DECLARE IT, DO NOT DRAW IT AND DO NOT LINK IT.
+You cannot fetch anything, and a remote URL breaks a render that must work
+with no network. When a scene wants a photograph, a video, music or a sound,
+declare it and it is resolved into the project before the film is checked:
+
+  <img id="hero-shot" class="clip" data-start="0" data-duration="3"
+       data-media="image" data-media-intent="cold brew poured over ice, warm late-afternoon light" />
+
+  <audio data-media="bgm" data-media-intent="upbeat lo-fi, no vocals, 90bpm"></audio>
+
+data-media is one of: image, icon, logo, bgm, sfx, voice.
+data-media-intent is what it should be, in plain words — the more specific,
+the better the result. For a logo, add data-media-entity="<the brand>".
+Leave src off entirely; it is written for you.
+
+Declare media only where the film genuinely needs a photograph or a sound.
+Type, shape, colour and motion you can draw yourself are better drawn: they
+cost nothing, they always match the brand, and they never fail to resolve.
+`

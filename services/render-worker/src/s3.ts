@@ -8,7 +8,7 @@
  * server render from a client one by its URL shape.
  */
 import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { config } from "./config";
 
@@ -108,4 +108,90 @@ export async function downloadPrefix(prefix: string, destDir: string): Promise<n
     } while (token);
 
     return count;
+}
+
+/**
+ * Put selected project files back where the project came from.
+ *
+ * Media resolution happens in the worker, on whichever of the preview or the
+ * render runs first, and what it produces is a paid artefact. Leaving it in
+ * the job's temp directory would mean the other one resolves it again and
+ * pays again, so the changed files go back to the prefix and the next job
+ * materialises them like any other part of the project.
+ *
+ * Paths are project-relative, and a traversal segment is refused for the
+ * same reason downloadPrefix refuses one: it would write outside the prefix
+ * this design owns.
+ */
+export async function uploadProjectFiles(prefix: string, dir: string, relativePaths: string[]): Promise<number> {
+    const bucket = config.s3Bucket();
+    const normalised = prefix.endsWith("/") ? prefix : `${prefix}/`;
+    let written = 0;
+
+    for (const rel of new Set(relativePaths)) {
+        if (!rel || rel.split("/").some((seg) => seg === ".." || seg === "")) {
+            throw new Error(`refusing to upload a path with a traversal segment: ${rel}`);
+        }
+        let body: Buffer;
+        try {
+            body = await readFile(join(dir, rel));
+        } catch {
+            // Reported by the caller as a media problem; a file the CLI said
+            // it wrote and did not is not worth failing a render over.
+            continue;
+        }
+        await s3().send(
+            new PutObjectCommand({
+                Bucket: bucket,
+                Key: normalised + rel,
+                Body: body,
+                ContentType: contentTypeFor(rel),
+            })
+        );
+        written++;
+    }
+    return written;
+}
+
+/** What CloudFront should serve a project file as. */
+function contentTypeFor(rel: string): string {
+    const ext = rel.slice(rel.lastIndexOf(".")).toLowerCase();
+    switch (ext) {
+        case ".html":
+            return "text/html; charset=utf-8";
+        case ".css":
+            return "text/css; charset=utf-8";
+        case ".js":
+        case ".mjs":
+            return "text/javascript; charset=utf-8";
+        case ".json":
+            return "application/json";
+        case ".svg":
+            return "image/svg+xml";
+        case ".png":
+            return "image/png";
+        case ".jpg":
+        case ".jpeg":
+            return "image/jpeg";
+        case ".webp":
+            return "image/webp";
+        case ".gif":
+            return "image/gif";
+        case ".mp3":
+            return "audio/mpeg";
+        case ".wav":
+            return "audio/wav";
+        case ".m4a":
+            return "audio/mp4";
+        case ".mp4":
+            return "video/mp4";
+        case ".webm":
+            return "video/webm";
+        case ".woff2":
+            return "font/woff2";
+        case ".woff":
+            return "font/woff";
+        default:
+            return "application/octet-stream";
+    }
 }

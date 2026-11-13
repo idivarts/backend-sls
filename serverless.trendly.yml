@@ -31,6 +31,7 @@ provider:
     # AI Studio — ElevenLabs (music + voiceover) and Canva Connect deep-edit
     # bridge. See docs/elevenlabs-setup.md and docs/canva-setup.md.
     ELEVENLABS_API_KEY: ${env:ELEVENLABS_API_KEY, ''}
+    HEYGEN_API_KEY: ${env:HEYGEN_API_KEY, ''}
     # Off unless the workspace actually has a flows webhook configured in the
     # ElevenLabs dashboard. Asking for a callback a workspace cannot make
     # refuses the whole generation, so this stays off until the endpoint exists;
