@@ -91,6 +91,12 @@ func RenderStudio(c *gin.Context) {
 	}
 
 	tokens := trendlymodels.StudioRenderTokenCost(s, scenes, media)
+	// Tracked so a dispatch that never starts can give them back. The charge
+	// happens before the work so the wallet cannot be raced, which means the
+	// moment the work does not start we owe a refund — otherwise the user has
+	// paid for a render that never existed. Proved on dev with the v3 path,
+	// which had the identical gap.
+	var chargedTokens int64
 	alreadyPaid := s.RenderChargedTokens > 0 && !req.Force
 
 	// A user-initiated render is gated on the wallet: refusing here is honest,
@@ -108,6 +114,7 @@ func RenderStudio(c *gin.Context) {
 		}
 		if orgID != "" && tokens > 0 {
 			if _, derr := trendlymodels.DeductTokens(orgID, tokens); derr == nil {
+				chargedTokens = tokens
 				_ = trendlymodels.UpdateStudio(ctx, brandID, contentID, studioID,
 					[]firestore.Update{{Path: "renderChargedTokens", Value: tokens}})
 			}
@@ -135,6 +142,10 @@ func RenderStudio(c *gin.Context) {
 			"brandId":  brandID,
 			"studioId": studioID,
 		})
+		if chargedTokens > 0 {
+			orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+			_, _ = trendlymodels.RefundTokens(orgID, chargedTokens)
+		}
 		_ = trendlymodels.MarkStudioRenderFailed(ctx, brandID, contentID, studioID,
 			"We couldn't start the render. Please try again.")
 		c.JSON(http.StatusBadGateway, gin.H{
