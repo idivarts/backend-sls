@@ -198,9 +198,10 @@ jobs:
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
         run: |
           missing=""
-          for name in ELEVENLABS_API_KEY OPENROUTER_API_KEY; do
+          for name in ELEVENLABS_API_KEY OPENROUTER_API_KEY HEYGEN_API_KEY; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -274,6 +275,15 @@ jobs:
           # no overage headroom, so an exhausted allowance takes production's
           # audio out.
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          # Media resolution for AI-authored designs. Environment-scoped like
+          # ELEVENLABS_API_KEY above, and guarded in the preflight because its
+          # absence does not degrade honestly: a film that declared a photo
+          # renders with an empty frame.
+          #
+          # It reaches the media-use step only. hyperframesEnv() builds the
+          # render subprocess's environment from an allowlist precisely so a
+          # render cannot reach a paid API, and that argument still holds.
+          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
           # Stock photography for AI-authored designs. Deliberately NOT in the
           # "Check the runtime secrets resolved" guard above: that guard is for
           # keys whose absence silently kills a surface. This one degrades

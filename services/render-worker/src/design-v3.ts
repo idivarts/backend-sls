@@ -30,7 +30,8 @@ import {
     snapshotProject,
     vendorGsap,
 } from "./hyperframes";
-import { downloadPrefix, upload } from "./s3";
+import { resolveProjectMedia } from "./media";
+import { downloadPrefix, upload, uploadProjectFiles } from "./s3";
 
 export interface DesignV3Job {
     brandId: string;
@@ -44,6 +45,14 @@ export interface DesignV3Job {
      */
     quality?: "draft" | "looks" | "delivery";
     force?: boolean;
+    /**
+     * What this design may spend resolving media, in HeyGen credits.
+     *
+     * Written into the project as Hyperframes' own `.hyperframes/
+     * credit-limit.json`, so the CLI refuses a call that would exceed it
+     * rather than us noticing afterwards.
+     */
+    creditCeiling?: number;
 }
 
 export interface DesignV3Hooks {
@@ -81,6 +90,7 @@ async function materialiseAndGate(
     workDir: string,
     hooks: DesignV3Hooks
 ): Promise<string[]> {
+    const warnings: string[] = [];
     const fileCount = await downloadPrefix(job.projectPrefix, workDir);
     if (fileCount < MIN_PROJECT_FILES) {
         throw new Error(`no project files found under ${job.projectPrefix}`);
@@ -99,13 +109,36 @@ async function materialiseAndGate(
     // one without, which is the worst kind of intermittent.
     await vendorGsap(workDir);
 
+    // Media the film declared but does not have yet. Before the gate for
+    // the same reason: an <img> with no src is a finding, and a film whose
+    // picture arrives only at render time is one the preview lied about.
+    //
+    // Non-fatal by contract. A brief that mentions a song it cannot find
+    // must still be previewable, so a failure here is reported as a warning
+    // and the film goes on without that asset.
+    try {
+        const media = await resolveProjectMedia(workDir, {
+            heygenApiKey: process.env.HEYGEN_API_KEY,
+            creditCeiling: job.creditCeiling,
+        });
+        for (const p of media.problems) warnings.push(`media: ${p}`);
+        if (media.changed) {
+            // Back to the bucket, so the render that follows this preview
+            // reuses the same files rather than resolving — and paying —
+            // for them a second time.
+            await uploadProjectFiles(job.projectPrefix, workDir, ["index.html", ...media.files]);
+        }
+    } catch (err) {
+        warnings.push(`media: ${(err as Error).message}`);
+    }
+
     const outcome = await checkProject(workDir);
     if (!outcome.ok) {
         const problem = outcome.problem ?? "This design has a problem that would stop it rendering.";
         await hooks.onCheckFailed?.(problem);
         throw new Error(`check failed: ${problem}`);
     }
-    return outcome.warnings.map((w) => w.message);
+    return [...warnings, ...outcome.warnings.map((w) => w.message)];
 }
 
 export async function renderDesignV3(
