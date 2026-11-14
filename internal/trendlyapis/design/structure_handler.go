@@ -46,6 +46,14 @@ func EditDesignStructure(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no such design"})
 		return
 	}
+	// A design nobody has written yet is a fact about the design, not a
+	// failure of ours — the render and preview endpoints answer 400 with
+	// the same sentence, and a 502 would have the user retrying something
+	// that cannot work.
+	if d.ProjectPrefix == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "This design has nothing in it yet."})
+		return
+	}
 	source, rerr := readCurrentDocument(ctx, d)
 	if rerr != nil {
 		mysentry.Capture(rerr, map[string]string{"op": "design.structure.read", "designId": designID})

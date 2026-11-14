@@ -181,7 +181,7 @@ func applyStructureEdit(source string, req structureRequest) (string, int, error
 		// Inserted right after the original, which is where a duplicate
 		// belongs and what every editor does.
 		extra = []hfedit.Edit{{Start: scenes[at].el.End, End: scenes[at].el.End, Text: "\n" + copyMarkup}}
-		_ = copyID
+		_ = copyID // named for the error messages; the layout pass finds it by reading the document again
 
 	case sceneOpAdd:
 		if len(scenes) >= maxScenes {
@@ -358,10 +358,15 @@ func readScenes(source string) ([]scene, error) {
 // with nothing in the document.
 func duplicateScene(source string, s scene, all []scene) (string, string, error) {
 	markup := source[s.el.Start:s.el.End]
-	suffix := freeSuffix(source, s.id)
+	ids := hfedit.FindAll(markup, func(e hfedit.Element) bool { return e.Attrs["id"] != "" })
+
+	suffix, serr := freeSuffix(source, ids)
+	if serr != nil {
+		return "", "", serr
+	}
 
 	var edits []hfedit.Edit
-	for _, el := range hfedit.FindAll(markup, func(e hfedit.Element) bool { return e.Attrs["id"] != "" }) {
+	for _, el := range ids {
 		e, err := hfedit.SetAttribute(el, markup, "id", el.Attrs["id"]+suffix)
 		if err != nil {
 			return "", "", err
@@ -375,15 +380,30 @@ func duplicateScene(source string, s scene, all []scene) (string, string, error)
 	return out, s.id + suffix, nil
 }
 
-// freeSuffix finds a suffix that makes every id in a copied scene unique.
-func freeSuffix(source, sceneID string) string {
+// freeSuffix finds a suffix that leaves EVERY id in the copy unique.
+//
+// Every id, not just the scene's. Checking only the scene meant that
+// duplicating `hook` into a film that already held `hook-title-2` — which
+// is what a previous duplicate leaves behind, or what an author may simply
+// have written — produced a copy whose headline collided with it. From
+// then on the selection bridge, FindByID and every later edit resolve to
+// whichever comes first, so the inspector edits one element while the user
+// is looking at another.
+func freeSuffix(source string, ids []hfedit.Element) (string, error) {
 	for n := 2; n < 100; n++ {
 		suffix := fmt.Sprintf("-%d", n)
-		if _, taken := hfedit.FindByID(source, sceneID+suffix); !taken {
-			return suffix
+		free := true
+		for _, el := range ids {
+			if _, taken := hfedit.FindByID(source, el.Attrs["id"]+suffix); taken {
+				free = false
+				break
+			}
+		}
+		if free {
+			return suffix, nil
 		}
 	}
-	return "-copy"
+	return "", fmt.Errorf("this scene has been duplicated too many times to name another copy")
 }
 
 // emptyScene is the markup for a new, blank scene.

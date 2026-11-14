@@ -220,3 +220,26 @@ func TestAStructuralEditLeavesEverythingElseAlone(t *testing.T) {
 		}
 	}
 }
+
+// The collision the suffix search exists to avoid: a film that already
+// holds the id a copy would produce for one of the scene's CHILDREN.
+func TestDuplicateAvoidsAnIdAChildWouldCollideWith(t *testing.T) {
+	// hook-2 is free, but hook-title-2 is taken — by a scene a previous
+	// duplicate left behind, or by hand.
+	film := strings.Replace(threeScenes,
+		`<h1 id="end-title" class="clip" data-start="6.2" data-duration="2.6">Three</h1>`,
+		`<h1 id="hook-title-2" class="clip" data-start="6.2" data-duration="2.6">Three</h1>`, 1)
+
+	out, _, err := applyStructureEdit(film, structureRequest{Op: sceneOpDuplicate, SceneID: "hook"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(out, `id="hook-title-2"`) != 1 {
+		t.Fatalf("the copy collided with an id already in the film:\n%s", out)
+	}
+	// It took the next suffix for the whole copy, so the scene and its
+	// child agree.
+	if !strings.Contains(out, `id="hook-3"`) || !strings.Contains(out, `id="hook-title-3"`) {
+		t.Fatalf("the copy did not move to a free suffix:\n%s", out)
+	}
+}
