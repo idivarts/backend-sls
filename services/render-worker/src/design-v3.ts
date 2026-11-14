@@ -30,7 +30,7 @@ import {
     snapshotProject,
     vendorGsap,
 } from "./hyperframes";
-import { resolveProjectMedia } from "./media";
+import { resolveProjectMedia, syncPlayerPage } from "./media";
 import { downloadPrefix, upload, uploadProjectFiles } from "./s3";
 
 export interface DesignV3Job {
@@ -123,6 +123,12 @@ async function materialiseAndGate(
         });
         for (const p of media.problems) warnings.push(`media: ${p}`);
         if (media.changed) {
+            // preview.html is what the PLAYER loads, and it was written at
+            // authoring time from an index.html that had no media yet. Left
+            // alone, the rendered film has the photograph and the film the
+            // user watches does not.
+            const synced = await syncPlayerPage(workDir);
+            if (synced) media.files.push("preview.html");
             // Back to the bucket, so the render that follows this preview
             // reuses the same files rather than resolving — and paying —
             // for them a second time.
