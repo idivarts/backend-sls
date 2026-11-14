@@ -87,4 +87,11 @@ func RegisterRoutes(engine *gin.Engine) {
 	// editing a line goes back through /element, so there is one write
 	// path rather than two.
 	g.GET(base+"/:designId/script", GetDesignScript)
+
+	// The media panel: what the project holds, and putting something into
+	// a scene. Adding media writes a DECLARATION — this runs in a Lambda
+	// with no media-use — so the next preview or render fetches it through
+	// the Phase 9a path. One resolver, one ledger, one credit limit.
+	g.GET(base+"/:designId/assets", ListDesignAssets)
+	g.POST(base+"/:designId/media", PlaceDesignMedia)
 }
