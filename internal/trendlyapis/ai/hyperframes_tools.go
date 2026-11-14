@@ -241,6 +241,16 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 		"Saved %d files. The film is %.1fs. It is checked by Hyperframes when it renders; "+
 			"a structural mistake fails there with a specific fix.",
 		len(project.Files), float64(project.DurationMs)/1000)
+	if fonts := undeclaredFonts(project); len(fonts) > 0 {
+		note += " ⚠️ This project names font families the renderer cannot supply: " +
+			strings.Join(fonts, ", ") +
+			". The gate FAILS on that. Either add an @font-face pointing at a font" +
+			" file the project actually holds, or switch to one it resolves by" +
+			" itself: " + RendererFontList + "." +
+			" Deleting an @font-face is NOT the fix — it leaves the family named" +
+			" and undeclared, which is the same error one step later."
+	}
+
 	if missing := danglingAssets(project, kept); len(missing) > 0 {
 		note += " ⚠️ This project references files this film does NOT have: " +
 			strings.Join(missing, ", ") +
@@ -337,6 +347,113 @@ func danglingAssets(project *hfproject.Project, kept map[string]bool) []string {
 				return out
 			}
 		}
+	}
+	return out
+}
+
+// ── Fonts the renderer can supply on its own ────────────────────────────
+// Hyperframes' check refuses a family it cannot resolve, as a hard error:
+// "used without @font-face declaration … not in the auto-resolved font
+// list". What it accepts is a family DECLARED by an @font-face in the
+// document, a family the document links from Google Fonts, or one of
+// these — the canonical faces bundled with the renderer, read out of its
+// own FONT_ALIAS_MAP (hyperframes/dist, checked 2026-11-14).
+//
+// The list matters because the obvious repair for a missing font file is
+// to delete the @font-face, and that leaves the family NAMED and
+// undeclared — which is the same error one step later. Seen exactly that
+// way on dev: the model removed two dangling woff2 references, said the
+// film should render, and the gate came back with "space grotesk".
+var rendererFonts = map[string]bool{
+	"inter": true, "montserrat": true, "outfit": true, "nunito": true,
+	"oswald": true, "league gothic": true, "archivo black": true,
+	"space mono": true, "ibm plex mono": true, "jetbrains mono": true,
+	"eb garamond": true, "playfair display": true, "source code pro": true,
+	"noto sans jp": true, "roboto": true, "open sans": true, "lato": true,
+	"poppins": true,
+}
+
+// RendererFontList is those names, for a prompt to read.
+var RendererFontList = "Inter, Montserrat, Outfit, Nunito, Oswald, League Gothic, " +
+	"Archivo Black, Space Mono, IBM Plex Mono, JetBrains Mono, EB Garamond, " +
+	"Playfair Display, Source Code Pro, Noto Sans JP, Roboto, Open Sans, Lato, Poppins"
+
+// genericFamilies are CSS keywords, not faces.
+var genericFamilies = map[string]bool{
+	"serif": true, "sans-serif": true, "monospace": true, "cursive": true,
+	"fantasy": true, "system-ui": true, "ui-sans-serif": true,
+	"ui-serif": true, "ui-monospace": true, "ui-rounded": true,
+	"inherit": true, "initial": true, "unset": true, "revert": true,
+	"emoji": true, "math": true, "fangsong": true,
+}
+
+var (
+	fontFaceBlock = regexp.MustCompile(`(?is)@font-face\s*{[^}]*}`)
+	fontFamilyUse = regexp.MustCompile(`(?i)font-family\s*:\s*([^;}]+)`)
+	googleFamily  = regexp.MustCompile(`(?i)family=([A-Za-z0-9+%20_-]+)`)
+)
+
+// undeclaredFonts are the families the project names and the renderer
+// cannot supply: not declared by an @font-face here, not linked from
+// Google Fonts, and not one of its own.
+//
+// The same shape as danglingAssets, and for the same reason: the model
+// cannot upload a font file either, so the only moment this is cheap to
+// fix is while it is being told what it just wrote.
+func undeclaredFonts(project *hfproject.Project) []string {
+	declared := map[string]bool{}
+	seen := map[string]bool{}
+	var out []string
+
+	// Pass one: what the project declares, and what it links.
+	for _, f := range project.Files {
+		for _, block := range fontFaceBlock.FindAllString(f.Content, -1) {
+			for _, m := range fontFamilyUse.FindAllStringSubmatch(block, -1) {
+				for _, name := range splitFamilies(m[1]) {
+					declared[name] = true
+				}
+			}
+		}
+		for _, m := range googleFamily.FindAllStringSubmatch(f.Content, -1) {
+			fam := strings.ToLower(strings.NewReplacer("+", " ", "%20", " ").Replace(m[1]))
+			declared[strings.TrimSpace(fam)] = true
+		}
+	}
+
+	// Pass two: what it uses, with the @font-face blocks taken out so a
+	// declaration does not count as a use of itself.
+	for _, f := range project.Files {
+		body := fontFaceBlock.ReplaceAllString(f.Content, "")
+		for _, m := range fontFamilyUse.FindAllStringSubmatch(body, -1) {
+			for _, name := range splitFamilies(m[1]) {
+				if declared[name] || rendererFonts[name] || seen[name] {
+					continue
+				}
+				seen[name] = true
+				out = append(out, name)
+				if len(out) >= 10 {
+					return out
+				}
+			}
+		}
+	}
+	return out
+}
+
+// splitFamilies reads a font-family value into comparable names: unquoted,
+// lowercased, with the generics and var() references dropped.
+func splitFamilies(value string) []string {
+	var out []string
+	for _, part := range strings.Split(value, ",") {
+		name := strings.ToLower(strings.TrimSpace(part))
+		name = strings.Trim(name, "'\"")
+		name = strings.TrimSpace(name)
+		// A var() is a reference to a token defined elsewhere in the same
+		// stylesheet; the token's own value is scanned on its own line.
+		if name == "" || genericFamilies[name] || strings.HasPrefix(name, "var(") {
+			continue
+		}
+		out = append(out, name)
 	}
 	return out
 }

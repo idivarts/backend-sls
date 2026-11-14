@@ -582,9 +582,13 @@ func designFault(d *trendlymodels.Design) string {
 	}
 	sb.WriteString("Offer to fix it, and fix it when they say yes — read the project and " +
 		"write it back without the thing that fails. ⚠️ A file under assets/ that 404s " +
-		"is NOT in this film: stop referencing it (fall back to a system font, drop the " +
-		"logo) rather than re-adding the reference, because you cannot upload binary " +
-		"files and writing the same path again will fail the same way.\n")
+		"is NOT in this film: stop referencing it rather than re-adding the reference, " +
+		"because you cannot upload binary files and writing the same path again will " +
+		"fail the same way.\n" +
+		"⚠️ For a FONT, deleting the @font-face is not enough — that leaves the family " +
+		"named and undeclared, which fails the same gate one step later. Change the " +
+		"font-family itself to one the renderer supplies on its own: " +
+		RendererFontList + ".\n")
 	return sb.String()
 }
 
