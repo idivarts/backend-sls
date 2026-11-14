@@ -163,6 +163,17 @@ func buildSystemPrompt(brand *trendlymodels.Brand, module, brandID, contextID st
 		// on ordering, since it is appended last.
 		sb.WriteString(designCraftInstructions)
 	}
+	// The studio chat gets the same craft standards — it is authoring the
+	// same kind of thing — plus how to behave in a panel beside a film that
+	// is playing.
+	if moduleIsDesignStudio(module) {
+		if css := brandKitCSS(ds, brandLogoURL(brand)); css != "" {
+			sb.WriteString("\n\nBrand kit CSS variables — use these custom properties in any film you write so colors and fonts match the brand:\n")
+			sb.WriteString(css)
+		}
+		sb.WriteString(designCraftInstructions)
+		sb.WriteString(designStudioInstructions)
+	}
 	return sb.String()
 }
 

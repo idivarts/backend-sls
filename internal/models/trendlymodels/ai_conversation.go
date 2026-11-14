@@ -101,6 +101,18 @@ type AIFocusArea struct {
 	ContentType string `json:"contentType,omitempty" firestore:"contentType,omitempty"`
 	Date        string `json:"date,omitempty" firestore:"date,omitempty"`
 
+	// film-element — an element of a Design Studio v3 FILM.
+	//
+	// Separate from design-element, which addresses an element of a
+	// CONTENT's own HTML design revision by contentId. A film is a
+	// first-class object with its own id, and putting a designId in
+	// ContentID would have every reader of a focus — the prompt, the
+	// tools, the message history — believing a content exists that does
+	// not.
+	DesignID string `json:"designId,omitempty" firestore:"designId,omitempty"`
+	SceneID  string `json:"sceneId,omitempty" firestore:"sceneId,omitempty"`
+	Tag      string `json:"tag,omitempty" firestore:"tag,omitempty"`
+
 	// design-element
 	RevisionID string `json:"revisionId,omitempty" firestore:"revisionId,omitempty"`
 	ElementID  string `json:"elementId,omitempty" firestore:"elementId,omitempty"`
@@ -145,6 +157,23 @@ func (a AIFocusArea) Describe() string {
 			reads = fmt.Sprintf(", which reads: %q", clipFocusStr(a.Text, 160))
 		}
 		return fmt.Sprintf("a design element (id: %s)%s of content %s%s", a.ElementID, where, a.ContentID, reads)
+	case "film-element":
+		// Named by the scene it is in, because that is how a person refers
+		// to it — "the headline in the hook", not "#h1".
+		where := ""
+		if strings.TrimSpace(a.SceneID) != "" {
+			where = fmt.Sprintf(" in the %s scene", a.SceneID)
+		}
+		reads := ""
+		if strings.TrimSpace(a.Text) != "" {
+			reads = fmt.Sprintf(", which reads: %q", clipFocusStr(a.Text, 160))
+		}
+		tag := a.Tag
+		if tag == "" {
+			tag = "element"
+		}
+		return fmt.Sprintf("the <%s> with id %s%s of film %s%s — change THAT and nothing else",
+			tag, a.ElementID, where, a.DesignID, reads)
 	case "strategy-snippet":
 		return fmt.Sprintf("a passage in strategy %s: %q", a.StrategyID, clipFocusStr(a.Snippet, 160))
 	case "calendar-content":

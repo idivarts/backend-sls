@@ -27,9 +27,13 @@ func CreateConversation(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
-	model, locked := pickModel(c.Request.Context(), req.BrandID, openrouter.TaskChat, req.Model)
+	// The module's own lane, not TaskChat: a design conversation created
+	// with a chat model recorded on it opens its dropdown naming a model
+	// its first turn will not use.
+	convTask := TaskForModule(req.Module)
+	model, locked := pickModel(c.Request.Context(), req.BrandID, convTask, req.Model)
 	if locked {
-		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskChat})
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": convTask})
 		return
 	}
 	title := req.Title
