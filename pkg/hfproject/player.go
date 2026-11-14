@@ -393,6 +393,14 @@ const bridgeJS = `
 // `controls` stays: the controls layer has its own pointer-events and sits
 // above the composition, so the transport still works and the film below it
 // becomes clickable.
+//
+// ── And `muted` is gone ──────────────────────────────────────────────────
+// It was there out of habit, not reasoning: a page that AUTOPLAYS has to
+// start muted or the browser refuses to play it at all. This page does not
+// autoplay — the user presses play, which is a user gesture, and a gesture
+// is exactly what an autoplay policy asks for. So the only thing `muted`
+// achieved was a film with a voiceover and a soundtrack playing in silence
+// until someone noticed the speaker icon.
 func playerPage(playerURL string) string {
 	return `<!doctype html>
 <html lang="en">
@@ -406,7 +414,7 @@ func playerPage(playerURL string) string {
     </style>
   </head>
   <body>
-    <hyperframes-player src="index.html" controls muted interactive></hyperframes-player>
+    <hyperframes-player src="index.html" controls interactive></hyperframes-player>
     <script src="` + playerURL + `"></script>
     <script>` + bridgeJS + `</script>
   </body>
