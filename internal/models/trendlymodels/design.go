@@ -679,9 +679,13 @@ func DeleteBrandDesign(ctx context.Context, brandID, designID string) error {
 // client writes outright (see internal/trendlyapis/design/init.go). So a
 // rename needs a route, and the route needs this.
 func RenameBrandDesign(ctx context.Context, brandID, designID, name string) error {
+	// Just the name. UpdateBrandDesign stamps updatedAt itself, and
+	// Firestore refuses an update that names the same field path twice:
+	// "field path [updatedAt] cannot be used in the same update as
+	// [updatedAt]". It fails the whole write, so a rename that looked
+	// perfectly reasonable answered 502 every time.
 	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
 		{Path: "name", Value: name},
-		{Path: "updatedAt", Value: time.Now().UnixMilli()},
 	})
 }
 
