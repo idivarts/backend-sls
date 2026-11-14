@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
@@ -130,6 +131,64 @@ func GetDesign(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"design": d})
+}
+
+// maxDesignNameLen bounds a name to something a header can draw.
+//
+// Generous: it is the one free-text field on a design and a person may
+// well paste a whole hook into it. Enforced here rather than by a
+// maxLength on the input, because a cap in the box truncates a paste
+// silently and the user never learns their name was cut.
+const maxDesignNameLen = 200
+
+type renameDesignRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+// RenameDesign changes a design's name.
+// PATCH /api/design/brands/:brandId/designs/:designId
+//
+// The name is the one field on a design that belongs to the person rather
+// than to the pipeline, and until now there was no way to set it after
+// creation — every film in the list read "Untitled design".
+func RenameDesign(c *gin.Context) {
+	brandID, designID, ok := guard(c, true)
+	if !ok {
+		return
+	}
+	var req renameDesignRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "a design needs a name"})
+		return
+	}
+	if len([]rune(name)) > maxDesignNameLen {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("a design's name is at most %d characters", maxDesignNameLen),
+		})
+		return
+	}
+
+	d, err := trendlymodels.GetBrandDesign(c.Request.Context(), brandID, designID)
+	if err != nil {
+		log.Printf("design rename read failed for %s/%s: %v", brandID, designID, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not read the design"})
+		return
+	}
+	if d == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no such design"})
+		return
+	}
+	if err := trendlymodels.RenameBrandDesign(c.Request.Context(), brandID, designID, name); err != nil {
+		log.Printf("design rename failed for %s/%s: %v", brandID, designID, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": "could not rename the design"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"name": name})
 }
 
 type renderDesignRequest struct {

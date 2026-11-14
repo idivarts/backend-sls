@@ -39,6 +39,13 @@ func RegisterRoutes(engine *gin.Engine) {
 	g.GET(base, ListDesigns)
 	g.GET(base+"/:designId", GetDesign)
 
+	// Renaming. A PATCH on the design itself, and the ONLY route that
+	// writes a field a person typed — everything else here is written by
+	// the pipeline. Without it every film in the list stayed "Untitled
+	// design", because firestore.rules denies client writes outright and
+	// there was nowhere else to set it.
+	g.PATCH(base+"/:designId", RenameDesign)
+
 	// Preview comes BEFORE render, and charges nothing. It captures stills
 	// across the film so the user can approve what they are about to pay for
 	// — Hyperframes' own loop snapshots at step 3 and renders at step 5
