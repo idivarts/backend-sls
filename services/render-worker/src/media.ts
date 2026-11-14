@@ -174,7 +174,15 @@ export async function resolveProjectMedia(
     const original = await readFile(indexPath, "utf8");
     const declarations = readDeclarations(original);
     const result: MediaResolution = { found: declarations.length, resolved: 0, files: [], problems: [], changed: false };
-    if (declarations.length === 0) return result;
+
+    // ── Nothing to fetch is not nothing to do ────────────────────────────
+    // This used to return here, and that quietly made every later fix to
+    // the captions unreachable: a film whose media is all resolved has no
+    // declarations, so the caption pass below never ran — and a caption
+    // track left stale by an earlier run could never catch up, however
+    // many times it was rendered. Only a film with neither declarations
+    // NOR caption tracks has nothing to do here.
+    if (declarations.length === 0 && captionTracks(original).length === 0) return result;
 
     // ── Say what is happening ────────────────────────────────────────────
     // The first run of this resolved nothing and left no trace: problems go
@@ -182,8 +190,9 @@ export async function resolveProjectMedia(
     // only place anyone looks when a preview misbehaves — said nothing at
     // all. A paid step that can fail silently is a step nobody can debug.
     console.log(
-        `[media] ${declarations.length} declaration(s): ` +
-            declarations.map((d) => `${d.type}`).join(", ") +
+        `[media] ${declarations.length} declaration(s)` +
+            (declarations.length > 0 ? `: ${declarations.map((d) => d.type).join(", ")}` : "") +
+            `, ${captionTracks(original).length} caption track(s)` +
             ` · credential ${opts.heygenApiKey ? "present" : "ABSENT"}` +
             (typeof opts.creditCeiling === "number" ? ` · ceiling ${opts.creditCeiling}` : "")
     );
@@ -203,9 +212,6 @@ export async function resolveProjectMedia(
     // Element id → the voiceover file resolved for it, so a caption track
     // can find the audio it is meant to follow.
     const voiceFor = new Map<string, string>();
-    // And the element itself, because a caption track has to be timed
-    // against where that audio sits in the film, not where the track does.
-    const voiceElements = new Map<string, FoundElement>();
     // How long each voiceover turned out to be, so a line that does not fit
     // the slot it was written for can be said out loud rather than silently
     // cut in the finished film.
@@ -302,7 +308,6 @@ export async function resolveProjectMedia(
             voiceFor.set(d.elementId, rel);
             const audioEl = findElements(original, (e) => e.attrs["id"] === d.elementId)[0];
             if (audioEl) {
-                voiceElements.set(d.elementId, audioEl);
                 // ── Does it fit? ──────────────────────────────────────────
                 // The renderer plays an audio element for its data-duration
                 // and not a moment longer, so a line written longer than
@@ -329,7 +334,17 @@ export async function resolveProjectMedia(
         result.resolved++;
     }
 
-    if (resolvedFor.size === 0 && failed.size === 0) return result;
+    // Falls through when nothing resolved: the caption pass below may
+    // still have work, and returning here is what kept a stale track
+    // stale.
+    if (resolvedFor.size === 0 && failed.size === 0) {
+        const rebuilt = await rebuildCaptions(projectDir, original, env, voiceFor, failedVoiceIDs, result);
+        if (rebuilt.length === 0) return result;
+        await writeFile(indexPath, applyEdits(original, rebuilt), "utf8");
+        result.changed = true;
+        console.log(`[media] rewrote index.html with ${rebuilt.length} caption edit(s)`);
+        return result;
+    }
 
     // Re-find the elements against the ORIGINAL source, now that every path
     // is known, so all the offsets come from one parse.
@@ -369,115 +384,7 @@ export async function resolveProjectMedia(
         edits.push(setAttribute(el, "data-media-resolved", rel));
     }
 
-    // ── Captions ─────────────────────────────────────────────────────────
-    // A container carrying data-captions="<audio id>" asks for a word-synced
-    // track against that voiceover. Done here, in the same pass, because the
-    // audio only exists now — and written as timed spans the runtime already
-    // knows how to show, so there is no new dependency and no custom script.
-    for (const el of captionTracks(original)) {
-        const forId = (el.attrs["data-captions"] || "").trim() || followsByTime(original, el);
-        if (forId === "") continue;
-        // ── Which audio this track should be built from ──────────────────
-        // The voiceover resolved in THIS run if there was one, and
-        // otherwise whatever the element already points at. The second
-        // half matters: a track can be stale while its audio is
-        // perfectly resolved and untouched — that is exactly the state a
-        // film is left in when the words were rewritten by one run and
-        // the captions were never rebuilt by it. Asking only about this
-        // run's resolutions meant such a track could never catch up.
-        const voicePath = voiceFor.get(forId) ?? currentVoiceSrc(original, forId);
-        if (!voicePath) {
-            // Nothing to do: either that voiceover did not resolve this
-            // run, or it was already resolved and has not changed. The
-            // attribute STAYS either way — it is the only record of which
-            // audio this track follows, and a track that has forgotten
-            // cannot be rebuilt when the line is rewritten.
-            if (failedVoiceIDs.has(forId)) {
-                result.problems.push(`captions for "${forId}": that voiceover did not resolve`);
-            }
-            continue;
-        }
-        // ── Already built for THIS audio ─────────────────────────────────
-        // A caption track is rebuilt when the words change and not
-        // otherwise. What marks it done is the audio it was built from:
-        // rewriting a voiceover gives it a new file, so this disagrees
-        // and the words are transcribed again.
-        //
-        // Found on dev: the first version of this removed data-captions
-        // once the words were in, so a rewritten line came back spoken
-        // correctly with the OLD caption still on screen — the film
-        // saying one thing and showing another.
-        if ((el.attrs["data-captions-for"] || "").trim() === voicePath) continue;
-        const started = Date.now();
-        const run = await runHyperframes(
-            projectDir,
-            [
-                "transcribe",
-                voicePath,
-                "--dir",
-                projectDir,
-                "--json",
-                // Skip rather than fail when whisper is unavailable: a film
-                // without captions is still a film.
-                "--optional",
-                // ── Three flags that are all about not surprising anyone ──
-                // whisper, not auto: auto prefers Parakeet when installed,
-                // and which engine ran decides how the words are shaped.
-                "--engine",
-                "whisper",
-                // base.en, not the CLI's small.en default — that is the model
-                // baked into the image, and asking for another would make a
-                // render download 490 MB mid-job.
-                "--model",
-                "base.en",
-                // And never build a runtime in here. Given no whisper-cli the
-                // CLI clones and COMPILES whisper.cpp into its cache, which
-                // inside a render reads as a hang. With this, a missing
-                // runtime is a skipped caption track and a line in the log.
-                "--no-runtime-install",
-            ],
-            { env, timeoutMs: RESOLVE_TIMEOUT_MS }
-        );
-        // ── Where the words actually are ──────────────────────────────────
-        // Three surprises, all found by running the real CLI in the image:
-        //
-        //  1. stdout carries ONLY the summary — {"ok":true,…,"wordCount":6}.
-        //     The {"type":"words",…} line goes to STDERR, with the progress
-        //     lines. Reading stdout alone finds a transcript of nothing.
-        //  2. The summary names a transcriptPath, and the file it names is
-        //     the better source: its timings are tightened per word, where
-        //     the streamed line's last word ends at 2.84s on a 2.69s clip —
-        //     captions that outlast their own audio.
-        //  3. So the file is preferred and the streams are the fallback,
-        //     rather than the other way round.
-        const words = run.code === 0 ? await transcribedWords(projectDir, run.stdout, run.stderr) : [];
-        if (words.length === 0) {
-            const why = firstLine(run.stderr || run.stdout) || `no words (exit ${run.code})`;
-            console.log(`[media] captions for ${forId} produced nothing after ${Date.now() - started}ms: ${why}`);
-            result.problems.push(`captions for "${forId}": ${why}`);
-            continue;
-        }
-        // ── Whose clock the transcript is on ─────────────────────────────
-        // The transcript starts at zero because the WAV does. What it has to
-        // be shifted onto is the moment the AUDIO starts in the film, which
-        // is the audio element's data-start — not the caption container's.
-        // Those are usually the same and need not be: a caption layer
-        // spanning the whole reel (data-start="0" data-duration="12") around
-        // a voiceover that begins at four seconds is a perfectly natural way
-        // to author it, and reading the container there would run every word
-        // four seconds ahead of the voice.
-        const offset = startSeconds(voiceElements.get(forId)) ?? startSeconds(el) ?? 0;
-        // The container's own children are replaced: whatever placeholder
-        // the model put there was a stand-in for exactly this.
-        edits.push({ start: el.tagEnd, end: el.end - closingTagLength(el), text: captionSpans(words, offset) });
-        edits.push(setAttribute(el, "data-captions-for", voicePath));
-        // Re-declared where it had lost the link, so the next run does not
-        // have to work it out again.
-        if ((el.attrs["data-captions"] || "").trim() === "") {
-            edits.push(setAttribute(el, "data-captions", forId));
-        }
-        console.log(`[media] captions for ${forId}: ${words.length} words in ${Date.now() - started}ms`);
-    }
+    edits.push(...(await rebuildCaptions(projectDir, original, env, voiceFor, failedVoiceIDs, result)));
 
     if (edits.length === 0) return result;
     await writeFile(indexPath, applyEdits(original, edits), "utf8");
@@ -604,6 +511,142 @@ function currentVoiceSrc(html: string, elementID: string): string {
         if (src !== "") return src;
     }
     return "";
+}
+
+/**
+ * Build or rebuild every caption track in the document.
+ *
+ * Extracted so it can run on BOTH paths: the one where media was just
+ * resolved, and the one where nothing needed resolving at all. That
+ * second path is where a stale track lives — a film whose voiceover was
+ * rewritten and re-spoken by an earlier run has no declarations left, so
+ * for a long time it never reached this code and its captions stayed on
+ * the old words for ever.
+ */
+async function rebuildCaptions(
+    projectDir: string,
+    original: string,
+    env: NodeJS.ProcessEnv,
+    voiceFor: Map<string, string>,
+    failedVoiceIDs: Set<string>,
+    result: MediaResolution
+): Promise<Edit[]> {
+    const out: Edit[] = [];
+    // ── Captions ─────────────────────────────────────────────────────────
+    // A container carrying data-captions="<audio id>" asks for a word-synced
+    // track against that voiceover. Done here, in the same pass, because the
+    // audio only exists now — and written as timed spans the runtime already
+    // knows how to show, so there is no new dependency and no custom script.
+    for (const el of captionTracks(original)) {
+        const forId = (el.attrs["data-captions"] || "").trim() || followsByTime(original, el);
+        if (forId === "") continue;
+        // ── Which audio this track should be built from ──────────────────
+        // The voiceover resolved in THIS run if there was one, and
+        // otherwise whatever the element already points at. The second
+        // half matters: a track can be stale while its audio is
+        // perfectly resolved and untouched — that is exactly the state a
+        // film is left in when the words were rewritten by one run and
+        // the captions were never rebuilt by it. Asking only about this
+        // run's resolutions meant such a track could never catch up.
+        const voicePath = voiceFor.get(forId) ?? currentVoiceSrc(original, forId);
+        if (!voicePath) {
+            // Nothing to do: either that voiceover did not resolve this
+            // run, or it was already resolved and has not changed. The
+            // attribute STAYS either way — it is the only record of which
+            // audio this track follows, and a track that has forgotten
+            // cannot be rebuilt when the line is rewritten.
+            if (failedVoiceIDs.has(forId)) {
+                result.problems.push(`captions for "${forId}": that voiceover did not resolve`);
+            }
+            continue;
+        }
+        // ── Already built for THIS audio ─────────────────────────────────
+        // A caption track is rebuilt when the words change and not
+        // otherwise. What marks it done is the audio it was built from:
+        // rewriting a voiceover gives it a new file, so this disagrees
+        // and the words are transcribed again.
+        //
+        // Found on dev: the first version of this removed data-captions
+        // once the words were in, so a rewritten line came back spoken
+        // correctly with the OLD caption still on screen — the film
+        // saying one thing and showing another.
+        if ((el.attrs["data-captions-for"] || "").trim() === voicePath) continue;
+        const started = Date.now();
+        const run = await runHyperframes(
+            projectDir,
+            [
+                "transcribe",
+                voicePath,
+                "--dir",
+                projectDir,
+                "--json",
+                // Skip rather than fail when whisper is unavailable: a film
+                // without captions is still a film.
+                "--optional",
+                // ── Three flags that are all about not surprising anyone ──
+                // whisper, not auto: auto prefers Parakeet when installed,
+                // and which engine ran decides how the words are shaped.
+                "--engine",
+                "whisper",
+                // base.en, not the CLI's small.en default — that is the model
+                // baked into the image, and asking for another would make a
+                // render download 490 MB mid-job.
+                "--model",
+                "base.en",
+                // And never build a runtime in here. Given no whisper-cli the
+                // CLI clones and COMPILES whisper.cpp into its cache, which
+                // inside a render reads as a hang. With this, a missing
+                // runtime is a skipped caption track and a line in the log.
+                "--no-runtime-install",
+            ],
+            { env, timeoutMs: RESOLVE_TIMEOUT_MS }
+        );
+        // ── Where the words actually are ──────────────────────────────────
+        // Three surprises, all found by running the real CLI in the image:
+        //
+        //  1. stdout carries ONLY the summary — {"ok":true,…,"wordCount":6}.
+        //     The {"type":"words",…} line goes to STDERR, with the progress
+        //     lines. Reading stdout alone finds a transcript of nothing.
+        //  2. The summary names a transcriptPath, and the file it names is
+        //     the better source: its timings are tightened per word, where
+        //     the streamed line's last word ends at 2.84s on a 2.69s clip —
+        //     captions that outlast their own audio.
+        //  3. So the file is preferred and the streams are the fallback,
+        //     rather than the other way round.
+        const words = run.code === 0 ? await transcribedWords(projectDir, run.stdout, run.stderr) : [];
+        if (words.length === 0) {
+            const why = firstLine(run.stderr || run.stdout) || `no words (exit ${run.code})`;
+            console.log(`[media] captions for ${forId} produced nothing after ${Date.now() - started}ms: ${why}`);
+            result.problems.push(`captions for "${forId}": ${why}`);
+            continue;
+        }
+        // ── Whose clock the transcript is on ─────────────────────────────
+        // The transcript starts at zero because the WAV does. What it has to
+        // be shifted onto is the moment the AUDIO starts in the film, which
+        // is the audio element's data-start — not the caption container's.
+        // Those are usually the same and need not be: a caption layer
+        // spanning the whole reel (data-start="0" data-duration="12") around
+        // a voiceover that begins at four seconds is a perfectly natural way
+        // to author it, and reading the container there would run every word
+        // four seconds ahead of the voice.
+        // Looked up fresh rather than carried in: this runs on a path
+        // where nothing was resolved and there is no map of elements from
+        // a loop that did not happen.
+        const voiceEl = findElements(original, (e) => (e.attrs["id"] || "") === forId)[0];
+        const offset = startSeconds(voiceEl) ?? startSeconds(el) ?? 0;
+        // The container's own children are replaced: whatever placeholder
+        // the model put there was a stand-in for exactly this.
+        out.push({ start: el.tagEnd, end: el.end - closingTagLength(el), text: captionSpans(words, offset) });
+        out.push(setAttribute(el, "data-captions-for", voicePath));
+        // Re-declared where it had lost the link, so the next run does not
+        // have to work it out again.
+        if ((el.attrs["data-captions"] || "").trim() === "") {
+            out.push(setAttribute(el, "data-captions", forId));
+        }
+        console.log(`[media] captions for ${forId}: ${words.length} words in ${Date.now() - started}ms`);
+    }
+
+    return out;
 }
 
 function firstLine(s: string): string {
