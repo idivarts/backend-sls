@@ -374,8 +374,9 @@ export async function resolveProjectMedia(
     // track against that voiceover. Done here, in the same pass, because the
     // audio only exists now — and written as timed spans the runtime already
     // knows how to show, so there is no new dependency and no custom script.
-    for (const el of findElements(original, (e) => typeof e.attrs["data-captions"] === "string")) {
-        const forId = (el.attrs["data-captions"] || "").trim();
+    for (const el of captionTracks(original)) {
+        const forId = (el.attrs["data-captions"] || "").trim() || followsByTime(original, el);
+        if (forId === "") continue;
         const voicePath = voiceFor.get(forId);
         if (!voicePath) {
             // Nothing to do: either that voiceover did not resolve this
@@ -462,6 +463,11 @@ export async function resolveProjectMedia(
         // the model put there was a stand-in for exactly this.
         edits.push({ start: el.tagEnd, end: el.end - closingTagLength(el), text: captionSpans(words, offset) });
         edits.push(setAttribute(el, "data-captions-for", voicePath));
+        // Re-declared where it had lost the link, so the next run does not
+        // have to work it out again.
+        if ((el.attrs["data-captions"] || "").trim() === "") {
+            edits.push(setAttribute(el, "data-captions", forId));
+        }
         console.log(`[media] captions for ${forId}: ${words.length} words in ${Date.now() - started}ms`);
     }
 
@@ -526,6 +532,54 @@ export function durationSeconds(el?: { attrs: Record<string, string | undefined>
     if (raw === undefined) return undefined;
     const n = Number(raw);
     return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Every caption track in the document.
+ *
+ * Two ways to be one: it says so, or it carries the class the authoring
+ * contract gives them. The second matters because a track written before
+ * this code existed LOST its declaration — the first version of captions
+ * removed data-captions once the words were in — and a track that cannot
+ * be recognised can never be rebuilt.
+ */
+function captionTracks(html: string) {
+    return findElements(
+        html,
+        (e) =>
+            typeof e.attrs["data-captions"] === "string" ||
+            (e.attrs["class"] || "").split(/\s+/).includes("caption-track")
+    );
+}
+
+/**
+ * The voiceover a track with no declaration follows: the one that starts
+ * at the same moment.
+ *
+ * ── Why this inference is safe, where most would not be ──────────────────
+ * A caption track is written to sit on its voiceover — same data-start,
+ * same data-duration — because that is the only way the words can line up
+ * with the speech. So an exact match on the start time is not a guess
+ * about intent; it is reading the timing the author already wrote.
+ *
+ * And it only answers when exactly ONE voiceover starts there. Two, and
+ * there is a real question about which, so it declines rather than
+ * picking — a caption track rebuilt from the wrong voice would be worse
+ * than a stale one, because a stale one at least matches something that
+ * was once true.
+ */
+function followsByTime(html: string, track: { attrs: Record<string, string | undefined> }): string {
+    const at = (track.attrs["data-start"] || "").trim();
+    if (at === "") return "";
+    const sameStart = findElements(
+        html,
+        (e) =>
+            e.tagName === "audio" &&
+            (e.attrs["data-media"] || "").trim().toLowerCase() === "voice" &&
+            (e.attrs["data-start"] || "").trim() === at &&
+            (e.attrs["id"] || "") !== ""
+    );
+    return sameStart.length === 1 ? sameStart[0].attrs["id"] || "" : "";
 }
 
 function firstLine(s: string): string {
