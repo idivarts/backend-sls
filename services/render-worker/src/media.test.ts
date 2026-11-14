@@ -2,15 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { applyEdits, findElements, removeAttribute, setAttribute } from "./html-edit";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
+import { stripPlayerRuntime } from "./hyperframes";
 import {
     captionSpans,
     pathFromResolveJSON,
     readDeclarations,
-    syncPlayerPage,
     wordsFromTranscribeJSON,
 } from "./media";
 
@@ -185,41 +181,24 @@ describe("captions", () => {
     });
 });
 
-describe("syncPlayerPage", () => {
-    // preview.html is what the player loads. It is written once, at
-    // authoring time, from an index.html that has no media in it yet — so
-    // without this the rendered film has the photograph and the film the
-    // user watches does not.
-    it("rebuilds the player page from the current index, keeping its script tags", async () => {
-        const dir = await mkdtemp(join(tmpdir(), "hfsync-"));
-        await writeFile(
-            join(dir, "preview.html"),
-            `<html><head>
+describe("stripPlayerRuntime", () => {
+    // index.html carries the player's runtime tag so the app can play the
+    // film with no second copy of the document. It points at CloudFront,
+    // and a render must work with no network — proved under --network none.
+    it("takes out the player's runtime tag", () => {
+        const html = `<html><head>
     <script src="https://cdn/design-player/0.9.39/runtime.js"></script>
     <script src="https://cdn/design-player/0.9.39/gsap-3.15.0.min.js"></script>
-    </head><body><img data-media="image" data-media-intent="old"></body></html>`,
-            "utf8"
-        );
-        await writeFile(
-            join(dir, "index.html"),
-            `<html><head><title>t</title></head><body><img src=".media/images/image_001.png"></body></html>`,
-            "utf8"
-        );
-
-        assert.equal(await syncPlayerPage(dir), true);
-        const out = await readFile(join(dir, "preview.html"), "utf8");
-        // The resolved media is there now…
-        assert.ok(out.includes('src=".media/images/image_001.png"'), out);
-        // …the stale declaration is gone…
-        assert.ok(!out.includes("data-media-intent"), out);
-        // …and both player scripts survived, so the film still plays.
-        assert.ok(out.includes("design-player/0.9.39/runtime.js"), out);
-        assert.ok(out.includes("design-player/0.9.39/gsap-3.15.0.min.js"), out);
+    </head><body>x</body></html>`;
+        const out = stripPlayerRuntime(html);
+        assert.ok(!out.includes("runtime.js"), out);
+        // GSAP stays: vendorGsap rewrites it to a local file, and the film
+        // needs it either way.
+        assert.ok(out.includes("gsap-3.15.0.min.js"), out);
     });
 
-    it("leaves a project alone when it has no player page", async () => {
-        const dir = await mkdtemp(join(tmpdir(), "hfsync-"));
-        await writeFile(join(dir, "index.html"), "<html><body>x</body></html>", "utf8");
-        assert.equal(await syncPlayerPage(dir), false);
+    it("leaves a composition's own scripts alone", () => {
+        const html = `<html><body><script src="scenes/runtime.js"></script><script>gsap.timeline()</script></body></html>`;
+        assert.equal(stripPlayerRuntime(html), html);
     });
 });

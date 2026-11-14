@@ -19,7 +19,7 @@
  * progress off the design document, which is what lets a render survive a
  * page reload, a locked phone, or the user walking away.
  */
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -28,9 +28,10 @@ import {
     listProjectFiles,
     renderProject,
     snapshotProject,
+    stripPlayerRuntime,
     vendorGsap,
 } from "./hyperframes";
-import { resolveProjectMedia, syncPlayerPage } from "./media";
+import { resolveProjectMedia } from "./media";
 import { downloadPrefix, upload, uploadProjectFiles } from "./s3";
 
 export interface DesignV3Job {
@@ -109,6 +110,16 @@ async function materialiseAndGate(
     // one without, which is the worst kind of intermittent.
     await vendorGsap(workDir);
 
+    // The player's runtime tag points at CloudFront, and a render must work
+    // with no network. The CLI injects its own runtime, so taking ours out
+    // costs the render nothing — frames are byte-identical either way.
+    {
+        const indexPath = join(workDir, "index.html");
+        const before = await readFile(indexPath, "utf8");
+        const after = stripPlayerRuntime(before);
+        if (after !== before) await writeFile(indexPath, after, "utf8");
+    }
+
     // Media the film declared but does not have yet. Before the gate for
     // the same reason: an <img> with no src is a finding, and a film whose
     // picture arrives only at render time is one the preview lied about.
@@ -123,12 +134,6 @@ async function materialiseAndGate(
         });
         for (const p of media.problems) warnings.push(`media: ${p}`);
         if (media.changed) {
-            // preview.html is what the PLAYER loads, and it was written at
-            // authoring time from an index.html that had no media yet. Left
-            // alone, the rendered film has the photograph and the film the
-            // user watches does not.
-            const synced = await syncPlayerPage(workDir);
-            if (synced) media.files.push("preview.html");
             // Back to the bucket, so the render that follows this preview
             // reuses the same files rather than resolving — and paying —
             // for them a second time.

@@ -43,19 +43,21 @@ export async function upload(
 /**
  * Root-level objects that are NOT part of the composition.
  *
- * The prefix holds two different things: the authored project, and the player
- * pages generated from it (pkg/hfproject/player.go). Both are HTML at the
- * root, and preview.html is index.html with two script tags — so the CLI
- * discovers two entry points and refuses the project outright:
+ * `player.html` is the page the app embeds — a wrapper around the film, not
+ * part of it. Materialising it handed the CLI a second root-level entry
+ * point and it refused the project outright:
  *
  *     Multiple root-level HTML files with data-composition-id:
- *     index.html, preview.html. The runtime may discover both as entry
- *     points, causing duplicate audio playback.
+ *     index.html, preview.html.
  *
- * which broke every preview and render the moment the player shipped. The
- * renderer wants the project alone, so the player pages are left in the
- * bucket and never materialised. Matched at the root only: a scene legitimately
- * called compositions/player.html is a scene.
+ * `preview.html` is in here for history: designs authored before the film
+ * became one document still have one in their prefix, and it would be that
+ * second entry point. New designs do not write it (pkg/hfproject/player.go
+ * explains why there used to be two files and why that was wrong), but the
+ * old ones must keep rendering.
+ *
+ * Matched at the root only: a scene legitimately called
+ * compositions/player.html is a scene.
  */
 export const PLAYER_ARTEFACTS = new Set(["preview.html", "player.html"]);
 
