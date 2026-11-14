@@ -701,6 +701,15 @@ func dropRevisionFiles(ctx context.Context, prefixes []string) {
 }
 
 func markAndPrepare(ctx context.Context, brandID, designID string, creditCeiling int) error {
+	// ── Put back what the film asks for and no longer has ───────────────
+	// Before the gate looks at it, and here rather than in any one caller,
+	// because every path that finishes a film goes through this function
+	// and a film repaired on one route and not another is worse than one
+	// never repaired at all. Costs a list and a few reads when nothing is
+	// missing, which is the normal case. See restoreBrandAssets.
+	if n := restoreBrandAssets(ctx, brandID, designID); n > 0 {
+		log.Printf("design prepare: restored %d brand asset(s) for %s/%s", n, brandID, designID)
+	}
 	if err := trendlymodels.MarkBrandDesignPreviewQueued(ctx, brandID, designID); err != nil {
 		return err
 	}

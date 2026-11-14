@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/middlewares"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/studiojobs"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/ai"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
 	"github.com/idivarts/backend-sls/pkg/mysentry"
@@ -431,6 +432,34 @@ func PreviewDesign(c *gin.Context) {
 			"status":  d.PreviewStatus,
 			"message": "This is already being previewed.",
 		})
+		return
+	}
+
+	// ── Hand it to the worker when there is one ─────────────────────────
+	// Finishing a film can mean putting back brand assets it lost, and
+	// fetching those is up to 8 seconds apiece against API Gateway's hard
+	// 29. The job does the same work with 900 seconds and one definition
+	// of "finish", so a film repaired by the chat and a film repaired by
+	// this button come out the same. The inline path below stays for a
+	// stage with no queue.
+	if studiojobs.Configured() {
+		if err := trendlymodels.MarkBrandDesignPreviewQueued(ctx, brandID, designID); err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "could not queue the preview"})
+			return
+		}
+		if err := studiojobs.Enqueue(studiojobs.Message{
+			Type:     studiojobs.JobDesignPrepare,
+			BrandID:  brandID,
+			DesignID: designID,
+		}); err != nil {
+			log.Printf("design preview enqueue failed for %s/%s: %v", brandID, designID, err)
+			mysentry.Capture(err, map[string]string{"op": "design.preview.enqueue", "brandId": brandID, "designId": designID})
+			_ = trendlymodels.MarkBrandDesignPreviewFailed(ctx, brandID, designID,
+				"We couldn't start the preview. Please try again.")
+			c.JSON(http.StatusBadGateway, gin.H{"error": "could not start the preview"})
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"status": trendlymodels.DesignPreviewQueued})
 		return
 	}
 

@@ -55,15 +55,14 @@ func ExecuteDesignPrepareJob(ctx context.Context, msg studiojobs.Message) error 
 		return nil
 	}
 
-	// Put back what the film asks for and no longer has, BEFORE the gate
-	// looks at it. See restoreBrandAssets.
-	if n := restoreBrandAssets(ctx, brandID, designID, d); n > 0 {
-		log.Printf("design prepare: restored %d brand asset(s) for %s/%s", n, brandID, designID)
-	}
-
 	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
 	return markAndPrepare(ctx, brandID, designID, MediaCreditCeilingPerAttempt(orgID, 1))
 }
+
+// ⚠️ NOT called from PreviewDesign, the HTTP route behind "Try again".
+// Each asset gets an 8-second fetch timeout and a brand can have three of
+// them, which is 24 seconds against API Gateway's hard 29. That route
+// queues this job instead; the worker has 900 seconds.
 
 // assetRef finds every assets/… path a project's source mentions.
 var assetRef = regexp.MustCompile(`assets/[A-Za-z0-9._/-]+`)
@@ -97,7 +96,11 @@ var assetRef = regexp.MustCompile(`assets/[A-Za-z0-9._/-]+`)
 // Best effort throughout: a film that cannot get its logo back is still a
 // film, and failing the preparation over it would replace a typography
 // warning with a hard stop.
-func restoreBrandAssets(ctx context.Context, brandID, designID string, d *trendlymodels.Design) int {
+func restoreBrandAssets(ctx context.Context, brandID, designID string) int {
+	d, derr := trendlymodels.GetBrandDesign(ctx, brandID, designID)
+	if derr != nil || d == nil || d.ProjectPrefix == "" {
+		return 0
+	}
 	rels, err := mediastore.ListPrefix(ctx, mediastore.TargetAttachment, d.ProjectPrefix)
 	if err != nil {
 		log.Printf("design prepare: could not list %s: %v", d.ProjectPrefix, err)
