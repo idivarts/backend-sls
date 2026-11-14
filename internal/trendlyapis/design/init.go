@@ -72,4 +72,9 @@ func RegisterRoutes(engine *gin.Engine) {
 	// model call. A POST because it writes a revision, but it charges
 	// nothing and there is no job: the answer carries the new player URL.
 	g.POST(base+"/:designId/element", EditDesignElement)
+
+	// The same element, changed by asking. A model call, so it charges the
+	// wallet and is gated by the plan — but scoped to one element, which
+	// is what makes it an edit rather than a re-roll of the whole film.
+	g.POST(base+"/:designId/element/ai", EditDesignElementWithAI)
 }
