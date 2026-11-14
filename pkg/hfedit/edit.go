@@ -61,6 +61,21 @@ type Element struct {
 // text to replace.
 func (e Element) HasChildren() bool { return e.End > e.TagEnd }
 
+// HoldsElements reports whether the element contains other ELEMENTS rather
+// than just text.
+//
+// The difference decides whether replacing its text is an edit or a
+// demolition: setting the words of an <h1> changes a headline, and setting
+// the words of the <div> that holds every scene replaces the entire film
+// with a text node.
+func (e Element) HoldsElements(source string) bool {
+	if !e.HasChildren() || e.End > len(source) {
+		return false
+	}
+	inner := source[e.TagEnd:e.End]
+	return len(findAll(inner, func(Element) bool { return true })) > 0
+}
+
 // Edit is a span of the source to replace.
 type Edit struct {
 	Start int

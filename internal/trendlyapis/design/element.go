@@ -198,9 +198,22 @@ func applyElementEdit(source string, req editElementRequest) (string, error) {
 	if !found {
 		return "", fmt.Errorf("that element is no longer in this film")
 	}
+	if err := editableTarget(el, source); err != nil {
+		return "", err
+	}
 
 	var edits []hfedit.Edit
 	if req.Text != nil {
+		// ── Words, not demolition ────────────────────────────────────────
+		// Replacing an element's text replaces EVERYTHING inside it. On a
+		// headline that is the point; on the <div> that holds every scene
+		// it is the whole film gone, and the player's bridge resolves a
+		// click through closest("[id]"), so clicking the background
+		// selects exactly that div. One keystroke in the text box would
+		// have flattened the film.
+		if el.HoldsElements(source) {
+			return "", fmt.Errorf("that is a group of other elements, so there are no words of its own to change")
+		}
 		e, err := hfedit.SetText(el, *req.Text)
 		if err != nil {
 			return "", err
@@ -244,6 +257,20 @@ func applyElementEdit(source string, req editElementRequest) (string, error) {
 		edits = append(edits, e)
 	}
 	return hfedit.Apply(source, edits)
+}
+
+// editableTarget refuses the one element that must never be rewritten.
+//
+// The root composition IS the film: its id, its data-composition-id and its
+// data-duration are what the renderer enters through. An edit that replaces
+// it is not a scoped edit however it is framed, and the AI path calling it
+// one would be a lie. Scenes are fair game — rewriting a whole scene is a
+// reasonable thing to ask for.
+func editableTarget(el hfedit.Element, source string) error {
+	if _, isRoot := el.Attrs["data-composition-id"]; isRoot {
+		return fmt.Errorf("that is the whole film rather than something in it — pick an element inside it")
+	}
+	return nil
 }
 
 func secondsAttr(ms int) string {

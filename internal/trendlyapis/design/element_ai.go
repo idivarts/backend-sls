@@ -35,6 +35,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -133,6 +134,10 @@ func EditDesignElementWithAI(c *gin.Context) {
 	el, found := hfedit.FindByID(source, req.ElementID)
 	if !found {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "that element is no longer in this film"})
+		return
+	}
+	if terr := editableTarget(el, source); terr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": terr.Error()})
 		return
 	}
 	current := source[el.Start:el.End]
@@ -334,8 +339,22 @@ func parseElementReply(reply, elementID, tagName string) (string, error) {
 	if out == "" {
 		return "", fmt.Errorf("the model answered with an empty block")
 	}
-	if strings.Contains(strings.ToLower(out), "<!doctype") || strings.Contains(strings.ToLower(out), "<body") {
+	lower := strings.ToLower(out)
+	if strings.Contains(lower, "<!doctype") || strings.Contains(lower, "<body") {
 		return "", fmt.Errorf("the model rewrote the whole film instead of the element")
+	}
+	// ── No script, and the prompt says so ────────────────────────────────
+	// A film already contains model-written JavaScript — its GSAP timeline
+	// — so this is not a new class of risk. But it is a rule the prompt
+	// states, the element being replaced is not where a timeline belongs,
+	// and a page served from the distribution every brand's projects share
+	// is not somewhere to let an unasked-for script in because checking was
+	// inconvenient.
+	if strings.Contains(lower, "<script") || strings.Contains(lower, "javascript:") {
+		return "", fmt.Errorf("the answer contains a script, which an element may not")
+	}
+	if onEventAttr.MatchString(out) {
+		return "", fmt.Errorf("the answer contains an event handler, which an element may not")
 	}
 
 	found := hfedit.FindAll(out, func(e hfedit.Element) bool { return e.Attrs["id"] == elementID })
@@ -352,11 +371,13 @@ func parseElementReply(reply, elementID, tagName string) (string, error) {
 	if strings.TrimSpace(out[:el.Start]) != "" || strings.TrimSpace(out[el.End:]) != "" {
 		return "", fmt.Errorf("the answer has more in it than the element")
 	}
-	if el.TagName != tagName {
-		// Allowed, but only deliberately: a headline that becomes a <div>
-		// loses whatever the stylesheet says about h1. Worth a log, not a
-		// refusal, because the instruction may well have asked for it.
-		_ = tagName
-	}
+	// A changed tag is allowed: "make this a paragraph" is a legitimate
+	// instruction, and refusing it would make the panel feel arbitrary.
+	_ = tagName
 	return out, nil
 }
+
+// onEventAttr matches an inline event handler — onclick, onload, onerror
+// and the rest — written as an attribute. Deliberately broad: the rule is
+// "no handlers", not "no handlers I thought of".
+var onEventAttr = regexp.MustCompile(`(?i)\son[a-z]+\s*=`)
