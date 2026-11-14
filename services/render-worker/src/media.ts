@@ -47,7 +47,6 @@ import {
     findElements,
     setAttribute,
     type Edit,
-    type FoundElement,
 } from "./html-edit";
 import { TTS_MODEL_IS_FREE, synthesizeVoice } from "./tts";
 
