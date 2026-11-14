@@ -86,6 +86,17 @@ func handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 					"designId": msg.DesignID,
 				})
 			}
+		case studiojobs.JobDesignPrepare:
+			if err := design.ExecuteDesignPrepareJob(ctx, msg); err != nil {
+				log.Printf("studio_sqs: design prepare failed for %s/%s: %v",
+					msg.BrandID, msg.DesignID, err)
+				mysentry.Capture(err, map[string]string{
+					"lambda":   "studio_sqs",
+					"op":       "design_prepare",
+					"brandId":  msg.BrandID,
+					"designId": msg.DesignID,
+				})
+			}
 		default:
 			// Not a default-to-something: an unknown type is a deploy skew
 			// (a newer producer, an older worker), and guessing which job was

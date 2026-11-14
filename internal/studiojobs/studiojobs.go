@@ -66,6 +66,24 @@ const (
 	// several, and the first attempt against the 30s HTTP route returned 504
 	// with nothing written. The queue's worker has 900 seconds.
 	JobDesignAuthor JobType = "design_author"
+
+	// JobDesignPrepare finishes a design that was edited rather than
+	// authored: it resolves the media the project DECLARES but does not
+	// have, and recaptures the stills.
+	//
+	// ── Why an edit needs this at all ────────────────────────────────────
+	// A project asks for media by declaring it — `<audio data-media="bgm"
+	// data-media-intent="warm, minimal, no vocals">` with no src — and a
+	// later step fetches the real file and fills the src in. Authoring runs
+	// that step. The AI chat's write did not, so a user who asked for music
+	// got an <audio> element with nothing behind it: the model truthfully
+	// said it had added the track, the file never existed, and the film
+	// played in silence.
+	//
+	// Queued rather than done inline for the usual reason — fetching a
+	// soundtrack is a provider call, and the turn should not hold the
+	// socket open for it.
+	JobDesignPrepare JobType = "design_prepare"
 )
 
 // Message is the payload shape. BrandID, ContentID and StudioID are always
@@ -115,7 +133,7 @@ func (m Message) Target() bool {
 		return m.ContentID != "" && m.StudioID != "" && m.RunID != ""
 	case JobSceneDesign:
 		return m.ContentID != "" && m.StudioID != "" && m.SceneID != ""
-	case JobDesignAuthor:
+	case JobDesignAuthor, JobDesignPrepare:
 		return m.DesignID != ""
 	default:
 		return false
