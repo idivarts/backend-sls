@@ -166,7 +166,8 @@ on, with data-track-index:
 
   <section id="scene-hook" class="clip" data-scene="hook" data-track-index="0"
            data-start="0" data-duration="3">
-  <audio id="score" data-media="bgm" data-track-index="3" ...></audio>
+  <audio id="score" data-media="bgm" data-media-intent="upbeat lo-fi, no vocals"
+         data-track-index="3" data-start="0" data-duration="9"></audio>
 
 It costs one attribute and it is what lets a person see the film as rows
 and move one thing without moving the rest. Text inside a scene does not

@@ -55,6 +55,18 @@ type structureRequest struct {
 	DurationMs *int `json:"durationMs"`
 	// ToIndex is where the scene goes, for "move": 0 is first.
 	ToIndex *int `json:"toIndex"`
+
+	// ── The clip ops ─────────────────────────────────────────────────────
+	// ClipID is the element acted on by a clip-* op: a photograph, a
+	// voiceover, a music track. Separate from SceneID because they mean
+	// different things — a scene op relays the film around the scene, a
+	// clip op moves exactly one element — and one field for both is how a
+	// drag on the music would come to relay the whole film.
+	ClipID string `json:"clipId"`
+	// StartMs is where a clip begins, for "clip-retime".
+	StartMs *int `json:"startMs"`
+	// TrackIndex is the row, for "clip-track".
+	TrackIndex *int `json:"trackIndex"`
 }
 
 // minSceneMs is the shortest a scene may be. Below about half a second
@@ -123,6 +135,12 @@ func sceneIndex(scenes []scene, key string) int {
 // markup without a bucket, a session or a design — which is where the
 // mistakes in this kind of code live.
 func applyStructureEdit(source string, req structureRequest) (string, int, error) {
+	// A clip op is not a scene op and must not go anywhere near the ripple
+	// below — see clip_edit.go for why that distinction is the whole point.
+	if isClipOp(req.Op) {
+		return applyClipEdit(source, req)
+	}
+
 	scenes, err := readScenes(source)
 	if err != nil {
 		return "", 0, err
