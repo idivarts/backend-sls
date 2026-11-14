@@ -126,6 +126,44 @@ export async function downloadPrefix(prefix: string, destDir: string): Promise<n
 }
 
 /**
+ * Read one object under a project prefix as text, without materialising it.
+ *
+ * For the files `downloadPrefix` deliberately skips. `player.html` is the
+ * one that matters: it must stay out of the work directory, because a second
+ * root-level HTML document makes the CLI refuse the project — but it is also
+ * the only place that records which version of the player assets this
+ * project was written against.
+ *
+ * Missing is not an error. A design authored before player.html existed, or
+ * one whose upload half-failed, simply has nothing to say here. Anything
+ * ELSE is logged: this read is what decides whether a broken stored film
+ * gets repaired, and a denied GetObject that returns undefined quietly
+ * looks exactly like a design that plays fine — the silent-failure shape
+ * that already cost this project a debugging session in the media path.
+ *
+ * `name` is a fixed string at every call site, and is refused if it ever
+ * stops being one. The sibling functions guard traversal because the
+ * bucket is shared by every brand, and a read is no less of a leak than a
+ * write.
+ */
+export async function readProjectFile(prefix: string, name: string): Promise<string | undefined> {
+    if (!name || name.split("/").some((seg) => seg === ".." || seg === "")) {
+        throw new Error(`refusing to read a path with a traversal segment: ${name}`);
+    }
+    const normalised = prefix.endsWith("/") ? prefix : `${prefix}/`;
+    try {
+        const got = await s3().send(new GetObjectCommand({ Bucket: config.s3Bucket(), Key: normalised + name }));
+        return await got.Body?.transformToString();
+    } catch (err) {
+        const code = (err as { name?: string }).name;
+        if (code !== "NoSuchKey" && code !== "NotFound") {
+            console.log(`[project] could not read ${normalised}${name}: ${code ?? ""} ${(err as Error).message}`);
+        }
+        return undefined;
+    }
+}
+
+/**
  * Put selected project files back where the project came from.
  *
  * Media resolution happens in the worker, on whichever of the preview or the
@@ -138,28 +176,6 @@ export async function downloadPrefix(prefix: string, destDir: string): Promise<n
  * same reason downloadPrefix refuses one: it would write outside the prefix
  * this design owns.
  */
-/**
- * Read one object under a project prefix as text, without materialising it.
- *
- * For the files `downloadPrefix` deliberately skips. `player.html` is the
- * one that matters: it must stay out of the work directory, because a second
- * root-level HTML document makes the CLI refuse the project — but it is also
- * the only place that records which version of the player assets this
- * project was written against.
- *
- * Missing is not an error. A design authored before player.html existed, or
- * one whose upload half-failed, simply has nothing to say here.
- */
-export async function readProjectFile(prefix: string, name: string): Promise<string | undefined> {
-    const normalised = prefix.endsWith("/") ? prefix : `${prefix}/`;
-    try {
-        const got = await s3().send(new GetObjectCommand({ Bucket: config.s3Bucket(), Key: normalised + name }));
-        return await got.Body?.transformToString();
-    } catch {
-        return undefined;
-    }
-}
-
 export async function uploadProjectFiles(prefix: string, dir: string, relativePaths: string[]): Promise<number> {
     const bucket = config.s3Bucket();
     const normalised = prefix.endsWith("/") ? prefix : `${prefix}/`;
