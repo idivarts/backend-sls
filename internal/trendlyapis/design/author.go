@@ -493,17 +493,8 @@ func (a *authorRun) write(ctx context.Context) (string, error) {
 
 	// The scenes travel with the project so the app can draw a timeline of
 	// the film it just wrote, rather than only a status line about it.
-	scenes := make([]trendlymodels.DesignScene, 0, len(project.Scenes))
-	for _, s := range project.Scenes {
-		scenes = append(scenes, trendlymodels.DesignScene{
-			ID:         s.ID,
-			Src:        s.Src,
-			StartMs:    s.StartMs,
-			DurationMs: s.DurationMs,
-			TrackIndex: s.TrackIndex,
-			TrackKind:  s.TrackKind,
-		})
-	}
+	scenes := scenesOf(project)
+	clips := clipsOf(project)
 	// The live player. Best-effort on purpose: a design whose player could
 	// not be written still renders, previews as stills and exports, so this
 	// must not fail an authoring run the user has already paid for.
@@ -513,7 +504,7 @@ func (a *authorRun) write(ctx context.Context) (string, error) {
 		mysentry.Capture(perr2, map[string]string{"op": "design.author.player", "brandId": brandID, "designId": designID})
 	}
 
-	if err := trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes, previewURL); err != nil {
+	if err := trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes, clips, previewURL); err != nil {
 		return "", err
 	}
 
@@ -530,6 +521,7 @@ func (a *authorRun) write(ctx context.Context) (string, error) {
 		Note:       a.revisionNote(),
 		DurationMs: project.DurationMs,
 		Scenes:     scenes,
+		Clips:      clips,
 	})
 	if cerr != nil {
 		log.Printf("design revision commit failed for %s/%s: %v", brandID, designID, cerr)

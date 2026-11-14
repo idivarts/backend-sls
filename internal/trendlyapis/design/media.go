@@ -34,6 +34,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/hfedit"
+	"github.com/idivarts/backend-sls/pkg/hfproject"
 	"github.com/idivarts/backend-sls/pkg/mediastore"
 	"github.com/idivarts/backend-sls/pkg/mysentry"
 )
@@ -303,6 +304,12 @@ func applyMediaPlacement(source string, req placeMediaRequest) (string, string, 
 	// is on screen over the first two as well.
 	fmt.Fprintf(&b, ` data-start=%q data-duration=%q`,
 		secondsAttr(target.startMs), secondsAttr(target.durationMs))
+	// ── And which row it is on ───────────────────────────────────────────
+	// Written here as well as by the director, because media added from
+	// the panel is exactly the media a person then wants to drag: a clip
+	// with no row falls back to one inferred from its kind, which draws
+	// fine and cannot be changed.
+	fmt.Fprintf(&b, ` data-track-index="%d"`, hfproject.DefaultTrackFor(kind))
 	if tag == "img" {
 		// Sized to its slot rather than left at its natural size, which
 		// for a 4000px stock photograph is a film with one corner of a
@@ -312,7 +319,12 @@ func applyMediaPlacement(source string, req placeMediaRequest) (string, string, 
 		b.WriteString(` class="clip"`)
 	}
 	if assetPath != "" {
-		fmt.Fprintf(&b, ` src=%q data-media-resolved=%q`, assetPath, assetPath)
+		// data-media as well as the file, so the document SAYS what this
+		// is. Without it an uploaded voiceover is an <audio> like any
+		// other, and reads back as music — the one pair the tag cannot
+		// tell apart. The worker skips it: a declaration whose
+		// data-media-resolved already agrees with its src is done.
+		fmt.Fprintf(&b, ` data-media=%q src=%q data-media-resolved=%q`, kind, assetPath, assetPath)
 	} else {
 		fmt.Fprintf(&b, ` data-media=%q data-media-intent=%q`, kind, intent)
 	}

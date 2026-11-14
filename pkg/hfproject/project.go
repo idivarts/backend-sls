@@ -69,6 +69,11 @@ type Project struct {
 	DurationMs int
 	// Scenes are the clips the root mounts, in timeline order.
 	Scenes []Scene
+
+	// Clips is everything on the timeline — the scenes plus the media and
+	// the caption tracks, each on its row. See clips.go for why Scenes
+	// alone was never enough to draw a timeline with.
+	Clips []Clip
 }
 
 var (
@@ -175,7 +180,12 @@ func Build(files []File) (*Project, error) {
 		return nil, err
 	}
 
-	return &Project{Files: files, DurationMs: durationMs, Scenes: parseScenes(index)}, nil
+	return &Project{
+		Files:      files,
+		DurationMs: durationMs,
+		Scenes:     parseScenes(index),
+		Clips:      Clips(index),
+	}, nil
 }
 
 // parseScenes reads the clips the root composition mounts.

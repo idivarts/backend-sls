@@ -71,13 +71,7 @@ func commitEditedDocument(
 		mysentry.Capture(perr, map[string]string{"op": "design.edit.player", "designId": designID})
 	}
 
-	scenes := make([]trendlymodels.DesignScene, 0, len(project.Scenes))
-	for _, s := range project.Scenes {
-		scenes = append(scenes, trendlymodels.DesignScene{
-			ID: s.ID, Src: s.Src, StartMs: s.StartMs,
-			DurationMs: s.DurationMs, TrackIndex: s.TrackIndex, TrackKind: s.TrackKind,
-		})
-	}
+	scenes := scenesOf(project)
 	pruned, comerr := trendlymodels.CommitDesignRevision(ctx, brandID, designID, trendlymodels.DesignRevision{
 		N:          rev,
 		Prefix:     prefix,
@@ -86,6 +80,7 @@ func commitEditedDocument(
 		Note:       note,
 		DurationMs: project.DurationMs,
 		Scenes:     scenes,
+		Clips:      clipsOf(project),
 	})
 	if comerr != nil {
 		mysentry.Capture(comerr, map[string]string{"op": "design.edit.commit", "designId": designID})

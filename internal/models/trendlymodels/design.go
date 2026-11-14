@@ -94,6 +94,26 @@ type DesignScene struct {
 	TrackKind  string `json:"trackKind,omitempty" firestore:"trackKind,omitempty"`
 }
 
+// DesignClip is one thing on the timeline: a scene, a photograph, a
+// voiceover, a music track, a caption track.
+//
+// Beside Scenes rather than replacing them. Scenes are the film's spine and
+// a lot already reads them — the layer tree, the structure endpoint, the
+// scene panel; clips are the timeline's own view, which needs the media and
+// the captions too. See pkg/hfproject/clips.go.
+type DesignClip struct {
+	ElementID  string `json:"elementId" firestore:"elementId"`
+	Kind       string `json:"kind" firestore:"kind"`
+	TrackIndex int    `json:"trackIndex" firestore:"trackIndex"`
+	// Authored is true when the FILM said which row this is on, rather
+	// than the row being inferred from the kind.
+	Authored   bool   `json:"authored,omitempty" firestore:"authored,omitempty"`
+	StartMs    int    `json:"startMs" firestore:"startMs"`
+	DurationMs int    `json:"durationMs" firestore:"durationMs"`
+	Label      string `json:"label,omitempty" firestore:"label,omitempty"`
+	Src        string `json:"src,omitempty" firestore:"src,omitempty"`
+}
+
 // PreviewFrame is one still from the film, with where in it the frame is.
 //
 // TimeMs and not seconds: every other time on this document is milliseconds,
@@ -193,6 +213,9 @@ type Design struct {
 	// become a second implementation of that parsing — one free to disagree
 	// with the renderer's.
 	Scenes []DesignScene `json:"scenes,omitempty" firestore:"scenes,omitempty"`
+
+	// Clips is the timeline: every timed thing in the film, on its row.
+	Clips []DesignClip `json:"clips,omitempty" firestore:"clips,omitempty"`
 
 	// PreviewURL is a page that PLAYS this design live, before any render:
 	// Hyperframes' own player over the project's own HTML. Written when the
@@ -724,6 +747,7 @@ func SetBrandDesignProject(
 	brandID, designID, prefix string,
 	durationMs int,
 	scenes []DesignScene,
+	clips []DesignClip,
 	previewURL string,
 ) error {
 	if scenes == nil {
@@ -731,6 +755,12 @@ func SetBrandDesignProject(
 		// produced no scenes must CLEAR the previous project's, or the
 		// timeline keeps drawing clips from a film that no longer exists.
 		scenes = []DesignScene{}
+	}
+	if clips == nil {
+		// Same reasoning as scenes: a rewrite that produced none must
+		// CLEAR the previous film's, or the timeline keeps drawing rows
+		// for media that is no longer there.
+		clips = []DesignClip{}
 	}
 	// An empty previewUrl CLEARS the old one: a rewrite whose player could
 	// not be written must not leave the app playing the previous film.
@@ -742,6 +772,7 @@ func SetBrandDesignProject(
 		{Path: "projectPrefix", Value: prefix},
 		{Path: "durationMs", Value: durationMs},
 		{Path: "scenes", Value: scenes},
+		{Path: "clips", Value: clips},
 		{Path: "previewUrl", Value: preview},
 		{Path: "authorStatus", Value: DesignAuthorDone},
 		{Path: "authorError", Value: firestore.Delete},

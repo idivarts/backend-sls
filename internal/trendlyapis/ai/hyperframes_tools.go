@@ -154,6 +154,17 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 			TrackKind:  sc.TrackKind,
 		})
 	}
+	// And the timeline, for the same reason: a restore that put the scenes
+	// back and left the clips describing the previous film would draw rows
+	// for media that is no longer in it.
+	clips := make([]trendlymodels.DesignClip, 0, len(project.Clips))
+	for _, c := range project.Clips {
+		clips = append(clips, trendlymodels.DesignClip{
+			ElementID: c.ElementID, Kind: c.Kind, TrackIndex: c.TrackIndex,
+			Authored: c.Authored, StartMs: c.StartMs, DurationMs: c.DurationMs,
+			Label: c.Label, Src: c.Src,
+		})
+	}
 
 	pruned, err := trendlymodels.CommitDesignRevision(ctx, brandID, a.DesignID, trendlymodels.DesignRevision{
 		N:          rev,
@@ -163,6 +174,7 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 		Note:       "Edited by the AI panel",
 		DurationMs: project.DurationMs,
 		Scenes:     scenes,
+		Clips:      clips,
 	})
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "could not save the design"}), err

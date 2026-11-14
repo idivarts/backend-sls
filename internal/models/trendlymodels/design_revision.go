@@ -82,6 +82,7 @@ type DesignRevision struct {
 	// a restore can put the timeline back without re-parsing the project.
 	DurationMs int           `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
 	Scenes     []DesignScene `json:"scenes,omitempty" firestore:"scenes,omitempty"`
+	Clips      []DesignClip  `json:"clips,omitempty" firestore:"clips,omitempty"`
 }
 
 // AllocateDesignRevision reserves the next revision number for a design.
@@ -188,6 +189,9 @@ func CommitDesignRevision(
 		if rev.Scenes != nil {
 			updates = append(updates, firestore.Update{Path: "scenes", Value: rev.Scenes})
 		}
+		if rev.Clips != nil {
+			updates = append(updates, firestore.Update{Path: "clips", Value: rev.Clips})
+		}
 		// An empty previewUrl CLEARS the old one, on the same reasoning as
 		// SetBrandDesignProject: a revision whose player could not be
 		// written must not leave the app playing the previous film.
@@ -268,6 +272,7 @@ func RestoreDesignRevision(ctx context.Context, brandID, designID string, n int)
 			Note:       fmt.Sprintf("Restored revision %d", n),
 			DurationMs: found.DurationMs,
 			Scenes:     found.Scenes,
+			Clips:      found.Clips,
 		}
 		list = append(list, entry)
 		list, pruned = pruneDesignRevisions(list, entry.Prefix)
@@ -282,6 +287,9 @@ func RestoreDesignRevision(ctx context.Context, brandID, designID string, n int)
 		}
 		if entry.Scenes != nil {
 			updates = append(updates, firestore.Update{Path: "scenes", Value: entry.Scenes})
+		}
+		if entry.Clips != nil {
+			updates = append(updates, firestore.Update{Path: "clips", Value: entry.Clips})
 		}
 		if entry.PreviewURL != "" {
 			updates = append(updates, firestore.Update{Path: "previewUrl", Value: entry.PreviewURL})

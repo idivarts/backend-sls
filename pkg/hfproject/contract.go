@@ -147,6 +147,23 @@ Give the caption container the SAME window as the audio it follows — the
 same data-start and at least the same data-duration. The container is itself
 a timed element, so words timed past its window are never drawn.
 
+TRACKS. Every timed element also says which ROW of the timeline it sits
+on, with data-track-index:
+
+  0  the scenes
+  1  pictures and video
+  2  voiceovers
+  3  music and sound effects
+  4  caption tracks
+
+  <section id="scene-hook" class="clip" data-scene="hook" data-track-index="0"
+           data-start="0" data-duration="3">
+  <audio id="score" data-media="bgm" data-track-index="3" ...></audio>
+
+It costs one attribute and it is what lets a person see the film as rows
+and move one thing without moving the rest. Text inside a scene does not
+need it — the scene it sits in carries the row.
+
 EVERY media element needs its own id. The renderer discovers media by id and
 refuses a film without one: "<audio> has data-start but no id attribute ...
 this audio will be SILENT in renders".
