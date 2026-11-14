@@ -382,6 +382,19 @@ export interface CheckOutcome {
 }
 
 /**
+ * Strip the project directory off a path the CLI reported.
+ *
+ * Exported for tests. Anything that is not under this project is left exactly
+ * as it is: a path we do not recognise is better shown in full than silently
+ * truncated to a basename that collides with a file in the project.
+ */
+export function relativeToProject(file: string | undefined, projectDir: string): string | undefined {
+    if (!file) return file;
+    const dir = projectDir.endsWith("/") ? projectDir : `${projectDir}/`;
+    return file.startsWith(dir) ? file.slice(dir.length) : file;
+}
+
+/**
  * One finding as a line a model can act on.
  *
  * The file is kept when the gate names one. A project is several documents and
@@ -437,6 +450,16 @@ export async function checkProject(projectDir: string): Promise<CheckOutcome> {
 
     const all: CheckFinding[] = [];
     collectFindings(parsed, all);
+    // Paths relative to the project, not to this worker's scratch directory.
+    //
+    // The CLI reports some findings against an absolute path, and the project
+    // lives in an mkdtemp directory — so a finding arrived as
+    // "/tmp/hfp-JGwmco…-zMPJsX/index.html: <audio id=\"bgm\"> has src but no
+    // data-start". That string is read by a person in the app AND put in the
+    // prompt that rewrites the film, where a path to a directory that no
+    // longer exists on a machine the model has never seen is at best noise and
+    // at worst something for it to go looking for.
+    for (const f of all) f.sourceFile = relativeToProject(f.sourceFile, projectDir);
     const errors = all.filter((f) => f.severity === "error");
     const warnings = all.filter((f) => f.severity === "warning");
     const ok = (parsed as Record<string, unknown>).ok === true && errors.length === 0;
