@@ -71,7 +71,30 @@ type placeMediaRequest struct {
 	// AssetPath places a file the project already holds — immediately,
 	// because there is nothing to fetch.
 	AssetPath string `json:"assetPath"`
+
+	// ── Dropping something on the timeline ───────────────────────────────
+	// StartMs puts the media AT A MOMENT instead of inside a scene: what a
+	// file dropped on a row at 0:06 means, and what "a sound at 0:06"
+	// means. Given it, the element goes at the root of the film rather
+	// than inside a scene, because a scene would clip anything timed
+	// outside its own window — the quietest failure this studio has, since
+	// the film still renders and the thing is simply not in it.
+	StartMs *int `json:"startMs"`
+	// DurationMs is how long it lasts there. Defaults to what is left of
+	// the film, which for music is what a person means and for a
+	// photograph is at least visible.
+	DurationMs *int `json:"durationMs"`
+	// TrackIndex is the row it was dropped on. Defaults to the row its
+	// kind belongs on.
+	TrackIndex *int `json:"trackIndex"`
 }
+
+// defaultDropMs is how long a dropped clip lasts when nothing says.
+//
+// Three seconds rather than the rest of the film: a photograph dropped at
+// 0:06 of a sixty-second film almost certainly is not meant to be on screen
+// for fifty-four seconds, and lengthening a clip is one drag.
+const defaultDropMs = 3000
 
 const maxIntent = 300
 
@@ -274,6 +297,11 @@ func applyMediaPlacement(source string, req placeMediaRequest) (string, string, 
 		if err := checkAssetPath(assetPath); err != nil {
 			return "", "", err
 		}
+	}
+
+	// ── Dropped at a moment, not into a scene ────────────────────────────
+	if req.StartMs != nil {
+		return placeMediaAtMoment(source, req, kind, assetPath, intent)
 	}
 
 	scenes, serr := readScenes(source)

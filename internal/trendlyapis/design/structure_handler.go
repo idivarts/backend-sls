@@ -89,6 +89,9 @@ func EditDesignStructure(c *gin.Context) {
 
 // structureNote is the line the revisions list shows.
 func structureNote(req structureRequest) string {
+	if isClipOp(req.Op) {
+		return clipNote(req)
+	}
 	switch req.Op {
 	case sceneOpRetime:
 		return "Retimed " + req.SceneID
