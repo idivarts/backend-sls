@@ -117,6 +117,13 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 		// the socket. The queue is what makes a closed tab survivable.
 		r, err := runStartDesignAuthoring(ctx, brandID, arguments)
 		return r, false, err
+	case toolPrepareDesign:
+		// The step that turns a DECLARED piece of media into a file the
+		// player can actually play. A write that leaves media declared
+		// starts it on its own; this is the lever for when it did not, or
+		// when the user says they cannot hear what was just added.
+		r, err := runPrepareDesign(ctx, brandID, arguments)
+		return r, false, err
 	case toolReadHyperframesProject:
 		// Read before write. The write tool replaces the project WHOLE, so a
 		// revision made without reading first throws away every scene the

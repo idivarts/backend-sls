@@ -78,6 +78,7 @@ func TaskForModule(module string) openrouter.TaskType {
 const (
 	toolReadHyperframesProject = "read_hyperframes_project"
 	toolStartDesignAuthoring   = "start_design_authoring"
+	toolPrepareDesign          = "prepare_design"
 )
 
 // designStudioTools are what the studio chat can do to the film.
@@ -108,6 +109,26 @@ func designStudioTools() []openrouter.Tool {
 					"What the film should be, in the user's own terms — length, " +
 						"format, what it says, how it ends."),
 			}, []string{"designId", "brief"}),
+		),
+		openrouter.NewFunctionTool(
+			toolPrepareDesign,
+			"Fetch the media this film DECLARES but does not have, and recapture "+
+				"its stills.\n\n"+
+				"⚠️ A project asks for media by declaring it — an <audio> or <img> "+
+				"with data-media and data-media-intent and NO src. Writing that "+
+				"declaration does not fetch anything: the clip appears on the "+
+				"timeline and the player stays silent, or the image stays empty. "+
+				"Preparing is the step that turns every declaration into a real "+
+				"file, and until it has run the user cannot hear the music or the "+
+				"voiceover you just added.\n\n"+
+				"A write that leaves media declared starts this on its own, so you "+
+				"rarely need to call it. Call it when the user says they cannot "+
+				"hear or see media that should be there, or after a failed "+
+				"preparation you have just fixed. It returns as soon as it is "+
+				"queued — say it is being finished and stop.",
+			openrouter.ObjectSchema(map[string]any{
+				"designId": openrouter.StringProp("The design to finish."),
+			}, []string{"designId"}),
 		),
 		openrouter.NewFunctionTool(
 			toolReadHyperframesProject,
@@ -350,6 +371,79 @@ func runStartDesignAuthoring(ctx context.Context, brandID, arguments string) (st
 	}), nil
 }
 
+// runPrepareDesign queues the step that fetches a film's declared media.
+//
+// ── Why this is a tool and not only an automatic step ───────────────────
+// Writing a project that declares media queues this already, which covers
+// the ordinary case. It does not cover the two that actually reach a
+// person: a preparation that failed and has since been fixed, and a user
+// saying "I still cannot hear the music" about a film whose declaration
+// was written before any of this existed. Both are the model's to act on,
+// and neither is a write.
+func runPrepareDesign(ctx context.Context, brandID, arguments string) (string, error) {
+	var a struct {
+		DesignID string `json:"designId"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &a); err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not read the arguments"}), nil
+	}
+	a.DesignID = strings.TrimSpace(a.DesignID)
+	if a.DesignID == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "say which design to finish"}), nil
+	}
+
+	d, err := trendlymodels.GetBrandDesign(ctx, brandID, a.DesignID)
+	if err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not read the design"}), nil
+	}
+	if d == nil {
+		return jsonResult(map[string]any{"ok": false, "error": "no such design"}), nil
+	}
+	if d.ProjectPrefix == "" {
+		return jsonResult(map[string]any{
+			"ok": false, "error": "nothing_written",
+			"say": "There is no film here yet to finish — it has to be written first.",
+		}), nil
+	}
+	if d.PreviewStatus == trendlymodels.DesignPreviewQueued ||
+		d.PreviewStatus == trendlymodels.DesignPreviewRunning {
+		// Not an error. Telling the model it is already running stops a
+		// second job fetching the same media and charging for it twice.
+		return jsonResult(map[string]any{
+			"ok":   true,
+			"note": "This film is already being finished. Tell the user it is on its way.",
+		}), nil
+	}
+	if !studiojobs.Configured() {
+		mysentry.Capture(fmt.Errorf("studio job queue not configured"), map[string]string{
+			"op": "design.chat.prepare.unconfigured", "designId": a.DesignID,
+		})
+		return jsonResult(map[string]any{
+			"ok": false, "error": "preparing_unconfigured",
+			"say": "Finishing a film is not switched on in this environment. Retrying " +
+				"will not help — say so plainly.",
+		}), nil
+	}
+
+	if eerr := studiojobs.Enqueue(studiojobs.Message{
+		Type:     studiojobs.JobDesignPrepare,
+		BrandID:  brandID,
+		DesignID: a.DesignID,
+	}); eerr != nil {
+		mysentry.Capture(eerr, map[string]string{
+			"op": "design.chat.prepare.enqueue", "designId": a.DesignID,
+		})
+		return jsonResult(map[string]any{"ok": false, "error": "could not start finishing this film"}), nil
+	}
+	return jsonResult(map[string]any{
+		"ok":     true,
+		"status": "queued",
+		"note": "Finishing has started: the declared media is being fetched and the " +
+			"stills recaptured. It carries on even if they close the tab. Say so in " +
+			"one short sentence and STOP.",
+	}), nil
+}
+
 // maxProjectChars bounds what one read hands back.
 const maxProjectChars = 120_000
 
@@ -428,6 +522,17 @@ func designStudioBrief(brandID, designID string) string {
 				s.ID, float64(s.DurationMs)/1000, float64(s.StartMs)/1000)
 		}
 	}
+	// ── What is on the timeline but not in the film ─────────────────────
+	// A declared clip looks identical to a resolved one in every list the
+	// model is given — same row, same label, same timing — and the
+	// difference is the whole reason a user hears nothing. So it is said
+	// out loud rather than left to be inferred from an absent src.
+	if pending := pendingMedia(d.Clips); pending > 0 {
+		fmt.Fprintf(&sb, "\n⚠️ %d clip(s) above are DECLARED and not fetched: they are "+
+			"on the timeline and the user can see them, but the player has nothing to "+
+			"play. Preparing the film is what fetches them — prepare_design.\n", pending)
+	}
+
 	if fault := designFault(d); fault != "" {
 		sb.WriteString(fault)
 	}
@@ -483,6 +588,25 @@ func designFault(d *trendlymodels.Design) string {
 	return sb.String()
 }
 
+// pendingMedia counts the clips that are on the timeline and not in the
+// film: a kind that needs a file, with no file behind it.
+//
+// The same test as unresolvedMedia in hyperframes_tools.go, over the
+// stored clips rather than a freshly parsed project — one reads what the
+// document says the film is, the other what the model just wrote.
+func pendingMedia(clips []trendlymodels.DesignClip) int {
+	n := 0
+	for _, c := range clips {
+		switch c.Kind {
+		case "music", "voice", "sound", "image", "video":
+			if strings.TrimSpace(c.Src) == "" {
+				n++
+			}
+		}
+	}
+	return n
+}
+
 // designStudioInstructions is how the studio chat is asked to behave.
 //
 // Short on purpose. The authoring contract is already in the write tool's
@@ -500,4 +624,12 @@ const designStudioInstructions = "\n\nYou are working inside the Design Studio o
 	"A film with nothing in it yet is written with start_design_authoring, " +
 	"which runs as a job: it returns the moment it is queued, so say it is on " +
 	"its way and stop. A film that already exists is changed by reading it and " +
-	"writing it back."
+	"writing it back.\n" +
+	"⚠️ DECLARED MEDIA IS NOT MEDIA. A voiceover, a music track, an image or a " +
+	"video is asked for by writing an element with data-media and " +
+	"data-media-intent and no src. That puts a clip on the timeline and NOTHING " +
+	"in the player: the user sees a music row and hears silence. Only preparing " +
+	"the film fetches the real files. A write that leaves media declared starts " +
+	"that on its own — so after one, say the media is being fetched and will " +
+	"arrive shortly, never that they can hear it now. If they come back saying " +
+	"they still cannot, call prepare_design."
