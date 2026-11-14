@@ -77,4 +77,9 @@ func RegisterRoutes(engine *gin.Engine) {
 	// wallet and is gated by the plan — but scoped to one element, which
 	// is what makes it an edit rather than a re-roll of the whole film.
 	g.POST(base+"/:designId/element/ai", EditDesignElementWithAI)
+
+	// The film's shape: retime, reorder, duplicate, add, delete a scene.
+	// Scenes play one after another, so every one of those ripples — the
+	// rule is stated in structure.go and shown in the panel.
+	g.POST(base+"/:designId/structure", EditDesignStructure)
 }
