@@ -387,3 +387,60 @@ describe("a caption track follows its voiceover", () => {
         assert.equal(upToDate("assets/voice/b.wav"), false);
     });
 });
+
+describe("a caption track that lost its declaration", () => {
+    // The first version of captions removed data-captions once the words
+    // were in, so every film written before that changed has tracks that
+    // cannot be rebuilt — and after a script edit they sit there showing
+    // the old words over the new speech.
+    const orphaned = `<div id="root" data-composition-id="main" data-duration="6">
+      <audio id="vo-1" data-media="voice" data-media-intent="Beat the three o'clock slump."
+             data-start="0.2" data-duration="2.5"></audio>
+      <audio id="vo-2" data-media="voice" data-media-intent="Cold brew, every single day."
+             data-start="3.2" data-duration="2.5"></audio>
+      <div id="captions-1" class="caption-track clip" data-start="0.2" data-duration="2.5">old words</div>
+      <div id="captions-2" class="caption-track clip" data-start="3.2" data-duration="2.5">old words</div>
+    </div>`;
+
+    it("is still recognised as a caption track by its class", () => {
+        const found = findElements(orphaned, (e) =>
+            (e.attrs["class"] || "").split(/\s+/).includes("caption-track")
+        );
+        assert.equal(found.length, 2);
+    });
+
+    it("follows the voiceover that starts at the same moment", () => {
+        // Not a guess about intent: a caption track is written to sit on
+        // its voiceover, so the start time it already carries IS the link.
+        for (const [track, want] of [
+            ["captions-1", "vo-1"],
+            ["captions-2", "vo-2"],
+        ]) {
+            const el = findElements(orphaned, (e) => e.attrs["id"] === track)[0];
+            const at = el.attrs["data-start"];
+            const voices = findElements(
+                orphaned,
+                (e) =>
+                    e.tagName === "audio" &&
+                    (e.attrs["data-media"] || "") === "voice" &&
+                    (e.attrs["data-start"] || "") === at
+            );
+            assert.equal(voices.length, 1);
+            assert.equal(voices[0].attrs["id"], want);
+        }
+    });
+
+    it("declines when two voiceovers start at the same moment", () => {
+        // A track rebuilt from the wrong voice is worse than a stale one:
+        // a stale one at least matches something that was once true.
+        const ambiguous = orphaned.replace('id="vo-2" data-media="voice" data-media-intent="Cold brew, every single day."\n             data-start="3.2"', 'id="vo-2" data-media="voice" data-media-intent="Cold brew." data-start="0.2"');
+        const voices = findElements(
+            ambiguous,
+            (e) =>
+                e.tagName === "audio" &&
+                (e.attrs["data-media"] || "") === "voice" &&
+                (e.attrs["data-start"] || "") === "0.2"
+        );
+        assert.equal(voices.length, 2, "the fixture should have two voices at 0.2");
+    });
+});
