@@ -126,10 +126,17 @@ func DefaultTrackFor(kind string) int {
 	return defaultTrack[ClipImage]
 }
 
-// maxClips bounds what one film reports. A timeline with more rows than
-// this is not a timeline anyone reads, and the document it is stored on has
-// a size limit.
-const maxClips = 200
+// maxClips bounds what one film reports.
+//
+// ── Why this number and not a round 200 ──────────────────────────────────
+// The clip list is stored on the design document AND on each of the ten
+// kept revisions, so the real cost is eleven copies. At roughly 200 bytes a
+// clip, 200 clips would be some 440KB of a document with a hard 1MB ceiling
+// — shared with the scenes, the preview frames and everything else on it,
+// and a document over the ceiling fails EVERY write to the design rather
+// than merely drawing a wrong timeline. 80 is well past any film a person
+// reads as rows and leaves the document an order of magnitude of headroom.
+const maxClips = 80
 
 // maxLabel keeps a row's name to something that fits on it.
 const maxLabel = 48

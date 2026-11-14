@@ -312,3 +312,38 @@ func TestParseScenesNeedsTheSceneMarker(t *testing.T) {
 		t.Fatalf("a clip without data-scene became a scene: %+v", got)
 	}
 }
+
+// A scene timed with data-end has a length, and it is the same length
+// clips.go reports for it.
+//
+// Two readings of one document that disagree is how a scene came to be
+// three seconds long on the timeline and zero in the scene panel.
+func TestSceneDurationFromDataEnd(t *testing.T) {
+	const doc = `<div id="root" data-composition-id="reel" data-duration="5">
+       <section id="s1" class="clip" data-scene="hook" data-start="0" data-end="3"></section>
+       <section id="s2" class="clip" data-scene="end" data-start="3" data-duration="2"></section>
+     </div>`
+
+	scenes := parseScenes(doc)
+	if len(scenes) != 2 {
+		t.Fatalf("want two scenes, got %d", len(scenes))
+	}
+	if scenes[0].DurationMs != 3000 {
+		t.Fatalf("data-end should give the scene a length: got %d, want 3000", scenes[0].DurationMs)
+	}
+	if scenes[1].DurationMs != 2000 {
+		t.Fatalf("data-duration still wins where it is given: got %d", scenes[1].DurationMs)
+	}
+
+	// And the timeline agrees with the panel, which is the point.
+	for _, c := range Clips(doc) {
+		if c.Kind != ClipScene {
+			continue
+		}
+		for _, s := range scenes {
+			if s.ID == c.ElementID && s.DurationMs != c.DurationMs {
+				t.Fatalf("scene %q: panel says %d, timeline says %d", s.ID, s.DurationMs, c.DurationMs)
+			}
+		}
+	}
+}
