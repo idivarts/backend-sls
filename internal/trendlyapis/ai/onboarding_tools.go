@@ -111,6 +111,12 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 	case toolGenerateDesign:
 		r, err := runGenerateDesign(ctx, brandID, contextID, arguments)
 		return r, false, err
+	case toolStartDesignAuthoring:
+		// A JOB, not a write in this turn: a first authoring fetches media,
+		// transcribes captions and runs the gate, and a tool call dies with
+		// the socket. The queue is what makes a closed tab survivable.
+		r, err := runStartDesignAuthoring(ctx, brandID, arguments)
+		return r, false, err
 	case toolReadHyperframesProject:
 		// Read before write. The write tool replaces the project WHOLE, so a
 		// revision made without reading first throws away every scene the

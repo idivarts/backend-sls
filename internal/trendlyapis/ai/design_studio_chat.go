@@ -35,7 +35,9 @@ import (
 	"strings"
 
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
+	"github.com/idivarts/backend-sls/internal/studiojobs"
 	"github.com/idivarts/backend-sls/pkg/mediastore"
+	"github.com/idivarts/backend-sls/pkg/mysentry"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -73,7 +75,10 @@ func TaskForModule(module string) openrouter.TaskType {
 	return openrouter.TaskChat
 }
 
-const toolReadHyperframesProject = "read_hyperframes_project"
+const (
+	toolReadHyperframesProject = "read_hyperframes_project"
+	toolStartDesignAuthoring   = "start_design_authoring"
+)
 
 // designStudioTools are what the studio chat can do to the film.
 //
@@ -84,6 +89,26 @@ const toolReadHyperframesProject = "read_hyperframes_project"
 // one-scene reel over a six-scene one.
 func designStudioTools() []openrouter.Tool {
 	tools := []openrouter.Tool{
+		openrouter.NewFunctionTool(
+			toolStartDesignAuthoring,
+			"Write a film from scratch, for a design that has nothing in it yet. "+
+				"Use this — NOT write_hyperframes_project — the first time a user "+
+				"describes the film they want: it runs as a background job, so it "+
+				"survives them closing the tab, and it finishes the film properly "+
+				"(fetching the photographs and voiceovers it asked for, transcribing "+
+				"captions, running the renderer's own check). It returns as soon as "+
+				"the job is queued; say so and stop. The film appears beside the user "+
+				"on its own.\n\n"+
+				"Pass the user's own description as the brief, tidied but not "+
+				"invented: it is stored on the design and is what they will see when "+
+				"they come back to it.",
+			openrouter.ObjectSchema(map[string]any{
+				"designId": openrouter.StringProp("The design to write."),
+				"brief": openrouter.StringProp(
+					"What the film should be, in the user's own terms — length, " +
+						"format, what it says, how it ends."),
+			}, []string{"designId", "brief"}),
+		),
 		openrouter.NewFunctionTool(
 			toolReadHyperframesProject,
 			"Read the current files of a Design Studio v3 film. ALWAYS call this "+
@@ -180,6 +205,97 @@ func runReadHyperframesProject(ctx context.Context, brandID, arguments string) (
 	}), nil
 }
 
+// runStartDesignAuthoring queues the authoring job for an empty design.
+//
+// ── Why a job and not a tool that writes ─────────────────────────────────
+// write_hyperframes_project writes the project inside this turn, which is
+// right for a revision: it is one model call and the user is watching. A
+// first authoring is not that. It fetches photographs and voiceovers,
+// transcribes captions and runs the renderer's own check, and a tool call
+// dies with the socket — so every disconnect would be a lost film the org
+// has already paid a frontier call for. The queue is what makes that
+// survivable, and ExecuteDesignAuthorJob's idempotency guard exists for
+// exactly the redelivery that follows.
+//
+// The guards are the ones AuthorDesign uses, in the same order and for the
+// same reason: this is the last place that can tell the user anything. Once
+// the message is on the queue the only surface left is an authorError on
+// the document, which reads as a fault rather than as a wall.
+func runStartDesignAuthoring(ctx context.Context, brandID, arguments string) (string, error) {
+	var a struct {
+		DesignID string `json:"designId"`
+		Brief    string `json:"brief"`
+	}
+	if err := json.Unmarshal([]byte(arguments), &a); err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not read the arguments"}), nil
+	}
+	a.DesignID = strings.TrimSpace(a.DesignID)
+	brief := strings.TrimSpace(a.Brief)
+	if a.DesignID == "" || brief == "" {
+		return jsonResult(map[string]any{"ok": false, "error": "say which design, and what the film should be"}), nil
+	}
+
+	d, err := trendlymodels.GetBrandDesign(ctx, brandID, a.DesignID)
+	if err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not read the design"}), nil
+	}
+	if d == nil {
+		return jsonResult(map[string]any{"ok": false, "error": "no such design"}), nil
+	}
+	if d.AuthorStatus == trendlymodels.DesignAuthorQueued ||
+		d.AuthorStatus == trendlymodels.DesignAuthorWriting {
+		// Not an error. Telling the model it is already running stops it
+		// queueing a second one, which would have two jobs writing the same
+		// film and the second overwriting the first.
+		return jsonResult(map[string]any{
+			"ok":   true,
+			"note": "This film is already being written. Tell the user it is on its way.",
+		}), nil
+	}
+	if !studiojobs.Configured() {
+		return jsonResult(map[string]any{"ok": false, "error": "writing is not available right now"}), nil
+	}
+
+	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+	if trendlymodels.TokensExhausted(orgID) {
+		return jsonResult(map[string]any{
+			"ok": false, "error": "upgrade_required", "reason": "tokens_exhausted",
+			"say": "They are out of AI tokens this month and need a top-up before a film can be written.",
+		}), nil
+	}
+	if model, locked := PickModelFor(ctx, brandID, openrouter.TaskDesign); locked || model == "" {
+		return jsonResult(map[string]any{
+			"ok": false, "error": "upgrade_required", "reason": "plan_locked",
+			"say": "Writing films is on the paid plans.",
+		}), nil
+	}
+
+	// Stored with the status rather than only carried on the queue message,
+	// so the app can show what this design was asked to be.
+	if qerr := trendlymodels.QueueBrandDesignAuthoring(ctx, brandID, a.DesignID, brief); qerr != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not start writing"}), nil
+	}
+	if eerr := studiojobs.Enqueue(studiojobs.Message{
+		Type:     studiojobs.JobDesignAuthor,
+		BrandID:  brandID,
+		DesignID: a.DesignID,
+		Brief:    brief,
+	}); eerr != nil {
+		mysentry.Capture(eerr, map[string]string{"op": "design.chat.author.enqueue", "designId": a.DesignID})
+		_ = trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, a.DesignID,
+			"We couldn't start writing this design. Please try again.")
+		return jsonResult(map[string]any{"ok": false, "error": "could not start writing"}), nil
+	}
+
+	return jsonResult(map[string]any{
+		"ok":     true,
+		"status": "queued",
+		"note": "Writing has started and will carry on even if they close the tab. " +
+			"Say so in one short sentence and STOP — do not describe the film you " +
+			"have not written yet, and do not call any other tool.",
+	}), nil
+}
+
 // maxProjectChars bounds what one read hands back.
 const maxProjectChars = 120_000
 
@@ -228,7 +344,10 @@ func designStudioBrief(brandID, designID string) string {
 		fmt.Fprintf(&sb, "name: %s\n", name)
 	}
 	if d.ProjectPrefix == "" {
-		sb.WriteString("This design has nothing in it yet — write a project for it.\n")
+		sb.WriteString("This design has NOTHING IN IT YET.\n" +
+			"The user's first message is the brief. Call start_design_authoring " +
+			"with it — not write_hyperframes_project — then say in one sentence " +
+			"that it is being written, and stop.\n")
 		return sb.String()
 	}
 	if d.DurationMs > 0 {
@@ -275,4 +394,8 @@ const designStudioInstructions = "\n\nYou are working inside the Design Studio o
 	"waste a render, ask with ask_options rather than guessing.\n" +
 	"The user may have something SELECTED on screen; when they do it is named " +
 	"in their message, and 'make this bigger' means that element and nothing " +
-	"else."
+	"else.\n" +
+	"A film with nothing in it yet is written with start_design_authoring, " +
+	"which runs as a job: it returns the moment it is queued, so say it is on " +
+	"its way and stop. A film that already exists is changed by reading it and " +
+	"writing it back."

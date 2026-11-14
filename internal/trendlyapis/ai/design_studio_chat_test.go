@@ -67,7 +67,7 @@ func TestDesignStudioToolsAreTheRightOnes(t *testing.T) {
 	for _, tool := range toolsForModule(moduleDesign) {
 		have[tool.Function.Name] = true
 	}
-	for _, want := range []string{toolReadHyperframesProject, toolWriteHyperframesProject} {
+	for _, want := range []string{toolReadHyperframesProject, toolWriteHyperframesProject, toolStartDesignAuthoring} {
 		if !have[want] {
 			t.Fatalf("the studio chat cannot %s", want)
 		}
@@ -90,6 +90,21 @@ func TestDesignStudioToolsAreTheRightOnes(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(desc), "before write_hyperframes_project") {
 		t.Fatal("the read tool does not tell the model to read before it writes")
+	}
+
+	// ⚠️ A first authoring is a JOB, and the model must be told which tool
+	// is which. Writing a film inside the turn means it dies with the
+	// socket — every disconnect a lost film the org already paid for.
+	var authorDesc string
+	for _, tool := range designStudioTools() {
+		if tool.Function.Name == toolStartDesignAuthoring {
+			authorDesc = strings.ToLower(tool.Function.Description)
+		}
+	}
+	for _, phrase := range []string{"not write_hyperframes_project", "background job"} {
+		if !strings.Contains(authorDesc, phrase) {
+			t.Fatalf("the authoring tool does not say %q, so the model will write inline instead", phrase)
+		}
 	}
 }
 
