@@ -213,8 +213,52 @@ const bridgeJS = `
       tag: target.tagName.toLowerCase(),
       sceneId: scene ? scene.getAttribute("data-scene") : "",
       text: (target.textContent || "").replace(/\s+/g, " ").trim().slice(0, 240),
+      style: styleOf(target),
+      startMs: msAttr(target, "data-start"),
+      durationMs: msAttr(target, "data-duration"),
       box: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }
     };
+  }
+
+  // ── What the inspector needs to show, not what the element declares ────
+  // An element usually has no inline colour: the brand kit styles it from a
+  // class, and an inspector that showed "unset" for a headline that is
+  // plainly navy would be lying about the film. So these are the COMPUTED
+  // values — what is actually on screen — and the panel writes back inline,
+  // which is the one place an override belongs.
+  function styleOf(node) {
+    var out = {};
+    try {
+      var cs = (node.ownerDocument.defaultView || window).getComputedStyle(node);
+      out.color = hex(cs.color);
+      // A transparent background reads as "no background" in the panel
+      // rather than as black, which is what rgba(0,0,0,0) converts to.
+      out.backgroundColor = cs.backgroundColor === "rgba(0, 0, 0, 0)" ? "" : hex(cs.backgroundColor);
+      out.fontSize = cs.fontSize || "";
+      out.fontWeight = cs.fontWeight || "";
+      out.textAlign = cs.textAlign || "";
+    } catch (err) {}
+    return out;
+  }
+
+  // rgb()/rgba() to #rrggbb, because that is what a colour input takes.
+  // Anything already hex, or a name, comes back untouched.
+  function hex(v) {
+    if (!v) return "";
+    var m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(v);
+    if (!m) return v;
+    return "#" + [m[1], m[2], m[3]].map(function (n) {
+      var h = parseInt(n, 10).toString(16);
+      return h.length === 1 ? "0" + h : h;
+    }).join("");
+  }
+
+  // Seconds in the document, milliseconds everywhere in the app.
+  function msAttr(node, name) {
+    var raw = node.getAttribute(name);
+    if (raw === null || raw === "") return null;
+    var n = parseFloat(raw);
+    return isFinite(n) ? Math.round(n * 1000) : null;
   }
 
   // Capture phase, so a composition that stops propagation on its own

@@ -67,4 +67,9 @@ func RegisterRoutes(engine *gin.Engine) {
 	// on needs no GET of its own, because revisions ride on the design
 	// document the app already watches.
 	g.POST(base+"/:designId/revisions/:n/restore", RestoreDesignRevision)
+
+	// One element, changed directly — the edits that should never cost a
+	// model call. A POST because it writes a revision, but it charges
+	// nothing and there is no job: the answer carries the new player URL.
+	g.POST(base+"/:designId/element", EditDesignElement)
 }
