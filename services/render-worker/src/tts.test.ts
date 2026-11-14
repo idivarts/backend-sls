@@ -210,3 +210,43 @@ describe("synthesizeVoice", () => {
         assert.equal(called, false);
     });
 });
+
+describe("synthesizeVoice, when the request never reaches HeyGen", () => {
+    it("retries a transport failure the same way it retries a 5xx", async () => {
+        const dir = await mkdtemp(join(tmpdir(), "tts-"));
+        let attempts = 0;
+        const fetchImpl = (async (url: string | URL | Request) => {
+            if (!String(url).startsWith("https://api.heygen.com")) return wav();
+            attempts++;
+            if (attempts === 1) throw new TypeError("fetch failed");
+            return ttsOK();
+        }) as unknown as typeof fetch;
+
+        const out = await synthesizeVoice({
+            projectDir: dir,
+            apiKey: "k",
+            text: "a socket reset is not a refusal",
+            fetchImpl,
+            sleep: async () => {},
+        });
+        assert.equal(attempts, 2);
+        assert.ok(out.path.endsWith(".wav"));
+    });
+
+    it("gives up with the transport error, not a generic one", async () => {
+        const dir = await mkdtemp(join(tmpdir(), "tts-"));
+        const fetchImpl = (async () => {
+            throw new TypeError("getaddrinfo ENOTFOUND api.heygen.com");
+        }) as unknown as typeof fetch;
+        await assert.rejects(
+            synthesizeVoice({
+                projectDir: dir,
+                apiKey: "k",
+                text: "nowhere to send this",
+                fetchImpl,
+                sleep: async () => {},
+            }),
+            /ENOTFOUND/
+        );
+    });
+});

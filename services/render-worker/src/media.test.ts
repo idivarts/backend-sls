@@ -7,6 +7,7 @@ import {
     captionSpans,
     pathFromResolveJSON,
     readDeclarations,
+    startSeconds,
     transcriptPathFromJSON,
     voiceIdFromEntity,
     wordsFromTranscribeJSON,
@@ -297,5 +298,22 @@ describe("transcriptPathFromJSON", () => {
     it("is null when no line names one", () => {
         assert.equal(transcriptPathFromJSON('{"ok":true,"wordCount":0}'), null);
         assert.equal(transcriptPathFromJSON("not json at all"), null);
+    });
+});
+
+describe("startSeconds", () => {
+    it("reads a data-start", () => {
+        assert.equal(startSeconds({ attrs: { "data-start": "4" } }), 4);
+        assert.equal(startSeconds({ attrs: { "data-start": "0" } }), 0);
+        assert.equal(startSeconds({ attrs: { "data-start": "2.5" } }), 2.5);
+    });
+
+    it("says undefined — not zero — when there is nothing to read", () => {
+        // The difference matters: a caption track falls back to the
+        // container's data-start only when the AUDIO does not say, and "0"
+        // is a thing the audio can say.
+        assert.equal(startSeconds({ attrs: {} }), undefined);
+        assert.equal(startSeconds(undefined), undefined);
+        assert.equal(startSeconds({ attrs: { "data-start": "soon" } }), undefined);
     });
 });

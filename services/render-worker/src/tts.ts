@@ -203,17 +203,35 @@ export async function synthesizeVoice(opts: {
     let lastRetryAfter: string | null = null;
     for (let attempt = 1; attempt <= TTS_MAX_ATTEMPTS; attempt++) {
         if (attempt > 1) await nap(retryDelayMs(attempt, lastRetryAfter));
-        const res = await doFetch(TTS_ENDPOINT, {
-            method: "POST",
-            headers: { "X-Api-Key": opts.apiKey, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: TTS_MODEL,
-                voice_id: voiceId,
-                text,
-                language: opts.language || "en",
-            }),
-            signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
-        });
+        // ── A reset socket is as transient as a 502 ───────────────────────
+        // fetch REJECTS on a transport failure rather than resolving with a
+        // status, so without this the backoff below — written for exactly
+        // this kind of blip — is skipped, and a DNS hiccup inside the task's
+        // VPC costs a film its voiceover and its captions. Retried on the
+        // same terms as a 5xx; each attempt is a fresh POST, so there is
+        // nothing half-done to clean up.
+        let res: Response;
+        try {
+            res = await doFetch(TTS_ENDPOINT, {
+                method: "POST",
+                headers: { "X-Api-Key": opts.apiKey, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: TTS_MODEL,
+                    voice_id: voiceId,
+                    text,
+                    language: opts.language || "en",
+                }),
+                signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+            });
+        } catch (err) {
+            lastRetryAfter = null;
+            lastWhy = err instanceof Error ? err.message : String(err);
+            if (attempt < TTS_MAX_ATTEMPTS) {
+                console.log(`[tts] attempt ${attempt} never reached HeyGen: ${lastWhy}`);
+                continue;
+            }
+            throw new Error(lastWhy);
+        }
 
         if (!res.ok) {
             lastRetryAfter = res.headers.get("retry-after");
