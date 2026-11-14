@@ -42,7 +42,14 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 
 import { hyperframesEnv, runHyperframes } from "./hyperframes";
-import { applyEdits, findElements, removeAttribute, setAttribute, type Edit } from "./html-edit";
+import {
+    applyEdits,
+    findElements,
+    removeAttribute,
+    setAttribute,
+    type Edit,
+    type FoundElement,
+} from "./html-edit";
 import { TTS_MODEL_IS_FREE, synthesizeVoice } from "./tts";
 
 /** The media kinds `media-use resolve --type` accepts. */
@@ -186,6 +193,9 @@ export async function resolveProjectMedia(
     // Element id → the voiceover file resolved for it, so a caption track
     // can find the audio it is meant to follow.
     const voiceFor = new Map<string, string>();
+    // And the element itself, because a caption track has to be timed
+    // against where that audio sits in the film, not where the track does.
+    const voiceElements = new Map<string, FoundElement>();
     // Declarations that could not be resolved, keyed the same way, so their
     // elements can be taken out rather than left pointing at nothing.
     const failed = new Set<string>();
@@ -267,7 +277,11 @@ export async function resolveProjectMedia(
             resolvedFor.set(key, rel);
             result.files.push(rel);
         }
-        if (d.type === "voice" && d.elementId) voiceFor.set(d.elementId, rel);
+        if (d.type === "voice" && d.elementId) {
+            voiceFor.set(d.elementId, rel);
+            const audioEl = findElements(original, (e) => e.attrs["id"] === d.elementId)[0];
+            if (audioEl) voiceElements.set(d.elementId, audioEl);
+        }
         result.resolved++;
     }
 
@@ -375,7 +389,16 @@ export async function resolveProjectMedia(
             result.problems.push(`captions for "${forId}": ${why}`);
             continue;
         }
-        const offset = Number(el.attrs["data-start"] ?? "0") || 0;
+        // ── Whose clock the transcript is on ─────────────────────────────
+        // The transcript starts at zero because the WAV does. What it has to
+        // be shifted onto is the moment the AUDIO starts in the film, which
+        // is the audio element's data-start — not the caption container's.
+        // Those are usually the same and need not be: a caption layer
+        // spanning the whole reel (data-start="0" data-duration="12") around
+        // a voiceover that begins at four seconds is a perfectly natural way
+        // to author it, and reading the container there would run every word
+        // four seconds ahead of the voice.
+        const offset = startSeconds(voiceElements.get(forId)) ?? startSeconds(el) ?? 0;
         // The container's own children are replaced: whatever placeholder
         // the model put there was a stand-in for exactly this.
         edits.push({ start: el.tagEnd, end: el.end - closingTagLength(el), text: captionSpans(words, offset) });
@@ -424,6 +447,19 @@ function voiceRefusal(opts: { heygenApiKey?: string; creditCeiling?: number }): 
         return "this org has no media credit left, and the voice model is a charged one";
     }
     return "";
+}
+
+/**
+ * An element's data-start in seconds, or undefined when it has none.
+ *
+ * Undefined rather than zero, so a caller can tell "starts at the beginning"
+ * from "does not say", and fall back to something that does.
+ */
+export function startSeconds(el?: { attrs: Record<string, string | undefined> }): number | undefined {
+    const raw = el?.attrs["data-start"];
+    if (raw === undefined) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
 }
 
 function firstLine(s: string): string {
