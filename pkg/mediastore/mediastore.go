@@ -104,6 +104,18 @@ type Spec struct {
 	// deliberately overwrites its own files.
 	ExactKey string
 
+	// CacheControl is sent with the object.
+	//
+	// Needed because a file stored at an ExactKey is MUTABLE: a design's
+	// index.html is rewritten when its media resolves, and the bytes behind
+	// that URL change while the URL does not. With no header CloudFront
+	// applies its default TTL and goes on serving the old film for hours —
+	// measured at Age: 27264 on a design whose media had already resolved,
+	// so the render had the photograph and the player did not.
+	//
+	// Generated keys do not need this: their URL changes with their content.
+	CacheControl string
+
 	// NoLibrary stores the bytes without filing a library row. The ONE
 	// legitimate use is a file that is not the brand's media at all: a
 	// contract PDF, a chat attachment. Everything else files a row, because
@@ -274,12 +286,16 @@ func Put(ctx context.Context, sp Spec, data []byte) (*Stored, error) {
 	}
 	contentType := orDefault(sp.ContentType, mimeFromFilename(sp.Filename))
 
-	if _, err := mys3.Client.PutObject(&s3.PutObjectInput{
+	put := &s3.PutObjectInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(data),
 		ContentType: aws.String(contentType),
-	}); err != nil {
+	}
+	if sp.CacheControl != "" {
+		put.CacheControl = aws.String(sp.CacheControl)
+	}
+	if _, err := mys3.Client.PutObject(put); err != nil {
 		return nil, fmt.Errorf("mediastore: could not store the object: %w", err)
 	}
 

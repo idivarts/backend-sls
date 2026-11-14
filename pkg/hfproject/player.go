@@ -404,12 +404,13 @@ func UploadPlayer(ctx context.Context, brandID, designID string, p *Project) (st
 	prefix := Prefix(brandID, designID)
 	write := func(name, body string) (string, error) {
 		s, err := mediastore.Put(ctx, mediastore.Spec{
-			BrandID:     brandID,
-			Target:      mediastore.TargetAttachment,
-			ExactKey:    prefix + "/" + name,
-			Filename:    name,
-			ContentType: "text/html; charset=utf-8",
-			NoLibrary:   true,
+			BrandID:      brandID,
+			Target:       mediastore.TargetAttachment,
+			ExactKey:     prefix + "/" + name,
+			Filename:     name,
+			ContentType:  "text/html; charset=utf-8",
+			NoLibrary:    true,
+			CacheControl: projectCacheControl,
 		}, []byte(body))
 		if err != nil {
 			return "", fmt.Errorf("hfproject.UploadPlayer: %s: %w", name, err)

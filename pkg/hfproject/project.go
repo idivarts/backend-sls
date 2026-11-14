@@ -339,6 +339,13 @@ func Upload(ctx context.Context, brandID, designID string, p *Project) (string, 
 			Filename:    path.Base(clean),
 			ContentType: contentTypeFor(clean),
 			NoLibrary:   true,
+			// Every file here is MUTABLE at a fixed URL: the worker rewrites
+			// index.html when a film's media resolves. Without this header
+			// CloudFront served the pre-media film for hours while S3 had
+			// the right one — the render had the photograph and the player
+			// did not. no-cache still caches; it just revalidates first, so
+			// an unchanged film costs a 304.
+			CacheControl: projectCacheControl,
 		}, []byte(f.Content))
 		if err != nil {
 			return "", fmt.Errorf("hfproject.Upload: %s: %w", clean, err)
@@ -346,6 +353,14 @@ func Upload(ctx context.Context, brandID, designID string, p *Project) (string, 
 	}
 	return prefix, nil
 }
+
+// projectCacheControl is what every project object is stored with.
+//
+// "no-cache" does not mean "do not cache": it means revalidate before use.
+// An unchanged film costs a conditional request and a 304, and a changed one
+// is never served stale. That is the right trade for a document whose URL
+// stays the same while its contents are rewritten underneath it.
+const projectCacheControl = "no-cache"
 
 func contentTypeFor(p string) string {
 	switch strings.ToLower(path.Ext(p)) {

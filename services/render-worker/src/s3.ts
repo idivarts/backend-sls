@@ -148,6 +148,11 @@ export async function uploadProjectFiles(prefix: string, dir: string, relativePa
                 Key: normalised + rel,
                 Body: body,
                 ContentType: contentTypeFor(rel),
+                // The same reason the backend sets it: these objects are
+                // mutable at a fixed URL. The worker rewriting index.html
+                // is precisely the case where CloudFront went on serving
+                // the pre-media film for hours.
+                CacheControl: "no-cache",
             })
         );
         written++;
