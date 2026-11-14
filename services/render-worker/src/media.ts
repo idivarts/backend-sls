@@ -45,7 +45,6 @@ import { hyperframesEnv, runHyperframes } from "./hyperframes";
 import {
     applyEdits,
     findElements,
-    removeAttribute,
     setAttribute,
     type Edit,
     type FoundElement,
