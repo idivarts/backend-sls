@@ -101,6 +101,11 @@ func restoreBrandAssets(ctx context.Context, brandID, designID string) int {
 	if derr != nil || d == nil || d.ProjectPrefix == "" {
 		return 0
 	}
+	// ⚠️ Every return below says why. The first version of this returned 0
+	// from four places in silence, and when it did nothing on a film that
+	// visibly needed it there was no way to tell WHICH four — a missing
+	// design system, an unreadable file, a kit that could not fetch the
+	// font, or simply nothing missing. One run, one line.
 	rels, err := mediastore.ListPrefix(ctx, mediastore.TargetAttachment, d.ProjectPrefix)
 	if err != nil {
 		log.Printf("design prepare: could not list %s: %v", d.ProjectPrefix, err)
@@ -120,6 +125,7 @@ func restoreBrandAssets(ctx context.Context, brandID, designID string) int {
 		}
 		raw, gerr := mediastore.Get(ctx, mediastore.TargetAttachment, d.ProjectPrefix+"/"+rel)
 		if gerr != nil {
+			log.Printf("design prepare: could not read %s/%s: %v", d.ProjectPrefix, rel, gerr)
 			continue
 		}
 		for _, ref := range assetRefsIn(string(raw)) {
@@ -129,19 +135,26 @@ func restoreBrandAssets(ctx context.Context, brandID, designID string) int {
 		}
 	}
 	if len(missing) == 0 {
+		log.Printf("design prepare: %s holds every asset its %d source file(s) reference",
+			d.ProjectPrefix, len(rels))
 		return 0
 	}
+	log.Printf("design prepare: %s is missing %d referenced asset(s)", d.ProjectPrefix, len(missing))
 
 	ds, dserr := trendlymodels.GetDesignSystem(ctx, brandID)
 	if dserr != nil || ds == nil {
 		// Nothing to restore from. The film keeps its warning, which is
 		// the honest outcome for a brand with no design system.
+		log.Printf("design prepare: no design system for %s, so nothing to restore from (err=%v)",
+			brandID, dserr)
 		return 0
 	}
 	kit := buildBrandKit(ctx, ds)
 	if kit == nil {
+		log.Printf("design prepare: the brand kit for %s built nothing", brandID)
 		return 0
 	}
+	log.Printf("design prepare: the brand kit offers %d file(s)", len(kit.Files))
 
 	restored := 0
 	for _, f := range kit.Files {
