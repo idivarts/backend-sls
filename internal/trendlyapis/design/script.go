@@ -53,6 +53,34 @@ type scriptLine struct {
 // pasted document is not.
 const maxScriptLine = 2000
 
+// captionWord is one word of a caption track, with the moment it appears.
+type captionWord struct {
+	Text       string `json:"text"`
+	StartMs    int    `json:"startMs"`
+	DurationMs int    `json:"durationMs"`
+}
+
+// captionTrack is one set of word-synced captions.
+//
+// Reported separately from the script's lines, and deliberately NOT as
+// editable copy: a caption track is transcribed from the audio of the
+// voiceover it follows, and rebuilt whenever that line changes. Editing
+// the words here would be editing a transcript of something about to be
+// replaced — the place to change them is the voiceover.
+type captionTrack struct {
+	ElementID string `json:"elementId"`
+	SceneID   string `json:"sceneId"`
+	// Follows is the id of the voiceover these words came out of.
+	Follows string `json:"follows"`
+	// Spoken is what that voiceover was asked to say, which is not always
+	// what the transcriber heard — "three" comes back as "3". Showing both
+	// is the point: these words are what a viewer READS, and they are
+	// taken from what a viewer HEARS.
+	Spoken  string        `json:"spoken"`
+	StartMs int           `json:"startMs"`
+	Words   []captionWord `json:"words"`
+}
+
 // GetDesignScript reads the film as a script.
 // GET /api/design/brands/:brandId/designs/:designId/script
 func GetDesignScript(c *gin.Context) {
@@ -73,7 +101,7 @@ func GetDesignScript(c *gin.Context) {
 	if d.ProjectPrefix == "" {
 		// Not an error: a design nobody has written has an empty script,
 		// and the panel says so rather than showing a failure.
-		c.JSON(http.StatusOK, gin.H{"lines": []scriptLine{}})
+		c.JSON(http.StatusOK, gin.H{"lines": []scriptLine{}, "captions": []captionTrack{}})
 		return
 	}
 	source, rerr := readCurrentDocument(ctx, d)
@@ -82,7 +110,10 @@ func GetDesignScript(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "could not read this film"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"lines": readScript(source)})
+	c.JSON(http.StatusOK, gin.H{
+		"lines":    readScript(source),
+		"captions": readCaptions(source),
+	})
 }
 
 // readScript pulls every line of copy out of a film, in the order it is
@@ -208,6 +239,93 @@ func readScript(source string) []scriptLine {
 		}
 	}
 	return lines
+}
+
+// readCaptions pulls every caption track out of a film, in the order they
+// appear on screen.
+//
+// A track is recognised the same three ways the worker recognises one:
+// the attribute, the class the authoring contract names, or the fact that
+// it holds timed children. A FILLED track may have lost its attribute on
+// an older film, and one that has never been filled has no children —
+// both are still caption tracks, and both belong in this panel, one of
+// them showing that it is empty.
+func readCaptions(source string) []captionTrack {
+	scenes := hfedit.FindAll(source, func(e hfedit.Element) bool {
+		_, has := e.Attrs["data-scene"]
+		return has
+	})
+	sceneName := func(el hfedit.Element) string {
+		for _, s := range scenes {
+			if s.Start <= el.Start && s.End >= el.End {
+				if n := strings.TrimSpace(s.Attrs["data-scene"]); n != "" {
+					return n
+				}
+				return s.Attrs["id"]
+			}
+		}
+		return ""
+	}
+
+	out := make([]captionTrack, 0, 4)
+	for _, el := range hfedit.FindAll(source, isCaptionTrack(source)) {
+		follows := strings.TrimSpace(el.Attrs["data-captions"])
+		track := captionTrack{
+			ElementID: el.Attrs["id"],
+			SceneID:   sceneName(el),
+			Follows:   follows,
+			Words:     readCaptionWords(source, el),
+		}
+		track.StartMs, _ = msAttr(el, "data-start")
+		if follows != "" {
+			for _, v := range hfedit.FindAll(source, func(e hfedit.Element) bool {
+				return e.Attrs["id"] == follows
+			}) {
+				track.Spoken = strings.TrimSpace(v.Attrs["data-media-intent"])
+				break
+			}
+		}
+		out = append(out, track)
+	}
+	return out
+}
+
+// isCaptionTrack is the predicate, kept next to readCaptions so the three
+// ways of recognising one stay together.
+func isCaptionTrack(source string) func(hfedit.Element) bool {
+	return func(e hfedit.Element) bool {
+		if _, has := e.Attrs["data-captions"]; has {
+			return true
+		}
+		for _, c := range strings.Fields(e.Attrs["class"]) {
+			if c == "caption-track" {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// readCaptionWords reads the timed spans inside a track.
+func readCaptionWords(source string, track hfedit.Element) []captionWord {
+	words := make([]captionWord, 0, 12)
+	for _, el := range hfedit.FindAll(source, func(e hfedit.Element) bool {
+		if e.Start <= track.Start || e.End > track.End {
+			return false
+		}
+		_, has := e.Attrs["data-start"]
+		return has
+	}) {
+		text := strings.TrimSpace(collapseSpaces(innerText(source, el)))
+		if text == "" {
+			continue
+		}
+		w := captionWord{Text: text}
+		w.StartMs, _ = msAttr(el, "data-start")
+		w.DurationMs, _ = msAttr(el, "data-duration")
+		words = append(words, w)
+	}
+	return words
 }
 
 // innerText is an element's content with tags taken out.

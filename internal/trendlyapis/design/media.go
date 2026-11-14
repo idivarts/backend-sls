@@ -107,7 +107,18 @@ func ListDesignAssets(c *gin.Context) {
 		if kind == "" {
 			continue
 		}
-		assets = append(assets, gin.H{"path": p, "kind": kind, "name": path.Base(p)})
+		// The URL as well as the path: the panel lists these so they can
+		// be OPENED, and a project-relative path is not something a
+		// browser can show. Built here rather than in the app, which
+		// would have to know the distribution and how a project prefix
+		// maps onto it.
+		url, uerr := mediastore.PublicURL(mediastore.TargetAttachment, d.ProjectPrefix+"/"+p)
+		if uerr != nil {
+			// A file with no address is still worth listing — it is in the
+			// film either way, and saying so beats hiding it.
+			url = ""
+		}
+		assets = append(assets, gin.H{"path": p, "kind": kind, "name": path.Base(p), "url": url})
 	}
 	sort.Slice(assets, func(i, j int) bool {
 		return assets[i]["path"].(string) < assets[j]["path"].(string)
