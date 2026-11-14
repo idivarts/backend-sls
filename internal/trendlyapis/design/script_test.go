@@ -168,3 +168,48 @@ func TestATimedContainerCannotHaveItsTextSet(t *testing.T) {
 		t.Fatalf("error does not say why: %v", err)
 	}
 }
+
+// Voiceovers routinely sit at the ROOT of the composition rather than
+// inside a scene — the director writes them as the film's soundtrack. A
+// script that grouped them by markup alone came out of dev as six groups
+// for a two-scene film: "Hook", "Scene 2", "Outro", "Scene 4".
+const voiceOutsideScenes = `<div id="root" data-composition-id="main" data-duration="6">
+  <audio id="vo-1" data-media="voice" data-media-intent="Beat the three o'clock slump."
+         data-start="0.2" data-duration="2.5"></audio>
+  <audio id="vo-2" data-media="voice" data-media-intent="Fuel your focus every day."
+         data-start="3.2" data-duration="2.5"></audio>
+  <section id="s1" data-scene="hook" data-start="0" data-duration="3">
+    <h1 id="hook-title" class="clip" data-start="0" data-duration="3">The 2 PM Wall</h1>
+  </section>
+  <section id="s2" data-scene="outro" data-start="3" data-duration="3">
+    <h1 id="outro-title" class="clip" data-start="3" data-duration="3">Fuel your focus</h1>
+  </section>
+</div>`
+
+func TestALineOutsideEverySceneBelongsToTheSceneItIsHeardIn(t *testing.T) {
+	byID := map[string]string{}
+	for _, l := range readScript(voiceOutsideScenes) {
+		byID[l.ElementID] = l.SceneID
+	}
+	for id, want := range map[string]string{
+		"vo-1": "hook", "hook-title": "hook",
+		"vo-2": "outro", "outro-title": "outro",
+	} {
+		if byID[id] != want {
+			t.Fatalf("%s is in scene %q, want %q", id, byID[id], want)
+		}
+	}
+}
+
+// Which means a two-scene film reads as two scenes.
+func TestTheScriptHasOneGroupPerScene(t *testing.T) {
+	var seen []string
+	for _, l := range readScript(voiceOutsideScenes) {
+		if len(seen) == 0 || seen[len(seen)-1] != l.SceneID {
+			seen = append(seen, l.SceneID)
+		}
+	}
+	if strings.Join(seen, ",") != "hook,outro" {
+		t.Fatalf("the script groups as %v", seen)
+	}
+}

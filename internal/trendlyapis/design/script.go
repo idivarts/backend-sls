@@ -92,20 +92,50 @@ func readScript(source string) []scriptLine {
 		_, has := e.Attrs["data-scene"]
 		return has
 	})
+	name := func(s hfedit.Element) string {
+		if n := strings.TrimSpace(s.Attrs["data-scene"]); n != "" {
+			return n
+		}
+		return s.Attrs["id"]
+	}
 	sceneOf := func(el hfedit.Element) (string, int) {
 		best := ""
 		start := 0
 		for _, s := range scenes {
 			if s.Start <= el.Start && s.End >= el.End {
 				// The innermost scene wins, for a film that nests them.
-				best = s.Attrs["data-scene"]
-				if best == "" {
-					best = s.Attrs["id"]
-				}
+				best = name(s)
 				start, _ = msAttr(s, "data-start")
 			}
 		}
-		return best, start
+		if best != "" {
+			return best, start
+		}
+		// ── A line that sits outside every scene ─────────────────────────
+		// Voiceovers routinely do: the director writes them at the root of
+		// the composition, before the sections, because they are the
+		// film's soundtrack rather than part of any one scene's markup.
+		// Structurally they belong to no scene; to a person reading a
+		// script they obviously belong to the scene they are HEARD in.
+		//
+		// Found on dev, where a script of two scenes came out as six
+		// groups — "Hook", "Scene 2", "Outro", "Scene 4" — inventing
+		// scenes that do not exist around lines that had nowhere to go.
+		at, ok := msAttr(el, "data-start")
+		if !ok {
+			return "", 0
+		}
+		for _, s := range scenes {
+			from, _ := msAttr(s, "data-start")
+			dur, has := msAttr(s, "data-duration")
+			if !has {
+				continue
+			}
+			if at >= from && at < from+dur {
+				return name(s), from
+			}
+		}
+		return "", at
 	}
 
 	lines := make([]scriptLine, 0, 12)
