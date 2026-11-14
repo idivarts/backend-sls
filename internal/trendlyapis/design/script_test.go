@@ -123,3 +123,48 @@ func TestEditingATextLineIsAnOrdinaryTextEdit(t *testing.T) {
 		t.Fatalf("the line did not change:\n%s", out)
 	}
 }
+
+// A caption track that has already been FILLED no longer carries
+// data-captions — the worker removes it once the words are in — and its
+// spans have no ids. So it read as an ordinary paragraph and appeared in
+// the script as an editable line, which is how it was found on dev.
+const filledCaptions = `<div id="root" data-composition-id="main" data-duration="3">
+  <section id="s1" data-scene="hook" data-start="0" data-duration="3">
+    <h1 id="hook-title" class="clip" data-start="0" data-duration="3">Tired of sugar?</h1>
+    <audio id="vo" data-media="voice" data-media-intent="Ditch the sweet milk."
+           data-media-resolved="assets/voice/a.wav" src="assets/voice/a.wav"></audio>
+    <div id="captions-hook" class="clip caption-track" data-start="0" data-duration="3"><span
+      class="clip" data-start="0.32" data-duration="0.10">ditch</span> <span
+      class="clip" data-start="0.49" data-duration="0.24">the</span></div>
+  </section>
+</div>`
+
+func TestAFilledCaptionTrackIsNotAScriptLine(t *testing.T) {
+	for _, l := range readScript(filledCaptions) {
+		if l.ElementID == "captions-hook" {
+			t.Fatalf("a caption track is in the script as %q", l.Text)
+		}
+	}
+	// The voiceover it was built from IS, and so is the headline.
+	var kinds []string
+	for _, l := range readScript(filledCaptions) {
+		kinds = append(kinds, l.Kind+":"+l.ElementID)
+	}
+	// Both start at zero — the voiceover says nothing about its own
+	// timing, so it takes its scene's — and at equal times the film's own
+	// order wins.
+	if strings.Join(kinds, ",") != "text:hook-title,voice:vo" {
+		t.Fatalf("the script is %v", kinds)
+	}
+}
+
+func TestATimedContainerCannotHaveItsTextSet(t *testing.T) {
+	words := "flattened"
+	_, err := applyElementEdit(filledCaptions, editElementRequest{ElementID: "captions-hook", Text: &words})
+	if err == nil {
+		t.Fatal("accepted a text edit that would flatten every timed span")
+	}
+	if !strings.Contains(err.Error(), "animated piece by piece") {
+		t.Fatalf("error does not say why: %v", err)
+	}
+}

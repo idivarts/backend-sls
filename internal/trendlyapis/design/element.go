@@ -219,6 +219,13 @@ func applyElementEdit(source string, req editElementRequest) (string, error) {
 		if el.HoldsAddressable(source) {
 			return "", fmt.Errorf("that is a group of other elements, so there are no words of its own to change")
 		}
+		// Timed children are animation, not formatting. A caption track's
+		// words are one timed span each; replacing its text would flatten
+		// them into a single node and the captions would stop appearing
+		// word by word, which is the whole point of them.
+		if el.HoldsTimed(source) {
+			return "", fmt.Errorf("that is animated piece by piece, so its words are not set here")
+		}
 		e, err := hfedit.SetText(el, *req.Text)
 		if err != nil {
 			return "", err

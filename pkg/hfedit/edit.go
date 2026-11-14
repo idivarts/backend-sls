@@ -71,6 +71,29 @@ func (e Element) HoldsElements(source string) bool {
 	return len(findAll(inner, func(Element) bool { return true })) > 0
 }
 
+// HoldsTimed reports whether the element contains an element with its own
+// timing.
+//
+// A caption track is the case this exists for. Its words are one <span
+// class="clip" data-start=…> per word, and those spans have no ids — so
+// HoldsAddressable says no, and without this a caption track reads as an
+// ordinary line of copy. Replacing its text would then flatten every
+// timed span into one text node and the captions would stop appearing
+// word by word, which is the entire point of them.
+//
+// More generally: anything with timed children is a piece of ANIMATION,
+// and its text is not a thing to set.
+func (e Element) HoldsTimed(source string) bool {
+	if !e.HasChildren() || e.End > len(source) {
+		return false
+	}
+	inner := source[e.TagEnd:e.End]
+	return len(findAll(inner, func(c Element) bool {
+		_, has := c.Attrs["data-start"]
+		return has
+	})) > 0
+}
+
 // HoldsAddressable reports whether the element contains another element
 // with an id.
 //
