@@ -69,10 +69,27 @@ const maxScenes = 24
 
 // scene is one top-level scene found in the document.
 type scene struct {
-	el         hfedit.Element
-	id         string
+	el hfedit.Element
+	// id is the element's id attribute — what an edit addresses.
+	id string
+	// name is its data-scene value, which is what the app calls it.
+	name       string
 	startMs    int
 	durationMs int
+}
+
+// matches reports whether this is the scene the caller means.
+//
+// ── Two names for one thing, and the app only knows one ──────────────────
+// A scene is written `<section id="scene-coldbrew" data-scene="coldbrew">`,
+// and hfproject keys it by the data-scene value — so the scene panel, the
+// timeline and every click in the app say "coldbrew" while the document
+// says "scene-coldbrew". Matching only the element id meant every button
+// in that panel answered "that scene is no longer in this film", which is
+// exactly how it read on dev: duplicate, and nothing happens but an error
+// about a scene plainly on screen.
+func (s scene) matches(key string) bool {
+	return key != "" && (key == s.id || key == s.name)
 }
 
 // applyStructureEdit returns the document with the change made, and the
@@ -102,7 +119,7 @@ func applyStructureEdit(source string, req structureRequest) (string, int, error
 	at := -1
 	if req.SceneID != "" {
 		for i, s := range scenes {
-			if s.id == req.SceneID {
+			if s.matches(req.SceneID) {
 				at = i
 				break
 			}
@@ -340,7 +357,10 @@ func readScenes(source string) ([]scene, error) {
 		if !ok || dur <= 0 {
 			return nil, fmt.Errorf("scene %q does not say how long it lasts", id)
 		}
-		out = append(out, scene{el: el, id: id, startMs: start, durationMs: dur})
+		out = append(out, scene{
+			el: el, id: id, name: strings.TrimSpace(el.Attrs["data-scene"]),
+			startMs: start, durationMs: dur,
+		})
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("this film has no scenes to change")

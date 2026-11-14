@@ -243,3 +243,43 @@ func TestDuplicateAvoidsAnIdAChildWouldCollideWith(t *testing.T) {
 		t.Fatalf("the copy did not move to a free suffix:\n%s", out)
 	}
 }
+
+// What the app calls a scene is its data-scene value; what the document
+// calls it is its id. They are not the same string, and the panel only
+// knows the first — so every button in it answered "that scene is no
+// longer in this film" about a scene plainly on screen.
+func TestASceneIsFoundByEitherOfItsNames(t *testing.T) {
+	film := `<div id="root" data-composition-id="main" data-duration="6">
+	  <section id="scene-coldbrew" data-scene="coldbrew" data-start="0" data-duration="3"><h1 id="a">A</h1></section>
+	  <section id="scene-nosugar" data-scene="nosugar" data-start="3" data-duration="3"><h1 id="b">B</h1></section>
+	</div>`
+
+	for _, key := range []string{"coldbrew", "scene-coldbrew"} {
+		out, total, err := applyStructureEdit(film, structureRequest{
+			Op: sceneOpRetime, SceneID: key, DurationMs: num2(5000),
+		})
+		if err != nil {
+			t.Fatalf("%q: %v", key, err)
+		}
+		if total != 8000 {
+			t.Fatalf("%q: film is %dms, want 8000", key, total)
+		}
+		if got := attr(t, out, "scene-nosugar", "data-start"); got != "5" {
+			t.Fatalf("%q: the ripple did not happen (%s)", key, got)
+		}
+	}
+
+	// And media goes into the scene the app named.
+	out, note, err := applyMediaPlacement(film, placeMediaRequest{
+		SceneID: "nosugar", Type: "bgm", Intent: "upbeat lo-fi",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(note, "nosugar") {
+		t.Fatalf("the note says %q", note)
+	}
+	if strings.Index(out, `id="bgm-1"`) < strings.Index(out, `id="scene-nosugar"`) {
+		t.Fatal("the music landed in the wrong scene")
+	}
+}

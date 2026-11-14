@@ -272,7 +272,7 @@ func applyMediaPlacement(source string, req placeMediaRequest) (string, string, 
 	if req.SceneID != "" {
 		found := false
 		for _, s := range scenes {
-			if s.id == req.SceneID {
+			if s.matches(req.SceneID) {
 				target, found = s, true
 				break
 			}
