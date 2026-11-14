@@ -137,13 +137,13 @@ func TestAnElementThatIsNoLongerThere(t *testing.T) {
 // character turns one property into two, or ends the attribute.
 func TestStyleValuesThatWouldEscapeTheDeclaration(t *testing.T) {
 	bad := map[string]string{
-		"red;position:fixed;top:0":            "a second property",
-		`#fff" onload="alert(1)`:              "ending the attribute",
-		"url(https://example.com/x.png)":      "fetching something",
-		"expression(alert(1))":                "legacy script",
-		"javascript:alert(1)":                 "a script url",
-		"#fff/*":                              "an open comment",
-		"<script>":                            "markup",
+		"red;position:fixed;top:0":       "a second property",
+		`#fff" onload="alert(1)`:         "ending the attribute",
+		"url(https://example.com/x.png)": "fetching something",
+		"expression(alert(1))":           "legacy script",
+		"javascript:alert(1)":            "a script url",
+		"#fff/*":                         "an open comment",
+		"<script>":                       "markup",
 	}
 	for value, why := range bad {
 		_, err := applyElementEdit(filmHTML, editElementRequest{

@@ -381,6 +381,20 @@ export interface CheckOutcome {
     problem?: string;
 }
 
+/**
+ * One finding as a line a model can act on.
+ *
+ * The file is kept when the gate names one. A project is several documents and
+ * a rewrite that is told "contrast is 2.83:1" without being told where has to
+ * guess which scene — and a guess that lands on the wrong one leaves the
+ * finding in place for the next attempt to spend another call on.
+ */
+export function describeFinding(f: CheckFinding): string {
+    const message = f.message.trim();
+    const file = f.sourceFile?.trim();
+    return file ? `${file}: ${message}` : message;
+}
+
 function collectFindings(node: unknown, out: CheckFinding[]): void {
     if (Array.isArray(node)) {
         for (const item of node) collectFindings(item, out);

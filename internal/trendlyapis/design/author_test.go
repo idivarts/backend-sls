@@ -3,6 +3,7 @@ package design
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
@@ -144,4 +145,161 @@ func cut(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+// ── The automatic rewrite ─────────────────────────────────────────────────
+//
+// Roughly half the designs written against a real brief came back refused by
+// Hyperframes' gate — a contrast ratio a few tenths under the bar, two text
+// blocks overlapping — and the user was handed a finished-looking film with an
+// error under it. The job now reads the refusal and writes the film again. The
+// tests below pin the parts of that which are cheap to get wrong and expensive
+// to notice: what the model is told, and how long it is allowed to take.
+
+func TestFirstAttemptSendsTheBriefAlone(t *testing.T) {
+	a := &authorRun{brief: "a 9s reel about cold brew", attempt: 1}
+	if got := a.userMessage(); got != "a 9s reel about cold brew" {
+		t.Fatalf("the first attempt added something to the brief: %q", got)
+	}
+}
+
+// A rewrite is a REPAIR, not a fresh roll of the dice: the model needs its own
+// document back, or it discards a film that was wrong in one measurable way
+// and returns one wrong in a different way.
+func TestARewriteCarriesTheDocumentAndEveryFinding(t *testing.T) {
+	a := &authorRun{
+		brief:    "a 9s reel about cold brew",
+		attempt:  2,
+		previous: "<html data-composition-id=\"main\">THE OLD FILM</html>",
+		fix: []string{
+			"index.html: Contrast is 2.83:1; WCAG AA requires 3:1.",
+			"index.html: Two text blocks overlap and may render unreadable.",
+		},
+	}
+	got := a.userMessage()
+
+	for _, want := range []string{
+		"a 9s reel about cold brew",
+		"THE OLD FILM",
+		"1. index.html: Contrast is 2.83:1; WCAG AA requires 3:1.",
+		"2. index.html: Two text blocks overlap and may render unreadable.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("the rewrite prompt is missing %q:\n%s", want, got)
+		}
+	}
+	// Told to keep the film it already is. Without this the repair drifts:
+	// the gate passes and the user gets a different video than the one they
+	// were looking at.
+	if !strings.Contains(got, "Keep the film it already is") {
+		t.Fatal("the rewrite prompt does not ask for a minimal change")
+	}
+	// And still asks for the same answer shape the parser expects.
+	if !strings.Contains(got, "complete corrected index.html") {
+		t.Fatal("the rewrite prompt does not ask for the whole document")
+	}
+}
+
+// Half a rewrite is a dice roll with extra steps. Either both the findings and
+// the document that produced them are in hand, or this is a first attempt.
+func TestARewriteNeedsBothHalvesOrItIsNotOne(t *testing.T) {
+	onlyFindings := &authorRun{brief: "brief", attempt: 2, fix: []string{"Contrast is 2.83:1."}}
+	if got := onlyFindings.userMessage(); got != "brief" {
+		t.Fatalf("findings with no document produced a rewrite prompt: %q", got)
+	}
+	onlyDocument := &authorRun{brief: "brief", attempt: 2, previous: "<html></html>"}
+	if got := onlyDocument.userMessage(); got != "brief" {
+		t.Fatalf("a document with no findings produced a rewrite prompt: %q", got)
+	}
+}
+
+// The clamp is what keeps the loop inside the Lambda. studio_sqs stops at 900s
+// and the queue redelivers at 960s, so a rewrite started with four minutes
+// left must not sit in a ten-minute call.
+func TestGenerationTimeoutNeverExceedsWhatIsLeft(t *testing.T) {
+	cases := []struct {
+		name      string
+		remaining time.Duration
+		want      time.Duration
+	}{
+		{"a fresh run gets the full call", authorLoopBudget, maxGenerationTime},
+		{"a late rewrite is clamped", 5 * time.Minute, 5 * time.Minute},
+		{"exactly the cap is the cap", maxGenerationTime, maxGenerationTime},
+		// ⚠️ A spent budget must fail SMALL. Reading a non-positive remainder
+		// as "no constraint" handed the full ten minutes to the one case that
+		// most needed a short call, and twenty-two minutes of run against a
+		// fifteen-minute Lambda leaves the design at "writing" for ever.
+		{"an overshot budget is floored, not unlimited", -time.Minute, minGenerationTime},
+		{"an unset budget is floored, not unlimited", 0, minGenerationTime},
+		{"a sliver is floored rather than cut off mid-document", 10 * time.Second, minGenerationTime},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			a := &authorRun{remaining: c.remaining}
+			got := a.generationTimeout()
+			if got != c.want {
+				t.Fatalf("generationTimeout() = %s, want %s", got, c.want)
+			}
+			if got <= 0 {
+				t.Fatal("a non-positive timeout would fail the call before it is made")
+			}
+			if got > maxGenerationTime {
+				t.Fatalf("generationTimeout() = %s, over the cap %s", got, maxGenerationTime)
+			}
+		})
+	}
+}
+
+// The whole run has to finish inside the Lambda, or the design is stranded:
+// studio_sqs stops at 900s, SQS redelivers at 960s, and the redelivery's
+// idempotency guard sees "writing" and skips — nobody finishes the rewrite.
+//
+// This is arithmetic on the constants rather than a comment claiming they fit,
+// because the first version of them did not: minRetryBudget was the same four
+// minutes as prepareWait, so a rewrite could clear the check with exactly
+// enough budget to wait and none left to write.
+func TestTheLoopCannotOutliveTheLambda(t *testing.T) {
+	const lambdaTimeout = 15 * time.Minute
+	// Upload, revision commit and dispatch, per attempt. Generous.
+	const overhead = 30 * time.Second
+
+	if maxAuthorAttempts < 2 {
+		t.Fatal("with fewer than two attempts there is no rewrite at all")
+	}
+	if minRetryBudget <= prepareWait {
+		t.Fatalf("a retry can begin with %s, all of which the %s wait can eat",
+			minRetryBudget, prepareWait)
+	}
+	// What is left when the wait has taken its share still has to be worth a
+	// call — otherwise the floor in generationTimeout is what overshoots.
+	if left := minRetryBudget - prepareWait; left < minGenerationTime {
+		t.Fatalf("a retry begun at the limit leaves %s for a call that needs %s", left, minGenerationTime)
+	}
+
+	// The worst case the loop permits: the first attempt runs right up to the
+	// point where a retry is still allowed, the wait takes all of prepareWait,
+	// and the rewrite takes everything the clamp then gives it.
+	firstAttempt := authorLoopBudget - minRetryBudget
+	rewrite := minRetryBudget - prepareWait
+	worst := firstAttempt + overhead + prepareWait + rewrite + overhead
+	if worst >= lambdaTimeout {
+		t.Fatalf("the worst run takes %s against a %s Lambda", worst, lambdaTimeout)
+	}
+}
+
+// Three versions all labelled with the same brief tell the user nothing about
+// why there are three.
+func TestARewriteSaysSoInTheRevisionList(t *testing.T) {
+	first := &authorRun{brief: "a 9s reel about cold brew", attempt: 1}
+	if got := first.revisionNote(); got != "a 9s reel about cold brew" {
+		t.Fatalf("the first version was labelled as a fix: %q", got)
+	}
+	second := &authorRun{brief: "a 9s reel about cold brew", attempt: 2}
+	if got := second.revisionNote(); !strings.HasPrefix(got, "Fix 1 ·") {
+		t.Fatalf("the first rewrite is not labelled as one: %q", got)
+	}
+	third := &authorRun{brief: "a 9s reel about cold brew", attempt: 3}
+	if got := third.revisionNote(); !strings.HasPrefix(got, "Fix 2 ·") {
+		t.Fatalf("the second rewrite is not labelled as one: %q", got)
+	}
 }

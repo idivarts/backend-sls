@@ -23,6 +23,7 @@ import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { CheckFinding } from "./hyperframes";
 import {
     checkProject,
     listProjectFiles,
@@ -59,7 +60,16 @@ export interface DesignV3Job {
 
 export interface DesignV3Hooks {
     onProgress?: (fraction: number) => Promise<void>;
-    onCheckFailed?: (problem: string) => Promise<void>;
+    /**
+     * The gate refused the film.
+     *
+     * `problem` is the one sentence a person reads. `findings` is EVERY error
+     * the gate raised, which is what makes an automatic repair possible: a
+     * rewrite handed only the first finding fixes one thing, fails on the
+     * second, and spends another frontier-model call per defect. Handed all
+     * of them it fixes the film in one pass.
+     */
+    onCheckFailed?: (problem: string, findings: CheckFinding[]) => Promise<void>;
 }
 
 export interface DesignV3Result {
@@ -185,7 +195,7 @@ async function materialiseAndGate(
     const outcome = await checkProject(workDir);
     if (!outcome.ok) {
         const problem = outcome.problem ?? "This design has a problem that would stop it rendering.";
-        await hooks.onCheckFailed?.(problem);
+        await hooks.onCheckFailed?.(problem, outcome.errors);
         throw new Error(`check failed: ${problem}`);
     }
     return [...warnings, ...outcome.warnings.map((w) => w.message)];

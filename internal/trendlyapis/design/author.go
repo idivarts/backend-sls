@@ -154,9 +154,85 @@ func AuthorDesign(c *gin.Context) {
 // was carrying nothing anyway. Asking for the document itself removes the
 // escaping, removes the wrapper's tokens, and removes the failure mode.
 
+// ── How many times a film gets written ────────────────────────────────────
+//
+// A gate failure is not an opinion. "Contrast is 2.83:1; WCAG AA requires 3:1"
+// and "two text blocks overlap" are measurements, and a model holding the
+// measurement can fix the film — which is why the run does not stop at the
+// first refusal and hand the user a design they cannot render.
+//
+// It stops at two: one pass, one repair.
+//
+// Not because a third would never help, but because of what an attempt costs.
+// Each one lands in a fresh revision whose media is resolved from scratch — the
+// model's document carries no data-media-resolved — so an attempt is not only
+// another frontier-model call, it is another trip to the paid media APIs. The
+// ceiling those calls share is divided by this number (see
+// MediaCreditCeilingPerAttempt), which means raising it does not raise the
+// spend; it shrinks what each attempt may buy. Two is where the repair is
+// worth the most and the division costs the least.
+const maxAuthorAttempts = 2
+
+// authorLoopBudget is the wall clock the whole run may spend, first attempt
+// included.
+//
+// Not a comfort margin. studio_sqs is capped at 900s and the queue's
+// visibility timeout is 960s, so a run that overshoots does not merely take
+// too long: SQS redelivers the message, the idempotency guard below sees
+// "writing" rather than "queued", and the redelivery is dropped — leaving a
+// design stuck mid-rewrite with nobody working on it. Twelve minutes leaves
+// the Lambda three to finish whatever it is in the middle of.
+const authorLoopBudget = 12 * time.Minute
+
+// prepareWait is how long the loop waits for a preparation to report before it
+// gives up on learning anything from it.
+//
+// Measured on dev: authoring lands around 45s, preparation around 70s. Four
+// minutes is room for a cold Batch queue. Running out is not a failure — the
+// preparation carries on in the worker and writes its own result — it only
+// means this run does not get to rewrite the film.
+const prepareWait = 4 * time.Minute
+
+// maxGenerationTime caps one model call, and minGenerationTime is the least
+// time a call is worth making with: below it the model would be cut off
+// mid-document, which costs the tokens and produces nothing.
+const (
+	maxGenerationTime = 10 * time.Minute
+	minGenerationTime = 2 * time.Minute
+)
+
+// minRetryBudget is the least time worth beginning another attempt with.
+//
+// ⚠️ Derived, not chosen, and that is the point. The first version of this was
+// a flat four minutes — the same as prepareWait — so a rewrite could clear the
+// check with exactly enough budget to WAIT and none left to write: the poll ate
+// all four minutes, the budget went negative, and generationTimeout read a
+// non-positive remainder as "no constraint" and handed the call the full ten
+// minutes. Eight minutes of first attempt plus four of polling plus ten of
+// rewriting is twenty-two, against a Lambda that stops at fifteen — and a
+// run killed there leaves the design at "writing" with nobody working on it,
+// because the redelivery's idempotency guard sees exactly that and skips.
+//
+// So it is the wait, plus a call worth making, plus a minute for the upload and
+// the dispatch between them.
+const minRetryBudget = prepareWait + minGenerationTime + time.Minute
+
 // ExecuteDesignAuthorJob is the worker side. Called from studio_sqs.
+//
+// ── Why this writes the film more than once ───────────────────────────────
+// Authoring produces a document; Hyperframes' `check` decides whether it can
+// become a film. Roughly half the designs written against a real brief were
+// coming back refused — a contrast ratio a few tenths under the bar, two text
+// blocks overlapping — and the user was handed a finished-looking design with
+// an error under it and nothing to do but press the button again.
+//
+// So the job reads the refusal and writes the film again with the findings in
+// hand. The alternative was to weaken the gate, and 3:1 on a phone in daylight
+// is not a bar worth lowering: a film nobody can read is worse than a film
+// that took a second pass.
 func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	brandID, designID := msg.BrandID, msg.DesignID
+	started := time.Now()
 
 	d, err := trendlymodels.GetBrandDesign(ctx, brandID, designID)
 	if err != nil {
@@ -198,14 +274,146 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		log.Printf("design author: could not read the design system for %s: %v", brandID, dserr)
 	}
 
-	genCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+	// Read once, for the whole run, and divided across the attempts it may
+	// make. A design that has to be written twice must not be allowed to buy
+	// twice as much media as one that got it right first time.
+	mediaCeiling := MediaCreditCeilingPerAttempt(orgID, maxAuthorAttempts)
+	run := &authorRun{
+		brandID:  brandID,
+		designID: designID,
+		design:   d,
+		model:    model,
+		kit:      kit,
+		brief:    msg.Brief,
+	}
+
+	for attempt := 1; ; attempt++ {
+		run.attempt = attempt
+		run.remaining = authorLoopBudget - time.Since(started)
+
+		written, werr := run.write(ctx)
+		if werr != nil || written == "" {
+			// Either an error the queue should retry, or an attempt that
+			// failed for a reason now written on the design. Neither leaves
+			// anything to rewrite from.
+			return werr
+		}
+
+		// ── Finish the film without being asked ──────────────────────────
+		// Authoring produces a document that DECLARES its media; it does not
+		// have any. Resolving it needs the Hyperframes CLI, which lives in
+		// the worker, so until this ran automatically the user had to press
+		// "Preview — free" to make the photograph exist — and a film they
+		// opened before pressing it was missing the very thing the brief
+		// asked for.
+		//
+		// It is also what produces the gate's verdict, which is what the
+		// loop below is waiting for.
+		if perr := markAndPrepare(ctx, brandID, designID, mediaCeiling); perr != nil {
+			log.Printf("design %s/%s: could not start preparation: %v", brandID, designID, perr)
+			mysentry.Capture(perr, map[string]string{"op": "design.author.prepare", "brandId": brandID, "designId": designID})
+			// The status was set to queued before dispatch so the app shows
+			// the job immediately. A dispatch that then fails must not leave
+			// it there: a spinner for a job nobody will run reads as slowness
+			// rather than breakage, and the design never resolves. The same
+			// rule the render handler follows, for the same reason.
+			if merr := trendlymodels.MarkBrandDesignPreviewFailed(ctx, brandID, designID,
+				"We wrote the design but could not start finishing it. Try preparing it again."); merr != nil {
+				log.Printf("design %s/%s: could not clear the stranded preparation: %v", brandID, designID, merr)
+			}
+			return nil
+		}
+
+		// ── Is another pass possible at all? ─────────────────────────────
+		// Asked BEFORE waiting on the preparation, because the wait is only
+		// worth four minutes if its answer can be used. On the last attempt
+		// the preparation carries on in the worker and writes its own
+		// result; this job has nothing left to add.
+		if attempt >= maxAuthorAttempts {
+			return nil
+		}
+		if left := authorLoopBudget - time.Since(started); left < minRetryBudget {
+			log.Printf("design %s/%s: %s left of the budget, not enough to rewrite", brandID, designID, left.Round(time.Second))
+			return nil
+		}
+
+		findings := awaitGateFindings(ctx, brandID, designID, prepareWait)
+		if len(findings) == 0 {
+			return nil
+		}
+
+		// A rewrite is another frontier-model call on the org's wallet. The
+		// request gated the first one; nothing has gated this one, and a
+		// wallet emptied by the attempt that just ran must not be overdrawn
+		// by its retry. The design keeps the gate's own error, which is the
+		// honest thing to show: the film has a problem, and we stopped.
+		if trendlymodels.TokensExhausted(orgID) {
+			log.Printf("design %s/%s: the gate refused attempt %d but the wallet is empty; not rewriting", brandID, designID, attempt)
+			return nil
+		}
+
+		log.Printf("design %s/%s: the gate refused attempt %d (%d finding(s)); rewriting", brandID, designID, attempt, len(findings))
+		run.fix, run.previous = findings, written
+		if merr := trendlymodels.MarkBrandDesignRewriting(ctx, brandID, designID, attempt+1); merr != nil {
+			// Without this write the app would show a failed preparation
+			// while a rewrite is in flight, and the rewrite would then
+			// overwrite a design the user has been told is broken. Stopping
+			// leaves them the gate's error, which is at least true.
+			log.Printf("design %s/%s: could not mark the rewrite: %v", brandID, designID, merr)
+			mysentry.Capture(merr, map[string]string{"op": "design.author.rewrite", "brandId": brandID, "designId": designID})
+			return nil
+		}
+	}
+}
+
+// authorRun is one authoring job's worth of state: what does not change
+// between attempts, and what the last attempt learned.
+//
+// A struct rather than a dozen parameters. The alternative was a function
+// taking brand, design, document, model, kit, brief, findings, previous
+// document, attempt number and remaining budget — ten arguments of which six
+// are strings, which is a call nobody can read and a signature that silently
+// accepts them in the wrong order.
+type authorRun struct {
+	brandID, designID string
+	design            *trendlymodels.Design
+	model             string
+	kit               *brandKit
+	brief             string
+
+	// attempt counts from 1. fix and previous are empty on the first attempt
+	// and carry the last one's findings and document on a rewrite.
+	attempt  int
+	fix      []string
+	previous string
+
+	// remaining is what is left of authorLoopBudget as this attempt starts.
+	remaining time.Duration
+}
+
+// write runs ONE attempt: the model call, the validation, the upload and the
+// revision. It returns the document the model produced.
+//
+// ⚠️ An empty document with a nil error means the attempt failed AND the
+// design already carries the sentence saying why. The caller stops; it does
+// not retry, and the job is over. A non-nil error is for the QUEUE — something
+// went wrong that a redelivery could fix.
+//
+// The document returned is the model's own output, before the brand kit's CSS
+// is injected into it. That is deliberate: it is exactly what the model sees
+// on a rewrite, so feeding it back cannot inject the same token block twice.
+func (a *authorRun) write(ctx context.Context) (string, error) {
+	brandID, designID := a.brandID, a.designID
+
+	genCtx, cancel := context.WithTimeout(ctx, a.generationTimeout())
 	defer cancel()
 
 	resp, err := openrouter.ChatCompletion(genCtx, openrouter.ChatRequest{
-		Model: model,
+		Model: a.model,
 		Messages: []openrouter.Message{
-			{Role: "system", Content: hyperframesAuthoringSystemPrompt(d, kit)},
-			{Role: "user", Content: msg.Brief},
+			{Role: "system", Content: hyperframesAuthoringSystemPrompt(a.design, a.kit)},
+			{Role: "user", Content: a.userMessage()},
 		},
 	})
 	if err != nil {
@@ -213,7 +421,7 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		if errors.Is(err, context.DeadlineExceeded) {
 			reason = "Writing this design took too long. Try again, or shorten the brief."
 		}
-		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, reason)
+		return "", trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, reason)
 	}
 	ai.MeterBrandUsage(brandID, resp.Usage)
 
@@ -226,9 +434,9 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	// "The model's answer could not be read as a project", which sends them
 	// to rewrite a brief that was never the problem.
 	if finishReason(resp) == "length" {
-		log.Printf("design author truncated for %s/%s: %d completion tokens, %d chars",
-			brandID, designID, completionTokens(resp), len(raw))
-		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
+		log.Printf("design author truncated for %s/%s on attempt %d: %d completion tokens, %d chars",
+			brandID, designID, a.attempt, completionTokens(resp), len(raw))
+		return "", trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
 			"This design was too long to write in one go. Try a shorter film, or fewer scenes.")
 	}
 
@@ -245,16 +453,16 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 			"op": "design.author.parse", "brandId": brandID, "designId": designID,
 			"finishReason": finishReason(resp), "chars": fmt.Sprint(len(raw)),
 		})
-		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, perr.Error())
+		return "", trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, perr.Error())
 	}
 
 	// The brand's tokens go in whatever the model did, and its assets travel
 	// with the project so a render needs no network. Both are no-ops for a
 	// brand with no design system.
 	files := []hfproject.File{{Path: "index.html", Content: indexHTML}}
-	if kit != nil {
-		files[0].Content = hfproject.InjectIntoHead(indexHTML, kit.CSS)
-		files = append(files, kit.Files...)
+	if a.kit != nil {
+		files[0].Content = hfproject.InjectIntoHead(indexHTML, a.kit.CSS)
+		files = append(files, a.kit.Files...)
 	}
 
 	project, berr := hfproject.Build(files)
@@ -262,7 +470,7 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		// The validator's messages are already written to be read by a
 		// person as well as a model, so they are surfaced rather than
 		// replaced with something vaguer.
-		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, berr.Error())
+		return "", trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, berr.Error())
 	}
 
 	// ── Every write is a revision ────────────────────────────────────────
@@ -272,14 +480,14 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	rev, rerr := trendlymodels.AllocateDesignRevision(ctx, brandID, designID)
 	if rerr != nil {
 		mysentry.Capture(rerr, map[string]string{"op": "design.author.revision", "brandId": brandID, "designId": designID})
-		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
+		return "", trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
 			"We wrote the design but could not save it. Please try again.")
 	}
 
 	prefix, uerr := hfproject.Upload(ctx, brandID, designID, rev, project)
 	if uerr != nil {
 		mysentry.Capture(uerr, map[string]string{"op": "design.author.upload", "brandId": brandID, "designId": designID})
-		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
+		return "", trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
 			"We wrote the design but could not save it. Please try again.")
 	}
 
@@ -306,7 +514,7 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	}
 
 	if err := trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes, previewURL); err != nil {
-		return err
+		return "", err
 	}
 
 	// The pointer and the list, after the files are up. Best-effort in the
@@ -319,7 +527,7 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		Prefix:     prefix,
 		PreviewURL: previewURL,
 		By:         trendlymodels.DesignRevisionAuthored,
-		Note:       revisionNote(msg.Brief),
+		Note:       a.revisionNote(),
 		DurationMs: project.DurationMs,
 		Scenes:     scenes,
 	})
@@ -329,36 +537,136 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	}
 	dropRevisionFiles(ctx, pruned)
 
-	// ── Finish the film without being asked ──────────────────────────────
-	// Authoring produces a document that DECLARES its media; it does not
-	// have any. Resolving it needs the Hyperframes CLI, which lives in the
-	// worker, so until now the user had to press "Preview — free" to make
-	// the photograph exist — and a film they opened before pressing it was
-	// missing the very thing the brief asked for.
-	//
-	// So the same job runs automatically here. It resolves the media, puts
-	// the film through `check`, and captures the stills. By the time the
-	// design opens, the live player IS the finished film and the only
-	// button left is Render.
-	//
-	// Best-effort, like the player upload above: a dispatch that fails must
-	// not fail an authoring run the user has already paid for. The design
-	// is written and playable; what it lacks is its media, and the error
-	// says so.
-	if err := markAndPrepare(ctx, brandID, designID); err != nil {
-		log.Printf("design %s/%s: could not start preparation: %v", brandID, designID, err)
-		mysentry.Capture(err, map[string]string{"op": "design.author.prepare", "brandId": brandID, "designId": designID})
-		// The status was set to queued before dispatch so the app shows the
-		// job immediately. A dispatch that then fails must not leave it
-		// there: a spinner for a job nobody will run reads as slowness
-		// rather than breakage, and the design never resolves. The same
-		// rule the render handler follows, for the same reason.
-		if merr := trendlymodels.MarkBrandDesignPreviewFailed(ctx, brandID, designID,
-			"We wrote the design but could not start finishing it. Try preparing it again."); merr != nil {
-			log.Printf("design %s/%s: could not clear the stranded preparation: %v", brandID, designID, merr)
+	return indexHTML, nil
+}
+
+// generationTimeout caps one model call at ten minutes, or at whatever is left
+// of the run's budget when that is less.
+//
+// The clamp is what keeps the loop inside the Lambda: a call that overshoots
+// the 900s cap is killed mid-write, taking the tokens and leaving the design
+// at "writing" for ever.
+//
+// ⚠️ A spent budget is floored, NOT treated as unlimited. Reading a
+// non-positive remainder as "no constraint" is the bug this comment exists for:
+// it turned the one case that most needed a short call into the one case that
+// got the longest. The floor cannot be reached through the loop — a retry is
+// only begun with minRetryBudget in hand — so this is the belt to that
+// braces, and it fails small rather than large.
+func (a *authorRun) generationTimeout() time.Duration {
+	if a.remaining >= maxGenerationTime {
+		return maxGenerationTime
+	}
+	if a.remaining <= minGenerationTime {
+		return minGenerationTime
+	}
+	return a.remaining
+}
+
+// revisionNote is the one line the revisions list shows. A rewrite says so,
+// because a list of three versions all labelled with the same brief tells the
+// user nothing about why there are three.
+func (a *authorRun) revisionNote() string {
+	note := revisionNote(a.brief)
+	if a.attempt > 1 {
+		return fmt.Sprintf("Fix %d · %s", a.attempt-1, note)
+	}
+	return note
+}
+
+// userMessage is the brief on the first attempt, and the brief plus the film
+// that failed plus what the gate said on a rewrite.
+//
+// ── Why the document goes back in ─────────────────────────────────────────
+// A rewrite from the brief alone is a fresh roll of the dice: it discards a
+// film that was wrong in one measurable way and may come back wrong in a
+// different one. Handing the model its own document and the findings makes
+// this a repair — the scenes, the timings, the words and the media intents all
+// survive, and only the thing the gate measured changes.
+//
+// All the findings, not the first. A rewrite told about one defect fixes one
+// defect and fails on the next, spending a frontier-model call per finding.
+func (a *authorRun) userMessage() string {
+	if len(a.fix) == 0 || a.previous == "" {
+		return a.brief
+	}
+	var b strings.Builder
+	b.WriteString(a.brief)
+	b.WriteString("\n\n──────────\n\nTHIS IS A REWRITE. You wrote the document at the end of this\n")
+	b.WriteString("message, and Hyperframes' check refused it:\n\n")
+	for i, f := range a.fix {
+		fmt.Fprintf(&b, "  %d. %s\n", i+1, f)
+	}
+	b.WriteString("\nEvery line above is a measurement, not an opinion. The same check runs\n")
+	b.WriteString("again on what you return, and the film cannot render until all of them\n")
+	b.WriteString("pass.\n\n")
+	b.WriteString("Keep the film it already is: the same scenes, the same ids, the same\n")
+	b.WriteString("timings, the same words, the same data-media-intent values. Change only\n")
+	b.WriteString("what these findings require.\n\n")
+	b.WriteString("Answer with the complete corrected index.html and nothing else.\n\n")
+	b.WriteString("── THE DOCUMENT THAT FAILED ──\n")
+	b.WriteString(a.previous)
+	return b.String()
+}
+
+// awaitGateFindings waits for the preparation to report, and returns what the
+// gate measured when it refused the film.
+//
+// ── Why this polls ────────────────────────────────────────────────────────
+// The preparation runs in the render worker, which writes its outcome to the
+// design document and has no route back into this process. A push would mean
+// an endpoint, a credential and a retry policy for a signal this job is
+// already sitting still for. The document is the channel both sides already
+// share.
+//
+// nil covers every outcome that is not "the gate refused the film": it passed,
+// it broke on infrastructure, the design was deleted, or nothing reported in
+// time. All of them end the run, and most of them end it well.
+func awaitGateFindings(ctx context.Context, brandID, designID string, within time.Duration) []string {
+	const poll = 5 * time.Second
+	deadline := time.Now().Add(within)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(poll):
+		}
+
+		d, err := trendlymodels.GetBrandDesign(ctx, brandID, designID)
+		switch {
+		case err != nil:
+			// A read that failed is not an answer. Keep waiting — the
+			// deadline below is what ends this, not one bad read.
+			log.Printf("design %s/%s: could not read the preparation: %v", brandID, designID, err)
+		case d == nil:
+			// Deleted while we waited.
+			return nil
+		case d.PreviewStatus == trendlymodels.DesignPreviewDone:
+			return nil
+		case d.PreviewStatus == trendlymodels.DesignPreviewFailed:
+			if d.PreviewFailure != trendlymodels.DesignPreviewFailureCheck {
+				// Infrastructure, not the film. Rewriting it would spend the
+				// org's tokens on a fault the film did not cause.
+				log.Printf("design %s/%s: preparation failed without the gate (%q); not rewriting",
+					brandID, designID, d.PreviewError)
+				return nil
+			}
+			if len(d.PreviewFindings) == 0 {
+				// Marked as the gate's, carrying nothing to aim at. A
+				// rewrite with no findings is the dice roll this exists to avoid.
+				log.Printf("design %s/%s: the gate refused it with no findings; not rewriting", brandID, designID)
+				return nil
+			}
+			return d.PreviewFindings
+		}
+
+		if time.Now().After(deadline) {
+			log.Printf("design %s/%s: the preparation had not reported after %s; not rewriting",
+				brandID, designID, within)
+			return nil
 		}
 	}
-	return nil
 }
 
 // markAndPrepare queues the work that turns an authored document into a
@@ -400,12 +708,15 @@ func dropRevisionFiles(ctx context.Context, prefixes []string) {
 	}
 }
 
-func markAndPrepare(ctx context.Context, brandID, designID string) error {
+func markAndPrepare(ctx context.Context, brandID, designID string, creditCeiling int) error {
 	if err := trendlymodels.MarkBrandDesignPreviewQueued(ctx, brandID, designID); err != nil {
 		return err
 	}
-	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
-	return rendering.SubmitDesignV3Preview(brandID, designID, MediaCreditCeiling(orgID))
+	// The ceiling is passed IN rather than read here, because what one
+	// preparation may spend depends on how many the caller is going to make.
+	// The user pressing "prepare" makes one and gets the whole cap; the
+	// authoring job may make two and divides it.
+	return rendering.SubmitDesignV3Preview(brandID, designID, creditCeiling)
 }
 
 // finishReason says how the model stopped. "length" means it ran out of room.

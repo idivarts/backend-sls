@@ -11,11 +11,11 @@ import (
 // one of them is the difference between an edit and a silent re-roll.
 func TestParseElementReplyRefusesWhatIsNotTheElement(t *testing.T) {
 	cases := map[string]string{
-		"":                       "an empty answer",
-		"   ":                    "whitespace",
-		"Sure! Here you go:":     "a sentence with no markup",
-		`<h1 id="other">x</h1>`:  "a different element's id",
-		`<h1>x</h1>`:             "no id at all",
+		"":                      "an empty answer",
+		"   ":                   "whitespace",
+		"Sure! Here you go:":    "a sentence with no markup",
+		`<h1 id="other">x</h1>`: "a different element's id",
+		`<h1>x</h1>`:            "no id at all",
 		`<!doctype html><html><body><h1 id="title">x</h1></body></html>`: "the whole film",
 		`<h1 id="title">a</h1><h1 id="title">b</h1>`:                     "the id twice",
 		`<div><h1 id="title">x</h1></div>`:                               "a wrapper nobody asked for",

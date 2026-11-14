@@ -64,6 +64,10 @@ const designsSubcollection = "designs"
 
 // Authoring lifecycle values, mirrored in the app.
 const (
+	// DesignPreviewFailureCheck marks a preparation that failed Hyperframes'
+	// own gate — a defect in the film, which a rewrite can fix.
+	DesignPreviewFailureCheck = "check"
+
 	DesignAuthorQueued  = "queued"
 	DesignAuthorWriting = "writing"
 	DesignAuthorDone    = "done"
@@ -171,6 +175,15 @@ type Design struct {
 	AuthorStatus string `json:"authorStatus,omitempty" firestore:"authorStatus,omitempty"`
 	AuthorError  string `json:"authorError,omitempty" firestore:"authorError,omitempty"`
 
+	// AuthorAttempt counts how many times this design has been written in the
+	// current job, including the first.
+	//
+	// It exists because the job rewrites a film the gate refused, and a user
+	// watching "writing" for the third time deserves to know that it is being
+	// FIXED rather than that the first attempt is slow. It is also the only
+	// record that an org's tokens went on more than one call.
+	AuthorAttempt int `json:"authorAttempt,omitempty" firestore:"authorAttempt,omitempty"`
+
 	// Scenes are the clips the root composition mounts, in timeline order,
 	// as parsed from index.html when the project was written.
 	//
@@ -205,9 +218,20 @@ type Design struct {
 	// step 3 and renders at step 5, because "passing checks alone is not a
 	// reason to render". Without this the first time anyone sees their film is
 	// after the tokens are gone.
-	PreviewStatus   string         `json:"previewStatus,omitempty" firestore:"previewStatus,omitempty"`
-	PreviewProgress float64        `json:"previewProgress,omitempty" firestore:"previewProgress,omitempty"`
-	PreviewError    string         `json:"previewError,omitempty" firestore:"previewError,omitempty"`
+	PreviewStatus   string  `json:"previewStatus,omitempty" firestore:"previewStatus,omitempty"`
+	PreviewProgress float64 `json:"previewProgress,omitempty" firestore:"previewProgress,omitempty"`
+	PreviewError    string  `json:"previewError,omitempty" firestore:"previewError,omitempty"`
+
+	// PreviewFailure says what KIND of failure PreviewError describes, and
+	// PreviewFindings carries every finding behind it.
+	//
+	// Written by the worker, read by the authoring job. PreviewError is a
+	// sentence for a person; this pair is the part a program can act on. Only
+	// DesignPreviewFailureCheck means the gate measured a defect in the film
+	// itself — anything else is infrastructure, and rewriting the film would
+	// spend the org's tokens on a fault the film did not cause.
+	PreviewFailure  string         `json:"previewFailure,omitempty" firestore:"previewFailure,omitempty"`
+	PreviewFindings []string       `json:"previewFindings,omitempty" firestore:"previewFindings,omitempty"`
 	PreviewFrames   []PreviewFrame `json:"previewFrames,omitempty" firestore:"previewFrames,omitempty"`
 	PreviewedAt     int64          `json:"previewedAt,omitempty" firestore:"previewedAt,omitempty"`
 
@@ -493,6 +517,11 @@ func MarkBrandDesignPreviewQueued(ctx context.Context, brandID, designID string)
 		{Path: "previewProgress", Value: 0},
 		{Path: "previewError", Value: firestore.Delete},
 		{Path: "previewFrames", Value: firestore.Delete},
+		// With the error, not separately. A run that starts while the last
+		// run's findings are still on the document is one the authoring job
+		// could read as a fresh gate failure.
+		{Path: "previewFailure", Value: firestore.Delete},
+		{Path: "previewFindings", Value: firestore.Delete},
 	})
 }
 
@@ -531,6 +560,8 @@ func SetBrandDesignPreviewFrames(ctx context.Context, brandID, designID string, 
 		{Path: "previewProgress", Value: 1},
 		{Path: "previewFrames", Value: frames},
 		{Path: "previewError", Value: firestore.Delete},
+		{Path: "previewFailure", Value: firestore.Delete},
+		{Path: "previewFindings", Value: firestore.Delete},
 		{Path: "previewedAt", Value: nowMs()},
 	})
 }
@@ -543,6 +574,12 @@ func MarkBrandDesignPreviewFailed(ctx context.Context, brandID, designID, reason
 	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
 		{Path: "previewStatus", Value: DesignPreviewFailed},
 		{Path: "previewError", Value: reason},
+		// This path is only ever reached for OUR failures — a dispatch that
+		// did not land, a filmstrip with no frames. None of them is a defect
+		// in the film, so the gate marks come off: leaving them would have
+		// the authoring job rewrite a film that was never refused.
+		{Path: "previewFailure", Value: firestore.Delete},
+		{Path: "previewFindings", Value: firestore.Delete},
 	})
 }
 
@@ -615,6 +652,38 @@ func MarkBrandDesignAuthoring(ctx context.Context, brandID, designID, status str
 	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
 		{Path: "authorStatus", Value: status},
 		{Path: "authorError", Value: firestore.Delete},
+		// Reset here rather than left to the loop. This is where a run
+		// BEGINS, so a design re-queued after an earlier run rewrote it
+		// twice would otherwise still read "attempt 3" on its first pass.
+		{Path: "authorAttempt", Value: 1},
+	})
+}
+
+// MarkBrandDesignRewriting puts a design back into authoring to fix what the
+// gate refused.
+//
+// One write, because the three facts belong together. The status says a job is
+// working, the attempt number says it is a REWRITE rather than a slow first
+// pass, and the preview fields have to go: a design showing "writing" beside
+// the last attempt's failure reads as two contradictory things at once, and
+// the findings it is being rewritten FROM would otherwise still be sitting
+// there when the next run reads them.
+//
+// authorError is cleared with them. A rewrite that follows a failed attempt
+// must not show the old failure next to a job that is in flight.
+func MarkBrandDesignRewriting(ctx context.Context, brandID, designID string, attempt int) error {
+	if attempt < 1 {
+		return fmt.Errorf("MarkBrandDesignRewriting: attempt must be at least 1, got %d", attempt)
+	}
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "authorStatus", Value: DesignAuthorWriting},
+		{Path: "authorError", Value: firestore.Delete},
+		{Path: "authorAttempt", Value: attempt},
+		{Path: "previewStatus", Value: firestore.Delete},
+		{Path: "previewProgress", Value: firestore.Delete},
+		{Path: "previewError", Value: firestore.Delete},
+		{Path: "previewFailure", Value: firestore.Delete},
+		{Path: "previewFindings", Value: firestore.Delete},
 	})
 }
 
