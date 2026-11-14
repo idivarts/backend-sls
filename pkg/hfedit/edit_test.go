@@ -251,3 +251,18 @@ func TestThePredicateSeesTheStartTagOnly(t *testing.T) {
 		t.Fatalf("End is %d after the walk, want %d", el.End, len(src))
 	}
 }
+
+func TestHoldsElements(t *testing.T) {
+	root, _ := FindByID(film, "root")
+	if !root.HoldsElements(film) {
+		t.Fatal("#root reported as holding no elements; a text edit would flatten the film")
+	}
+	title, _ := FindByID(film, "title")
+	if title.HoldsElements(film) {
+		t.Fatal("a headline of plain words reported as holding elements")
+	}
+	img, _ := FindByID(film, "shot")
+	if img.HoldsElements(film) {
+		t.Fatal("a void element reported as holding elements")
+	}
+}
