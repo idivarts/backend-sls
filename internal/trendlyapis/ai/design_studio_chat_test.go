@@ -255,3 +255,38 @@ func TestDesignFaultCarriesTheGateFindings(t *testing.T) {
 		t.Fatal("a film with nothing wrong with it says nothing")
 	}
 }
+
+// Declared media and real media look identical on a timeline; only one of
+// them plays.
+func TestPendingMediaCountsWhatThePlayerCannotPlay(t *testing.T) {
+	got := pendingMedia([]trendlymodels.DesignClip{
+		{Kind: "music"},                          // declared
+		{Kind: "voice", Src: " "},                // declared, blank src
+		{Kind: "image", Src: ".media/img/1.png"}, // real
+		{Kind: "scene"},                          // never has a file
+		{Kind: "captions"},                       // nor this
+	})
+	if got != 2 {
+		t.Fatalf("pendingMedia = %d, want 2 (the music and the voiceover)", got)
+	}
+}
+
+// The studio chat can ask for a film to be finished.
+func TestPrepareToolIsOffered(t *testing.T) {
+	var desc string
+	for _, tool := range designStudioTools() {
+		if tool.Function.Name == toolPrepareDesign {
+			desc = strings.ToLower(tool.Function.Description)
+		}
+	}
+	if desc == "" {
+		t.Fatal("prepare_design is not offered, so the model cannot fetch declared media")
+	}
+	// The description has to say WHY, or the model will not reach for it:
+	// a declaration looks like a finished clip from where it is standing.
+	for _, phrase := range []string{"declare", "silent", "queued"} {
+		if !strings.Contains(desc, phrase) {
+			t.Fatalf("the prepare tool does not mention %q", phrase)
+		}
+	}
+}
