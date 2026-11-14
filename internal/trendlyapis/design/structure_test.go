@@ -283,3 +283,52 @@ func TestASceneIsFoundByEitherOfItsNames(t *testing.T) {
 		t.Fatal("the music landed in the wrong scene")
 	}
 }
+
+// A copy that kept the original's data-scene would give the panel two
+// rows called "coldbrew" and no way to say which one a button meant:
+// pressing Delete on the second would delete the first.
+func TestADuplicateGetsItsOwnName(t *testing.T) {
+	film := `<div id="root" data-composition-id="main" data-duration="6">
+	  <section id="scene-coldbrew" data-scene="coldbrew" data-start="0" data-duration="3"><h1 id="a">A</h1></section>
+	  <section id="scene-nosugar" data-scene="nosugar" data-start="3" data-duration="3"><h1 id="b">B</h1></section>
+	</div>`
+	out, _, err := applyStructureEdit(film, structureRequest{Op: sceneOpDuplicate, SceneID: "coldbrew"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(out, `data-scene="coldbrew"`) != 1 {
+		t.Fatalf("two scenes share a name:\n%s", out)
+	}
+	if !strings.Contains(out, `data-scene="coldbrew-2"`) {
+		t.Fatalf("the copy was not renamed:\n%s", out)
+	}
+
+	// And each row now addresses its own scene: deleting the copy leaves
+	// the original.
+	after, total, err := applyStructureEdit(out, structureRequest{Op: sceneOpDelete, SceneID: "coldbrew-2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(after, `data-scene="coldbrew"`) || strings.Contains(after, `coldbrew-2`) {
+		t.Fatalf("the wrong scene was deleted:\n%s", after)
+	}
+	if total != 6000 {
+		t.Fatalf("the film is %dms, want 6000", total)
+	}
+}
+
+// An id wins over a name, which is the only way to tell apart two scenes
+// in a film that was written with the same name twice.
+func TestAnIdBeatsANameWhenBothMatch(t *testing.T) {
+	film := `<div id="root" data-composition-id="main" data-duration="6">
+	  <section id="first" data-scene="beat" data-start="0" data-duration="3"><h1 id="a">A</h1></section>
+	  <section id="second" data-scene="beat" data-start="3" data-duration="3"><h1 id="b">B</h1></section>
+	</div>`
+	out, _, err := applyStructureEdit(film, structureRequest{Op: sceneOpDelete, SceneID: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `id="first"`) || strings.Contains(out, `id="second"`) {
+		t.Fatalf("the wrong scene went:\n%s", out)
+	}
+}

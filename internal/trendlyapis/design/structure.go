@@ -92,6 +92,30 @@ func (s scene) matches(key string) bool {
 	return key != "" && (key == s.id || key == s.name)
 }
 
+// sceneIndex finds the scene a caller means, or -1.
+//
+// An element id wins over a data-scene name, because an id is unique and
+// a name need not be: duplicating a scene gives the copy its own name
+// (see duplicateScene) precisely so this stays unambiguous, but a film
+// may have been written with two scenes called the same thing, and then
+// the id is the only thing that can tell them apart.
+func sceneIndex(scenes []scene, key string) int {
+	if key == "" {
+		return -1
+	}
+	for i, s := range scenes {
+		if s.id == key {
+			return i
+		}
+	}
+	for i, s := range scenes {
+		if s.name == key {
+			return i
+		}
+	}
+	return -1
+}
+
 // applyStructureEdit returns the document with the change made, and the
 // film's new length.
 //
@@ -116,15 +140,7 @@ func applyStructureEdit(source string, req structureRequest) (string, int, error
 		durations[i] = s.durationMs
 	}
 
-	at := -1
-	if req.SceneID != "" {
-		for i, s := range scenes {
-			if s.matches(req.SceneID) {
-				at = i
-				break
-			}
-		}
-	}
+	at := sceneIndex(scenes, req.SceneID)
 
 	var extra []hfedit.Edit // insertions and removals of whole markup
 	switch req.Op {
@@ -392,6 +408,25 @@ func duplicateScene(source string, s scene, all []scene) (string, string, error)
 			return "", "", err
 		}
 		edits = append(edits, e)
+	}
+	// ── And its own NAME ─────────────────────────────────────────────────
+	// The app addresses a scene by its data-scene value, so a copy that
+	// kept the original's name would give the panel two rows called
+	// "coldbrew" and no way to say which one a button meant — pressing
+	// Delete on the second would delete the first. The copy is named
+	// after itself.
+	if name := strings.TrimSpace(s.el.Attrs["data-scene"]); name != "" {
+		outer := hfedit.FindAll(markup, func(e hfedit.Element) bool {
+			_, has := e.Attrs["data-scene"]
+			return has
+		})
+		if len(outer) > 0 {
+			e, err := hfedit.SetAttribute(outer[0], markup, "data-scene", name+suffix)
+			if err != nil {
+				return "", "", err
+			}
+			edits = append(edits, e)
+		}
 	}
 	out, err := hfedit.Apply(markup, edits)
 	if err != nil {
