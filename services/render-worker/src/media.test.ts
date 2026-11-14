@@ -7,6 +7,7 @@ import {
     captionSpans,
     pathFromResolveJSON,
     readDeclarations,
+    durationSeconds,
     startSeconds,
     transcriptPathFromJSON,
     voiceIdFromEntity,
@@ -315,5 +316,18 @@ describe("startSeconds", () => {
         assert.equal(startSeconds({ attrs: {} }), undefined);
         assert.equal(startSeconds(undefined), undefined);
         assert.equal(startSeconds({ attrs: { "data-start": "soon" } }), undefined);
+    });
+});
+
+describe("durationSeconds", () => {
+    it("reads a data-duration", () => {
+        assert.equal(durationSeconds({ attrs: { "data-duration": "3" } }), 3);
+        assert.equal(durationSeconds({ attrs: { "data-duration": "4.5" } }), 4.5);
+    });
+
+    it("is undefined when the element does not say", () => {
+        assert.equal(durationSeconds({ attrs: {} }), undefined);
+        assert.equal(durationSeconds(undefined), undefined);
+        assert.equal(durationSeconds({ attrs: { "data-duration": "a while" } }), undefined);
     });
 });

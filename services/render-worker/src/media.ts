@@ -196,6 +196,10 @@ export async function resolveProjectMedia(
     // And the element itself, because a caption track has to be timed
     // against where that audio sits in the film, not where the track does.
     const voiceElements = new Map<string, FoundElement>();
+    // How long each voiceover turned out to be, so a line that does not fit
+    // the slot it was written for can be said out loud rather than silently
+    // cut in the finished film.
+    const spokenSeconds = new Map<string, number>();
     // Declarations that could not be resolved, keyed the same way, so their
     // elements can be taken out rather than left pointing at nothing.
     const failed = new Set<string>();
@@ -236,6 +240,7 @@ export async function resolveProjectMedia(
                 rel = spoken.path;
                 resolvedFor.set(key, rel);
                 result.files.push(rel);
+                if (spoken.duration) spokenSeconds.set(key, spoken.duration);
                 console.log(`[media] voice resolved to ${rel} in ${Date.now() - startedAt}ms`);
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
@@ -280,7 +285,30 @@ export async function resolveProjectMedia(
         if (d.type === "voice" && d.elementId) {
             voiceFor.set(d.elementId, rel);
             const audioEl = findElements(original, (e) => e.attrs["id"] === d.elementId)[0];
-            if (audioEl) voiceElements.set(d.elementId, audioEl);
+            if (audioEl) {
+                voiceElements.set(d.elementId, audioEl);
+                // ── Does it fit? ──────────────────────────────────────────
+                // The renderer plays an audio element for its data-duration
+                // and not a moment longer, so a line written longer than
+                // its scene is cut off mid-sentence — and the next scene's
+                // voiceover starts talking over the end of it. Seen on the
+                // first real reel: nine words in a three-second scene came
+                // out as "Ditch the sweet milk, experience pure". Nothing
+                // here can fix it (lengthening the clip would push every
+                // later scene, shortening the words is the author's call),
+                // but it must not be silent. The authoring contract now
+                // gives the model a word budget; this catches the times it
+                // does not keep to it.
+                const slot = durationSeconds(audioEl);
+                const spokenFor = spokenSeconds.get(key);
+                if (spokenFor !== undefined && slot !== undefined && slot > 0 && spokenFor > slot + 0.25) {
+                    const why =
+                        `${spokenFor.toFixed(1)}s of speech in a ${slot}s slot — ` +
+                        `the film will cut it off, and the next line will talk over it`;
+                    console.log(`[media] voice ${d.elementId} does not fit: ${why}`);
+                    result.problems.push(`voice "${trim(d.intent)}": ${why}`);
+                }
+            }
         }
         result.resolved++;
     }
@@ -457,6 +485,14 @@ function voiceRefusal(opts: { heygenApiKey?: string; creditCeiling?: number }): 
  */
 export function startSeconds(el?: { attrs: Record<string, string | undefined> }): number | undefined {
     const raw = el?.attrs["data-start"];
+    if (raw === undefined) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+}
+
+/** An element's data-duration in seconds, or undefined when it has none. */
+export function durationSeconds(el?: { attrs: Record<string, string | undefined> }): number | undefined {
+    const raw = el?.attrs["data-duration"];
     if (raw === undefined) return undefined;
     const n = Number(raw);
     return Number.isFinite(n) ? n : undefined;
