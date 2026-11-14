@@ -444,3 +444,37 @@ describe("a caption track that lost its declaration", () => {
         assert.equal(voices.length, 2, "the fixture should have two voices at 0.2");
     });
 });
+
+describe("a caption track that is stale while its audio is fine", () => {
+    // The state a film is left in when one run rewrote the words and
+    // never rebuilt the captions: the voiceover is perfectly resolved and
+    // untouched, and the track under it still shows the old line. Asking
+    // only about THIS run's resolutions meant it could never catch up.
+    const film = `<div id="root" data-composition-id="main" data-duration="3">
+      <audio id="vo" data-media="voice" data-media-intent="Beat the three o'clock slump."
+             data-media-resolved="assets/voice/new.wav" src="assets/voice/new.wav"
+             data-start="0.2" data-duration="2.5"></audio>
+      <div id="cap" class="caption-track" data-captions="vo"
+           data-captions-for="assets/voice/old.wav" data-start="0.2" data-duration="2.5">old</div>
+    </div>`;
+
+    const srcOf = (id: string) =>
+        (findElements(film, (e) => e.attrs["id"] === id)[0].attrs["src"] || "").trim();
+
+    it("can find the audio it should have been built from, with nothing resolved this run", () => {
+        assert.equal(srcOf("vo"), "assets/voice/new.wav");
+    });
+
+    it("is out of date against it", () => {
+        const el = findElements(film, (e) => e.attrs["id"] === "cap")[0];
+        assert.notEqual((el.attrs["data-captions-for"] || "").trim(), srcOf("vo"));
+    });
+
+    it("does not rebuild from a voiceover that has not been spoken yet", () => {
+        // An empty src is a declaration waiting its turn; captions built
+        // from nothing would wipe the words already on screen.
+        const pending = film.replace('src="assets/voice/new.wav"', 'src=""');
+        const el = findElements(pending, (e) => e.attrs["id"] === "vo")[0];
+        assert.equal((el.attrs["src"] || "").trim(), "");
+    });
+});

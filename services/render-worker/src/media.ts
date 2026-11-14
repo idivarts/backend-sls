@@ -377,7 +377,15 @@ export async function resolveProjectMedia(
     for (const el of captionTracks(original)) {
         const forId = (el.attrs["data-captions"] || "").trim() || followsByTime(original, el);
         if (forId === "") continue;
-        const voicePath = voiceFor.get(forId);
+        // ── Which audio this track should be built from ──────────────────
+        // The voiceover resolved in THIS run if there was one, and
+        // otherwise whatever the element already points at. The second
+        // half matters: a track can be stale while its audio is
+        // perfectly resolved and untouched — that is exactly the state a
+        // film is left in when the words were rewritten by one run and
+        // the captions were never rebuilt by it. Asking only about this
+        // run's resolutions meant such a track could never catch up.
+        const voicePath = voiceFor.get(forId) ?? currentVoiceSrc(original, forId);
         if (!voicePath) {
             // Nothing to do: either that voiceover did not resolve this
             // run, or it was already resolved and has not changed. The
@@ -580,6 +588,22 @@ function followsByTime(html: string, track: { attrs: Record<string, string | und
             (e.attrs["id"] || "") !== ""
     );
     return sameStart.length === 1 ? sameStart[0].attrs["id"] || "" : "";
+}
+
+/**
+ * The audio a voiceover element currently points at, or "".
+ *
+ * Only a RESOLVED one answers: a declaration still waiting to be spoken
+ * has an empty src, and building captions from nothing would write an
+ * empty track over the words already on screen.
+ */
+function currentVoiceSrc(html: string, elementID: string): string {
+    const found = findElements(html, (e) => (e.attrs["id"] || "") === elementID);
+    for (const el of found) {
+        const src = (el.attrs["src"] || "").trim();
+        if (src !== "") return src;
+    }
+    return "";
 }
 
 function firstLine(s: string): string {
