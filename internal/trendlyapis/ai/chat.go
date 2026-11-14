@@ -112,6 +112,15 @@ func handleMessageWS(req WSRequest) {
 		}
 		systemPrompt = systemPrompt + "\n\n" + scriptEditBrief
 	}
+	// The studio chat's context IS a film: its shape, its timeline and how to
+	// change it. A reference only — the HTML comes from read_hyperframes_project
+	// when the model needs it, for the same reason the content surface fetches
+	// its design on demand rather than inlining it.
+	if moduleIsDesignStudio(conv.Module) && conv.ContextID != "" {
+		if film := designStudioBrief(conv.BrandID, conv.ContextID); film != "" {
+			systemPrompt = systemPrompt + "\n\n" + film
+		}
+	}
 
 	msgs := make([]openrouter.Message, 0, len(history)+2)
 	msgs = append(msgs, openrouter.Message{Role: "system", Content: systemPrompt})
@@ -155,14 +164,20 @@ func handleMessageWS(req WSRequest) {
 
 	// Image-bearing turns must run on a vision-capable model — route them through
 	// the multimodal task (its allowed models are all vision-capable).
-	chatTask := openrouter.TaskChat
+	chatTask := TaskForModule(conv.Module)
 	switch {
-	case moduleHasStudio(conv.Module):
-		// The design surface authors HTML layouts and animation timings, which a
-		// fast chat model is measurably worse at than a reasoning one — and it
-		// has to be able to SEE its own render to correct them. TaskDesign is
+	case chatTask == openrouter.TaskDesign:
+		// The design surfaces author HTML layouts and animation timings, which a
+		// fast chat model is measurably worse at than a reasoning one — and they
+		// have to be able to SEE their own render to correct them. TaskDesign is
 		// both: reasoning-grade and all vision-capable, so it also covers an
 		// image-bearing turn without falling back to the multimodal lane.
+		//
+		// ⚠️ The studio chat is a CHAT, so TaskChat is the obvious lane and the
+		// wrong one. Resolve takes the first allowed model the plan unlocks;
+		// TaskDesign leads with anthropic/claude-opus-4.8 and TaskChat with
+		// google/gemini-3.5-flash. Routing the studio to TaskChat would drop it
+		// from Opus to Flash with nothing on screen saying so.
 		chatTask = openrouter.TaskDesign
 	case len(req.Images) > 0:
 		chatTask = openrouter.TaskMultimodal
@@ -525,6 +540,14 @@ func toolsForModule(module string) []openrouter.Tool {
 		// revision in the conversation and nothing in the editor.
 		tools = append(tools, scriptServerTools()...)
 	}
+	// ── The Design Studio's own film ─────────────────────────────────────
+	// Deliberately NOT the v2 design tools above: those work on a content's
+	// own HTML design revision, this works on a v3 Hyperframes project, and
+	// a model handed both would call generate_design on a designId it has no
+	// business with and quietly replace a film with a slide.
+	if moduleIsDesignStudio(module) {
+		tools = append(tools, designStudioTools()...)
+	}
 	// On-demand read-only fetch tools (content, analytics, inbox, strategy,
 	// account, assets, billing) let the AI ground its output in the brand's real
 	// data. Available on the planner surfaces — not during onboarding (no data
@@ -586,15 +609,16 @@ func HTTPMessage(c *gin.Context) {
 	}
 	msgs = append(msgs, openrouter.Message{Role: "user", Content: httpUserContent})
 
-	model, locked := pickModel(ctx, conv.BrandID, openrouter.TaskChat, req.Model)
+	httpTask := TaskForModule(conv.Module)
+	model, locked := pickModel(ctx, conv.BrandID, httpTask, req.Model)
 	if locked {
-		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": openrouter.TaskChat})
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "task": httpTask})
 		return
 	}
 
 	orgID, _ := orgIDForBrand(conv.BrandID)
 	if aiTokensExhausted(orgID) {
-		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "reason": "tokens_exhausted", "task": openrouter.TaskChat})
+		c.JSON(http.StatusPaymentRequired, gin.H{"error": "upgrade_required", "reason": "tokens_exhausted", "task": httpTask})
 		return
 	}
 

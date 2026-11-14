@@ -111,6 +111,12 @@ func dispatchServerTool(ctx context.Context, brandID, managerID, contextID, name
 	case toolGenerateDesign:
 		r, err := runGenerateDesign(ctx, brandID, contextID, arguments)
 		return r, false, err
+	case toolReadHyperframesProject:
+		// Read before write. The write tool replaces the project WHOLE, so a
+		// revision made without reading first throws away every scene the
+		// model did not happen to re-type.
+		r, err := runReadHyperframesProject(ctx, brandID, arguments)
+		return r, false, err
 	case toolWriteHyperframesProject:
 		// v3 authoring. Takes a designId rather than the chat's contextID: a
 		// design is a first-class object now, and the one being written is
