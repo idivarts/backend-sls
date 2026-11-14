@@ -6,6 +6,7 @@ import { test } from "node:test";
 
 import {
     describeFinding,
+    relativeToProject,
     hyperframesEnv,
     listProjectFiles,
     parseSnapshotJson,
@@ -421,4 +422,37 @@ test("describeFinding does not leave a dangling separator", () => {
         describeFinding({ severity: "error", message: "  Contrast is 2.83:1.  ", sourceFile: "   " }),
         "Contrast is 2.83:1."
     );
+});
+
+// A finding is read by a person in the app AND put in the prompt that rewrites
+// the film. The project lives in an mkdtemp directory, so an absolute path
+// names a directory that no longer exists on a machine the model has never
+// seen.
+
+test("relativeToProject strips the worker's scratch directory", () => {
+    assert.equal(
+        relativeToProject("/tmp/hfp-abc-zMPJsX/index.html", "/tmp/hfp-abc-zMPJsX"),
+        "index.html"
+    );
+    // With or without the trailing slash on the project dir.
+    assert.equal(
+        relativeToProject("/tmp/hfp-abc/scenes/hook.html", "/tmp/hfp-abc/"),
+        "scenes/hook.html"
+    );
+});
+
+test("relativeToProject leaves a path it does not recognise alone", () => {
+    // Truncating this to a basename would collide with the project's own
+    // index.html and point a rewrite at the wrong document.
+    assert.equal(
+        relativeToProject("/var/task/index.html", "/tmp/hfp-abc"),
+        "/var/task/index.html"
+    );
+    // A path that merely shares a prefix is not inside the project.
+    assert.equal(
+        relativeToProject("/tmp/hfp-abc-other/index.html", "/tmp/hfp-abc"),
+        "/tmp/hfp-abc-other/index.html"
+    );
+    assert.equal(relativeToProject(undefined, "/tmp/hfp-abc"), undefined);
+    assert.equal(relativeToProject("index.html", "/tmp/hfp-abc"), "index.html");
 });

@@ -44,3 +44,58 @@ func itoa(n int) string {
 	}
 	return string(rune('0'+n/10)) + string(rune('0'+n%10))
 }
+
+// ⚠️ The contract's own examples are copied by the model, so an example that
+// fails the gate fails every film that follows it.
+//
+// This is not hypothetical. The <audio> examples carried no data-start, and
+// check refuses untimed media the moment it has a file to play — so the first
+// design authored after the rewrite loop shipped was refused with
+// `<audio id="bgm"> has src but no data-start`, which is exactly what the
+// contract had told it to write.
+func TestEveryMediaExampleInTheContractIsTimed(t *testing.T) {
+	c := AuthoringContract
+	els := mediaElements(c)
+	// A finder that finds nothing passes every assertion below it.
+	if len(els) < 3 {
+		t.Fatalf("found %d media examples; the contract shows an image, a score and a voiceover", len(els))
+	}
+	for _, el := range els {
+		if !strings.Contains(el, "data-start") {
+			t.Errorf("this example is untimed, and check refuses untimed media:\n  %s", el)
+		}
+		if !strings.Contains(el, "data-duration") {
+			t.Errorf("this example has a start but no duration:\n  %s", el)
+		}
+	}
+	// A caption track is timed too, and it declares no media of its own.
+	if !strings.Contains(c, `data-captions="vo" data-start=`) {
+		t.Error("the caption-track example is untimed")
+	}
+	// And the rule is stated, not only demonstrated: a model that copies the
+	// example gets it right, a model that writes its own needs telling.
+	if !strings.Contains(c, "untimed media") {
+		t.Error("the contract shows timed media but never says it is required")
+	}
+}
+
+// mediaElements returns the full text of every element in the contract that
+// declares media — from its opening "<" to the ">" that closes the tag, so a
+// declaration wrapped across lines is still read as one thing.
+func mediaElements(c string) []string {
+	var out []string
+	for i := 0; ; {
+		j := strings.Index(c[i:], `data-media="`)
+		if j < 0 {
+			return out
+		}
+		at := i + j
+		start := strings.LastIndex(c[:at], "<")
+		end := strings.Index(c[at:], ">")
+		if start < 0 || end < 0 {
+			return out
+		}
+		out = append(out, strings.Join(strings.Fields(c[start:at+end+1]), " "))
+		i = at + end + 1
+	}
+}

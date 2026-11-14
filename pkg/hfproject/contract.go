@@ -114,12 +114,20 @@ declare it and it is resolved into the project before the film is checked:
   <img id="hero-shot" class="clip" data-start="0" data-duration="3"
        data-media="image" data-media-intent="cold brew poured over ice, warm late-afternoon light" />
 
-  <audio id="score" data-media="bgm" data-media-intent="upbeat lo-fi, no vocals, 90bpm"></audio>
+  <audio id="score" data-start="0" data-duration="9"
+         data-media="bgm" data-media-intent="upbeat lo-fi, no vocals, 90bpm"></audio>
+
+EVERY <audio> AND <video> NEEDS data-start AND data-duration, in seconds, even
+when it runs the whole film — use the root's duration for a score that does.
+check refuses untimed media the moment it has a file to play, because nothing
+owns when it starts and the preview and the render are then free to disagree.
+This is the single most common reason a film is refused.
 
 VOICEOVER AND CAPTIONS. A voiceover is media like any other, and its intent
 is the words to be spoken:
 
-  <audio id="vo" data-media="voice" data-media-intent="Hit the 2 PM wall? Not any more."></audio>
+  <audio id="vo" data-start="0.5" data-duration="8"
+         data-media="voice" data-media-intent="Hit the 2 PM wall? Not any more."></audio>
 
 For word-synced captions against it, add an empty container pointing at that
 audio by id. It is filled with one timed span per word, from a real
