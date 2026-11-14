@@ -467,6 +467,21 @@ functions:
       - http: ANY /api/collabs/{proxy+}
   trendly_ai_apis:
     handler: functions/trendly_ai/main.go
+    environment:
+      # The Design Studio chat's start_design_authoring tool queues the film
+      # (internal/trendlyapis/ai/design_studio_chat.go). The AI package runs
+      # in THIS function over HTTP and in t_websocket over the socket, so
+      # both need the URL — trendly_studio_apis having it only covers the
+      # REST route the chat does not use.
+      #
+      # ⚠️ Third time, same trap, after SOCIAL_SYNC_QUEUE_URL and the Batch
+      # render names. Without it studiojobs.Configured() is false and the
+      # tool refuses up front: no deploy fails, no request errors, and the
+      # user re-sends a prompt that cannot ever succeed. The refusal now
+      # says it is permanent and raises a Sentry event, so the next one of
+      # these is visible rather than deduced from a chat transcript.
+      STUDIO_JOB_QUEUE_URL:
+        Ref: StudioJobQueue
     package:
       include:
         - 'service-account.json'
@@ -736,6 +751,13 @@ functions:
       # Unset ⇒ pkg/designpreview reports "not configured" and the model is told
       # to carry on without looking, rather than the turn failing.
       DESIGN_PREVIEW_FUNCTION: ${self:service}-${sls:stage}-render_preview
+      # Design Studio v3's chat runs here (internal/websocket receive.go →
+      # ai.HandleWS), and its start_design_authoring tool queues the film.
+      # See the note on trendly_ai_apis: this is the function the studio's
+      # own chat actually talks to, so without the URL the first prompt on
+      # an empty film is refused every single time.
+      STUDIO_JOB_QUEUE_URL:
+        Ref: StudioJobQueue
     package:
       include:
         - 'service-account.json'

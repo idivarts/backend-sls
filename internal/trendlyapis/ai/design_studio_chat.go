@@ -253,7 +253,23 @@ func runStartDesignAuthoring(ctx context.Context, brandID, arguments string) (st
 		}), nil
 	}
 	if !studiojobs.Configured() {
-		return jsonResult(map[string]any{"ok": false, "error": "writing is not available right now"}), nil
+		// ── Say that it is permanent, because the model will not guess ──
+		// This read "writing is not available right now", and the model did
+		// the natural thing with an unexplained failure: called it a
+		// transient service issue and invited a retry. It is not transient.
+		// It means this stage's chat function was never given
+		// STUDIO_JOB_QUEUE_URL, so every retry fails identically and the
+		// user re-sends the same prompt until they give up — which is
+		// exactly what happened on dev.
+		mysentry.Capture(fmt.Errorf("studio job queue not configured"), map[string]string{
+			"op": "design.chat.author.unconfigured", "designId": a.DesignID,
+		})
+		return jsonResult(map[string]any{
+			"ok":    false,
+			"error": "writing_unconfigured",
+			"say": "Writing films is not switched on in this environment. Retrying " +
+				"will not help — say so plainly and do not offer to try again.",
+		}), nil
 	}
 
 	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
