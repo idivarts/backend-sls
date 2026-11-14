@@ -27,12 +27,13 @@ import {
     checkProject,
     listProjectFiles,
     renderProject,
+    restorePlayerShape,
     snapshotProject,
     stripPlayerRuntime,
     vendorGsap,
 } from "./hyperframes";
 import { resolveProjectMedia } from "./media";
-import { downloadPrefix, upload, uploadProjectFiles } from "./s3";
+import { downloadPrefix, readProjectFile, upload, uploadProjectFiles } from "./s3";
 
 export interface DesignV3Job {
     brandId: string;
@@ -112,25 +113,48 @@ async function materialiseAndGate(
     // Non-fatal by contract. A brief that mentions a song it cannot find
     // must still be previewable, so a failure here is reported as a warning
     // and the film goes on without that asset.
+    let mediaFiles: string[] = [];
     try {
         const media = await resolveProjectMedia(workDir, {
             heygenApiKey: process.env.HEYGEN_API_KEY,
             creditCeiling: job.creditCeiling,
         });
         for (const p of media.problems) warnings.push(`media: ${p}`);
-        if (media.changed) {
-            // Back to the bucket, so the render that follows this preview
-            // reuses the same files rather than resolving — and paying —
-            // for them a second time.
-            const n = await uploadProjectFiles(job.projectPrefix, workDir, ["index.html", ...media.files]);
-            console.log(`[media] uploaded ${n} file(s) back to ${job.projectPrefix}`);
-        }
+        mediaFiles = media.files;
     } catch (err) {
         // Logged as well as warned. The first version only warned, and a
         // denied upload left the preview looking perfect while the stored
         // project kept pointing at media that was never there.
         console.log(`[media] FAILED: ${(err as Error).message}`);
         warnings.push(`media: ${(err as Error).message}`);
+    }
+
+    // ── The stored film goes back to the bucket, every time ─────────────
+    // Not only when media changed. New media was never the only reason the
+    // stored document could be wrong: a design prepared while the render-
+    // only mutations ran too early is sitting in the bucket with no runtime
+    // tag and a GSAP src that 403s, and it has no media left to resolve, so
+    // a "changed" test skips exactly the designs that need repairing.
+    // Re-preparing one now fixes it.
+    //
+    // Uploading what the PLAYER needs, before the two mutations below turn
+    // this same file into what the RENDER needs.
+    try {
+        const indexPath = join(workDir, "index.html");
+        // From the bucket, not the work directory: player.html is the one
+        // file downloadPrefix skips, because a second root-level HTML
+        // document makes the CLI refuse the project.
+        const playerHTML = await readProjectFile(job.projectPrefix, "player.html");
+        const healed = restorePlayerShape(await readFile(indexPath, "utf8"), playerHTML);
+        await writeFile(indexPath, healed, "utf8");
+        const n = await uploadProjectFiles(job.projectPrefix, workDir, ["index.html", ...mediaFiles]);
+        console.log(`[project] uploaded ${n} file(s) back to ${job.projectPrefix}`);
+    } catch (err) {
+        // Non-fatal, like the resolution above: a film that cannot be stored
+        // can still be rendered, and refusing the render would turn a stale
+        // player into a total outage.
+        console.log(`[project] upload FAILED: ${(err as Error).message}`);
+        warnings.push(`project: ${(err as Error).message}`);
     }
 
     // ── Render-only mutations, AFTER anything that uploads ──────────────
