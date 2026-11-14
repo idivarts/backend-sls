@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/hfproject"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
@@ -186,5 +187,71 @@ func TestUnresolvedMediaCountsDeclarationsOnly(t *testing.T) {
 	}
 	if got := unresolvedMedia(&hfproject.Project{}); got != 0 {
 		t.Fatalf("a project with no clips has nothing pending, got %d", got)
+	}
+}
+
+// A reference the film cannot satisfy is caught while the model can still
+// change it.
+//
+// The alternative is the gate finding it minutes later — "404 loading
+// assets/fonts/space-grotesk-700.woff2" in a red banner over a film that
+// will not finish. The model cannot upload a woff2, so the only useful
+// moment to say so is while it is being told what it just saved.
+func TestDanglingAssetsNamesWhatIsMissing(t *testing.T) {
+	project := &hfproject.Project{Files: []hfproject.File{{
+		Path: "index.html",
+		Content: `<style>@font-face{src:url('assets/fonts/space-grotesk-700.woff2')}` +
+			`:root{--brand-logo:url('assets/brand-logo.png')}</style>` +
+			`<img src="assets/fonts/inter-400.woff2">`,
+	}}}
+	kept := map[string]bool{"assets/fonts/inter-400.woff2": true}
+
+	got := danglingAssets(project, kept)
+	if len(got) != 2 {
+		t.Fatalf("danglingAssets = %v, want the font and the logo", got)
+	}
+	for _, want := range []string{"assets/fonts/space-grotesk-700.woff2", "assets/brand-logo.png"} {
+		found := false
+		for _, g := range got {
+			if g == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%q is referenced and not in the film, but was not reported: %v", want, got)
+		}
+	}
+	// A file the film DOES have is not a problem, and must not be reported
+	// — a warning that cries wolf is one the model learns to write past.
+	for _, g := range got {
+		if g == "assets/fonts/inter-400.woff2" {
+			t.Fatal("a file carried forward into the revision was reported as missing")
+		}
+	}
+	if n := len(danglingAssets(project, map[string]bool{
+		"assets/fonts/space-grotesk-700.woff2": true,
+		"assets/brand-logo.png":                true,
+		"assets/fonts/inter-400.woff2":         true,
+	})); n != 0 {
+		t.Fatalf("nothing is missing, got %d", n)
+	}
+}
+
+// The chat is told what is wrong with the film, because it is the only
+// party that can fix it.
+func TestDesignFaultCarriesTheGateFindings(t *testing.T) {
+	d := &trendlymodels.Design{
+		PreviewStatus:   trendlymodels.DesignPreviewFailed,
+		PreviewError:    "404 loading assets/fonts/space-grotesk-700.woff2",
+		PreviewFindings: []string{"404 loading assets/fonts/space-grotesk-700.woff2"},
+	}
+	got := designFault(d)
+	for _, want := range []string{"FAILED", "space-grotesk-700.woff2", "assets/"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("the fault does not mention %q:\n%s", want, got)
+		}
+	}
+	if designFault(&trendlymodels.Design{}) != "" {
+		t.Fatal("a film with nothing wrong with it says nothing")
 	}
 }
