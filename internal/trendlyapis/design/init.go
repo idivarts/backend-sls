@@ -61,4 +61,10 @@ func RegisterRoutes(engine *gin.Engine) {
 	// returned 504 with nothing stored. The job runs on the studio queue and
 	// reports on the design document, which the app already watches.
 	g.POST(base+"/:designId/author", AuthorDesign)
+
+	// Going back to a revision. A POST because it changes which bytes the
+	// renderer, the preview and the player all read — and the list it acts
+	// on needs no GET of its own, because revisions ride on the design
+	// document the app already watches.
+	g.POST(base+"/:designId/revisions/:n/restore", RestoreDesignRevision)
 }

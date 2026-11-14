@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	"cloud.google.com/go/firestore"
+	"log"
+
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/pkg/hfproject"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -112,19 +114,46 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 		return jsonResult(map[string]any{"ok": false, "error": err.Error()}), nil
 	}
 
-	prefix, err := hfproject.Upload(ctx, brandID, a.DesignID, project)
+	// A revision, not an overwrite. An AI edit is exactly the writer this
+	// mechanism exists for: it rewrites a film the user may have liked, and
+	// the way back has to be written at the same moment the change is.
+	rev, err := trendlymodels.AllocateDesignRevision(ctx, brandID, a.DesignID)
+	if err != nil {
+		return jsonResult(map[string]any{"ok": false, "error": "could not save the design"}), err
+	}
+
+	prefix, err := hfproject.Upload(ctx, brandID, a.DesignID, rev, project)
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "could not store the project"}), err
 	}
 
-	// Both fields in one write. projectPrefix without durationMs would be a
-	// renderable design the wallet cannot price, and durationMs without the
-	// prefix would price a design with nothing to render.
-	if err := trendlymodels.UpdateBrandDesign(ctx, brandID, a.DesignID, []firestore.Update{
-		{Path: "projectPrefix", Value: prefix},
-		{Path: "durationMs", Value: project.DurationMs},
-	}); err != nil {
+	// The player pages go beside the project, or the app plays the previous
+	// revision while the renderer renders this one. Best-effort, as
+	// everywhere else: a film with no player still renders.
+	previewURL, perr := hfproject.UploadPlayer(ctx, brandID, a.DesignID, rev, project)
+	if perr != nil {
+		log.Printf("ai design player upload failed for %s/%s: %v", brandID, a.DesignID, perr)
+	}
+
+	// Pointer, duration and the revision entry in one transaction.
+	// projectPrefix without durationMs would be a renderable design the
+	// wallet cannot price, and durationMs without the prefix would price a
+	// design with nothing to render.
+	pruned, err := trendlymodels.CommitDesignRevision(ctx, brandID, a.DesignID, trendlymodels.DesignRevision{
+		N:          rev,
+		Prefix:     prefix,
+		PreviewURL: previewURL,
+		By:         trendlymodels.DesignRevisionAIEdit,
+		Note:       "Edited by the AI panel",
+		DurationMs: project.DurationMs,
+	})
+	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "could not save the design"}), err
+	}
+	for _, p := range pruned {
+		if _, derr := mediastore.DeletePrefix(ctx, mediastore.TargetAttachment, p); derr != nil {
+			log.Printf("design revision cleanup failed for %s: %v", p, derr)
+		}
 	}
 
 	return jsonResult(map[string]any{

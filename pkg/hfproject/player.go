@@ -384,7 +384,10 @@ func EnsureSharedPlayerAssets(ctx context.Context, brandID string) (playerURL, r
 // Best-effort by contract: a design whose player could not be written still
 // renders, previews and exports. The caller logs and carries on rather than
 // failing an authoring run over the preview surface.
-func UploadPlayer(ctx context.Context, brandID, designID string, p *Project) (string, error) {
+// `rev` is the revision these pages belong to, matching the one Upload was
+// given: the player plays the project beside it, so the two must land in
+// the same directory or the player plays the wrong revision.
+func UploadPlayer(ctx context.Context, brandID, designID string, rev int, p *Project) (string, error) {
 	var indexHTML string
 	for _, f := range p.Files {
 		if strings.EqualFold(f.Path, "index.html") {
@@ -401,7 +404,7 @@ func UploadPlayer(ctx context.Context, brandID, designID string, p *Project) (st
 		return "", err
 	}
 
-	prefix := Prefix(brandID, designID)
+	prefix := RevisionPrefix(brandID, designID, rev)
 	write := func(name, body string) (string, error) {
 		s, err := mediastore.Put(ctx, mediastore.Spec{
 			BrandID:      brandID,
