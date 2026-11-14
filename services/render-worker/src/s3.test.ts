@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 import { PLAYER_ARTEFACTS } from "./s3";
 
 /**
- * The regression this guards. pkg/hfproject writes preview.html and
- * player.html into the SAME prefix as the project, and preview.html is
+ * The regression this guards. pkg/hfproject writes its player pages into
+ * the SAME prefix as the project, and the old preview.html was
  * index.html with two script tags — so materialising the whole prefix handed
  * the CLI two root-level compositions and it refused the project:
  *

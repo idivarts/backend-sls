@@ -52,10 +52,16 @@ func TestWithScriptsDoesNotMutateItsInput(t *testing.T) {
 	}
 }
 
-func TestPlayerPagePointsAtThePreviewCopy(t *testing.T) {
+// There is ONE document. The player plays index.html, so a change to the
+// film cannot leave the watched copy behind — which is exactly what the two
+// documents did when media resolution rewrote only one of them.
+func TestPlayerPagePlaysTheFilmItself(t *testing.T) {
 	page := playerPage("https://cdn/player.js")
-	if !strings.Contains(page, `src="preview.html"`) {
-		t.Fatal("the player must play preview.html, which carries the runtime, not index.html")
+	if !strings.Contains(page, `src="index.html"`) {
+		t.Fatal("the player must play index.html; a second copy falls out of step")
+	}
+	if strings.Contains(page, "preview.html") {
+		t.Fatal("preview.html is gone; nothing should reference it")
 	}
 	if !strings.Contains(page, `<script src="https://cdn/player.js"></script>`) {
 		t.Fatal("the player script is missing")

@@ -216,6 +216,23 @@ export function runHyperframes(
  * to the file being patched — `compositions/hook.html` needs `../assets/...`,
  * not `assets/...`.
  */
+/**
+ * Take the player's runtime tag out before the CLI opens the project.
+ *
+ * index.html carries it so the app can play the film with no second copy of
+ * the document (pkg/hfproject/player.go explains why there used to be two).
+ * It points at CloudFront, and a render must work with no network at all —
+ * proved under `--network none`, and the whole reason GSAP is vendored.
+ *
+ * The CLI injects its own runtime anyway, so removing this costs the render
+ * nothing: measured, the frames are byte-identical either way.
+ */
+const playerRuntimeTag = /[ \t]*<script[^>]+src=["'][^"']*\/design-player\/[^"']*runtime\.js["'][^>]*>\s*<\/script>\s*\n?/gi;
+
+export function stripPlayerRuntime(html: string): string {
+    return html.replace(playerRuntimeTag, "");
+}
+
 export async function vendorGsap(projectDir: string): Promise<void> {
     const dest = join(projectDir, GSAP_PROJECT_PATH);
     await mkdir(dirname(dest), { recursive: true });

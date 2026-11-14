@@ -16,11 +16,31 @@ package hfproject
 // `window.__timelines` is undefined, every scene sits at its CSS default, and
 // seeking does nothing. Measured, before the tag was added and after.
 //
-// So the runtime tag goes into a SEPARATE preview.html rather than into
-// index.html. index.html is what the renderer opens, and the CLI injects its
-// own runtime there — adding a second one to the file the render path uses
-// would be meddling with the one path that is currently working, to fix a
-// different one.
+// ── Why there is ONE document, after there were two ──────────────────────
+// That tag used to go into a separate preview.html, on the reasoning that
+// index.html is what the renderer opens and adding a second runtime to it
+// would be "meddling with the one path that is currently working". That
+// reasoning was never tested, and it was wrong.
+//
+// It also caused a real bug. Media resolution rewrites index.html in the
+// worker; nothing rebuilt preview.html. So the rendered film had its
+// photograph and the film the user watched was a snapshot from before the
+// media existed — and every instrument except the player agreed it was
+// fine, because the preview stills come off the worker's own copy.
+//
+// Measured properly, the same project rendered twice in the render image:
+//
+//	index.html WITHOUT the runtime tag  741.5 KB, 9.0s
+//	index.html WITH the runtime tag     740.3 KB, 9.0s
+//	frame at 1.5s, SHA-256              identical, byte for byte
+//
+// The CLI injects its own runtime and does not mind finding one already
+// there. So the tags go into index.html, the player plays index.html, and
+// there is no second copy of the film to fall out of step.
+//
+// The render path keeps its air gap: the worker strips this runtime tag
+// before rendering (services/render-worker/src/hyperframes.ts), because the
+// tag points at CloudFront and a render must work with no network.
 //
 // ── The second thing that is not obvious: GSAP ────────────────────────────
 // A composition animates with `gsap.timeline()` and Hyperframes' own docs
@@ -283,7 +303,8 @@ const bridgeJS = `
 })();
 `
 
-// playerPage is the page the app embeds. Deliberately bare: it is shown inside
+// playerPage is the page the app embeds. It plays index.html directly —
+// there is no second copy of the film. Deliberately bare: it is shown inside
 // an iframe that already has a frame around it, so any chrome here would be a
 // second one.
 //
@@ -312,7 +333,7 @@ func playerPage(playerURL string) string {
     </style>
   </head>
   <body>
-    <hyperframes-player src="preview.html" controls muted interactive></hyperframes-player>
+    <hyperframes-player src="index.html" controls muted interactive></hyperframes-player>
     <script src="` + playerURL + `"></script>
     <script>` + bridgeJS + `</script>
   </body>
@@ -396,7 +417,10 @@ func UploadPlayer(ctx context.Context, brandID, designID string, p *Project) (st
 		return s.URL, nil
 	}
 
-	if _, err := write("preview.html", withScripts(indexHTML, runtimeURL, gsapURL)); err != nil {
+	// The scripts go into index.html itself. There is ONE document now; see
+	// the note at the top of this file for why there used to be two and why
+	// that was wrong.
+	if _, err := write("index.html", withScripts(indexHTML, runtimeURL, gsapURL)); err != nil {
 		return "", err
 	}
 	return write("player.html", playerPage(playerURL))
