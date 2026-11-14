@@ -671,6 +671,20 @@ func DeleteBrandDesign(ctx context.Context, brandID, designID string) error {
 // MarkBrandDesignAuthoring moves a design into the authoring lifecycle and
 // clears the previous attempt's error, so a retry does not show the old
 // failure beside a job that is working.
+// RenameBrandDesign sets a design's name and nothing else.
+//
+// The name is the ONE field on a design a person owns. Everything else
+// here — the prefix, the statuses, the revision pointer — is written by
+// the backend and read by the client, which is why firestore.rules denies
+// client writes outright (see internal/trendlyapis/design/init.go). So a
+// rename needs a route, and the route needs this.
+func RenameBrandDesign(ctx context.Context, brandID, designID, name string) error {
+	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
+		{Path: "name", Value: name},
+		{Path: "updatedAt", Value: time.Now().UnixMilli()},
+	})
+}
+
 func MarkBrandDesignAuthoring(ctx context.Context, brandID, designID, status string) error {
 	return UpdateBrandDesign(ctx, brandID, designID, []firestore.Update{
 		{Path: "authorStatus", Value: status},
