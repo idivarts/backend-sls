@@ -162,13 +162,7 @@ func EditDesignElement(c *gin.Context) {
 		mysentry.Capture(perr, map[string]string{"op": "design.element.player", "designId": designID})
 	}
 
-	scenes := make([]trendlymodels.DesignScene, 0, len(project.Scenes))
-	for _, s := range project.Scenes {
-		scenes = append(scenes, trendlymodels.DesignScene{
-			ID: s.ID, Src: s.Src, StartMs: s.StartMs,
-			DurationMs: s.DurationMs, TrackIndex: s.TrackIndex, TrackKind: s.TrackKind,
-		})
-	}
+	scenes := scenesOf(project)
 
 	pruned, cerr := trendlymodels.CommitDesignRevision(ctx, brandID, designID, trendlymodels.DesignRevision{
 		N:          rev,
@@ -178,6 +172,11 @@ func EditDesignElement(c *gin.Context) {
 		Note:       editNote(req),
 		DurationMs: project.DurationMs,
 		Scenes:     scenes,
+		// An inspector edit changes the timeline too: emptying a
+		// voiceover's src leaves the clip's file and label describing a
+		// recording that is no longer there, and a revision stored
+		// without clips restores someone else's film onto this one.
+		Clips: clipsOf(project),
 	})
 	if cerr != nil {
 		mysentry.Capture(cerr, map[string]string{"op": "design.element.commit", "designId": designID})

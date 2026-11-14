@@ -69,6 +69,11 @@ type Project struct {
 	DurationMs int
 	// Scenes are the clips the root mounts, in timeline order.
 	Scenes []Scene
+
+	// Clips is everything on the timeline — the scenes plus the media and
+	// the caption tracks, each on its row. See clips.go for why Scenes
+	// alone was never enough to draw a timeline with.
+	Clips []Clip
 }
 
 var (
@@ -96,6 +101,7 @@ var (
 	sceneSrcRe    = attrRe(`data-composition-src`)
 	sceneStartRe  = attrRe(`data-start`)
 	sceneDurRe    = attrRe(`data-duration`)
+	sceneEndRe    = attrRe(`data-end`)
 	sceneTrackRe  = attrRe(`data-track-index`)
 	sceneKindRe   = attrRe(`data-track-kind`)
 	sceneFallback = attrRe(`id`)
@@ -175,7 +181,30 @@ func Build(files []File) (*Project, error) {
 		return nil, err
 	}
 
-	return &Project{Files: files, DurationMs: durationMs, Scenes: parseScenes(index)}, nil
+	return &Project{
+		Files:      files,
+		DurationMs: durationMs,
+		Scenes:     parseScenes(index),
+		Clips:      Clips(index),
+	}, nil
+}
+
+// sceneDuration is how long a scene lasts.
+//
+// data-duration where the film gives one, data-end minus data-start where
+// it gives that instead. Both are in the composition contract, and clips.go
+// reads both — a scene reported as 3 seconds long on the timeline and 0 in
+// the scene panel is the same document read two ways.
+func sceneDuration(tag string) int {
+	if d := secondsToMs(first(sceneDurRe, tag)); d > 0 {
+		return d
+	}
+	if end := secondsToMs(first(sceneEndRe, tag)); end > 0 {
+		if d := end - secondsToMs(first(sceneStartRe, tag)); d > 0 {
+			return d
+		}
+	}
+	return 0
 }
 
 // parseScenes reads the clips the root composition mounts.
@@ -218,7 +247,7 @@ func parseScenes(index string) []Scene {
 			ID:         id,
 			Src:        src,
 			StartMs:    secondsToMs(first(sceneStartRe, tag)),
-			DurationMs: secondsToMs(first(sceneDurRe, tag)),
+			DurationMs: sceneDuration(tag),
 			TrackIndex: atoiOr(first(sceneTrackRe, tag), 0),
 			TrackKind:  first(sceneKindRe, tag),
 		})

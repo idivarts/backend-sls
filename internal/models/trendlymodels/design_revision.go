@@ -82,6 +82,32 @@ type DesignRevision struct {
 	// a restore can put the timeline back without re-parsing the project.
 	DurationMs int           `json:"durationMs,omitempty" firestore:"durationMs,omitempty"`
 	Scenes     []DesignScene `json:"scenes,omitempty" firestore:"scenes,omitempty"`
+	Clips      []DesignClip  `json:"clips,omitempty" firestore:"clips,omitempty"`
+}
+
+// clipsOrFromScenes is the restored film's timeline.
+//
+// The clips where the revision has them. Where it does not — every revision
+// written before the timeline knew about rows — the scenes, each as a clip
+// on row 0, which is where a scene belongs. That is less than the film
+// really contains and more than nothing, and crucially it is all about THIS
+// film rather than the one that happened to be loaded before the restore.
+func clipsOrFromScenes(clips []DesignClip, scenes []DesignScene) []DesignClip {
+	if clips != nil {
+		return clips
+	}
+	out := make([]DesignClip, 0, len(scenes))
+	for _, s := range scenes {
+		out = append(out, DesignClip{
+			ElementID:  s.ID,
+			Kind:       "scene",
+			TrackIndex: 0,
+			StartMs:    s.StartMs,
+			DurationMs: s.DurationMs,
+			Label:      s.ID,
+		})
+	}
+	return out
 }
 
 // AllocateDesignRevision reserves the next revision number for a design.
@@ -188,6 +214,9 @@ func CommitDesignRevision(
 		if rev.Scenes != nil {
 			updates = append(updates, firestore.Update{Path: "scenes", Value: rev.Scenes})
 		}
+		if rev.Clips != nil {
+			updates = append(updates, firestore.Update{Path: "clips", Value: rev.Clips})
+		}
 		// An empty previewUrl CLEARS the old one, on the same reasoning as
 		// SetBrandDesignProject: a revision whose player could not be
 		// written must not leave the app playing the previous film.
@@ -268,6 +297,16 @@ func RestoreDesignRevision(ctx context.Context, brandID, designID string, n int)
 			Note:       fmt.Sprintf("Restored revision %d", n),
 			DurationMs: found.DurationMs,
 			Scenes:     found.Scenes,
+			// ── A revision from before clips existed ──────────────────
+			// Every revision written before the timeline knew about rows
+			// carries scenes and no clips. Restoring one used to leave
+			// the `clips` field alone, which means the timeline keeps
+			// drawing the music, voiceovers and photographs of whichever
+			// film was loaded a moment ago — rows belonging to a
+			// different design. The film's spine is the part we can still
+			// recover, so the timeline shows the scenes and admits it
+			// knows nothing about the rest, rather than lying.
+			Clips: clipsOrFromScenes(found.Clips, found.Scenes),
 		}
 		list = append(list, entry)
 		list, pruned = pruneDesignRevisions(list, entry.Prefix)
@@ -283,6 +322,11 @@ func RestoreDesignRevision(ctx context.Context, brandID, designID string, n int)
 		if entry.Scenes != nil {
 			updates = append(updates, firestore.Update{Path: "scenes", Value: entry.Scenes})
 		}
+		// Always written, never conditionally: the whole failure this
+		// guards against is a `clips` field left over from another film,
+		// and an empty list is the honest answer when the restored
+		// revision has nothing to say about its rows.
+		updates = append(updates, firestore.Update{Path: "clips", Value: entry.Clips})
 		if entry.PreviewURL != "" {
 			updates = append(updates, firestore.Update{Path: "previewUrl", Value: entry.PreviewURL})
 		}

@@ -111,3 +111,42 @@ func TestToIntReadsEveryShapeFirestoreReturns(t *testing.T) {
 		t.Fatal("toInt accepted nil")
 	}
 }
+
+// A revision written before clips existed restores its own scenes, not
+// whatever film was loaded a moment ago.
+//
+// This is the whole reason the restore writes `clips` unconditionally: the
+// field used to be left alone when the revision had nothing to say, which
+// left the timeline drawing the music and voiceovers of a different design.
+func TestClipsOrFromScenesDerivesFromScenes(t *testing.T) {
+	scenes := []DesignScene{
+		{ID: "scene-hook", StartMs: 0, DurationMs: 3000},
+		{ID: "scene-end", StartMs: 3000, DurationMs: 2000},
+	}
+
+	got := clipsOrFromScenes(nil, scenes)
+	if len(got) != 2 {
+		t.Fatalf("a two-scene revision should restore two clips, got %d", len(got))
+	}
+	for i, c := range got {
+		if c.Kind != "scene" || c.TrackIndex != 0 {
+			t.Fatalf("clip %d: a scene belongs on row 0, got kind %q row %d", i, c.Kind, c.TrackIndex)
+		}
+		if c.ElementID != scenes[i].ID || c.StartMs != scenes[i].StartMs || c.DurationMs != scenes[i].DurationMs {
+			t.Fatalf("clip %d does not match its scene: %+v vs %+v", i, c, scenes[i])
+		}
+	}
+
+	// A revision that HAS clips keeps them untouched — the derivation is a
+	// fallback, not a rewrite.
+	real := []DesignClip{{ElementID: "score", Kind: "music", TrackIndex: 3}}
+	if out := clipsOrFromScenes(real, scenes); len(out) != 1 || out[0].ElementID != "score" {
+		t.Fatalf("a revision with clips should keep them, got %+v", out)
+	}
+
+	// No scenes and no clips is an empty list rather than nil, so the
+	// restore CLEARS the previous film's rows instead of leaving them.
+	if out := clipsOrFromScenes(nil, nil); out == nil || len(out) != 0 {
+		t.Fatalf("nothing to restore should clear the rows, got %+v", out)
+	}
+}
