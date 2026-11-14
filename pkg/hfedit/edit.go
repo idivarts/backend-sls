@@ -63,17 +63,33 @@ func (e Element) HasChildren() bool { return e.End > e.TagEnd }
 
 // HoldsElements reports whether the element contains other ELEMENTS rather
 // than just text.
-//
-// The difference decides whether replacing its text is an edit or a
-// demolition: setting the words of an <h1> changes a headline, and setting
-// the words of the <div> that holds every scene replaces the entire film
-// with a text node.
 func (e Element) HoldsElements(source string) bool {
 	if !e.HasChildren() || e.End > len(source) {
 		return false
 	}
 	inner := source[e.TagEnd:e.End]
 	return len(findAll(inner, func(Element) bool { return true })) > 0
+}
+
+// HoldsAddressable reports whether the element contains another element
+// with an id.
+//
+// This, and not HoldsElements, is what decides whether replacing an
+// element's text is an edit or a demolition. Setting the words of an
+// <h1>Hit the <em>2 PM</em> wall?</h1> changes a headline — the <em> is
+// formatting, and flattening it is a trade a script editor makes
+// knowingly. Setting the words of the <section> that holds two headlines,
+// or the <div> that holds every scene, destroys things that can be
+// selected, edited and timed on their own.
+//
+// An id is exactly the line between the two: it is what makes an element
+// addressable, and these films give one to everything that matters.
+func (e Element) HoldsAddressable(source string) bool {
+	if !e.HasChildren() || e.End > len(source) {
+		return false
+	}
+	inner := source[e.TagEnd:e.End]
+	return len(findAll(inner, func(c Element) bool { return c.Attrs["id"] != "" })) > 0
 }
 
 // Edit is a span of the source to replace.

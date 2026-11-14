@@ -266,3 +266,24 @@ func TestHoldsElements(t *testing.T) {
 		t.Fatal("a void element reported as holding elements")
 	}
 }
+
+// The line between formatting and structure, which is what decides
+// whether replacing an element's text is an edit or a demolition.
+func TestHoldsAddressable(t *testing.T) {
+	src := `<div id="root"><section id="s1"><h1 id="t">Hit the <em>2 PM</em> wall?</h1></section></div>`
+	root, _ := FindByID(src, "root")
+	s1, _ := FindByID(src, "s1")
+	h1, _ := FindByID(src, "t")
+
+	if !root.HoldsAddressable(src) || !s1.HoldsAddressable(src) {
+		t.Fatal("a container of addressable elements reported as holding none")
+	}
+	// An <em> is formatting, not something anyone selects or times.
+	if h1.HoldsAddressable(src) {
+		t.Fatal("a headline with an <em> in it was treated as a container")
+	}
+	// It does hold an element, which is a different question.
+	if !h1.HoldsElements(src) {
+		t.Fatal("HoldsElements missed the <em>")
+	}
+}

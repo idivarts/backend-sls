@@ -82,4 +82,9 @@ func RegisterRoutes(engine *gin.Engine) {
 	// Scenes play one after another, so every one of those ripples — the
 	// rule is stated in structure.go and shown in the panel.
 	g.POST(base+"/:designId/structure", EditDesignStructure)
+
+	// The film as words. A GET because reading a script changes nothing;
+	// editing a line goes back through /element, so there is one write
+	// path rather than two.
+	g.GET(base+"/:designId/script", GetDesignScript)
 }

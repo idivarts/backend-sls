@@ -112,6 +112,17 @@ export function readDeclarations(html: string): Declaration[] {
         // is left exactly as it is: better a film with a gap the author can
         // see than a silent call to a paid API on a guess.
         if (!MEDIA_TYPES.has(type) || intent === "") continue;
+        // ── Already served ───────────────────────────────────────────────
+        // A resolved declaration keeps its intent now, because the script
+        // panel edits a voiceover BY its intent — those are the words it
+        // says, and a film that has forgotten them cannot show them in a
+        // script or let anyone rewrite them. So what marks a declaration
+        // done is data-media-resolved agreeing with the src, and a
+        // voiceover whose words were changed has neither: the script
+        // editor clears them, which is exactly how it asks for the line to
+        // be spoken again.
+        const resolved = (el.attrs["data-media-resolved"] || "").trim();
+        if (resolved !== "" && resolved === (el.attrs["src"] || "").trim()) continue;
         out.push({
             type,
             intent,
@@ -342,12 +353,14 @@ export async function resolveProjectMedia(
         }
 
         edits.push(setAttribute(el, "src", rel));
-        // The declaration has been honoured; leaving it would have the next
-        // run resolve it again and pay again.
-        for (const gone of ["data-media", "data-media-intent", "data-media-entity"]) {
-            const e = removeAttribute(el, gone, original);
-            if (e) edits.push(e);
-        }
+        // ── What the film remembers about its own media ──────────────────
+        // The declaration used to be STRIPPED here, so a second run could
+        // not resolve it again and pay again. It is kept now, and
+        // data-media-resolved is what stops the second run instead (see
+        // readDeclarations) — because the words a voiceover says are the
+        // only record of that line, and the script panel edits them. A
+        // film that threw them away could show a script of its on-screen
+        // text and nothing of what it SAYS.
         edits.push(setAttribute(el, "data-media-resolved", rel));
     }
 
