@@ -105,6 +105,7 @@ RULES — each is enforced, and breaking one fails the render:
 13. Keep content inside the middle 90% of the canvas and text inside the middle 80%. Phones crop the edges.
 14. Scenes that are not on screen must not be visible: give every scene opacity:0 in CSS and let the timeline bring it in and take it out. Two scenes drawn at once is the most common way a film comes out unreadable.
 15. Do not tween a property the browser snaps to whole pixels during layout — letterSpacing, width, height, margin, padding. check rejects them. Animate transform, opacity, scale, x and y instead.
+16. Every word must clear WCAG AA against what is ACTUALLY behind it: 3:1 for display type, 4.5:1 for body copy. check measures the real pairing and refuses the film below it — this is the most common reason a finished-looking film will not render. A gradient or a tint over a photograph is not a contrast guarantee: put the words on a solid panel, or on a scrim dark enough to win on the brightest part of the image, and keep a low-contrast colour for an accent that carries no meaning on its own. White on a mid-tone is usually the failure; near-black on near-white, or white on a deep, saturated ground, usually passes.
 MEDIA — DECLARE IT, DO NOT DRAW IT AND DO NOT LINK IT.
 You cannot fetch anything, and a remote URL breaks a render that must work
 with no network. When a scene wants a photograph, a video, music or a sound,

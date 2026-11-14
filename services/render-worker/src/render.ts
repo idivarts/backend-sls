@@ -54,6 +54,7 @@ import {
 import { renderFailed, renderSucceeded } from "./metrics";
 import { makeThumbnail } from "./thumbnail";
 import { previewDesignV3, renderDesignV3 } from "./design-v3";
+import { describeFinding } from "./hyperframes";
 import type { RenderJob, RenderTarget } from "./types";
 import { compositionFromDesign, measureComposition } from "../../../shared-libs/design/composition-runtime";
 import {
@@ -624,9 +625,14 @@ async function runHyperframesPreviewJob(job: RenderJob): Promise<void> {
                     // it is the same `check` the render runs, so a preview
                     // that fails here tells the user what the render would
                     // have told them AFTER taking their tokens.
-                    onCheckFailed: async (problem) => {
+                    onCheckFailed: async (problem, findings) => {
                         reasonWritten = true;
-                        await markDesignV3PreviewFailed(job.brandId, designId, problem);
+                        await markDesignV3PreviewFailed(
+                            job.brandId,
+                            designId,
+                            problem,
+                            findings.map(describeFinding)
+                        );
                     },
                 }
             ),

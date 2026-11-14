@@ -694,18 +694,53 @@ export async function setDesignV3PreviewFrames(
             previewFrames: frames,
             previewedAt: Date.now(),
             previewError: FieldValue.delete(),
+            // With the reason, not after it. A design that passes while still
+            // carrying the last run's findings is one the authoring job would
+            // rewrite for no reason.
+            previewFailure: FieldValue.delete(),
+            previewFindings: FieldValue.delete(),
         },
         { merge: true }
     );
 }
 
+/**
+ * Record a failed preparation.
+ *
+ * ── Why the KIND of failure is written, not just the reason ────────────────
+ * `previewError` is a sentence for a person, and a person can tell "the words
+ * are unreadable against the picture" from "the render queue is down". The
+ * authoring job cannot: it reads this document, and a string match on English
+ * is not a contract. So a gate failure is marked as one.
+ *
+ * That distinction is what the automatic rewrite turns on. A film the gate
+ * measured a defect IN is worth writing again with the findings in hand; a
+ * preparation that fell over on infrastructure is not, and re-running a
+ * frontier model against it would spend the org's tokens on a fault that has
+ * nothing to do with the film.
+ *
+ * Passing no findings CLEARS both fields rather than leaving them. A design
+ * that failed the gate, was rewritten, and then failed on infrastructure
+ * would otherwise still be carrying "check" from the earlier run — and the
+ * authoring job would rewrite it a second time over findings that no longer
+ * describe anything.
+ */
 export async function markDesignV3PreviewFailed(
     brandId: string,
     designId: string,
-    reason: string
+    reason: string,
+    findings?: string[]
 ): Promise<void> {
+    const gated = findings !== undefined && findings.length > 0;
     await designRef(brandId, designId).set(
-        { previewStatus: "failed", previewError: reason },
+        {
+            previewStatus: "failed",
+            previewError: reason,
+            previewFailure: gated ? "check" : FieldValue.delete(),
+            // Capped. The authoring job puts these in a prompt, and a project
+            // with a broken root can raise a finding per element.
+            previewFindings: gated ? findings.slice(0, 12) : FieldValue.delete(),
+        },
         { merge: true }
     );
 }

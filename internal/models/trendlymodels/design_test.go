@@ -288,3 +288,33 @@ func TestRefundIsOnlyOwedByAFailedRenderThatWasCharged(t *testing.T) {
 		})
 	}
 }
+
+// A rewrite must not be recordable as attempt zero. The number is what tells
+// the user "this is being FIXED" rather than "the first attempt is slow", and
+// a zero would be dropped by omitempty and read as neither.
+func TestRewritingRefusesAnImpossibleAttempt(t *testing.T) {
+	for _, n := range []int{0, -1} {
+		if err := MarkBrandDesignRewriting(context.Background(), "b", "d", n); err == nil {
+			t.Fatalf("attempt %d was accepted", n)
+		}
+	}
+}
+
+// The findings the gate raised and the status a rewrite turns on have to be
+// readable back off the document — a json tag that does not match what the
+// worker writes makes the rewrite silently never happen.
+func TestTheGateFieldsRoundTripUnderTheNamesTheWorkerWrites(t *testing.T) {
+	typ := reflect.TypeOf(Design{})
+	seen := map[string]bool{}
+	for i := 0; i < typ.NumField(); i++ {
+		seen[strings.Split(typ.Field(i).Tag.Get("firestore"), ",")[0]] = true
+	}
+	for _, required := range []string{"previewFailure", "previewFindings", "authorAttempt"} {
+		if !seen[required] {
+			t.Fatalf("the design model has no %q field for the worker to write", required)
+		}
+	}
+	if DesignPreviewFailureCheck != "check" {
+		t.Fatalf("the gate marker is %q; the worker writes \"check\"", DesignPreviewFailureCheck)
+	}
+}

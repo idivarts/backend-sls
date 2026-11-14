@@ -51,6 +51,47 @@ func MediaCreditCeiling(orgID string) int {
 	return designCreditCeiling()
 }
 
+// MediaCreditCeilingPerAttempt is what to pass the worker for ONE attempt of a
+// run that may make several.
+//
+// ── Why the ceiling is divided and not repeated ───────────────────────────
+// The cap above exists to bound the blast radius of one bad run, and the
+// comment at the top of this file names "a retry loop" as one of the things it
+// is bounding. The authoring job now IS a retry loop: a film the gate refuses
+// is written again, and each attempt lands in a fresh revision whose media has
+// to be resolved from scratch — the model's document carries no
+// data-media-resolved, so nothing is reused.
+//
+// Handing every attempt the full ceiling would therefore multiply the cap by
+// the number of attempts, quietly, for a feature that was supposed to cost
+// tokens and not money. Dividing it keeps the guarantee exactly as it was:
+// one design, one ceiling, however many times it has to be written.
+//
+// Integer division floors on purpose. A ceiling smaller than the attempt count
+// comes out at zero, which means "resolve from anything free and buy nothing"
+// — the same safe degradation an org out of tokens already gets, not a
+// failure. In the common case it binds on nothing at all: a catalogue search
+// is free, and that is what every design on dev has resolved to so far.
+func MediaCreditCeilingPerAttempt(orgID string, attempts int) int {
+	return splitCeiling(MediaCreditCeiling(orgID), attempts)
+}
+
+// splitCeiling shares one run's ceiling between the attempts it may make.
+//
+// Separate from the function above so the arithmetic can be tested without
+// reading a wallet: the division is the part worth pinning, and a unit test
+// that reaches Firestore to check a division is a unit test that fails for
+// reasons that have nothing to do with it.
+func splitCeiling(ceiling, attempts int) int {
+	if ceiling <= 0 {
+		return 0
+	}
+	if attempts < 1 {
+		attempts = 1
+	}
+	return ceiling / attempts
+}
+
 // designCreditCeiling reads the cap, so it can be lowered without a deploy
 // if a run ever looks expensive.
 func designCreditCeiling() int {

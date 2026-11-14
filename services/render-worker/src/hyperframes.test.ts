@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import {
+    describeFinding,
     hyperframesEnv,
     listProjectFiles,
     parseSnapshotJson,
@@ -389,5 +390,35 @@ test("restorePlayerShape reaches a nested document's ../ GSAP src", () => {
         restorePlayerShape(nested, playerDoc).includes(
             'src="https://cdn.example.net/design-player/0.9.39/gsap-3.15.0.min.js"'
         )
+    );
+});
+
+// ── Findings as lines a rewrite can act on ────────────────────────────────
+//
+// The authoring job writes a refused film again with these in the prompt, so
+// each line has to stand on its own: a project is several documents, and a
+// rewrite told "contrast is 2.83:1" without being told where has to guess
+// which scene.
+
+test("describeFinding keeps the file the gate named", () => {
+    assert.equal(
+        describeFinding({ severity: "error", message: "Contrast is 2.83:1; WCAG AA requires 3:1.", sourceFile: "index.html" }),
+        "index.html: Contrast is 2.83:1; WCAG AA requires 3:1."
+    );
+});
+
+test("describeFinding is the message alone when the gate named no file", () => {
+    assert.equal(
+        describeFinding({ severity: "error", message: "Two text blocks overlap." }),
+        "Two text blocks overlap."
+    );
+});
+
+test("describeFinding does not leave a dangling separator", () => {
+    // A blank sourceFile is not a file. "  : message" in a numbered prompt
+    // list reads as a path the model then looks for.
+    assert.equal(
+        describeFinding({ severity: "error", message: "  Contrast is 2.83:1.  ", sourceFile: "   " }),
+        "Contrast is 2.83:1."
     );
 });
