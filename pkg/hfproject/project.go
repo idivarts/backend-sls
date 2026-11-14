@@ -304,8 +304,26 @@ func cleanPath(p string) (string, error) {
 // Keyed by brand AND design so two designs cannot collide and a brand's
 // projects stay together. The render task role is scoped to design-projects/*
 // — widening this path means widening that policy.
+//
+// This is the LEGACY location, and still the one a design written before
+// revisions existed points at. New writes go to RevisionPrefix; nothing
+// reads either of these by computing it, because the design document's
+// projectPrefix is the pointer and the only thing that decides which bytes
+// are current.
 func Prefix(brandID, designID string) string {
 	return fmt.Sprintf("design-projects/%s/%s", brandID, designID)
+}
+
+// RevisionPrefix is where revision n of a design's project lives.
+//
+// Under the same design-projects/{brand}/{design} root, so the render task
+// role needs no widening, and numbered rather than hashed so a person
+// reading the bucket can see what happened in what order.
+func RevisionPrefix(brandID, designID string, n int) string {
+	if n <= 0 {
+		return Prefix(brandID, designID)
+	}
+	return fmt.Sprintf("%s/revisions/%d", Prefix(brandID, designID), n)
 }
 
 // Upload writes the project to S3 under the design's prefix.
@@ -318,14 +336,17 @@ func Prefix(brandID, designID string) string {
 // ExactKey, because the relative paths are the project: index.html mounts a
 // scene by `compositions/hook.html` and a generated key would be a missing
 // scene.
-func Upload(ctx context.Context, brandID, designID string, p *Project) (string, error) {
+// `rev` is the revision to write, from trendlymodels.AllocateDesignRevision.
+// Zero writes to the legacy root prefix, which is what the tests and any
+// caller that has no revision to hand still do.
+func Upload(ctx context.Context, brandID, designID string, rev int, p *Project) (string, error) {
 	if brandID == "" || designID == "" {
 		return "", fmt.Errorf("hfproject.Upload: brandID and designID are required")
 	}
 	if p == nil || len(p.Files) == 0 {
 		return "", fmt.Errorf("hfproject.Upload: nothing to upload")
 	}
-	prefix := Prefix(brandID, designID)
+	prefix := RevisionPrefix(brandID, designID, rev)
 
 	for _, f := range p.Files {
 		clean, err := cleanPath(f.Path)

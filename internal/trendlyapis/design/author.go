@@ -38,6 +38,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/trendlyapis/ai"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
 	"github.com/idivarts/backend-sls/pkg/hfproject"
+	"github.com/idivarts/backend-sls/pkg/mediastore"
 	"github.com/idivarts/backend-sls/pkg/mysentry"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
@@ -264,7 +265,18 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID, berr.Error())
 	}
 
-	prefix, uerr := hfproject.Upload(ctx, brandID, designID, project)
+	// ── Every write is a revision ────────────────────────────────────────
+	// The number is reserved before the bytes go up, so two writers racing
+	// cannot land in the same directory. A reservation that then fails is a
+	// skipped number and nothing worse.
+	rev, rerr := trendlymodels.AllocateDesignRevision(ctx, brandID, designID)
+	if rerr != nil {
+		mysentry.Capture(rerr, map[string]string{"op": "design.author.revision", "brandId": brandID, "designId": designID})
+		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
+			"We wrote the design but could not save it. Please try again.")
+	}
+
+	prefix, uerr := hfproject.Upload(ctx, brandID, designID, rev, project)
 	if uerr != nil {
 		mysentry.Capture(uerr, map[string]string{"op": "design.author.upload", "brandId": brandID, "designId": designID})
 		return trendlymodels.MarkBrandDesignAuthorFailed(ctx, brandID, designID,
@@ -287,7 +299,7 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	// The live player. Best-effort on purpose: a design whose player could
 	// not be written still renders, previews as stills and exports, so this
 	// must not fail an authoring run the user has already paid for.
-	previewURL, perr2 := hfproject.UploadPlayer(ctx, brandID, designID, project)
+	previewURL, perr2 := hfproject.UploadPlayer(ctx, brandID, designID, rev, project)
 	if perr2 != nil {
 		log.Printf("design player upload failed for %s/%s: %v", brandID, designID, perr2)
 		mysentry.Capture(perr2, map[string]string{"op": "design.author.player", "brandId": brandID, "designId": designID})
@@ -296,6 +308,26 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	if err := trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes, previewURL); err != nil {
 		return err
 	}
+
+	// The pointer and the list, after the files are up. Best-effort in the
+	// same sense the player is: a design whose revision could not be
+	// recorded still plays and still renders — it has simply lost its way
+	// back, which is worth a line in Sentry and not worth failing a run the
+	// user has already paid for.
+	pruned, cerr := trendlymodels.CommitDesignRevision(ctx, brandID, designID, trendlymodels.DesignRevision{
+		N:          rev,
+		Prefix:     prefix,
+		PreviewURL: previewURL,
+		By:         trendlymodels.DesignRevisionAuthored,
+		Note:       revisionNote(msg.Brief),
+		DurationMs: project.DurationMs,
+		Scenes:     scenes,
+	})
+	if cerr != nil {
+		log.Printf("design revision commit failed for %s/%s: %v", brandID, designID, cerr)
+		mysentry.Capture(cerr, map[string]string{"op": "design.author.commitRevision", "brandId": brandID, "designId": designID})
+	}
+	dropRevisionFiles(ctx, pruned)
 
 	// ── Finish the film without being asked ──────────────────────────────
 	// Authoring produces a document that DECLARES its media; it does not
@@ -335,6 +367,39 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 // Queued before dispatch for the same reason the handler does it: the app
 // should show the job the instant the design appears, rather than a film
 // that looks done and is missing its photograph.
+// revisionNote is the one line the revisions list shows for an authoring
+// run: the brief, shortened, because what a person recognises a version by
+// is what they asked for.
+func revisionNote(brief string) string {
+	brief = strings.Join(strings.Fields(brief), " ")
+	const max = 90
+	if len(brief) > max {
+		return brief[:max-1] + "…"
+	}
+	return brief
+}
+
+// dropRevisionFiles deletes the files of revisions the retention cap pushed
+// out of the list.
+//
+// Best-effort and never fatal: bytes left behind cost a few hundred
+// kilobytes, while a failed delete that fails the write would cost the user
+// the design they just made. Each failure is logged so a prefix that never
+// goes away is visible rather than merely absent.
+func dropRevisionFiles(ctx context.Context, prefixes []string) {
+	for _, p := range prefixes {
+		if p == "" {
+			continue
+		}
+		if n, err := mediastore.DeletePrefix(ctx, mediastore.TargetAttachment, p); err != nil {
+			log.Printf("design revision cleanup failed for %s: %v", p, err)
+			mysentry.Capture(err, map[string]string{"op": "design.revision.cleanup", "prefix": p})
+		} else {
+			log.Printf("design revision cleanup: removed %d file(s) under %s", n, p)
+		}
+	}
+}
+
 func markAndPrepare(ctx context.Context, brandID, designID string) error {
 	if err := trendlymodels.MarkBrandDesignPreviewQueued(ctx, brandID, designID); err != nil {
 		return err

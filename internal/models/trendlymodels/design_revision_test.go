@@ -1,0 +1,113 @@
+package trendlymodels
+
+import (
+	"fmt"
+	"testing"
+)
+
+// revs builds a list of n revisions numbered 1..n, each at its own prefix.
+func revs(n int) []DesignRevision {
+	out := make([]DesignRevision, 0, n)
+	for i := 1; i <= n; i++ {
+		out = append(out, DesignRevision{N: i, Prefix: fmt.Sprintf("design-projects/b/d/revisions/%d", i)})
+	}
+	return out
+}
+
+func TestPruneKeepsEverythingUnderTheCap(t *testing.T) {
+	list, pruned := pruneDesignRevisions(revs(MaxDesignRevisions), "design-projects/b/d/revisions/10")
+	if len(list) != MaxDesignRevisions {
+		t.Fatalf("kept %d, want %d", len(list), MaxDesignRevisions)
+	}
+	if len(pruned) != 0 {
+		t.Fatalf("pruned %v, want nothing", pruned)
+	}
+}
+
+func TestPruneTakesTheOldestFirst(t *testing.T) {
+	list, pruned := pruneDesignRevisions(revs(MaxDesignRevisions+3), "design-projects/b/d/revisions/13")
+	if len(list) != MaxDesignRevisions {
+		t.Fatalf("kept %d, want %d", len(list), MaxDesignRevisions)
+	}
+	if list[0].N != 4 {
+		t.Fatalf("oldest kept is %d, want 4", list[0].N)
+	}
+	want := []string{
+		"design-projects/b/d/revisions/1",
+		"design-projects/b/d/revisions/2",
+		"design-projects/b/d/revisions/3",
+	}
+	if len(pruned) != len(want) {
+		t.Fatalf("pruned %v, want %v", pruned, want)
+	}
+	for i := range want {
+		if pruned[i] != want[i] {
+			t.Fatalf("pruned[%d] = %q, want %q", i, pruned[i], want[i])
+		}
+	}
+}
+
+// The case that costs a user their design if it is wrong: they restored
+// revision 1, so the design is PLAYING revision 1's files while revision 1
+// is the oldest entry and first in line to be pruned.
+func TestPruneNeverDeletesWhatTheDesignIsPlaying(t *testing.T) {
+	list := revs(MaxDesignRevisions + 1)
+	current := "design-projects/b/d/revisions/1"
+	kept, pruned := pruneDesignRevisions(list, current)
+	if len(kept) != MaxDesignRevisions {
+		t.Fatalf("kept %d, want %d", len(kept), MaxDesignRevisions)
+	}
+	for _, p := range pruned {
+		if p == current {
+			t.Fatalf("pruned the prefix the design points at: %q", p)
+		}
+	}
+}
+
+// A restore adds a SECOND entry on the same prefix. Dropping the older of
+// the two must not delete the bytes they share.
+func TestPruneKeepsFilesStillReferencedByAnotherEntry(t *testing.T) {
+	list := revs(MaxDesignRevisions)
+	shared := list[0].Prefix // revision 1's files…
+	list = append(list, DesignRevision{N: 11, Prefix: shared, By: DesignRevisionRestored})
+
+	kept, pruned := pruneDesignRevisions(list, shared)
+	if len(kept) != MaxDesignRevisions {
+		t.Fatalf("kept %d, want %d", len(kept), MaxDesignRevisions)
+	}
+	for _, p := range pruned {
+		if p == shared {
+			t.Fatalf("pruned %q, which revision 11 still points at", p)
+		}
+	}
+	// And the restore entry survived.
+	if kept[len(kept)-1].N != 11 {
+		t.Fatalf("newest kept is %d, want 11", kept[len(kept)-1].N)
+	}
+}
+
+func TestSortPutsRevisionsInOrder(t *testing.T) {
+	list := []DesignRevision{{N: 3}, {N: 1}, {N: 12}, {N: 2}}
+	sortDesignRevisions(list)
+	for i, want := range []int{1, 2, 3, 12} {
+		if list[i].N != want {
+			t.Fatalf("list[%d] = %d, want %d", i, list[i].N, want)
+		}
+	}
+}
+
+func TestToIntReadsEveryShapeFirestoreReturns(t *testing.T) {
+	// int64 off the wire, int from a local write, float64 from JSON.
+	for _, v := range []any{int64(7), 7, float64(7)} {
+		got, ok := toInt(v)
+		if !ok || got != 7 {
+			t.Fatalf("toInt(%T %v) = %d, %v", v, v, got, ok)
+		}
+	}
+	if _, ok := toInt("7"); ok {
+		t.Fatal("toInt accepted a string")
+	}
+	if _, ok := toInt(nil); ok {
+		t.Fatal("toInt accepted nil")
+	}
+}

@@ -143,6 +143,25 @@ provider:
             - arn:aws:s3:::${self:service}-image-uploads/*
             - arn:aws:s3:::${self:service}-attachment-uploads
             - arn:aws:s3:::${self:service}-attachment-uploads/*
+        # Deleting a SUPERSEDED DESIGN REVISION, and nothing else.
+        #
+        # Every write to a design's project is now a revision rather than an
+        # overwrite, which is what makes an AI edit undoable. A retention cap
+        # keeps the newest few and removes the rest, or a design edited fifty
+        # times keeps fifty copies of a 400 KB project for ever.
+        #
+        # Scoped to the revisions path on purpose, and kept as its own
+        # statement rather than adding Delete to the list above: the broad
+        # statement covers four buckets including the whole media library,
+        # and a delete permission that wide is one bad prefix away from
+        # removing a brand's uploads. pkg/mediastore/delete.go enforces the
+        # same shape a second time in code, because an IAM policy is not a
+        # thing a reviewer reads on the way past.
+        - Effect: "Allow"
+          Action:
+            - "s3:DeleteObject"
+          Resource:
+            - arn:aws:s3:::${self:service}-attachment-uploads/design-projects/*/*/revisions/*
         - Effect: "Allow"
           Action:
             - "iam:PassRole"

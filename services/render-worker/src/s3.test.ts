@@ -29,3 +29,34 @@ describe("player artefacts", () => {
         assert.equal(PLAYER_ARTEFACTS.has("compositions/player.html"), false);
     });
 });
+
+describe("what downloadPrefix leaves behind", () => {
+    // These are the two filters downloadPrefix applies, stated as data so
+    // the rule is readable without running S3.
+    const skipped = (relative: string) =>
+        PLAYER_ARTEFACTS.has(relative) || relative === "revisions" || relative.startsWith("revisions/");
+
+    it("skips the player pages, which are ours and not part of the film", () => {
+        assert.equal(skipped("player.html"), true);
+        assert.equal(skipped("preview.html"), true);
+    });
+
+    it("skips a design's past selves", () => {
+        // A job pointed at the design ROOT lists every revision under it.
+        assert.equal(skipped("revisions/7/index.html"), true);
+        assert.equal(skipped("revisions/7/assets/voice/a.wav"), true);
+        assert.equal(skipped("revisions"), true);
+    });
+
+    it("keeps the project itself, including names that merely start the same way", () => {
+        for (const keep of [
+            "index.html",
+            "compositions/hook.html",
+            "assets/fonts/inter-700.woff2",
+            "revisions.html",
+            "assets/revisions/note.txt",
+        ]) {
+            assert.equal(skipped(keep), false, `should have kept ${keep}`);
+        }
+    });
+});
