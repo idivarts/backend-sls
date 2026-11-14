@@ -91,6 +91,19 @@ export async function downloadPrefix(prefix: string, destDir: string): Promise<n
             if (!relative) continue;
             if (PLAYER_ARTEFACTS.has(relative)) continue;
 
+            // ── A design's past selves are not part of it ────────────────
+            // Revisions live UNDER the design root
+            // (design-projects/{brand}/{design}/revisions/{n}/…), so a job
+            // pointed at that root — a design written before revisions
+            // existed, or one whose revision commit failed after its files
+            // were already up — would otherwise materialise every past copy
+            // of itself beside the current one. `check` then sees
+            // compositions nobody asked for, and the render either fails
+            // the gate or renders the wrong film. A job pointed AT a
+            // revision never sees this, because the prefix is already
+            // inside it.
+            if (relative === "revisions" || relative.startsWith("revisions/")) continue;
+
             // A key is attacker-influenced only as far as whoever wrote the
             // project, but `..` in one would write outside the job directory,
             // so it is refused rather than normalised.

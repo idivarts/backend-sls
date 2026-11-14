@@ -139,6 +139,22 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 	// projectPrefix without durationMs would be a renderable design the
 	// wallet cannot price, and durationMs without the prefix would price a
 	// design with nothing to render.
+	// The scenes travel with the revision. Without them a restore puts the
+	// pointer back and leaves the timeline describing a different film —
+	// three clips drawn over a two-scene project, and a scene panel listing
+	// something that is not there.
+	scenes := make([]trendlymodels.DesignScene, 0, len(project.Scenes))
+	for _, sc := range project.Scenes {
+		scenes = append(scenes, trendlymodels.DesignScene{
+			ID:         sc.ID,
+			Src:        sc.Src,
+			StartMs:    sc.StartMs,
+			DurationMs: sc.DurationMs,
+			TrackIndex: sc.TrackIndex,
+			TrackKind:  sc.TrackKind,
+		})
+	}
+
 	pruned, err := trendlymodels.CommitDesignRevision(ctx, brandID, a.DesignID, trendlymodels.DesignRevision{
 		N:          rev,
 		Prefix:     prefix,
@@ -146,6 +162,7 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 		By:         trendlymodels.DesignRevisionAIEdit,
 		Note:       "Edited by the AI panel",
 		DurationMs: project.DurationMs,
+		Scenes:     scenes,
 	})
 	if err != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "could not save the design"}), err
