@@ -227,3 +227,27 @@ func TestNoEditsMeansNoChange(t *testing.T) {
 		t.Fatal("an empty edit list changed the document")
 	}
 }
+
+// The constraint that cost a debugging session: the predicate runs at the
+// START TAG, so End is not known yet. A predicate that asks "does this
+// contain that?" matches nothing, which reads exactly like "there is no
+// such element".
+func TestThePredicateSeesTheStartTagOnly(t *testing.T) {
+	src := `<section id="s1" data-scene="hook"><h1 id="title">A</h1></section>`
+	var endAtPredicateTime int
+	FindAll(src, func(e Element) bool {
+		if e.Attrs["id"] == "s1" {
+			endAtPredicateTime = e.End
+		}
+		return false
+	})
+	// At predicate time, End is still the end of the START TAG…
+	if endAtPredicateTime != strings.Index(src, "<h1") {
+		t.Fatalf("End was %d at predicate time", endAtPredicateTime)
+	}
+	// …and by the time the element is returned, it covers the whole thing.
+	el, ok := FindByID(src, "s1")
+	if !ok || el.End != len(src) {
+		t.Fatalf("End is %d after the walk, want %d", el.End, len(src))
+	}
+}

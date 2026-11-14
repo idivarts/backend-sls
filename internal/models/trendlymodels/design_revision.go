@@ -196,6 +196,17 @@ func CommitDesignRevision(
 		} else {
 			updates = append(updates, firestore.Update{Path: "previewUrl", Value: firestore.Delete})
 		}
+		// ── A new revision makes the rendered film stale ─────────────────
+		// The MP4 was made from the revision that was current a moment
+		// ago. Left marked done, the app offers it for download and
+		// refuses to render again ("already done and unchanged"), so a
+		// user who changes a headline and presses Render gets the film
+		// from before their edit and nothing says why. Restore already
+		// cleared this; every other write has exactly the same problem.
+		updates = append(updates,
+			firestore.Update{Path: "renderStatus", Value: firestore.Delete},
+			firestore.Update{Path: "renderUrl", Value: firestore.Delete},
+		)
 		return tx.Update(ref, updates)
 	})
 	if err != nil {

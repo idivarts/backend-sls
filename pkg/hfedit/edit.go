@@ -84,6 +84,21 @@ func FindByID(source, id string) (Element, bool) {
 	return Element{}, false
 }
 
+// FindAll returns every element the predicate accepts, in document order.
+//
+// Exported for callers that need more than "the element with this id" —
+// the AI edit path checks what a model's answer actually contains before
+// it splices it into a film.
+//
+// ⚠️ The predicate sees the element as its START TAG, so TagName and Attrs
+// are final but End is NOT: for a normal element it is filled in when the
+// matching end tag is reached, which is after the predicate has run.
+// Anything that depends on where an element ENDS — "does this contain
+// that?" — belongs in a filter over the result, not in the predicate.
+func FindAll(source string, accept func(Element) bool) []Element {
+	return findAll(source, accept)
+}
+
 // findAll walks the document and returns every element the predicate
 // accepts, in document order.
 //
