@@ -244,6 +244,60 @@ export function stripPlayerRuntime(html: string): string {
     return html.replace(playerRuntimeTag, "");
 }
 
+/**
+ * Put the player's script tags BACK, so the document that returns to the
+ * bucket is the one the app can play.
+ *
+ * The exact inverse of `stripPlayerRuntime` + `vendorGsap`, and it exists
+ * because those two are not symmetric with what gets stored. The worker
+ * downloads the stored film, mutates it for the CLI (runtime out, GSAP
+ * local) and uploads it again. An earlier ordering uploaded the mutated
+ * copy, and every design authored in that window is still sitting in the
+ * bucket with no runtime tag and a `assets/vendor/gsap-*.js` src that was
+ * never uploaded — a 403, no animation library, and a black rectangle.
+ * Those designs cannot heal on their own: their media is already resolved,
+ * so the resolver has nothing to do and the upload never fires.
+ *
+ * Running this on every preparation makes re-preparing a design repair it.
+ *
+ * The CDN base is read out of the project's own player.html rather than
+ * configured here. That file is written by the same Go code that wrote the
+ * script tags (pkg/hfproject/player.go), so it names the exact asset
+ * version this project was built against — and pinning the version is the
+ * whole reason those assets are addressed by version. Guessing a host here
+ * would eventually serve a project a runtime it was not written for.
+ *
+ * Unparseable or missing player.html → the html is returned untouched. A
+ * document we cannot heal confidently is better left as it is: the render
+ * does not need these tags at all.
+ */
+export function restorePlayerShape(html: string, playerHTML: string | undefined): string {
+    if (!playerHTML) return html;
+    const base = playerHTML.match(/(https?:\/\/[^"']*\/design-player\/[^"']*\/)player\.js/i)?.[1];
+    if (!base) return html;
+
+    let out = html;
+
+    // A local GSAP src is this worker's own doing — put it back on the CDN.
+    // The basename carries the version, so it is reused rather than restated.
+    out = out.replace(
+        /<script([^>]*)\ssrc=["'](?:\.\.\/)*assets\/vendor\/(gsap-[^"'/]+)["']([^>]*)>/gi,
+        (_m, pre, file, post) => `<script${pre} src="${base}${file}"${post}>`
+    );
+
+    // Already carries a runtime tag — whatever wrote it knew the version.
+    if (/<script[^>]+src=["'][^"']*\/design-player\/[^"']*runtime\.js["']/i.test(out)) return out;
+
+    const tag = `<script src="${base}runtime.js"></script>`;
+    // Same placement as the Go writer: immediately inside <head>, before the
+    // composition script that calls into the runtime.
+    // Function replacements throughout: a literal one would read `$&` and
+    // friends out of the URL.
+    if (/<head[^>]*>/i.test(out)) return out.replace(/<head[^>]*>/i, (m) => `${m}\n    ${tag}`);
+    if (/<body[^>]*>/i.test(out)) return out.replace(/<body[^>]*>/i, (m) => `${m}\n    ${tag}`);
+    return `${tag}\n${out}`;
+}
+
 export async function vendorGsap(projectDir: string): Promise<void> {
     const dest = join(projectDir, GSAP_PROJECT_PATH);
     await mkdir(dirname(dest), { recursive: true });

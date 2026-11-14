@@ -4,7 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { hyperframesEnv, listProjectFiles, parseSnapshotJson, patchGsapTag, vendorGsap } from "./hyperframes";
+import {
+    hyperframesEnv,
+    listProjectFiles,
+    parseSnapshotJson,
+    patchGsapTag,
+    restorePlayerShape,
+    stripPlayerRuntime,
+    vendorGsap,
+} from "./hyperframes";
 
 async function project(indexHtml: string): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), "hf-test-"));
@@ -323,4 +331,63 @@ test("a frame with no time is placed at zero rather than NaN", () => {
     const frames = parseSnapshotJson('{"frames":[{"path":"b.png","time":"x"},{"path":"a.png","time":1}]}');
     assert.deepEqual(frames.map((f) => f.timeMs), [0, 1000]);
     assert.ok(frames.every((f) => Number.isFinite(f.timeMs)));
+});
+
+// ── restorePlayerShape ──────────────────────────────────────────────────
+// The document these tests start from is the exact shape the bad ordering
+// left in the bucket: no runtime tag, and a GSAP src pointing at a vendored
+// file that was never uploaded.
+
+const playerDoc = `<hyperframes-player src="index.html"></hyperframes-player>
+<script src="https://cdn.example.net/design-player/0.9.39/player.js"></script>`;
+
+const brokenDoc = `<!doctype html><html><head>
+    <script src="assets/vendor/gsap-3.15.0.min.js"></script>
+  </head><body><div id="a"></div></body></html>`;
+
+test("restorePlayerShape puts the runtime back and returns GSAP to the CDN", () => {
+    const out = restorePlayerShape(brokenDoc, playerDoc);
+    assert.match(out, /<script src="https:\/\/cdn\.example\.net\/design-player\/0\.9\.39\/runtime\.js"><\/script>/);
+    assert.match(out, /src="https:\/\/cdn\.example\.net\/design-player\/0\.9\.39\/gsap-3\.15\.0\.min\.js"/);
+    assert.equal(out.includes("assets/vendor/gsap"), false);
+});
+
+test("restorePlayerShape loads the runtime before GSAP, as the Go writer does", () => {
+    const out = restorePlayerShape(brokenDoc, playerDoc);
+    assert.ok(out.indexOf("runtime.js") < out.indexOf("gsap-3.15.0"));
+});
+
+test("restorePlayerShape takes the asset version from the project's own player.html", () => {
+    const out = restorePlayerShape(brokenDoc, playerDoc.replace("0.9.39", "0.8.1"));
+    assert.ok(out.includes("/design-player/0.8.1/runtime.js"));
+});
+
+test("restorePlayerShape leaves an already player-shaped document alone", () => {
+    const good = `<!doctype html><html><head>
+    <script src="https://cdn.example.net/design-player/0.9.39/runtime.js"></script>
+    <script src="https://cdn.example.net/design-player/0.9.39/gsap-3.15.0.min.js"></script>
+  </head><body></body></html>`;
+    assert.equal(restorePlayerShape(good, playerDoc), good);
+});
+
+test("restorePlayerShape does nothing when player.html is missing or silent", () => {
+    assert.equal(restorePlayerShape(brokenDoc, undefined), brokenDoc);
+    assert.equal(restorePlayerShape(brokenDoc, "<html>no script here</html>"), brokenDoc);
+});
+
+test("restorePlayerShape round-trips with the render-only mutations", () => {
+    // What the bucket gets, run back through what the CLI gets.
+    const healed = restorePlayerShape(brokenDoc, playerDoc);
+    const forRender = patchGsapTag(stripPlayerRuntime(healed), "index.html");
+    assert.equal(forRender.includes("runtime.js"), false);
+    assert.ok(forRender.includes('src="assets/vendor/gsap-3.15.0.min.js"'));
+});
+
+test("restorePlayerShape reaches a nested document's ../ GSAP src", () => {
+    const nested = `<head><script src="../../assets/vendor/gsap-3.15.0.min.js"></script></head>`;
+    assert.ok(
+        restorePlayerShape(nested, playerDoc).includes(
+            'src="https://cdn.example.net/design-player/0.9.39/gsap-3.15.0.min.js"'
+        )
+    );
 });
