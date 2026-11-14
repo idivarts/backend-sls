@@ -362,3 +362,28 @@ describe("a declaration that has already been served", () => {
         assert.equal(readDeclarations(stale).length, 1);
     });
 });
+
+describe("a caption track follows its voiceover", () => {
+    // What marks a track done is the AUDIO it was built from, not the
+    // absence of an attribute. The first version removed data-captions
+    // once the words were in — so a rewritten line came back spoken
+    // correctly with the old caption still on screen, the film saying one
+    // thing and showing another.
+    const built = `<div id="cap" class="caption-track" data-captions="vo"
+        data-captions-for="assets/voice/a.wav" data-start="0" data-duration="3"><span
+        class="clip" data-start="0.2" data-duration="0.3">Old</span></div>`;
+
+    it("still says which voiceover it follows after it has been built", () => {
+        const el = findElements(built, (e) => e.attrs["id"] === "cap")[0];
+        assert.equal(el.attrs["data-captions"], "vo");
+    });
+
+    it("is up to date only while the audio it was built from is the current one", () => {
+        const el = findElements(built, (e) => e.attrs["id"] === "cap")[0];
+        const upToDate = (voicePath: string) => (el.attrs["data-captions-for"] || "").trim() === voicePath;
+        assert.equal(upToDate("assets/voice/a.wav"), true);
+        // A rewritten line gets a new file, named from a hash of its
+        // words — so this disagrees and the track is transcribed again.
+        assert.equal(upToDate("assets/voice/b.wav"), false);
+    });
+});

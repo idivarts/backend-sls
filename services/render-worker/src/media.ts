@@ -45,7 +45,6 @@ import { hyperframesEnv, runHyperframes } from "./hyperframes";
 import {
     applyEdits,
     findElements,
-    removeAttribute,
     setAttribute,
     type Edit,
     type FoundElement,
@@ -214,6 +213,10 @@ export async function resolveProjectMedia(
     // Declarations that could not be resolved, keyed the same way, so their
     // elements can be taken out rather than left pointing at nothing.
     const failed = new Set<string>();
+    // The ids of voiceovers that failed, so a caption track following one
+    // can say why it has nothing — without saying it about every track
+    // whose audio simply has not changed.
+    const failedVoiceIDs = new Set<string>();
 
     for (const d of declarations) {
         const key = `${d.type}\u0000${d.intent}\u0000${d.entity ?? ""}`;
@@ -231,6 +234,7 @@ export async function resolveProjectMedia(
                 console.log(`[media] voice REFUSED: ${why}`);
                 result.problems.push(`voice "${trim(d.intent)}": ${why}`);
                 failed.add(key);
+                if (d.elementId) failedVoiceIDs.add(d.elementId);
                 continue;
             }
             try {
@@ -258,6 +262,7 @@ export async function resolveProjectMedia(
                 console.log(`[media] voice FAILED after ${Date.now() - startedAt}ms: ${msg}`);
                 result.problems.push(`voice "${trim(d.intent)}": ${msg}`);
                 failed.add(key);
+                if (d.elementId) failedVoiceIDs.add(d.elementId);
                 continue;
             }
         }
@@ -373,14 +378,27 @@ export async function resolveProjectMedia(
         const forId = (el.attrs["data-captions"] || "").trim();
         const voicePath = voiceFor.get(forId);
         if (!voicePath) {
-            // The attribute goes even though the captions cannot be made:
-            // left in place it is a promise to a later run that the audio
-            // exists, and the container is already empty.
-            const drop = removeAttribute(el, "data-captions", original);
-            if (drop) edits.push(drop);
-            result.problems.push(`captions for "${forId}": that voiceover did not resolve`);
+            // Nothing to do: either that voiceover did not resolve this
+            // run, or it was already resolved and has not changed. The
+            // attribute STAYS either way — it is the only record of which
+            // audio this track follows, and a track that has forgotten
+            // cannot be rebuilt when the line is rewritten.
+            if (failedVoiceIDs.has(forId)) {
+                result.problems.push(`captions for "${forId}": that voiceover did not resolve`);
+            }
             continue;
         }
+        // ── Already built for THIS audio ─────────────────────────────────
+        // A caption track is rebuilt when the words change and not
+        // otherwise. What marks it done is the audio it was built from:
+        // rewriting a voiceover gives it a new file, so this disagrees
+        // and the words are transcribed again.
+        //
+        // Found on dev: the first version of this removed data-captions
+        // once the words were in, so a rewritten line came back spoken
+        // correctly with the OLD caption still on screen — the film
+        // saying one thing and showing another.
+        if ((el.attrs["data-captions-for"] || "").trim() === voicePath) continue;
         const started = Date.now();
         const run = await runHyperframes(
             projectDir,
@@ -443,8 +461,7 @@ export async function resolveProjectMedia(
         // The container's own children are replaced: whatever placeholder
         // the model put there was a stand-in for exactly this.
         edits.push({ start: el.tagEnd, end: el.end - closingTagLength(el), text: captionSpans(words, offset) });
-        const e = removeAttribute(el, "data-captions", original);
-        if (e) edits.push(e);
+        edits.push(setAttribute(el, "data-captions-for", voicePath));
         console.log(`[media] captions for ${forId}: ${words.length} words in ${Date.now() - started}ms`);
     }
 
