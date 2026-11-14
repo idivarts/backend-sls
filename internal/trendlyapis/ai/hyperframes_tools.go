@@ -211,8 +211,19 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 	// that played in silence — with the model reporting, truthfully as far
 	// as it could tell, that it had added the track.
 	declared := unresolvedMedia(project)
+
+	// ── A film that was failing has to be told it is not any more ───────
+	// The gate's verdict lives on the document: previewStatus "failed" and
+	// the sentence the user reads. Nothing clears it but another run. So a
+	// write that fixes the fault left the banner saying "Something went
+	// wrong — 404 loading assets/fonts/inter-400.woff2" over a film with
+	// no such reference in it, and the user had no way to tell a repair
+	// from a no-op. Seen exactly that way on dev: the model found both
+	// dangling fonts, removed them, said "the film should render now",
+	// and the error stayed on screen.
+	wasFailing := d.PreviewStatus == trendlymodels.DesignPreviewFailed
 	queued := false
-	if declared > 0 && studiojobs.Configured() {
+	if (declared > 0 || wasFailing) && studiojobs.Configured() {
 		if eerr := studiojobs.Enqueue(studiojobs.Message{
 			Type:     studiojobs.JobDesignPrepare,
 			BrandID:  brandID,
@@ -243,6 +254,10 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 		note += fmt.Sprintf(" %d piece(s) of media are DECLARED but not fetched yet;"+
 			" that is running now. Say the film is being finished and that the"+
 			" media will arrive shortly — do NOT say it is already playing.", declared)
+	case wasFailing && queued:
+		note += " This film was in a failed state; it is being finished again now," +
+			" which is what clears the error the user can see. Say it is being" +
+			" re-checked rather than that it is fixed."
 	case declared > 0:
 		note += fmt.Sprintf(" ⚠️ %d piece(s) of media are declared with no file and"+
 			" nothing is fetching them. Tell the user the media could not be"+
