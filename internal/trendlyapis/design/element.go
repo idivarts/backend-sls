@@ -52,6 +52,11 @@ type editElementRequest struct {
 	// clears a background without having to send the whole declaration.
 	Style map[string]string `json:"style"`
 
+	// Voice replaces what a voiceover SAYS. Only meaningful on an element
+	// declared data-media="voice"; see applyElementEdit for why it clears
+	// what the old words resolved to.
+	Voice *string `json:"voice"`
+
 	// StartMs and DurationMs set the element's place on the timeline. In
 	// milliseconds because that is what the app's timeline works in; the
 	// document wants seconds, and the conversion lives here rather than in
@@ -79,7 +84,7 @@ func EditDesignElement(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Text == nil && len(req.Style) == 0 && req.StartMs == nil && req.DurationMs == nil {
+	if req.Text == nil && req.Voice == nil && len(req.Style) == 0 && req.StartMs == nil && req.DurationMs == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "nothing to change"})
 		return
 	}
@@ -211,7 +216,7 @@ func applyElementEdit(source string, req editElementRequest) (string, error) {
 		// click through closest("[id]"), so clicking the background
 		// selects exactly that div. One keystroke in the text box would
 		// have flattened the film.
-		if el.HoldsElements(source) {
+		if el.HoldsAddressable(source) {
 			return "", fmt.Errorf("that is a group of other elements, so there are no words of its own to change")
 		}
 		e, err := hfedit.SetText(el, *req.Text)
@@ -219,6 +224,46 @@ func applyElementEdit(source string, req editElementRequest) (string, error) {
 			return "", err
 		}
 		edits = append(edits, e)
+	}
+	if req.Voice != nil {
+		// ── Rewriting what the film says ─────────────────────────────────
+		// A voiceover's words are its data-media-intent. Changing them is
+		// not enough on its own: the element still has the WAV of the old
+		// line beside it, and the resolver skips anything whose
+		// data-media-resolved agrees with its src. So both go, which is
+		// precisely how this asks for the new line to be spoken — the
+		// next preview or render resolves it again, and the captions are
+		// rebuilt from the audio that comes back.
+		//
+		// A film therefore says the new words from the next render, not
+		// from this request: speaking takes a round trip to HeyGen, and
+		// an endpoint that is otherwise instant should not wait on one.
+		words := strings.TrimSpace(*req.Voice)
+		if words == "" {
+			return "", fmt.Errorf("a voiceover has to say something")
+		}
+		if !strings.EqualFold(strings.TrimSpace(el.Attrs["data-media"]), "voice") {
+			return "", fmt.Errorf("that is not a voiceover")
+		}
+		e, err := hfedit.SetAttribute(el, source, "data-media-intent", words)
+		if err != nil {
+			return "", err
+		}
+		edits = append(edits, e)
+		for _, stale := range []string{"src", "data-media-resolved"} {
+			if _, has := el.Attrs[stale]; !has {
+				continue
+			}
+			// Emptied rather than removed: removing an attribute and
+			// setting another on the same tag means two edits over
+			// overlapping bytes, which Apply refuses — and an empty src
+			// is as unresolved as a missing one.
+			d, derr := hfedit.SetAttribute(el, source, stale, "")
+			if derr != nil {
+				return "", derr
+			}
+			edits = append(edits, d)
+		}
 	}
 	if len(req.Style) > 0 {
 		merged, err := mergeStyle(el.Attrs["style"], req.Style)
@@ -387,6 +432,9 @@ func editNote(req editElementRequest) string {
 	var parts []string
 	if req.Text != nil {
 		parts = append(parts, "text")
+	}
+	if req.Voice != nil {
+		parts = append(parts, "voiceover")
 	}
 	if len(req.Style) > 0 {
 		names := make([]string, 0, len(req.Style))

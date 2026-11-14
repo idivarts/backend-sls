@@ -331,3 +331,34 @@ describe("durationSeconds", () => {
         assert.equal(durationSeconds({ attrs: { "data-duration": "a while" } }), undefined);
     });
 });
+
+describe("a declaration that has already been served", () => {
+    const resolved = `<audio id="vo" data-media="voice" data-media-intent="Hit the 2 PM wall?"
+        data-media-resolved="assets/voice/a.wav" src="assets/voice/a.wav"></audio>`;
+
+    it("is not resolved a second time", () => {
+        // What stops the second run is data-media-resolved agreeing with
+        // the src — not the declaration being stripped, which is how this
+        // used to work and which threw away the words the voiceover says.
+        assert.deepEqual(readDeclarations(resolved), []);
+    });
+
+    it("still carries the words, so a script can show them", () => {
+        const el = findElements(resolved, (e) => e.attrs["id"] === "vo")[0];
+        assert.equal(el.attrs["data-media-intent"], "Hit the 2 PM wall?");
+    });
+
+    it("is resolved again once the script editor clears what it resolved to", () => {
+        // Which is exactly how a rewritten line asks to be spoken again.
+        const rewritten = `<audio id="vo" data-media="voice" data-media-intent="Tired of sugar?"></audio>`;
+        const found = readDeclarations(rewritten);
+        assert.equal(found.length, 1);
+        assert.equal(found[0].intent, "Tired of sugar?");
+    });
+
+    it("is resolved again when the src was changed out from under it", () => {
+        const stale = `<audio id="vo" data-media="voice" data-media-intent="x"
+            data-media-resolved="assets/voice/a.wav" src="assets/voice/b.wav"></audio>`;
+        assert.equal(readDeclarations(stale).length, 1);
+    });
+});
