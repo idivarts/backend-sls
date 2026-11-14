@@ -136,7 +136,25 @@ type Design struct {
 
 	// ProjectPrefix is the S3 key prefix holding the Hyperframes project
 	// directory. Empty until the director has written one.
+	//
+	// It is also the REVISION POINTER: it names one of the entries in
+	// Revisions, and moving it is what a restore does. See
+	// design_revision.go.
 	ProjectPrefix string `json:"projectPrefix,omitempty" firestore:"projectPrefix,omitempty"`
+
+	// Revisions is the way back — every state this design's project has
+	// been in, newest last, capped at MaxDesignRevisions.
+	//
+	// On the document rather than in a subcollection because the app
+	// already subscribes to the document to draw the studio, so the list
+	// arrives with everything else and needs no second read.
+	Revisions []DesignRevision `json:"revisions,omitempty" firestore:"revisions,omitempty"`
+
+	// RevisionCounter is how many revisions have ever been allocated. Not
+	// len(Revisions), which is pruned — see AllocateDesignRevision for why
+	// reusing a number would be worse than leaving a gap. Internal: the app
+	// has no use for it.
+	RevisionCounter int `json:"-" firestore:"revisionCounter,omitempty"`
 
 	// Variables are the project's declared variables and their current values,
 	// keyed by the id in data-composition-variables. This is the only part of
