@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/idivarts/backend-sls/pkg/hfproject"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
 )
 
@@ -153,5 +154,37 @@ func TestProjectKeyIsAbsolute(t *testing.T) {
 	// The bug, named: the key must never be the bare relative path.
 	if projectKey(prefix, "index.html") == "index.html" {
 		t.Fatal("the key is the relative path — Get would look at the bucket root")
+	}
+}
+
+// Media a project ASKS for is not media it HAS.
+//
+// ── Why this matters ─────────────────────────────────────────────────────
+// A project declares media as an element with data-media-intent and no src,
+// and a later pass fetches the file and fills the src in. Authoring runs
+// that pass; the chat's write did not. A user asked for music, the model
+// correctly declared `<audio data-media="bgm" data-media-intent="warm,
+// minimal, no vocals">`, said it had added the track — and the film played
+// in silence, because no file was ever fetched. Counting the declarations
+// is what lets the write queue the fetch and stop the model claiming the
+// music is already there.
+func TestUnresolvedMediaCountsDeclarationsOnly(t *testing.T) {
+	p := &hfproject.Project{Clips: []hfproject.Clip{
+		// Declared, no file: these are the ones that need fetching.
+		{Kind: hfproject.ClipMusic, ElementID: "score"},
+		{Kind: hfproject.ClipVoice, ElementID: "vo-1"},
+		{Kind: hfproject.ClipImage, ElementID: "hero", Src: "   "},
+		// Resolved: a file is already behind them.
+		{Kind: hfproject.ClipVideo, ElementID: "b-roll", Src: ".media/video/1.mp4"},
+		{Kind: hfproject.ClipSound, ElementID: "whoosh", Src: ".media/audio/sfx/1.wav"},
+		// Not media at all — a scene has no file and never will.
+		{Kind: hfproject.ClipScene, ElementID: "scene-1"},
+		{Kind: hfproject.ClipCaptions, ElementID: "cc"},
+	}}
+	if got := unresolvedMedia(p); got != 3 {
+		t.Fatalf("unresolvedMedia = %d, want 3 (the music, the voiceover and the image)", got)
+	}
+	if got := unresolvedMedia(&hfproject.Project{}); got != 0 {
+		t.Fatalf("a project with no clips has nothing pending, got %d", got)
 	}
 }
