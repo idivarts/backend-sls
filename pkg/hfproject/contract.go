@@ -130,6 +130,22 @@ Style .caption-track and its spans yourself, from the brand tokens. Give the
 container a sensible place on the frame; the words inherit whatever you set.
 Ask for captions only when the film has a voiceover.
 
+COUNT THE WORDS. A voiceover is spoken at about TWO WORDS PER SECOND, and
+the renderer plays an audio element for its data-duration and not a moment
+longer. A line that does not fit is cut off mid-sentence in the finished
+film — "Ditch the sweet milk. Experience pure cold brew focus." is nine
+words, takes 4.7 seconds, and in a 3-second scene the viewer hears "Ditch
+the sweet milk, experience pure" and then the next scene talking over it.
+
+So: at most 2 words per second of the audio's data-duration. Six words in a
+3-second scene, eight in four, twelve in six. Count them before you write
+the line. If the words matter more than the pacing, give the scene more
+time; if the timing matters more, cut the line.
+
+Give the caption container the SAME window as the audio it follows — the
+same data-start and at least the same data-duration. The container is itself
+a timed element, so words timed past its window are never drawn.
+
 EVERY media element needs its own id. The renderer discovers media by id and
 refuses a film without one: "<audio> has data-start but no id attribute ...
 this audio will be SILENT in renders".
