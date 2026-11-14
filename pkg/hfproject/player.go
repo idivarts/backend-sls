@@ -120,11 +120,40 @@ var gsapLoadedRe = regexp.MustCompile(`(?i)<script[^>]+src=["'][^"']*gsap[^"']*[
 // GSAP on one page is a second global clobbering the first, and the one we
 // would add loads last.
 func withScripts(indexHTML, runtimeURL, gsapURL string) string {
+	// ── Injecting twice is the failure mode, not forgetting to ───────────
+	// index.html is now the ONE document, so what this writes is what the
+	// next edit READS: the inspector, a scoped AI edit and a structural
+	// change all pull the current index.html, change one element, and hand
+	// it back through here. Without this, each of those added another copy
+	// of the runtime — a design edited four times on dev had five of them
+	// in its head, each re-executing the player runtime over the one
+	// before it.
+	//
+	// So the document is stripped of these exact scripts before they go
+	// back in. Which also repairs a design that already collected a few:
+	// its next edit comes out with one.
+	indexHTML = withoutScript(indexHTML, runtimeURL)
+	indexHTML = withoutScript(indexHTML, gsapURL)
+
 	tags := fmt.Sprintf(`<script src=%q></script>`, runtimeURL)
 	if !gsapLoadedRe.MatchString(indexHTML) {
 		tags += "\n    " + fmt.Sprintf(`<script src=%q></script>`, gsapURL)
 	}
 	return InjectIntoHead(indexHTML, tags)
+}
+
+// withoutScript removes every <script> tag loading exactly this src.
+//
+// By exact src, not by anything cleverer: a film's own <script> blocks hold
+// its timeline, and the one thing this must never do is take one of those
+// out.
+func withoutScript(html, src string) string {
+	if src == "" {
+		return html
+	}
+	pattern := regexp.MustCompile(
+		`(?i)[ \t]*<script[^>]*\bsrc\s*=\s*["']` + regexp.QuoteMeta(src) + `["'][^>]*>\s*</script>\s*\n?`)
+	return pattern.ReplaceAllString(html, "")
 }
 
 // InjectIntoHead puts a snippet immediately after <head>.
