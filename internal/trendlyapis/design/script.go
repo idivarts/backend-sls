@@ -140,7 +140,21 @@ func readScript(source string) []scriptLine {
 		if el.HoldsAddressable(source) || !el.HasChildren() {
 			continue
 		}
+		// ── A caption track is not a line ────────────────────────────────
+		// Captions are generated from the voiceover and rebuilt whenever
+		// it changes, so editing them would be editing a transcript of
+		// something about to be replaced. Three ways to recognise one,
+		// because a track that has already been FILLED no longer carries
+		// data-captions — the worker removes it once the words are in —
+		// and its spans have no ids, so it read as an ordinary paragraph
+		// and showed up in the script.
 		if _, isCaptions := el.Attrs["data-captions"]; isCaptions {
+			continue
+		}
+		if strings.Contains(el.Attrs["class"], "caption-track") {
+			continue
+		}
+		if el.HoldsTimed(source) {
 			continue
 		}
 		if _, isRoot := el.Attrs["data-composition-id"]; isRoot {
