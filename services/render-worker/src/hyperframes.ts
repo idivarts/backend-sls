@@ -107,6 +107,17 @@ export function hyperframesEnv(opts: HyperframesEnvOptions = {}): NodeJS.Process
     const ffprobe = opts.ffprobePath ?? process.env.HYPERFRAMES_FFPROBE_PATH;
     if (ffmpeg && existsSync(ffmpeg)) env.HYPERFRAMES_FFMPEG_PATH = ffmpeg;
     if (ffprobe && existsSync(ffprobe)) env.HYPERFRAMES_FFPROBE_PATH = ffprobe;
+
+    // Where whisper-cli is, for `transcribe`.
+    //
+    // The image sets this and also puts the binary on PATH, so either of the
+    // CLI's two discovery routes finds it. Passed through on the same terms
+    // as ffmpeg — only when it exists — because a path that is set and wrong
+    // is worse than one that is unset: the CLI trusts it instead of looking.
+    const whisper = process.env.HYPERFRAMES_WHISPER_PATH;
+    if (whisper && existsSync(whisper)) env.HYPERFRAMES_WHISPER_PATH = whisper;
+    // The model cache, when it has been moved off $HOME.
+    if (process.env.HYPERFRAMES_CACHE_DIR) env.HYPERFRAMES_CACHE_DIR = process.env.HYPERFRAMES_CACHE_DIR;
     if (process.env.PRODUCER_HEADLESS_SHELL_PATH) {
         env.PRODUCER_HEADLESS_SHELL_PATH = process.env.PRODUCER_HEADLESS_SHELL_PATH;
     }

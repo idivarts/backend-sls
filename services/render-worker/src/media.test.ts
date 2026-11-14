@@ -7,6 +7,9 @@ import {
     captionSpans,
     pathFromResolveJSON,
     readDeclarations,
+    startSeconds,
+    transcriptPathFromJSON,
+    voiceIdFromEntity,
     wordsFromTranscribeJSON,
 } from "./media";
 
@@ -200,5 +203,117 @@ describe("stripPlayerRuntime", () => {
     it("leaves a composition's own scripts alone", () => {
         const html = `<html><body><script src="scenes/runtime.js"></script><script>gsap.timeline()</script></body></html>`;
         assert.equal(stripPlayerRuntime(html), html);
+    });
+});
+
+describe("voiceIdFromEntity", () => {
+    it("passes a real HeyGen id through", () => {
+        assert.equal(
+            voiceIdFromEntity("83548de556df48ba8c09c42a57c51d85"),
+            "83548de556df48ba8c09c42a57c51d85"
+        );
+        assert.equal(
+            voiceIdFromEntity("  83548DE556DF48BA8C09C42A57C51D85 "),
+            "83548de556df48ba8c09c42a57c51d85"
+        );
+    });
+
+    it("drops anything that is not one, so the default voice speaks", () => {
+        // The contract documents data-media-entity as the BRAND for a logo,
+        // so a model writing data-media-entity="narrator" on a voice out of
+        // symmetry must not turn a working voiceover into a 400.
+        for (const e of ["narrator", "warm female voice", "", undefined, "83548de5"]) {
+            assert.equal(voiceIdFromEntity(e), undefined, `expected ${String(e)} to be dropped`);
+        }
+    });
+});
+
+describe("wordsFromTranscribeJSON, against what the CLI really prints", () => {
+    // Verbatim from `hyperframes transcribe <voiceover.wav> --json` run in
+    // the render image on a real HeyGen voiceover. Note that the LAST line
+    // has no words in it: reading only the final line finds nothing.
+    const REAL = [
+        '{"type":"progress","phase":"transcription","model":"base.en","status":"started","durationSeconds":2.693}',
+        '{"type":"words","model":"base.en","words":[{"text":"Hit","start":0,"end":0.341},{"text":"the","start":0.341,"end":0.682},{"text":"2pm","start":0.682,"end":1.022},{"text":"wall,","start":1.022,"end":1.59},{"text":"not","start":1.59,"end":1.931},{"text":"anymore.","start":1.931,"end":2.84}],"through":2.84}',
+        '{"type":"progress","phase":"transcription","model":"base.en","status":"completed"}',
+        '{"ok":true,"engine":"whisper","model":"base.en","detectedLanguage":null,"wordCount":6,"durationSeconds":2.84,"speechOnsetSeconds":null,"transcriptPath":"/proj/transcript.json"}',
+    ].join("\n");
+
+    it("finds the words on the line that has them", () => {
+        const words = wordsFromTranscribeJSON(REAL);
+        assert.equal(words.length, 6);
+        assert.deepEqual(words[0], { text: "Hit", start: 0, end: 0.341 });
+        assert.deepEqual(words[5], { text: "anymore.", start: 1.931, end: 2.84 });
+    });
+
+    it("makes a caption track out of them", () => {
+        const spans = captionSpans(wordsFromTranscribeJSON(REAL), 1.5);
+        assert.match(spans, /^<span class="clip" data-start="1\.50" data-duration="0\.34">Hit<\/span>/);
+        assert.ok(spans.includes('>anymore.</span>'));
+        assert.equal(spans.split("<span").length - 1, 6);
+    });
+
+    it("is empty, not broken, when only progress and a summary arrive", () => {
+        const noWords = [
+            '{"type":"progress","phase":"transcription","status":"started"}',
+            '{"ok":true,"wordCount":0}',
+        ].join("\n");
+        assert.deepEqual(wordsFromTranscribeJSON(noWords), []);
+    });
+});
+
+describe("wordsFromTranscribeJSON, against the transcript FILE", () => {
+    // Verbatim from the transcript.json the CLI wrote beside the project.
+    // Pretty-printed, one array — not NDJSON — and its timings are tighter
+    // than the streamed line's: the stream ends the last word at 2.84s on a
+    // 2.69s clip, the file at 2.68s.
+    const FILE = `[
+  { "text": "Hit", "start": 0.32, "end": 0.35, "id": "w0" },
+  { "text": "the", "start": 0.35, "end": 0.63, "id": "w1" },
+  { "text": "anymore.", "start": 2.01, "end": 2.68, "id": "w5" }
+]`;
+
+    it("reads a pretty-printed array, not just NDJSON", () => {
+        const words = wordsFromTranscribeJSON(FILE);
+        assert.equal(words.length, 3);
+        assert.deepEqual(words[0], { text: "Hit", start: 0.32, end: 0.35 });
+    });
+
+    it("gives a word the transcriber squeezed to nothing a readable minimum", () => {
+        // 0.35 - 0.32 = 0.03s would be one frame at 30fps: a flicker.
+        const spans = captionSpans(wordsFromTranscribeJSON(FILE));
+        assert.match(spans, /data-start="0\.32" data-duration="0\.08">Hit</);
+    });
+});
+
+describe("transcriptPathFromJSON", () => {
+    it("takes the path off the summary line", () => {
+        const out = [
+            '{"type":"progress","phase":"transcription","status":"started"}',
+            '{"ok":true,"wordCount":6,"transcriptPath":"/work/proj/transcript.json"}',
+        ].join("\n");
+        assert.equal(transcriptPathFromJSON(out), "/work/proj/transcript.json");
+    });
+
+    it("is null when no line names one", () => {
+        assert.equal(transcriptPathFromJSON('{"ok":true,"wordCount":0}'), null);
+        assert.equal(transcriptPathFromJSON("not json at all"), null);
+    });
+});
+
+describe("startSeconds", () => {
+    it("reads a data-start", () => {
+        assert.equal(startSeconds({ attrs: { "data-start": "4" } }), 4);
+        assert.equal(startSeconds({ attrs: { "data-start": "0" } }), 0);
+        assert.equal(startSeconds({ attrs: { "data-start": "2.5" } }), 2.5);
+    });
+
+    it("says undefined — not zero — when there is nothing to read", () => {
+        // The difference matters: a caption track falls back to the
+        // container's data-start only when the AUDIO does not say, and "0"
+        // is a thing the audio can say.
+        assert.equal(startSeconds({ attrs: {} }), undefined);
+        assert.equal(startSeconds(undefined), undefined);
+        assert.equal(startSeconds({ attrs: { "data-start": "soon" } }), undefined);
     });
 });
