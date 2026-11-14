@@ -105,21 +105,6 @@ async function materialiseAndGate(
         throw new Error(`project at ${job.projectPrefix} has no index.html (found: ${files.slice(0, 5).join(", ")})`);
     }
 
-    // Before the gate, not after: a project carrying a CDN script tag
-    // would otherwise pass `check` on a machine with network and fail on
-    // one without, which is the worst kind of intermittent.
-    await vendorGsap(workDir);
-
-    // The player's runtime tag points at CloudFront, and a render must work
-    // with no network. The CLI injects its own runtime, so taking ours out
-    // costs the render nothing — frames are byte-identical either way.
-    {
-        const indexPath = join(workDir, "index.html");
-        const before = await readFile(indexPath, "utf8");
-        const after = stripPlayerRuntime(before);
-        if (after !== before) await writeFile(indexPath, after, "utf8");
-    }
-
     // Media the film declared but does not have yet. Before the gate for
     // the same reason: an <img> with no src is a finding, and a film whose
     // picture arrives only at render time is one the preview lied about.
@@ -146,6 +131,31 @@ async function materialiseAndGate(
         // project kept pointing at media that was never there.
         console.log(`[media] FAILED: ${(err as Error).message}`);
         warnings.push(`media: ${(err as Error).message}`);
+    }
+
+    // ── Render-only mutations, AFTER anything that uploads ──────────────
+    // These two rewrite index.html for the CLI's benefit and must NOT reach
+    // the bucket. Done before the media upload, they did: the stored film
+    // came back with its runtime tag stripped and pointing at a vendored
+    // GSAP that was never uploaded (403), so the player had no runtime and
+    // no animation library — a black rectangle with no transport.
+    //
+    // The uploaded document is the one the PLAYER needs: CDN GSAP, runtime
+    // tag intact. The worker's own copy is the one the RENDER needs: local
+    // GSAP so it works with no network, and no second runtime.
+
+    // A project carrying a CDN script tag would otherwise pass `check` on a
+    // machine with network and fail on one without — the worst kind of
+    // intermittent — so this happens before the gate.
+    await vendorGsap(workDir);
+
+    // The CLI injects its own runtime, so taking ours out costs the render
+    // nothing: frames are byte-identical either way.
+    {
+        const indexPath = join(workDir, "index.html");
+        const before = await readFile(indexPath, "utf8");
+        const after = stripPlayerRuntime(before);
+        if (after !== before) await writeFile(indexPath, after, "utf8");
     }
 
     const outcome = await checkProject(workDir);
