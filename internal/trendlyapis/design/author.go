@@ -36,6 +36,7 @@ import (
 	"github.com/idivarts/backend-sls/internal/models/trendlymodels"
 	"github.com/idivarts/backend-sls/internal/studiojobs"
 	"github.com/idivarts/backend-sls/internal/trendlyapis/ai"
+	"github.com/idivarts/backend-sls/internal/trendlyapis/rendering"
 	"github.com/idivarts/backend-sls/pkg/hfproject"
 	"github.com/idivarts/backend-sls/pkg/mysentry"
 	"github.com/idivarts/backend-sls/pkg/openrouter"
@@ -292,7 +293,45 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 		mysentry.Capture(perr2, map[string]string{"op": "design.author.player", "brandId": brandID, "designId": designID})
 	}
 
-	return trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes, previewURL)
+	if err := trendlymodels.SetBrandDesignProject(ctx, brandID, designID, prefix, project.DurationMs, scenes, previewURL); err != nil {
+		return err
+	}
+
+	// ── Finish the film without being asked ──────────────────────────────
+	// Authoring produces a document that DECLARES its media; it does not
+	// have any. Resolving it needs the Hyperframes CLI, which lives in the
+	// worker, so until now the user had to press "Preview — free" to make
+	// the photograph exist — and a film they opened before pressing it was
+	// missing the very thing the brief asked for.
+	//
+	// So the same job runs automatically here. It resolves the media, puts
+	// the film through `check`, and captures the stills. By the time the
+	// design opens, the live player IS the finished film and the only
+	// button left is Render.
+	//
+	// Best-effort, like the player upload above: a dispatch that fails must
+	// not fail an authoring run the user has already paid for. The design
+	// is written and playable; what it lacks is its media, and the error
+	// says so.
+	if err := markAndPrepare(ctx, brandID, designID); err != nil {
+		log.Printf("design %s/%s: could not start preparation: %v", brandID, designID, err)
+		mysentry.Capture(err, map[string]string{"op": "design.author.prepare", "brandId": brandID, "designId": designID})
+	}
+	return nil
+}
+
+// markAndPrepare queues the work that turns an authored document into a
+// finished film: media resolved, gate passed, stills captured.
+//
+// Queued before dispatch for the same reason the handler does it: the app
+// should show the job the instant the design appears, rather than a film
+// that looks done and is missing its photograph.
+func markAndPrepare(ctx context.Context, brandID, designID string) error {
+	if err := trendlymodels.MarkBrandDesignPreviewQueued(ctx, brandID, designID); err != nil {
+		return err
+	}
+	orgID, _ := trendlymodels.OrgIDForBrand(brandID)
+	return rendering.SubmitDesignV3Preview(brandID, designID, MediaCreditCeiling(orgID))
 }
 
 // finishReason says how the model stopped. "length" means it ran out of room.
