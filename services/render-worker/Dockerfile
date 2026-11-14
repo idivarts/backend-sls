@@ -74,6 +74,36 @@ COPY --from=build /app/services/render-worker/dist ./services/render-worker/dist
 # one either. Pinned to the version Hyperframes 0.9.39 expects.
 COPY services/render-worker/vendor/ /app/services/render-worker/vendor/
 
+# whisper, for the captions half of a voiceover.
+#
+# `hyperframes transcribe` is what turns a voiceover into word-level
+# timestamps, and it shells out to whisper-cli. Given none, it CLONES AND
+# COMPILES whisper.cpp into its cache on first use — inside the render, in a
+# Fargate task that is thrown away afterwards, every time. So the binary is
+# vendored (built once on arm64; see vendor/README.md for the exact build and
+# why it is not a stage here) and the model is fetched by digest.
+#
+# base.en rather than the CLI's small.en default: a third of the size for
+# captions that are a few seconds of clean studio TTS, and the model is named
+# explicitly at the call site so the cached one is the one used. Fetched from
+# the same model repository and revision Hyperframes itself pins, and
+# sha256-checked, because an unverified 148 MB download into an image is a
+# supply chain nobody is watching.
+COPY services/render-worker/vendor/whisper-cli-aarch64 /usr/local/bin/whisper-cli
+RUN chmod 0755 /usr/local/bin/whisper-cli \
+    && apt-get update && apt-get install -y --no-install-recommends curl \
+    && mkdir -p /root/.cache/hyperframes/whisper/models \
+    && curl -fsSL -o /root/.cache/hyperframes/whisper/models/ggml-base.en.bin \
+         https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en.bin \
+    && echo "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  /root/.cache/hyperframes/whisper/models/ggml-base.en.bin" \
+         | sha256sum -c - \
+    && rm -rf /var/lib/apt/lists/*
+# Fatal if the binary cannot run here — a wrong architecture or a missing
+# libstdc++ is a thing to learn at build time, not from a render that quietly
+# produces a film with no captions.
+RUN whisper-cli --help > /dev/null
+ENV HYPERFRAMES_WHISPER_PATH=/usr/local/bin/whisper-cli
+
 # Brand fonts, if any are dropped in. Kept last so adding one doesn't rebuild
 # Chromium. Quicksand belongs here once the design prompt is allowed to ask for
 # it by name (Phase 3).
