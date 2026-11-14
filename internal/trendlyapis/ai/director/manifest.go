@@ -99,10 +99,10 @@ type Budget struct {
 
 // Manifest is the whole of what the planner sees.
 type Manifest struct {
-	Content      ContentFacts       `json:"content"`
-	Brand        BrandFacts         `json:"brand"`
-	Models       []MediaModel       `json:"enabledModels"`
-	Library      []MediaItem        `json:"mediaLibrary"`
+	Content ContentFacts `json:"content"`
+	Brand   BrandFacts   `json:"brand"`
+	Models  []MediaModel `json:"enabledModels"`
+	Library []MediaItem  `json:"mediaLibrary"`
 
 	// Attachments are the files the user attached to THIS brief.
 	//
@@ -111,7 +111,7 @@ type Manifest struct {
 	// on one row in a list of forty does not read that way. An uploaded
 	// attachment is already in `mediaLibrary` too; what this adds is "and they
 	// meant this one".
-	Attachments []Attachment `json:"attachments,omitempty"`
+	Attachments  []Attachment       `json:"attachments,omitempty"`
 	Budget       Budget             `json:"budget"`
 	Capabilities StudioCapabilities `json:"studioCapabilities"`
 	Tools        map[string][]Tool  `json:"tools"`

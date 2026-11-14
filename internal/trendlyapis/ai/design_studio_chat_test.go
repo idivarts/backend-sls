@@ -290,3 +290,43 @@ func TestPrepareToolIsOffered(t *testing.T) {
 		}
 	}
 }
+
+// Deleting an @font-face is not how you fix a missing font.
+//
+// ── The loop this closes ─────────────────────────────────────────────────
+// On dev the chat was asked to fix a film failing on a dangling woff2. It
+// removed both @font-face rules, said the film should render — and the
+// gate came back with "Font family used without @font-face declaration:
+// space grotesk", because the families were still named. A family is only
+// safe when the project declares it, the document links it from Google
+// Fonts, or the renderer bundles it.
+func TestUndeclaredFontsCatchesTheNamedButNotDeclared(t *testing.T) {
+	p := &hfproject.Project{Files: []hfproject.File{{
+		Path: "index.html",
+		Content: `<style>` +
+			`@font-face{font-family:'Brand Sans';src:url('assets/fonts/brand.woff2')}` +
+			`h1{font-family:'Space Grotesk',sans-serif}` +
+			`h2{font-family:'Brand Sans',sans-serif}` +
+			`p{font-family:Inter,sans-serif}` +
+			`small{font-family:var(--brand-font-body)}` +
+			`</style>`,
+	}}}
+	got := undeclaredFonts(p)
+	if len(got) != 1 || got[0] != "space grotesk" {
+		t.Fatalf("undeclaredFonts = %v, want only [space grotesk]", got)
+	}
+}
+
+// A family the document links from Google Fonts is fine, and so is one the
+// renderer bundles — flagging either would be a warning that cries wolf.
+func TestUndeclaredFontsAcceptsLinkedAndBundled(t *testing.T) {
+	p := &hfproject.Project{Files: []hfproject.File{{
+		Path: "index.html",
+		Content: `<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700">` +
+			`<style>h1{font-family:'Space Grotesk'}h2{font-family:Poppins}` +
+			`h3{font-family:"Playfair Display",serif}</style>`,
+	}}}
+	if got := undeclaredFonts(p); len(got) != 0 {
+		t.Fatalf("nothing here is unresolvable, got %v", got)
+	}
+}
