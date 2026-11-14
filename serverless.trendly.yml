@@ -604,6 +604,21 @@ functions:
               - Arn
   studio_sqs:
     handler: functions/studio_sqs/main.go
+    # This function DISPATCHES renders as well as writing designs: finishing
+    # an authored film — resolving its media, running the gate, capturing
+    # stills — is queued the moment authoring completes, so the user never
+    # has to ask for it.
+    #
+    # Without these it failed with "render queue is not configured for this
+    # stage" and left the design sitting at "queued" for a job nobody would
+    # ever run. Exactly the failure the comment on trendly_studio_apis
+    # describes: the function had the permission and was simply never told
+    # the names.
+    environment:
+      VIDEO_RENDER_JOB_QUEUE:
+        Ref: RenderJobQueue
+      VIDEO_RENDER_JOB_DEFINITION:
+        Ref: RenderJobDefinition
     package:
       include:
         - 'service-account.json'

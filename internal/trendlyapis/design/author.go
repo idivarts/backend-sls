@@ -316,6 +316,15 @@ func ExecuteDesignAuthorJob(ctx context.Context, msg studiojobs.Message) error {
 	if err := markAndPrepare(ctx, brandID, designID); err != nil {
 		log.Printf("design %s/%s: could not start preparation: %v", brandID, designID, err)
 		mysentry.Capture(err, map[string]string{"op": "design.author.prepare", "brandId": brandID, "designId": designID})
+		// The status was set to queued before dispatch so the app shows the
+		// job immediately. A dispatch that then fails must not leave it
+		// there: a spinner for a job nobody will run reads as slowness
+		// rather than breakage, and the design never resolves. The same
+		// rule the render handler follows, for the same reason.
+		if merr := trendlymodels.MarkBrandDesignPreviewFailed(ctx, brandID, designID,
+			"We wrote the design but could not start finishing it. Try preparing it again."); merr != nil {
+			log.Printf("design %s/%s: could not clear the stranded preparation: %v", brandID, designID, merr)
+		}
 	}
 	return nil
 }
