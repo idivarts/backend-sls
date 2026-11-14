@@ -428,10 +428,58 @@ func designStudioBrief(brandID, designID string) string {
 				s.ID, float64(s.DurationMs)/1000, float64(s.StartMs)/1000)
 		}
 	}
+	if fault := designFault(d); fault != "" {
+		sb.WriteString(fault)
+	}
+
 	sb.WriteString("\nTo change it: read_hyperframes_project first, then " +
 		"write_hyperframes_project with the WHOLE project, the changed file(s) " +
 		"rewritten and every other file passed back unchanged. Writing saves a " +
 		"revision, so a change the user dislikes is one click back.\n")
+	return sb.String()
+}
+
+// designFault is what is wrong with the film right now, for the model.
+//
+// ── Why the chat is told about a failure at all ──────────────────────────
+// A failed preparation used to be a red banner over the player and nothing
+// else. The user reads "404 loading assets/fonts/space-grotesk-700.woff2",
+// which is a sentence about the inside of a film they did not write, and
+// their only move is to ask the chat — which knew nothing about it, having
+// been told only the shape of the film.
+//
+// The gate's findings are the most actionable thing in this whole system
+// and they were being shown to the one party who cannot act on them. A
+// font that 404s is fixed by rewriting one @font-face, which is precisely
+// what this chat does. So it gets the fault, every turn, until it is gone.
+func designFault(d *trendlymodels.Design) string {
+	var sb strings.Builder
+	switch {
+	case d.PreviewStatus == trendlymodels.DesignPreviewFailed && d.PreviewError != "":
+		sb.WriteString("\nWHAT IS WRONG WITH IT RIGHT NOW\n")
+		sb.WriteString("Finishing this film FAILED, so the user is looking at an error " +
+			"instead of a film: " + d.PreviewError + "\n")
+	case d.AuthorError != "":
+		sb.WriteString("\nWHAT IS WRONG WITH IT RIGHT NOW\n")
+		sb.WriteString("Writing this film failed: " + d.AuthorError + "\n")
+	case d.RenderError != "":
+		sb.WriteString("\nWHAT IS WRONG WITH IT RIGHT NOW\n")
+		sb.WriteString("The last render failed: " + d.RenderError + "\n")
+	default:
+		return ""
+	}
+	for i, f := range d.PreviewFindings {
+		if i >= 8 {
+			fmt.Fprintf(&sb, "  …and %d more\n", len(d.PreviewFindings)-i)
+			break
+		}
+		sb.WriteString("  - " + f + "\n")
+	}
+	sb.WriteString("Offer to fix it, and fix it when they say yes — read the project and " +
+		"write it back without the thing that fails. ⚠️ A file under assets/ that 404s " +
+		"is NOT in this film: stop referencing it (fall back to a system font, drop the " +
+		"logo) rather than re-adding the reference, because you cannot upload binary " +
+		"files and writing the same path again will fail the same way.\n")
 	return sb.String()
 }
 

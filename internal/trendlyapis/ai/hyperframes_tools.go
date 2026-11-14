@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"log"
@@ -142,7 +143,7 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 	// real: from the first chat edit onwards a film lost its brand font
 	// and logo to 404s and kept rendering, in fallback type, with nobody
 	// told. element.go has always done this copy; this is the same one.
-	carryForward(ctx, d.ProjectPrefix, prefix, project)
+	kept := carryForward(ctx, d.ProjectPrefix, prefix, project)
 
 	// The player pages go beside the project, or the app plays the previous
 	// revision while the renderer renders this one. Best-effort, as
@@ -229,6 +230,14 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 		"Saved %d files. The film is %.1fs. It is checked by Hyperframes when it renders; "+
 			"a structural mistake fails there with a specific fix.",
 		len(project.Files), float64(project.DurationMs)/1000)
+	if missing := danglingAssets(project, kept); len(missing) > 0 {
+		note += " ⚠️ This project references files this film does NOT have: " +
+			strings.Join(missing, ", ") +
+			". They will 404 and finishing the film will fail. You cannot upload" +
+			" binary files — rewrite those references away (a system font, no logo)" +
+			" and write the project again, then tell the user what you changed."
+	}
+
 	switch {
 	case declared > 0 && queued:
 		note += fmt.Sprintf(" %d piece(s) of media are DECLARED but not fetched yet;"+
@@ -256,9 +265,10 @@ func runWriteHyperframesProject(ctx context.Context, brandID, arguments string) 
 // Best effort, like every other copy in this flow — a film that loses its
 // logo is worse off than one that does not, but it is still a film, and
 // failing the write would throw away an edit the user has paid for.
-func carryForward(ctx context.Context, from, to string, project *hfproject.Project) {
+func carryForward(ctx context.Context, from, to string, project *hfproject.Project) map[string]bool {
+	kept := map[string]bool{}
 	if from == "" || from == to {
-		return
+		return kept
 	}
 	// Skip anything the new revision owns. The player pages are written
 	// separately just below, so they must not be overwritten by the old
@@ -273,12 +283,47 @@ func carryForward(ctx context.Context, from, to string, project *hfproject.Proje
 		for _, rel := range olds {
 			if isProjectSource(rel) {
 				skip = append(skip, rel)
+				continue
 			}
+			kept[rel] = true
 		}
 	}
 	if _, cerr := mediastore.CopyPrefix(ctx, mediastore.TargetAttachment, from, to, skip...); cerr != nil {
 		log.Printf("design chat write: carrying files forward failed %s → %s: %v", from, to, cerr)
 	}
+	return kept
+}
+
+// assetRef finds every assets/… path a project's source mentions.
+var assetRef = regexp.MustCompile(`assets/[A-Za-z0-9._/-]+`)
+
+// danglingAssets are the files the project asks for and the film does not
+// have.
+//
+// ── Why this is checked at WRITE time ───────────────────────────────────
+// Because the alternative is finding out from the gate, minutes later, as
+// "404 loading assets/fonts/space-grotesk-700.woff2" in a red banner over
+// a film that will not finish. The model cannot upload a woff2, so a
+// reference it cannot satisfy is a reference it must not write — and the
+// one moment it can still choose otherwise is while it is being told what
+// it just saved.
+func danglingAssets(project *hfproject.Project, kept map[string]bool) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, f := range project.Files {
+		for _, ref := range assetRef.FindAllString(f.Content, -1) {
+			ref = strings.TrimRight(ref, ".,;:)'\"")
+			if seen[ref] || kept[ref] {
+				continue
+			}
+			seen[ref] = true
+			out = append(out, ref)
+			if len(out) >= 10 {
+				return out
+			}
+		}
+	}
+	return out
 }
 
 // unresolvedMedia counts the elements that ask for media and have none.
