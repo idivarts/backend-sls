@@ -156,14 +156,15 @@ func runReadHyperframesProject(ctx context.Context, brandID, arguments string) (
 		}), nil
 	}
 
-	keys, lerr := mediastore.ListPrefix(ctx, mediastore.TargetAttachment, d.ProjectPrefix)
+	rels, lerr := mediastore.ListPrefix(ctx, mediastore.TargetAttachment, d.ProjectPrefix)
 	if lerr != nil {
 		return jsonResult(map[string]any{"ok": false, "error": "could not read this film's files"}), nil
 	}
-	out := make([]map[string]any, 0, len(keys))
+	out := make([]map[string]any, 0, len(rels))
 	total := 0
-	for _, key := range keys {
-		rel := strings.TrimPrefix(strings.TrimPrefix(key, d.ProjectPrefix), "/")
+	unreadable := 0
+	for _, rel := range rels {
+		rel = strings.TrimPrefix(rel, "/")
 		// ── Source only ──────────────────────────────────────────────────
 		// The prefix also holds the film's resolved media — a voiceover WAV,
 		// a stock photograph, the player's own runtime. Handing a model the
@@ -173,8 +174,9 @@ func runReadHyperframesProject(ctx context.Context, brandID, arguments string) (
 			out = append(out, map[string]any{"path": rel, "asset": true})
 			continue
 		}
-		raw, gerr := mediastore.Get(ctx, mediastore.TargetAttachment, key)
+		raw, gerr := mediastore.Get(ctx, mediastore.TargetAttachment, projectKey(d.ProjectPrefix, rel))
 		if gerr != nil {
+			unreadable++
 			out = append(out, map[string]any{"path": rel, "error": "could not be read"})
 			continue
 		}
@@ -195,6 +197,25 @@ func runReadHyperframesProject(ctx context.Context, brandID, arguments string) (
 		out = append(out, map[string]any{"path": rel, "content": string(raw)})
 	}
 
+	// ── A project whose files will not open is not a project ────────────
+	// This used to be soft: each file carried its own "could not be read"
+	// and the call still answered ok. That is how the key bug above
+	// survived — the model got a correct-looking file list in which every
+	// source had failed, and reasonably concluded the film was still being
+	// written. Loud, and in Sentry, so the next one is an error rather than
+	// a confused reply.
+	if unreadable > 0 {
+		mysentry.Capture(fmt.Errorf("design project files unreadable: %d of %d", unreadable, len(rels)),
+			map[string]string{"op": "design.chat.read.unreadable", "designId": a.DesignID})
+		return jsonResult(map[string]any{
+			"ok":    false,
+			"error": "project_unreadable",
+			"say": "This film's files could not be read, so do NOT try to rewrite it — " +
+				"a write would replace it with whatever you could see. Tell the user " +
+				"something is wrong with the stored film.",
+		}), nil
+	}
+
 	return jsonResult(map[string]any{
 		"ok":         true,
 		"designId":   a.DesignID,
@@ -203,6 +224,23 @@ func runReadHyperframesProject(ctx context.Context, brandID, arguments string) (
 		"scenes":     d.Scenes,
 		"clips":      d.Clips,
 	}), nil
+}
+
+// projectKey is the S3 key of one file inside a film's project.
+//
+// ── ⚠️ ListPrefix gives you RELATIVE paths; Get takes a FULL key ─────────
+// They do not compose. This read passed the list straight back into Get,
+// which asked the bucket for "index.html" at its root — nothing is there,
+// so EVERY source file came back unreadable while the file list looked
+// perfectly correct. The studio chat has never once been able to read a
+// film: every request to change one was answered with a guess about why
+// it could not be read yet.
+//
+// mediastore.ListPrefix's own doc says it returns relative paths, and
+// internal/trendlyapis/design/media.go joins them back on. This is the
+// same join, in the one place that got it wrong.
+func projectKey(prefix, rel string) string {
+	return strings.TrimSuffix(prefix, "/") + "/" + strings.TrimPrefix(rel, "/")
 }
 
 // runStartDesignAuthoring queues the authoring job for an empty design.

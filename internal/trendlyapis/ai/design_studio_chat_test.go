@@ -123,3 +123,35 @@ func TestProjectReadSkipsMedia(t *testing.T) {
 		}
 	}
 }
+
+// A file's key is the prefix joined to its relative path.
+//
+// ── Why this test exists ─────────────────────────────────────────────────
+// mediastore.ListPrefix returns paths RELATIVE to the prefix and
+// mediastore.Get takes a FULL key, and the read tool passed the first
+// straight into the second. The bucket was asked for "index.html" at its
+// root, every source came back unreadable, and the file LIST still looked
+// right — so the model saw a film it could not open and said it must still
+// be being written. The studio chat could not read a single film from the
+// day it shipped.
+func TestProjectKeyIsAbsolute(t *testing.T) {
+	const prefix = "design-projects/brand1/design1/revisions/3"
+
+	for _, c := range []struct{ rel, want string }{
+		{"index.html", prefix + "/index.html"},
+		{"compositions/hook.html", prefix + "/compositions/hook.html"},
+		// A leading slash on either side must not double up.
+		{"/index.html", prefix + "/index.html"},
+	} {
+		if got := projectKey(prefix, c.rel); got != c.want {
+			t.Fatalf("projectKey(%q, %q) = %q, want %q", prefix, c.rel, got, c.want)
+		}
+	}
+	if projectKey(prefix+"/", "index.html") != prefix+"/index.html" {
+		t.Fatal("a trailing slash on the prefix must not double up")
+	}
+	// The bug, named: the key must never be the bare relative path.
+	if projectKey(prefix, "index.html") == "index.html" {
+		t.Fatal("the key is the relative path — Get would look at the bucket root")
+	}
+}
